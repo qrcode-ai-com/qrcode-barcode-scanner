@@ -25,12 +25,12 @@ test_tool = "nextest"
 # 38105646991.
 #
 # Same class: the `#[cfg(not(feature = "engine-rxing"))]` stub of
-# `Binarized::black` (engine/locate.rs 308-312, body `None`) is compiled
+# `Binarized::black` (engine/locate.rs 313-317, body `None`) is compiled
 # only without engine-rxing — an rqrr-only build — so this all-features run
 # never compiles it and every mutant of it is a structural MISSED. Its
 # pattern covers the stub's lines: its three function-value mutants (`with
-# None`, `with Some(true)`, `with Some(false)`) sit at its body's 310:9,
-# while the compiled engine-rxing `Binarized::black` just above (289-306)
+# None`, `with Some(true)`, `with Some(false)`) sit at its body's 315:9,
+# while the compiled engine-rxing `Binarized::black` just above (294-311)
 # shares its name and stays generated. Line drift stays safe: the stub's
 # mutants resurface as MISSED in the weekly report and get re-anchored.
 #
@@ -46,14 +46,14 @@ test_tool = "nextest"
 # carry the same line:col.
 #
 # transform.rs
-#   376:87 / 379:96  downscale `.max(y0+1)`/`.max(x0+1)` `+`→`*`: h ≥ new_h
+#   383:87 / 386:96  downscale `.max(y0+1)`/`.max(x0+1)` `+`→`*`: h ≥ new_h
 #     always in a downscale, the guard never binds (upscale-only defense).
-#   488:45  `-`→`+`/`/` in `.min(n - 1)`: the clamp only fires when the
+#   495:45  `-`→`+`/`/` in `.min(n - 1)`: the clamp only fires when the
 #     catch-up loop is empty either way (prev_hi ≥ hi at that point).
-#   489:31  `prev_hi + 1`→`* 1`: re-push of the back index; `dominates` is
+#   496:31  `prev_hi + 1`→`* 1`: re-push of the back index; `dominates` is
 #     non-strict, so the equal-value copy pops its original — deque
 #     bit-identical.
-#   508:24  `(k | 1)`→`^`: for m = k.max(3), (m|1)/2 == (m^1)/2 for all m
+#   515:24  `(k | 1)`→`^`: for m = k.max(3), (m|1)/2 == (m^1)/2 for all m
 #     (integer-division identity, odd and even).
 # score/structural.rs
 #   98:33 / 100:30  `modules - 1 / offset` mirror: offsets {-2,-1} swap
@@ -68,12 +68,12 @@ test_tool = "nextest"
 #   66:23 / 67:37  `%`→`+` inside is_multiple_of(2): +2 preserves parity
 #     and %2 preserves value mod 2 — same predicate.
 # lib.rs
-#   102:9  `Scanner::builder`→`Default::default()`: the fn body already IS
+#   107:9  `Scanner::builder`→`Default::default()`: the fn body already IS
 #     `ScannerBuilder::default()`, and the `-> ScannerBuilder` return type
 #     pins `Default::default()` to `<ScannerBuilder as Default>::default()`
 #     — the byte-identical call. No test can distinguish them. The killable
-#     builder siblings DISCARD state and ARE caught: `limits` (282:9) and
-#     `profile` (275:9) drop the argument, `build` (289:9) recurses through
+#     builder siblings DISCARD state and ARE caught: `limits` (300:9) and
+#     `profile` (293:9) drop the argument, `build` (307:9) recurses through
 #     `Scanner::default` until the stack overflows. This one alone is a true
 #     equivalent.
 #
@@ -81,11 +81,11 @@ test_tool = "nextest"
 #   Both replace `* 1_000.0` with `/ 1_000.0` in a stage-scope seconds→ms
 #   conversion (`started.elapsed().as_secs_f64() * 1_000.0`). They shrink the
 #   reported `ms` by 1e6 to a smaller-but-still-positive value.
-#   1025:49  Run::rescue_stage `ms`  ·  1205:49  Run::stage `ms`
+#   1155:49  Run::rescue_stage `ms`  ·  1338:49  Run::stage `ms`
 #   The three KILLABLE siblings are caught (ladder_mutant_kills): the `+ 1000`
 #   inflations blow past the `stage.ms <= total_ms` sub-interval invariant
-#   (1205 `+`, and the rescue unit's `rescue.ms < 100`), and the TOTAL-scope
-#   `/ 1000` (1463:59, in Run::finish) drops total below a real stage's ms.
+#   (1338 `+`, and the rescue unit's `rescue.ms < 100`), and the TOTAL-scope
+#   `/ 1000` (1709:59, in Run::finish) drops total below a real stage's ms.
 #   A STAGE-scope `/` has no machine-independent distinguisher: `ms` is a
 #   documented wall-clock field, explicitly excluded from the determinism
 #   contract (lib.rs §Deterministic + the determinism tests skip it), and
@@ -140,12 +140,12 @@ test_tool = "nextest"
 exclude_re = [
     "replace (fuzzing|fuzz_api)::",
     " in (fuzzing|fuzz_api)::",
-    "locate\\.rs:3(0[89]|1[0-2]):\\d+: .*Binarized<'a>::black",
-    "transform\\.rs:376:87: replace \\+ with \\* in downscale_to",
-    "transform\\.rs:379:96: replace \\+ with \\* in downscale_to",
-    "transform\\.rs:488:45: replace - with . in windowed_extremum_strided",
-    "transform\\.rs:489:31: replace \\+ with \\* in windowed_extremum_strided",
-    "transform\\.rs:508:24: replace \\| with \\^ in morph_filter",
+    "locate\\.rs:31[3-7]:\\d+: .*Binarized<'a>::black",
+    "transform\\.rs:383:87: replace \\+ with \\* in downscale_to",
+    "transform\\.rs:386:96: replace \\+ with \\* in downscale_to",
+    "transform\\.rs:495:45: replace - with . in windowed_extremum_strided",
+    "transform\\.rs:496:31: replace \\+ with \\* in windowed_extremum_strided",
+    "transform\\.rs:515:24: replace \\| with \\^ in morph_filter",
     "structural\\.rs:98:33: replace - with / in quiet_zone_ok",
     "structural\\.rs:100:30: replace - with / in quiet_zone_ok",
     "structural\\.rs:111:11: replace > with >= in quiet_zone_ok",
@@ -153,9 +153,9 @@ exclude_re = [
     "zigzag\\.rs:33:75: replace < with <= in reserved_cell",
     "zigzag\\.rs:66:23: replace % with \\+ in mask_bit",
     "zigzag\\.rs:67:37: replace % with \\+ in mask_bit",
-    "lib\\.rs:102:9: replace Scanner::builder -> ScannerBuilder with Default::default\\(\\)",
-    "ladder\\.rs:1025:49: replace \\* with / in Run",
-    "ladder\\.rs:1205:49: replace \\* with / in Run",
+    "lib\\.rs:107:9: replace Scanner::builder -> ScannerBuilder with Default::default\\(\\)",
+    "ladder\\.rs:1155:49: replace \\* with / in Run",
+    "ladder\\.rs:1338:49: replace \\* with / in Run",
     "gs1\\.rs:227:15: replace > with >= in split_head",
     "bitstream\\.rs:342:42: replace \\| with \\^ in double_byte",
     "bitstream\\.rs:65:30: replace \\| with \\^ in Bits",
