@@ -3,14 +3,24 @@ title: "Quickstart"
 description: "Decode and grade your first QR on every surface."
 ---
 
+<Note>
+The 0.11.0 packages are **pending publication** under their new names, and the
+code samples below target 0.11.0. Until a registry serves 0.11.0, each install
+line installs 0.10.1 under its previous name, imported under that name too:
+`qrcode_ai_scanner` in Rust, `@supernovae-st/qrcode-ai-scanner` and
+`@supernovae-st/qrcode-ai-scanner-wasm` in JavaScript. Python builds from
+source until its PyPI release. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) maps each name.
+</Note>
+
 <Tabs>
   <Tab title="Rust">
     ```bash
-    cargo add qrcode-ai-scanner
+    cargo add qrcode-ai-scanner@0.10.1
     ```
 
     ```rust
-    use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
+    use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
 
     let scanner = Scanner::builder().profile(ScanProfile::Full).build();
     let report = scanner.scan(ImageInput::encoded(&image_bytes))?;
@@ -34,11 +44,11 @@ description: "Decode and grade your first QR on every surface."
 
   <Tab title="Node">
     ```bash
-    npm i @supernovae-st/qrcode-ai-scanner
+    npm i @supernovae-st/qrcode-ai-scanner@0.10.1
     ```
 
     ```js
-    import { scan } from "@supernovae-st/qrcode-ai-scanner";
+    import { scan } from "@qrcode-ai-com/qrcode-barcode-scanner";
 
     // async on the libuv pool — never blocks the event loop
     const report = await scan(imageBuffer, {
@@ -60,11 +70,11 @@ description: "Decode and grade your first QR on every surface."
 
   <Tab title="Browser (WASM)">
     ```bash
-    npm i @supernovae-st/qrcode-ai-scanner-wasm
+    npm i @supernovae-st/qrcode-ai-scanner-wasm@0.10.1
     ```
 
     ```ts
-    import init, { scan_image } from "@supernovae-st/qrcode-ai-scanner-wasm";
+    import init, { scan_image } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 
     await init(); // loads the .wasm via import.meta.url
 
@@ -84,12 +94,14 @@ description: "Decode and grade your first QR on every surface."
     </Warning>
 
     Vite/Nuxt: exclude the package from pre-bundling —
-    `optimizeDeps: { exclude: ["@supernovae-st/qrcode-ai-scanner-wasm"] }`.
+    `optimizeDeps: { exclude: ["@qrcode-ai-com/qrcode-barcode-scanner-wasm"] }`,
+    with the name of the package you installed (`@supernovae-st/qrcode-ai-scanner-wasm`
+    for 0.10.1).
   </Tab>
 
   <Tab title="CLI">
     ```bash
-    cargo install qrcode-ai-scanner-cli
+    cargo install qrcode-ai-scanner-cli@0.10.1
 
     qrscan image.png            # full ScanReport JSON on stdout
     qrscan image.png --pretty   # human summary (incl. the ISO grade card)
@@ -97,15 +109,24 @@ description: "Decode and grade your first QR on every surface."
     qrscan image.png -s --budget-ms 0   # unbounded: reproducible, never cut
     # exit codes: 0 found · 1 none · 2 invalid input/usage · 3 (-s) not judged within the budget
     ```
+
+    From 0.11.0, `qrscan` ships in the `qrcode-barcode-scanner-cli` crate. Both
+    crates install the same `qrscan` command: uninstall `qrcode-ai-scanner-cli`
+    before installing the new one.
   </Tab>
 
   <Tab title="Python">
+    Until `qrcode-barcode-scanner` is on PyPI, build it from a checkout of the
+    repository (this needs a Rust toolchain):
+
     ```bash
-    pip install qrcode-ai-scanner
+    git clone https://github.com/qrcode-ai-com/qrcode-barcode-scanner
+    cd qrcode-barcode-scanner
+    python -m pip install ./crates/qrcode-ai-scanner-py
     ```
 
     ```python
-    import qrcode_ai_scanner as q
+    import qrcode_barcode_scanner as q
 
     report = q.scan(image_bytes, "full")   # → ScanReport dict; the scan releases the GIL
     dets = report["detections"]
@@ -114,7 +135,7 @@ description: "Decode and grade your first QR on every surface."
         print(d["content"]["text"], d["payload"]["kind"], (report["score"] or {}).get("value"))
     ```
 
-    One `abi3` wheel covers CPython 3.8 → 3.14. Types ship (`qrcode_ai_scanner.pyi`).
+    One `abi3` wheel covers CPython 3.8 → 3.14. Types ship (`qrcode_barcode_scanner.pyi`).
   </Tab>
 </Tabs>
 

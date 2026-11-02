@@ -1,10 +1,18 @@
 ---
-title: "Node — @supernovae-st/qrcode-ai-scanner"
+title: "Node — @qrcode-ai-com/qrcode-barcode-scanner"
 description: "Async native binding on the libuv pool — for Nuxt/Next servers and workers."
 ---
 
+<Note>
+The `@qrcode-ai-com/qrcode-barcode-scanner` package is **pending publication**
+on npm, and the samples on this page target its 0.11.0 release. Until npm
+serves it, the line below installs 0.10.1 under the package's previous name,
+`@supernovae-st/qrcode-ai-scanner`, imported under that name too. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-npm i @supernovae-st/qrcode-ai-scanner
+npm i @supernovae-st/qrcode-ai-scanner@0.10.1
 ```
 
 Prebuilt for macOS (arm64/x64), Linux (gnu+musl, arm64/x64), Windows
@@ -26,8 +34,8 @@ instead.
 ## API
 
 ```ts
-import { capabilities, scan, scanSync, version } from "@supernovae-st/qrcode-ai-scanner";
-import type { ScanReport, ScanOptions } from "@supernovae-st/qrcode-ai-scanner";
+import { capabilities, scan, scanSync, version } from "@qrcode-ai-com/qrcode-barcode-scanner";
+import type { ScanReport, ScanOptions } from "@qrcode-ai-com/qrcode-barcode-scanner";
 
 // async on the libuv pool — NEVER blocks the event loop
 const report: ScanReport = await scan(imageBuffer, {

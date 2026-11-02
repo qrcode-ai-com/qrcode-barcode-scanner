@@ -1,10 +1,18 @@
 ---
-title: "Rust — qrcode-ai-scanner"
+title: "Rust — qrcode-barcode-scanner"
 description: "The core crate: Scanner, profiles, cancellation, batching."
 ---
 
+<Note>
+The `qrcode-barcode-scanner` crate is **pending publication** on crates.io, and
+the samples on this page target its 0.11.0 release. Until crates.io serves it,
+the line below adds 0.10.1 under the crate's previous name, `qrcode-ai-scanner`,
+imported as `qrcode_ai_scanner`. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-cargo add qrcode-ai-scanner
+cargo add qrcode-ai-scanner@0.10.1
 ```
 
 Features: `engine-rxing` + `engine-rqrr` (default — at least one
@@ -16,7 +24,7 @@ required) · `parallel` (rayon batching, native only — OFF for wasm) ·
 `Send + Sync`, no interior state — build once, share across threads.
 
 ```rust
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     CancelToken, ImageInput, Limits, ScanConfig, ScanProfile, Scanner,
 };
 
@@ -96,7 +104,7 @@ a zero `Limits` cap, a zero side, a palette above
 `ScanConfig::MAX_ALPHA_PALETTE` or a `budget_ms` above
 `ScanConfig::MAX_BUDGET_MS` (4 294 967 295 ms) — refused before the input
 is read. `ScanConfig::validate` and `Limits::validate` run the same check
-ahead of a scan; `qrcode_ai_scanner::options` maps a JavaScript number
+ahead of a scan; `qrcode_barcode_scanner::options` maps a JavaScript number
 onto these domains (the WASM and Node bindings use it).
 
 ## Type surface

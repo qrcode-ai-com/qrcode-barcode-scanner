@@ -3,8 +3,17 @@ title: "CLI — qrscan"
 description: "The scanner in scripts and CI."
 ---
 
+<Note>
+From 0.11.0, `qrscan` ships in the `qrcode-barcode-scanner-cli` crate,
+**pending publication** on crates.io; this page describes that release. Until
+crates.io serves it, the line below installs 0.10.1 from the crate's previous
+name, `qrcode-ai-scanner-cli`. Both crates install the same `qrscan` command:
+uninstall `qrcode-ai-scanner-cli` before installing the new crate. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-cargo install qrcode-ai-scanner-cli
+cargo install qrcode-ai-scanner-cli@0.10.1
 ```
 
 ## Usage
