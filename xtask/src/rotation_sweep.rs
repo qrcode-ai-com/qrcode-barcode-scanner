@@ -24,7 +24,7 @@
 
 use std::path::Path;
 
-use qrcode_ai_scanner::{ImageInput, Scanner, Symbology};
+use qrcode_barcode_scanner::{ImageInput, Scanner, Symbology};
 use rayon::prelude::*;
 
 use crate::external::{ground_truth, scanner};

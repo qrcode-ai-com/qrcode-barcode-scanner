@@ -17,7 +17,7 @@
 use qrcode::bits::Bits;
 use qrcode::types::QrResult;
 use qrcode::{EcLevel, QrCode, Version};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Detection, EngineKind, ImageInput, Payload, ScanProfile, ScanReport, Scanner, ScoreDepth,
     Symbology,
 };

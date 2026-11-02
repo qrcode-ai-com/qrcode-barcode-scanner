@@ -10,8 +10,9 @@
 //!   crates outside the workspace — each its own `[workspace]` root with a
 //!   lockfile seeded from the workspace lock and the workspace release
 //!   profile — one depending on this tree by path, one on
-//!   `qrcode-ai-scanner = "=0.10.1"` from crates.io; given a built napi
-//!   library it also assembles the candidate Node package.
+//!   `qrcode-barcode-scanner = { package = "qrcode-ai-scanner", version = "=0.10.1" }`
+//!   from crates.io; given a built napi library it also assembles the
+//!   candidate Node package.
 //! - `bench prepare-base --work DIR …` extracts the v0.10.1 sources the base
 //!   artifacts are rebuilt from (the release commit's `git archive`, the
 //!   published CLI crate), prints how to build each, and assembles the base
@@ -153,9 +154,10 @@ fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
 }
 
 /// The base worker's requirement on the registry crate: exactly the base
-/// release.
+/// release, published as `qrcode-ai-scanner`, under the dependency key the
+/// candidate uses, so one worker source builds against either side.
 fn base_dependency() -> String {
-    format!("\"={BASE_VERSION}\"")
+    format!("{{ package = \"qrcode-ai-scanner\", version = \"={BASE_VERSION}\" }}")
 }
 
 /// The worker crate for one side: manifest, seeded lock, main.
@@ -228,7 +230,7 @@ fn prepare_in(work: &Path, node_addon: Option<&Path>) -> Result<(), String> {
         base.display()
     );
     println!(
-        "  {}  — qrcode-ai-scanner by path ({core})",
+        "  {}  — qrcode-barcode-scanner by path ({core})",
         candidate.display()
     );
     if let Some(addon) = node_addon {
@@ -640,13 +642,28 @@ fn node_package(
         let bytes = std::fs::read(package.join(name)).map_err(|e| format!("{name}: {e}"))?;
         write_file(&dir.join(name), &bytes)?;
     }
-    let binary = format!("qrcode-ai-scanner.{platform}.node");
+    let binary = format!("{}.{platform}.node", binary_name(package)?);
     write_file(&dir.join(&binary), addon)?;
     if let Some(mut stamped) = stamped {
         stamped.artifact.name = binary;
         manifest::write(&dir.join(manifest::PACKAGE_MANIFEST), &stamped)?;
     }
     Ok(())
+}
+
+/// The name native.js gives the addon, before `.<platform>.node`: the
+/// `napi.binaryName` of the package's own package.json, so each side keeps
+/// the addon name of the release it comes from.
+fn binary_name(package: &Path) -> Result<String, String> {
+    let text = std::fs::read_to_string(package.join("package.json"))
+        .map_err(|e| format!("package.json: {e}"))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("package.json: {e}"))?;
+    json["napi"]["binaryName"]
+        .as_str()
+        .filter(|name| !name.is_empty() && !name.contains(['/', '\\']))
+        .map(str::to_owned)
+        .ok_or_else(|| String::from("package.json: no usable napi.binaryName"))
 }
 
 /// `stamp`: run an artifact's build and write the manifest the build
@@ -1180,8 +1197,9 @@ mod tests {
     }
 
     /// The base is one release: the extraction directory and the base
-    /// worker's registry requirement name its version, and the pins have
-    /// the shape of a commit and of a sha256.
+    /// worker's registry requirement name its version — the requirement
+    /// also its published crate name, under the candidate's dependency key
+    /// — and the pins have the shape of a commit and of a sha256.
     #[test]
     fn the_base_identity_is_one_release() {
         let hex = |s: &str, len: usize| {
@@ -1200,13 +1218,54 @@ mod tests {
         .expect("the base worker manifest");
         let requirement = manifest
             .get("dependencies")
-            .and_then(|d| d.get("qrcode-ai-scanner"))
-            .and_then(toml::Value::as_str);
+            .and_then(|d| d.get("qrcode-barcode-scanner"))
+            .and_then(toml::Value::as_table);
+        let field = |key: &str| {
+            requirement
+                .and_then(|r| r.get(key))
+                .and_then(toml::Value::as_str)
+        };
         assert_eq!(
-            requirement,
-            Some(format!("={BASE_VERSION}").as_str()),
+            (field("package"), field("version")),
+            (
+                Some("qrcode-ai-scanner"),
+                Some(format!("={BASE_VERSION}").as_str())
+            ),
             "the base worker links exactly the base release from the registry"
         );
+        assert_eq!(
+            requirement.map(toml::Table::len),
+            Some(2),
+            "no path and no features: the crate as published"
+        );
+    }
+
+    /// The candidate Node package carries the addon under the name its own
+    /// native.js loads on this platform, from its package.json.
+    #[test]
+    fn the_addon_takes_the_name_native_js_loads() {
+        let package = crate::repo_root().join("crates/qrcode-ai-scanner-node");
+        let name = binary_name(&package).expect("napi.binaryName");
+        let native = std::fs::read_to_string(package.join("native.js")).expect("native.js");
+        if let Some(platform) = napi_platform() {
+            assert!(
+                native.contains(&format!("require('./{name}.{platform}.node')")),
+                "native.js loads no ./{name}.{platform}.node"
+            );
+        }
+        let dir = std::env::temp_dir().join(format!("qrscan-bench-binary-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        write_file(
+            &dir.join("package.json"),
+            br#"{"napi": {"binaryName": "a/b"}}"#,
+        )
+        .expect("package.json");
+        let refused = binary_name(&dir);
+        write_file(&dir.join("package.json"), br#"{"name": "x"}"#).expect("package.json");
+        let missing = binary_name(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(refused.is_err(), "a path is no addon name: {refused:?}");
+        assert!(missing.is_err(), "no napi.binaryName: {missing:?}");
     }
 
     /// The release tag holds the base commit: a tag naming another commit

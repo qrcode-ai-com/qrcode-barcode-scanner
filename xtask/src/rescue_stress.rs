@@ -132,7 +132,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use image::{GrayImage, Luma};
 use qrcode::canvas::{Canvas, MaskPattern, Module};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Charset, DecodedContent, Detection, EngineKind, Hint, ImageInput, ScanProfile, ScanReport,
     Scanner,
 };
@@ -2354,7 +2354,7 @@ fn verify_base_symbols(scanner: &Scanner) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qrcode_ai_scanner::{EciSegment, Fnc1Position, Symbology};
+    use qrcode_barcode_scanner::{EciSegment, Fnc1Position, Symbology};
 
     fn rescued(correct: u32, wrong: u32) -> Bucket {
         Bucket {

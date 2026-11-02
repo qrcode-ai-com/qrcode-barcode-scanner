@@ -516,6 +516,17 @@ pub(crate) fn checkout_of(dir: &Path) -> Option<Checkout> {
 /// the artifact, the scanner, and rxing (its overflow-checks override).
 pub(crate) const ROLES: [&str; 3] = ["artifact", "qrcode-ai-scanner", "rxing"];
 
+/// The role a library package fills: the scanner role keeps its key
+/// `qrcode-ai-scanner` for both scanner packages — the published base
+/// release under that name and this tree as `qrcode-barcode-scanner` — so
+/// stamped manifests and receipts read one key on either side.
+fn role_of(package: &str) -> &str {
+    match package {
+        "qrcode-barcode-scanner" => "qrcode-ai-scanner",
+        other => other,
+    }
+}
+
 /// What the stamp step observed of the build it ran: the command, the
 /// units of [`ROLES`], and the codegen-affecting environment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -694,8 +705,8 @@ pub(crate) fn units_of(
         };
         let role = if produces(&message, &artifact) {
             String::from("artifact")
-        } else if ROLES.contains(&package.as_str()) && message["target"]["kind"][0] == "lib" {
-            package.clone()
+        } else if ROLES.contains(&role_of(&package)) && message["target"]["kind"][0] == "lib" {
+            role_of(&package).to_owned()
         } else {
             continue;
         };
@@ -1780,7 +1791,8 @@ mod tests {
     /// The unit record tells the registry 0.9.0 scanner from the one of a
     /// tree, which the record of a package id's name and version alone
     /// could not, and a path unit keeps the checkout of its package
-    /// directory — read by the stamp, never as a path.
+    /// directory — read by the stamp, never as a path. A tree whose scanner
+    /// package is `qrcode-barcode-scanner` fills the same scanner role.
     #[test]
     fn units_keep_their_package_source_and_checkout() {
         let dir = std::env::temp_dir().join(format!("qrscan-bench-sources-{}", std::process::id()));
@@ -1820,6 +1832,8 @@ mod tests {
         let registry =
             units("registry+https://github.com/rust-lang/crates.io-index#qrcode-ai-scanner@0.9.0");
         let tree = units("path+file:///w/crates/qrcode-ai-scanner#0.9.0");
+        let renamed =
+            units("path+file:///w/crates/qrcode-ai-scanner#qrcode-barcode-scanner@0.11.0");
         let _ = std::fs::remove_dir_all(&dir);
         let scanner = |units: &BTreeMap<String, Unit>| {
             let unit = &units["qrcode-ai-scanner"];
@@ -1845,6 +1859,26 @@ mod tests {
             )
         );
         assert_ne!(registry["qrcode-ai-scanner"], tree["qrcode-ai-scanner"]);
+        assert_eq!(
+            scanner(&renamed),
+            (
+                String::from("0.11.0"),
+                String::from("path"),
+                Some(Checkout {
+                    sha: String::from("c0ffee"),
+                    tree: String::from("clean")
+                })
+            )
+        );
+        assert_eq!(
+            renamed["qrcode-ai-scanner"].package,
+            "qrcode-barcode-scanner"
+        );
+        assert_eq!(
+            renamed.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["artifact", "qrcode-ai-scanner"],
+            "one scanner role, under its kept key"
+        );
     }
 
     /// A native pair whose observed builds differ — rxing without its

@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{Capabilities, EngineKind, Versions};
+use qrcode_barcode_scanner::{Capabilities, EngineKind, Versions};
 
 #[test]
 fn engines_follow_the_compiled_features_in_order() {

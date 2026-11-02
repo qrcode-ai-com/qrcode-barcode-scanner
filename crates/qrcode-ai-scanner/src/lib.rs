@@ -1,4 +1,4 @@
-//! # QR Code AI Scanner
+//! # QR Code & Barcode Scanner
 //!
 //! Decoding + scannability validation for artistic, AI-generated, and
 //! photo-captured QR codes — the codes that break standard scanners.
@@ -30,7 +30,7 @@
 
 #[cfg(not(any(feature = "engine-rxing", feature = "engine-rqrr")))]
 compile_error!(
-    "qrcode-ai-scanner requires at least one engine feature: `engine-rxing` or `engine-rqrr`"
+    "qrcode-barcode-scanner requires at least one engine feature: `engine-rxing` or `engine-rqrr`"
 );
 
 mod alpha;

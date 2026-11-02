@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, AlphaPlacement, Hint, ImageInput, PlateColor, ScanConfig, ScanProfile,
     Scanner, ScoreCheck,
 };

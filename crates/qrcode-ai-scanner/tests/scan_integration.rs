@@ -7,7 +7,7 @@
     clippy::cast_precision_loss
 )]
 
-use qrcode_ai_scanner::{CancelToken, Grade, ImageInput, Payload, ScanProfile, Scanner};
+use qrcode_barcode_scanner::{CancelToken, Grade, ImageInput, Payload, ScanProfile, Scanner};
 
 fn fixture(rel: &str) -> Vec<u8> {
     let path = format!("{}/../../fixtures/{rel}", env!("CARGO_MANIFEST_DIR"));
@@ -250,7 +250,7 @@ fn degraded_copy_never_scores_higher_and_a_knee_crossing_scores_less() {
                 score_blurred.value,
                 score_clean.value
             );
-            let cells = |s: &qrcode_ai_scanner::Score| -> u32 {
+            let cells = |s: &qrcode_barcode_scanner::Score| -> u32 {
                 s.axes.iter().map(|a| u32::from(a.passed)).sum()
             };
             assert!(
@@ -457,12 +457,12 @@ fn iso15415_grade_card_on_a_clean_symbol() {
     // pristine black/white render: contrast + modulation + ANU are A-grade
     assert_eq!(
         iso.symbol_contrast.grade,
-        qrcode_ai_scanner::IsoGrade::A,
+        qrcode_barcode_scanner::IsoGrade::A,
         "{iso:?}"
     );
     assert_eq!(
         iso.axial_nonuniformity.grade,
-        qrcode_ai_scanner::IsoGrade::A,
+        qrcode_barcode_scanner::IsoGrade::A,
         "{iso:?}"
     );
     assert!(iso.symbol_contrast.value > 0.9, "{iso:?}");
@@ -488,7 +488,7 @@ fn scanner_is_send_sync_and_report_is_send() {
     // compile-time pins for the documented threading contract
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Scanner>();
-    assert_send_sync::<qrcode_ai_scanner::ScanReport>();
+    assert_send_sync::<qrcode_barcode_scanner::ScanReport>();
     assert_send_sync::<CancelToken>();
 }
 
@@ -515,7 +515,7 @@ fn inverted_symbol_structural_checks_read_true_polarity() {
     // skip S1/S2 (rxing AlsoInverted would win there with no geometry):
     // force the S3 path where rqrr decodes on the INVERT attempt and
     // becomes the geometry source.
-    let mut config = qrcode_ai_scanner::ScanConfig::full();
+    let mut config = qrcode_barcode_scanner::ScanConfig::full();
     config.budget_ms = None;
     config.pyramid = false;
     config.direct = false;
@@ -542,13 +542,13 @@ fn inverted_symbol_structural_checks_read_true_polarity() {
         !report
             .hints
             .iter()
-            .any(|h| matches!(h, qrcode_ai_scanner::Hint::FixFinderPattern { .. })),
+            .any(|h| matches!(h, qrcode_barcode_scanner::Hint::FixFinderPattern { .. })),
         "no bogus finder hint: {:?}",
         report.hints
     );
     let iso = score.iso15415.expect("geometry → grade card");
     assert!(
-        iso.fixed_pattern_damage.grade < qrcode_ai_scanner::IsoGrade::C,
+        iso.fixed_pattern_damage.grade < qrcode_barcode_scanner::IsoGrade::C,
         "FPD must not read damaged: {iso:?}"
     );
 }
@@ -567,7 +567,7 @@ fn logo_occluded_symbol_rescued_by_erasure_decoding() {
     assert_eq!(d.content.text, "https://qrcode-ai.com/rescue-pin");
     assert_eq!(
         d.engines,
-        vec![qrcode_ai_scanner::EngineKind::Rescue],
+        vec![qrcode_barcode_scanner::EngineKind::Rescue],
         "the rescue stage is the decode source"
     );
     assert!(d.meta.version.is_some() && d.corners.is_some());
@@ -581,7 +581,7 @@ fn logo_occluded_symbol_rescued_by_erasure_decoding() {
 
 #[test]
 fn every_symbology_fixture_decodes_with_the_right_label() {
-    use qrcode_ai_scanner::Symbology as S;
+    use qrcode_barcode_scanner::Symbology as S;
     let cases: &[(&str, S, &str)] = &[
         (
             "symbology/datamatrix.png",
@@ -678,8 +678,8 @@ fn same_digits_in_two_symbologies_stay_two_detections() {
     assert_eq!(
         symbologies,
         vec![
-            qrcode_ai_scanner::Symbology::Ean13,
-            qrcode_ai_scanner::Symbology::QrCode
+            qrcode_barcode_scanner::Symbology::Ean13,
+            qrcode_barcode_scanner::Symbology::QrCode
         ],
         "{:?}",
         report.detections
@@ -693,7 +693,7 @@ fn micro_qr_decodes_with_its_own_label() {
         .unwrap();
     assert_eq!(report.detections.len(), 1, "trace: {:?}", report.trace);
     let d = &report.detections[0];
-    assert_eq!(d.symbology, qrcode_ai_scanner::Symbology::MicroQrCode);
+    assert_eq!(d.symbology, qrcode_barcode_scanner::Symbology::MicroQrCode);
     assert_eq!(d.content.text, "HELLO42");
     // rqrr is QR-model-2-only: micro decodes via rxing, no geometry
     assert_eq!(d.corners, None);
@@ -722,7 +722,7 @@ fn exif_rotated_phone_photos_still_decode() {
         .unwrap();
     assert_eq!(
         ean.detections[0].symbology,
-        qrcode_ai_scanner::Symbology::Ean13
+        qrcode_barcode_scanner::Symbology::Ean13
     );
 }
 
@@ -755,7 +755,7 @@ fn qr_family_is_always_the_primary_detection() {
     assert!(report.detections.len() >= 2, "{:?}", report.detections);
     assert_eq!(
         report.detections[0].symbology,
-        qrcode_ai_scanner::Symbology::QrCode,
+        qrcode_barcode_scanner::Symbology::QrCode,
         "QR family must lead"
     );
     assert!(report.score.is_some(), "the QR is the scored primary");
@@ -767,7 +767,7 @@ fn skip_axes_config_reaches_the_report_and_the_hints() {
     // capture-geometry axes skipped. The report self-describes (four axes,
     // no perspective/rotation entries) and axis-derived hints from skipped
     // axes structurally cannot fire.
-    use qrcode_ai_scanner::{ScanConfig, ScanProfile, StressAxis};
+    use qrcode_barcode_scanner::{ScanConfig, ScanProfile, StressAxis};
     let bytes = fixture("clean/gen_v2_l.png");
     let mut config: ScanConfig = ScanProfile::Full.config();
     config.budget_ms = None;
@@ -846,7 +846,7 @@ fn quiet_ring_shifts_perspective_cells_near_the_knee() {
         let axis = score
             .axes
             .iter()
-            .find(|a| a.axis == qrcode_ai_scanner::StressAxis::Perspective)
+            .find(|a| a.axis == qrcode_barcode_scanner::StressAxis::Perspective)
             .expect("the perspective axis runs");
         perspective.push(axis.passed);
     }

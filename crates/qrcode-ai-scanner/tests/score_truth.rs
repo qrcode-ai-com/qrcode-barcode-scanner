@@ -5,7 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Hint, ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner, Score, ScoreCheck, StressAxis,
 };
 
@@ -169,7 +169,7 @@ fn a_rescue_only_decode_is_still_judged_whole() {
     let detection = report.detections.first().expect("the rescue decodes");
     assert_eq!(
         detection.engines,
-        vec![qrcode_ai_scanner::EngineKind::Rescue],
+        vec![qrcode_barcode_scanner::EngineKind::Rescue],
         "precondition: a rescue-only decode"
     );
     let score = report
@@ -188,7 +188,7 @@ fn a_rescue_only_decode_is_still_judged_whole() {
     }
     assert_eq!(
         (score.value, score.grade),
-        (0, qrcode_ai_scanner::Grade::Poor)
+        (0, qrcode_barcode_scanner::Grade::Poor)
     );
 }
 
@@ -204,7 +204,7 @@ fn a_clean_rmqr_is_judged_by_probes_that_read_it() {
     let detection = report.detections.first().expect("the rMQR decodes");
     assert_eq!(
         detection.symbology,
-        qrcode_ai_scanner::Symbology::RectangularMicroQrCode
+        qrcode_barcode_scanner::Symbology::RectangularMicroQrCode
     );
     let score = report.score.as_ref().expect("an unbounded scan judges");
     assert_honest(score);
@@ -342,7 +342,7 @@ fn budget_cuts_never_ship_a_partial_judgment() {
     }
 }
 
-/// Dev diagnostic — `cargo nextest run -p qrcode-ai-scanner --run-ignored
+/// Dev diagnostic — `cargo nextest run -p qrcode-barcode-scanner --run-ignored
 /// only --no-capture -E 'test(pdf417_verdict_repeatability)'`. The same
 /// unbudgeted Full scan of the PDF417 fixture, repeated in ONE process: a
 /// deterministic pipeline prints a single verdict. rxing's PDF417 decoder

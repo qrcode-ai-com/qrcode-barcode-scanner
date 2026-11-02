@@ -6,7 +6,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use qrcode::{Color, EcLevel, Version, bits::Bits, canvas::Canvas};
-use qrcode_ai_scanner::{EngineKind, ImageInput, ScanProfile, Scanner, Symbology};
+use qrcode_barcode_scanner::{EngineKind, ImageInput, ScanProfile, Scanner, Symbology};
 
 struct Symbol {
     colors: Vec<Color>,
@@ -108,7 +108,7 @@ fn rqrr_rejects_a_truncated_count_after_valid_segments() {
     assert_eq!(decoded, b"AAAAAABBBBBB");
 }
 
-fn scan(symbol: &Symbol) -> qrcode_ai_scanner::ScanReport {
+fn scan(symbol: &Symbol) -> qrcode_barcode_scanner::ScanReport {
     let image = symbol.image();
     let mut config = ScanProfile::Frame.config();
     config.budget_ms = None;
@@ -136,7 +136,10 @@ fn scanner_preserves_exact_content_and_rqrr_consensus_on_the_damaged_symbol() {
     assert_eq!(detection.content.eci, None);
     assert!(detection.engines.contains(&EngineKind::Rqrr));
     assert_eq!(detection.meta.version, Some(7));
-    assert_eq!(detection.meta.ec_level, Some(qrcode_ai_scanner::EcLevel::Q));
+    assert_eq!(
+        detection.meta.ec_level,
+        Some(qrcode_barcode_scanner::EcLevel::Q)
+    );
     assert_eq!(report.trace.engine_panics, 0);
     assert_eq!(report.trace.budget_exhausted, Some(false));
 }

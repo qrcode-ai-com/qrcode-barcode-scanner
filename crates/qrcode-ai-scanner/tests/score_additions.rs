@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     ImageInput, ScanConfig, ScanProfile, Scanner, Score, ScorePreset, StressAxis,
 };
 
@@ -160,6 +160,6 @@ fn knee_axes_carry_a_refined_label() {
 #[test]
 fn old_reports_parse_with_weights_run_default() {
     let old = r#"{"value":87,"grade":"excellent","axes":[],"structural":null,"uec":null,"iso15415":null}"#;
-    let score: qrcode_ai_scanner::Score = serde_json::from_str(old).unwrap();
+    let score: qrcode_barcode_scanner::Score = serde_json::from_str(old).unwrap();
     assert_eq!(score.weights_run, 0);
 }

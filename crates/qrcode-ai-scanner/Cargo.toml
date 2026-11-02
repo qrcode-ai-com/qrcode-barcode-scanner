@@ -1,5 +1,5 @@
 [package]
-name = "qrcode-ai-scanner"
+name = "qrcode-barcode-scanner"
 description = "QR code decoding and scannability scoring for artistic, AI-generated, and photo-captured QR codes"
 keywords = ["qrcode", "qr", "scanner", "validation", "decoder"]
 categories = ["multimedia::images", "encoding", "computer-vision"]

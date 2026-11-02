@@ -1,4 +1,4 @@
-# qrcode-ai-scanner
+# qrcode-barcode-scanner
 
 QR decoding + scannability scoring for **artistic, AI-generated, and
 photo-captured** QR codes. Deterministic multi-engine ladder (rxing + rqrr),
@@ -14,7 +14,7 @@ Machine-actionable hints close the generate → scan →
 regenerate loop.
 
 ```rust
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
 
 let scanner = Scanner::builder().profile(ScanProfile::Full).build();
 let report = scanner.scan(ImageInput::encoded(&bytes))?;
@@ -32,5 +32,7 @@ unbounded, reproducible scan. Camera frames skip the PNG roundtrip
 via `ImageInput::rgba8`. Full docs: the
 [repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner) —
 `docs/ARCHITECTURE.md` + `docs/SCORING.md`.
+
+Releases up to 0.10.1 were published as `qrcode-ai-scanner`.
 
 License: AGPL-3.0-or-later · © SuperNovae Studio.

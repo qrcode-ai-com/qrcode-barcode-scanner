@@ -52,7 +52,7 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64};
 use std::sync::{Mutex, OnceLock, mpsc};
 use std::time::{Duration, Instant};
 
-use qrcode_ai_scanner::{ImageInput, ScanProfile, ScanReport, Scanner, Versions};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, ScanReport, Scanner, Versions};
 
 /// The worker protocol this file speaks; `hello` names it.
 pub const PROTOCOL: &str = "qrscan-bench-worker/5";

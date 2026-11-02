@@ -2884,7 +2884,7 @@ mod tests {
         assert!(raised(&hints), "{hints:?}");
     }
 
-    /// Dev diagnostic — `cargo nextest run -p qrcode-ai-scanner --run-ignored
+    /// Dev diagnostic — `cargo nextest run -p qrcode-barcode-scanner --run-ignored
     /// only --no-capture -E 'test(pdf417_stress_cells_repeatability)'`.
     /// Re-decodes the SAME pixels of every resolution cell of the PDF417
     /// fixture in one process, with the scoring filter: a pure function of

@@ -13,7 +13,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{Detection, ImageInput, ScanReport, Scanner, Versions};
+use qrcode_barcode_scanner::{Detection, ImageInput, ScanReport, Scanner, Versions};
 
 fn spec_path(rel: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../spec/{rel}"))
@@ -339,7 +339,7 @@ fn content_contract_objects_validate_and_its_negatives_do_not() {
             .collect();
         assert!(errors.is_empty(), "{content}: {errors:#?}");
         // the real types read it back to the same object
-        let back: qrcode_ai_scanner::DecodedContent =
+        let back: qrcode_barcode_scanner::DecodedContent =
             serde_json::from_value(content.clone()).unwrap_or_else(|e| panic!("{content}: {e}"));
         assert_eq!(&serde_json::to_value(&back).unwrap(), content);
     }
@@ -389,7 +389,7 @@ fn occurrence_objects_validate_and_their_negatives_do_not() {
             .collect();
         assert!(errors.is_empty(), "{occurrence}: {errors:#?}");
         // the real types read it back to the same object
-        let back: qrcode_ai_scanner::Occurrence = serde_json::from_value(occurrence.clone())
+        let back: qrcode_barcode_scanner::Occurrence = serde_json::from_value(occurrence.clone())
             .unwrap_or_else(|e| panic!("{occurrence}: {e}"));
         let round = serde_json::to_value(&back).unwrap();
         assert!(

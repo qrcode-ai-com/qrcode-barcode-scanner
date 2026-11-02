@@ -13,7 +13,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use qrcode_ai_scanner::{ImageInput, ScanConfig, ScanProfile, Scanner};
+use qrcode_barcode_scanner::{ImageInput, ScanConfig, ScanProfile, Scanner};
 use std::hint::black_box;
 
 fn fixture(rel: &str) -> Vec<u8> {

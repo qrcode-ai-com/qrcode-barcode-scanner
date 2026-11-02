@@ -58,7 +58,7 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner, ScoreDepth};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner, ScoreDepth};
 use rayon::prelude::*;
 use sha2::{Digest as _, Sha256};
 

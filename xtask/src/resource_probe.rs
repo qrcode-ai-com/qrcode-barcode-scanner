@@ -18,7 +18,7 @@
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Detection, ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner, ScorePreset, Symbology,
 };
 use serde_json::{Value, json};
@@ -51,7 +51,7 @@ fn config(args: &[String]) -> Result<ScanConfig, &'static str> {
 fn exact(detection: &Detection, truth: &str) -> bool {
     detection.symbology == Symbology::QrCode
         && !detection.content.charset.is_lossy()
-        && detection.content.charset != qrcode_ai_scanner::Charset::Unrecognized
+        && detection.content.charset != qrcode_barcode_scanner::Charset::Unrecognized
         && detection.content.raw == truth.as_bytes()
         && detection.content.text == truth
         && detection.content.eci.is_none()
@@ -220,10 +220,10 @@ mod tests {
             );
         }
         for (mode, budget, depth, skipped) in [
-            ("full", 4000, qrcode_ai_scanner::ScoreDepth::Full, 0),
-            ("fast", 800, qrcode_ai_scanner::ScoreDepth::Reduced, 0),
-            ("frame", 80, qrcode_ai_scanner::ScoreDepth::Off, 0),
-            ("design", 4000, qrcode_ai_scanner::ScoreDepth::Full, 2),
+            ("full", 4000, qrcode_barcode_scanner::ScoreDepth::Full, 0),
+            ("fast", 800, qrcode_barcode_scanner::ScoreDepth::Reduced, 0),
+            ("frame", 80, qrcode_barcode_scanner::ScoreDepth::Off, 0),
+            ("design", 4000, qrcode_barcode_scanner::ScoreDepth::Full, 2),
         ] {
             let config = config(&["--mode".into(), mode.into()]).unwrap();
             assert_eq!(config.budget_ms, Some(budget));
@@ -233,8 +233,8 @@ mod tests {
                 assert_eq!(
                     config.score_skip_axes,
                     vec![
-                        qrcode_ai_scanner::StressAxis::Perspective,
-                        qrcode_ai_scanner::StressAxis::Rotation
+                        qrcode_barcode_scanner::StressAxis::Perspective,
+                        qrcode_barcode_scanner::StressAxis::Rotation
                     ]
                 );
             }
@@ -262,7 +262,7 @@ mod tests {
         report.detections[1].symbology = Symbology::DataBar;
         assert_eq!(account(&report, &truth, true)["non_qr_outputs"], 1);
         report.detections = vec![detection];
-        report.detections[0].content.fnc1 = Some(qrcode_ai_scanner::Fnc1Position::First);
+        report.detections[0].content.fnc1 = Some(qrcode_barcode_scanner::Fnc1Position::First);
         assert_eq!(account(&report, &truth, true)["wrong_outputs"], 1);
         report.detections[0].content.fnc1 = None;
         report.detections[0].content.eci = Some(Vec::new());
@@ -275,9 +275,9 @@ mod tests {
             serde_json::from_str(include_str!("../../spec/examples/clean-url.json")).unwrap();
         let truth = report.detections[0].content.text.clone();
         for (charset, truth_outputs, wrong_outputs, strict_correct) in [
-            (qrcode_ai_scanner::Charset::Utf8, 1, 0, true),
-            (qrcode_ai_scanner::Charset::Unknown, 0, 1, false),
-            (qrcode_ai_scanner::Charset::Unrecognized, 0, 1, false),
+            (qrcode_barcode_scanner::Charset::Utf8, 1, 0, true),
+            (qrcode_barcode_scanner::Charset::Unknown, 0, 1, false),
+            (qrcode_barcode_scanner::Charset::Unrecognized, 0, 1, false),
         ] {
             // Change only the declaration: equal bytes/text cannot make a
             // lossy or reader-only reading exact.

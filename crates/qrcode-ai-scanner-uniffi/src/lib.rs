@@ -1,4 +1,4 @@
-//! Kotlin/Android + Swift/iOS bindings for `qrcode-ai-scanner` (UniFFI).
+//! Kotlin/Android + Swift/iOS bindings for `qrcode-barcode-scanner` (UniFFI).
 //!
 //! Thin wrapper over the Rust core: bytes → scan → the same versioned
 //! `ScanReport`, returned as a JSON **String** (serialized via the core's serde

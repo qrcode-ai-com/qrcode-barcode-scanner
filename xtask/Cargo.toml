@@ -17,7 +17,7 @@ rxing = { version = "=0.9.3", default-features = false, features = [
   "full_barcode_format_support",
   "encoding_rs",
 ] }
-qrcode-ai-scanner = { path = "../crates/qrcode-ai-scanner", features = ["serde"] }
+qrcode-barcode-scanner = { path = "../crates/qrcode-ai-scanner", features = ["serde"] }
 qrcode.workspace = true
 image.workspace = true
 serde = { workspace = true }

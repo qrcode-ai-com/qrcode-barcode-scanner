@@ -1484,7 +1484,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrcode-ai-scanner"
+name = "qrcode-ai-scanner-node"
+version = "0.11.0"
+dependencies = [
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "qrcode-barcode-scanner",
+ "serde_json",
+]
+
+[[package]]
+name = "qrcode-ai-scanner-wasm"
+version = "0.11.0"
+dependencies = [
+ "qrcode-barcode-scanner",
+ "rxing",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "qrcode-barcode-scanner"
 version = "0.11.0"
 dependencies = [
  "base64",
@@ -1507,37 +1529,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrcode-ai-scanner-cli"
+name = "qrcode-barcode-scanner-cli"
 version = "0.11.0"
 dependencies = [
  "clap",
  "image",
  "jsonschema",
  "qrcode",
- "qrcode-ai-scanner",
+ "qrcode-barcode-scanner",
  "serde_json",
-]
-
-[[package]]
-name = "qrcode-ai-scanner-node"
-version = "0.11.0"
-dependencies = [
- "napi",
- "napi-build",
- "napi-derive",
- "qrcode-ai-scanner",
- "serde_json",
-]
-
-[[package]]
-name = "qrcode-ai-scanner-wasm"
-version = "0.11.0"
-dependencies = [
- "qrcode-ai-scanner",
- "rxing",
- "serde",
- "serde-wasm-bindgen",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -2336,7 +2336,7 @@ version = "0.11.0"
 dependencies = [
  "image",
  "qrcode",
- "qrcode-ai-scanner",
+ "qrcode-barcode-scanner",
  "rayon",
  "rxing",
  "serde",

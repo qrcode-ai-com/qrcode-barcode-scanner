@@ -20,7 +20,7 @@
 
 use qrcode::bits::Bits;
 use qrcode::{EcLevel, QrCode, Version};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Detection, EngineKind, GeometryKind, ImageInput, Point, ScanProfile, ScanReport, Scanner,
     ScoreDepth, Symbology,
 };
@@ -40,7 +40,7 @@ fn scan(image: &image::GrayImage, profile: &ScanProfile) -> ScanReport {
 fn scan_with(
     image: &image::GrayImage,
     profile: &ScanProfile,
-    adjust: impl FnOnce(&mut qrcode_ai_scanner::ScanConfig),
+    adjust: impl FnOnce(&mut qrcode_barcode_scanner::ScanConfig),
 ) -> ScanReport {
     let mut config = profile.clone().config();
     config.budget_ms = None;
@@ -649,7 +649,7 @@ fn identically_damaged_twins_only_the_rescue_reads_are_two_occurrences() {
     let symbol = fixture(include_bytes!(
         "../../../fixtures/degraded/logo-occluded-rescue.png"
     ));
-    let unscored = |c: &mut qrcode_ai_scanner::ScanConfig| {
+    let unscored = |c: &mut qrcode_barcode_scanner::ScanConfig| {
         c.deep = false;
         c.score_depth = ScoreDepth::Off;
     };

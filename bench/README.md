@@ -15,7 +15,7 @@ dry run never yields a verdict.
 
 | runtime | what runs | base | candidate |
 |---|---|---|---|
-| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner = "=0.10.1"` | worker built against this tree by path |
+| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner` 0.10.1 from crates.io (dependency key `qrcode-barcode-scanner`) | worker built against this tree by path |
 | `cli` | one `qrscan` process per scan | the published 0.10.1 CLI crate, built `--locked` | this tree's CLI |
 | `node` | the napi package's public `scan()` in Node | the v0.10.1 package files with the addon rebuilt from the v0.10.1 source | this tree's package + addon |
 | `wasm` | the wasm package's `scan_image()` in Node | the v0.10.1 portable module (`pkg/compatible`) rebuilt from its source by the release recipe | a package built by `scripts/build-wasm.sh` |
@@ -304,7 +304,7 @@ codes and `file.rs:line:column` panic locations.
 A timing segment starts only when the one-minute load average is at most
 0.5 per logical core (for example 6 on a 12-core host), no other build
 runs (a cargo / rustc process in any worktree of this repository, or
-carrying the `qrscan` / `qrcode-ai-scanner` markers — arguments are read
+carrying the `qrscan` / `qrcode-ai-scanner` / `qrcode-barcode-scanner` markers — arguments are read
 to classify, never
 printed), the host is on AC power outside Low Power Mode, swap use is at
 most 8 GB (8 × 10⁹ bytes), and the run holds the host-wide bench lock
@@ -374,7 +374,7 @@ $X bench prepare-base --work <dir> [--cli-crate qrcode-ai-scanner-cli-0.10.1.cra
 
 # 3b. the candidate CLI on the published crate's profile (Build parity, CLIs)
 $X bench stamp --source . --artifact <target>/candidate-cli/release/qrscan \
-  -- cargo build -p qrcode-ai-scanner-cli --release --locked --target-dir <target>/candidate-cli \
+  -- cargo build -p qrcode-barcode-scanner-cli --release --locked --target-dir <target>/candidate-cli \
   --config profile.release.lto=false --config profile.release.codegen-units=16 \
   --config 'profile.release.strip="debuginfo"'
 

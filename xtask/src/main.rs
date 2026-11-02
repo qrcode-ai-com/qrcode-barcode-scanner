@@ -85,7 +85,7 @@ use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use qrcode_ai_scanner::ImageInput;
+use qrcode_barcode_scanner::ImageInput;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -115,7 +115,7 @@ struct Entry {
     eci: Option<Vec<oracle::Eci>>,
     /// The symbol's FNC1 position (`"first"` · `"second"`). Requires
     /// `raw_hex`.
-    fnc1: Option<qrcode_ai_scanner::Fnc1Position>,
+    fnc1: Option<qrcode_barcode_scanner::Fnc1Position>,
 }
 
 fn repo_root() -> PathBuf {
@@ -878,8 +878,8 @@ fn baseline(bin: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qrcode_ai_scanner::Charset;
-    use qrcode_ai_scanner::Symbology::{self, Ean13, QrCode};
+    use qrcode_barcode_scanner::Charset;
+    use qrcode_barcode_scanner::Symbology::{self, Ean13, QrCode};
 
     #[test]
     fn runtime_repo_root_selection_is_explicit_and_absolute() {
@@ -1012,7 +1012,7 @@ mod tests {
     /// same text under a second symbology is extra output — a miss.
     #[test]
     fn a_text_only_truth_is_met_once() {
-        use qrcode_ai_scanner::Symbology::MicroQrCode;
+        use qrcode_barcode_scanner::Symbology::MicroQrCode;
         let truth = entry(Some("E"), None);
         assert_eq!(
             entry_state(&truth, &seen(&[(QrCode, "E"), (MicroQrCode, "E")])),

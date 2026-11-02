@@ -1,4 +1,4 @@
-//! Node bindings — `@supernovae-st/qrcode-ai-scanner`.
+//! Node bindings — `@qrcode-ai-com/qrcode-barcode-scanner`.
 //!
 //! CPU-bound scans run as `AsyncTask` on the libuv pool: the event loop
 //! never blocks, even on a 2-4s artistic-QR Full scan. `AbortSignal`
@@ -11,7 +11,7 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, ImageInput, Limits, ScanConfig, ScanProfile, Scanner, ScoreCheck, ScorePreset,
     StressAxis, options,
 };
@@ -169,11 +169,11 @@ fn profile_from(
     Ok(ScanProfile::Custom(config))
 }
 
-fn to_json(report: &qrcode_ai_scanner::ScanReport) -> Result<String> {
+fn to_json(report: &qrcode_barcode_scanner::ScanReport) -> Result<String> {
     serde_json::to_string(report).map_err(|e| Error::from_reason(format!("serialize: {e}")))
 }
 
-fn scan_error(e: &qrcode_ai_scanner::ScanError) -> Error {
+fn scan_error(e: &qrcode_barcode_scanner::ScanError) -> Error {
     // QRS-xxx lands in the message — consumers match `[QRS-...]`
     Error::new(Status::GenericFailure, format!("{} [{}]", e, e.code()))
 }
@@ -298,6 +298,6 @@ pub fn version() -> String {
 /// return. Says which readers are included, not that an image will decode.
 #[napi]
 pub fn capabilities_json() -> Result<String> {
-    serde_json::to_string(&qrcode_ai_scanner::Capabilities::current())
+    serde_json::to_string(&qrcode_barcode_scanner::Capabilities::current())
         .map_err(|e| Error::from_reason(format!("serialize: {e}")))
 }

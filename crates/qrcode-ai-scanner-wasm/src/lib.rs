@@ -1,11 +1,11 @@
-//! Browser bindings — `@supernovae-st/qrcode-ai-scanner-wasm`.
+//! Browser bindings — `@qrcode-ai-com/qrcode-barcode-scanner-wasm`.
 //!
 //! Two entry points: `scan_image` (encoded bytes — upload/verify flows) and
 //! `scan_frame` (raw RGBA from `ImageData` — live camera, no PNG roundtrip).
 //! Both return the full `ScanReport` contract as a JS object (snake_case,
 //! `raw` as base64) — identical shape to the server/CLI surfaces.
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, Capabilities, ImageInput, Limits, ScanConfig, ScanError, ScanProfile, Scanner,
     ScoreCheck, ScorePreset, StressAxis, options,
 };

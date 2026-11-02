@@ -785,7 +785,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
 
 [[package]]
-name = "qrcode-ai-scanner"
+name = "qrcode-ai-scanner-uniffi"
+version = "0.11.0"
+dependencies = [
+ "qrcode-barcode-scanner",
+ "serde_json",
+ "thiserror",
+ "uniffi",
+]
+
+[[package]]
+name = "qrcode-barcode-scanner"
 version = "0.11.0"
 dependencies = [
  "base64",
@@ -798,16 +808,6 @@ dependencies = [
  "serde",
  "thiserror",
  "web-time",
-]
-
-[[package]]
-name = "qrcode-ai-scanner-uniffi"
-version = "0.11.0"
-dependencies = [
- "qrcode-ai-scanner",
- "serde_json",
- "thiserror",
- "uniffi",
 ]
 
 [[package]]

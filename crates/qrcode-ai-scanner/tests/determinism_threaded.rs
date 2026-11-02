@@ -13,7 +13,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use pretty_assertions::assert_eq;
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
 
 const THREADS: usize = 4;
 
@@ -24,7 +24,7 @@ fn fixture(rel: &str) -> Vec<u8> {
 
 /// Serialize with the wall-clock fields zeroed — the only report content
 /// allowed to differ between two runs of the same scan.
-fn normalized_json(mut report: qrcode_ai_scanner::ScanReport) -> String {
+fn normalized_json(mut report: qrcode_barcode_scanner::ScanReport) -> String {
     report.trace.total_ms = 0.0;
     for stage in &mut report.trace.stages {
         stage.ms = 0.0;

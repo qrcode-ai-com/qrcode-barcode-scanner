@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, Capabilities, Charset, DecodedContent, ImageInput, ScanConfig, ScanProfile,
     ScanReport, Scanner, ScoreCheck, ScoreDepth, ScorePreset, StressAxis,
 };
@@ -324,7 +324,7 @@ fn content_lines(content: &DecodedContent) -> Vec<String> {
 
 /// The alpha block of the pretty view: the flatten verdict line + the
 /// placement-envelope strip (every probe a tested background).
-fn render_alpha(alpha: &qrcode_ai_scanner::AlphaReport) {
+fn render_alpha(alpha: &qrcode_barcode_scanner::AlphaReport) {
     println!(
         "alpha     over {} · {:?} · coverage {:.0}% · content luma {}{}",
         alpha.background,
@@ -530,13 +530,13 @@ fn parse_skip_checks(args: &[String]) -> Result<Vec<ScoreCheck>, ExitCode> {
 
 /// Parse `--alpha-palette` colors with the CLI's loud-typo posture.
 fn parse_palette_args(args: &[String]) -> Result<Vec<[u8; 3]>, ExitCode> {
-    if args.len() > qrcode_ai_scanner::ScanConfig::MAX_ALPHA_PALETTE {
+    if args.len() > qrcode_barcode_scanner::ScanConfig::MAX_ALPHA_PALETTE {
         let th = term::Theme::auto_stderr();
         eprintln!(
             "{} alpha palette too large: {} colors (max {})",
             th.err_strong("✖"),
             args.len(),
-            qrcode_ai_scanner::ScanConfig::MAX_ALPHA_PALETTE
+            qrcode_barcode_scanner::ScanConfig::MAX_ALPHA_PALETTE
         );
         return Err(ExitCode::from(2));
     }
@@ -714,7 +714,7 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
-    use qrcode_ai_scanner::ScanConfig;
+    use qrcode_barcode_scanner::ScanConfig;
 
     /// A report as the wire carries it: one QR detection or none, a score
     /// or null, the budget flag.

@@ -136,7 +136,7 @@ impl Mode {
 
     /// The preset's wall-clock budget (the same in 0.10.1 and this tree).
     pub(crate) fn budget_ms(self) -> Option<u64> {
-        use qrcode_ai_scanner::ScanProfile;
+        use qrcode_barcode_scanner::ScanProfile;
         let preset = match self {
             Self::Full => ScanProfile::Full,
             Self::FullUnbounded => return None,
@@ -1198,18 +1198,18 @@ fn candidate_source(
             ScannerUnit::Linked(unit) => match &unit.checkout {
                 Some(c) if unit.source == "path" && c.sha == measured.git_sha && c.tree == "clean" => {}
                 Some(c) => found.push(format!(
-                    "links qrcode-ai-scanner from {} at {} ({}), not the measured tree",
+                    "links qrcode-barcode-scanner from {} at {} ({}), not the measured tree",
                     unit.source,
                     short(&c.sha),
                     c.tree
                 )),
                 None => found.push(format!(
-                    "links qrcode-ai-scanner from {} outside any git work tree, not the measured tree",
+                    "links qrcode-barcode-scanner from {} outside any git work tree, not the measured tree",
                     unit.source
                 )),
             },
             ScannerUnit::Missing => {
-                found.push(String::from("its build shows no qrcode-ai-scanner unit"));
+                found.push(String::from("its build shows no qrcode-barcode-scanner unit"));
             }
             ScannerUnit::Unrecorded => {}
         }
@@ -1224,7 +1224,7 @@ fn hello_identity(runtime: Runtime, variant: Variant, hello: &Hello) -> Vec<Stri
     let side = variant.as_str();
     let expected = match variant {
         Variant::Base => super::BASE_VERSION.to_owned(),
-        Variant::Candidate => qrcode_ai_scanner::Versions::current().scanner,
+        Variant::Candidate => qrcode_barcode_scanner::Versions::current().scanner,
     };
     let mut found = Vec::new();
     if hello.scanner != expected {
@@ -4365,7 +4365,7 @@ mod tests {
     /// the candidates from the measured tree; each hello names its side.
     #[test]
     fn sides_built_from_their_own_sources_pass() {
-        let current = qrcode_ai_scanner::Versions::current().scanner;
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
         let base = super::super::BASE_VERSION;
         let registry = Some((base, "crates.io", None));
         let from_tree = Some((current.as_str(), "path", Some(("c0ffee", "clean"))));
@@ -4470,7 +4470,7 @@ mod tests {
             identity_of((Runtime::Wasm, Variant::Base), &wasm, None),
             refused
         );
-        let current = qrcode_ai_scanner::Versions::current().scanner;
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
         let mut candidate = stamped(
             ("git", "c0ffee", "clean"),
             Some((current.as_str(), "path", None)),
@@ -4496,7 +4496,7 @@ mod tests {
         reason = "one table of refused sides, each with its exact finding"
     )]
     fn swapped_mislabelled_and_dirty_sides_are_refused() {
-        let current = qrcode_ai_scanner::Versions::current().scanner;
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
         let base = super::super::BASE_VERSION;
         let registry = Some((base, "crates.io", None));
         let from_tree = Some((current.as_str(), "path", Some(("c0ffee", "clean"))));
@@ -4531,7 +4531,7 @@ mod tests {
         );
         assert!(
             swapped_candidate.contains(&String::from(
-                "source: candidate: links qrcode-ai-scanner from crates.io outside any git work tree, not the measured tree"
+                "source: candidate: links qrcode-barcode-scanner from crates.io outside any git work tree, not the measured tree"
             )) && swapped_candidate.contains(&String::from(
                 "scanner: candidate: the worker was built as qrscan-bench-worker-base, not qrscan-bench-worker-candidate"
             )),
@@ -4597,7 +4597,7 @@ mod tests {
                     Some((current.as_str(), "path", Some(("c0ffee", "dirty")))),
                 ),
                 String::from(
-                    "source: candidate: links qrcode-ai-scanner from path at c0ffee (dirty), not the measured tree",
+                    "source: candidate: links qrcode-barcode-scanner from path at c0ffee (dirty), not the measured tree",
                 ),
             ),
         ];

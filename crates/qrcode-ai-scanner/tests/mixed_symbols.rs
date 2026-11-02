@@ -6,7 +6,7 @@
 #![cfg(feature = "engine-rxing")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner, Symbology};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner, Symbology};
 
 const BARCODE: &str = "STOCK-4827";
 const QR: &str = "https://qrc-ai.com/mixed-symbols";
@@ -67,7 +67,7 @@ fn the_console_mixed_code128_is_read_at_original_resolution() {
     let mut config = ScanProfile::Full.config();
     config.pyramid = false;
     config.budget_ms = None;
-    config.score_depth = qrcode_ai_scanner::ScoreDepth::Off;
+    config.score_depth = qrcode_barcode_scanner::ScoreDepth::Off;
     let report = Scanner::builder()
         .profile(ScanProfile::Custom(config))
         .build()
@@ -203,7 +203,7 @@ fn image_with_small_data_matrix(matrix_first: bool) -> image::GrayImage {
     mixed
 }
 
-fn exact_contents(report: &qrcode_ai_scanner::ScanReport) -> Vec<(Symbology, &str, &[u8])> {
+fn exact_contents(report: &qrcode_barcode_scanner::ScanReport) -> Vec<(Symbology, &str, &[u8])> {
     let mut contents: Vec<_> = report
         .detections
         .iter()

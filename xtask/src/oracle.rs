@@ -67,7 +67,7 @@
 //! rule. Identical outputs are grouped before judging, the 16-detection cap
 //! and QR-first order (our wire shape) are recorded as information, and
 //! dispositions apply their outcome rule unchanged — an output that is not
-//! the pinned qrcode-ai-scanner reading marks the entry `differs`
+//! the pinned qrcode-barcode-scanner reading marks the entry `differs`
 //! (information) instead of stale. `--emit-observed <jsonl>` writes our own
 //! scans in that shape (decoded text and bytes included: keep it local).
 
@@ -75,7 +75,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Charset, Detection, EngineKind, Fnc1Position, ImageInput, Scanner, Symbology, Versions,
 };
 use rayon::prelude::*;
@@ -621,7 +621,7 @@ pub(crate) struct Disposition {
     pub(crate) image_sha256: &'static str,
     pub(crate) truth_sha256: &'static str,
     pub(crate) kind: DispositionKind,
-    /// The qrcode-ai-scanner judge verdict this entry was written against.
+    /// The qrcode-barcode-scanner judge verdict this entry was written against.
     pub(crate) verdict: Outcome,
     /// Why — public corpus facts only.
     pub(crate) note: &'static str,
@@ -665,7 +665,7 @@ enum DispositionState {
     /// Our own scan: hashes as pinned, but the output is not what the pin
     /// excuses — edit the table deliberately (blocks).
     Stale,
-    /// Observed decoder: its output is not the pinned qrcode-ai-scanner
+    /// Observed decoder: its output is not the pinned qrcode-barcode-scanner
     /// reading. Information only — the outcome rule still applies.
     Differs,
     /// Original pins still hold, but independently validated effective text
@@ -985,7 +985,7 @@ fn verdict_of(expected: Option<&[Expected]>, scan: &Scan, wire_binds: bool) -> V
 // ------------------------------------------------------------- observed
 
 /// Name the emitted and observed files use for our own scanner.
-const OUR_DECODER: &str = "qrcode-ai-scanner";
+const OUR_DECODER: &str = "qrcode-barcode-scanner";
 
 /// A decoder's metadata line in an `--observed` file.
 #[derive(Debug, Deserialize)]
@@ -2730,7 +2730,7 @@ pub(crate) fn run(args: Vec<String>) {
 mod tests {
     use super::*;
     use crate::external::RootSource;
-    use qrcode_ai_scanner::Symbology::{Ean13, MicroQrCode, QrCode};
+    use qrcode_barcode_scanner::Symbology::{Ean13, MicroQrCode, QrCode};
 
     fn qr(text: &str) -> Unit {
         Unit {
@@ -3304,7 +3304,7 @@ mod tests {
 
     /// The same outcome rule for every decoder; only our own scan's
     /// unexcused output is a stale (blocking) table — another decoder's
-    /// merely `differs` from the pinned qrcode-ai-scanner reading.
+    /// merely `differs` from the pinned qrcode-barcode-scanner reading.
     #[test]
     fn dispositions_apply_identically_to_every_decoder() {
         let [known_wrong, double_qr] = DISPOSITIONS;

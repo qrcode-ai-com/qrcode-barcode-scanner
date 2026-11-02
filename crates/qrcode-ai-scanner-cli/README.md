@@ -1,4 +1,4 @@
-# qrcode-ai-scanner-cli
+# qrcode-barcode-scanner-cli
 
 `qrscan` — scan and validate QR codes from the command line (artistic /
 AI-generated specialty). JSON `ScanReport` by default, `--pretty` for humans,
@@ -7,10 +7,11 @@ input, usage or fault, and with `-s` a configuration that computes no score
 · `3` (`-s` only) decoded, not judged within the budget.
 
 ```bash
-cargo install qrcode-ai-scanner-cli
 qrscan image.png --pretty
 qrscan --capabilities   # the compiled readers: versions, engines, symbologies
 ```
 
-Powered by [qrcode-ai-scanner](https://crates.io/crates/qrcode-ai-scanner).
+Releases up to 0.10.1 were published as `qrcode-ai-scanner-cli`; both install `qrscan`.
+
+Powered by [qrcode-barcode-scanner](https://crates.io/crates/qrcode-barcode-scanner).
 License: AGPL-3.0-or-later · © SuperNovae Studio.
