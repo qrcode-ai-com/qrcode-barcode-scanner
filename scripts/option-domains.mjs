@@ -6,6 +6,7 @@
 // on the INSTALLED packages, by packed-node-consumer.mjs: a pass on the
 // source tree does not stand for the packed loader or glue.
 import assert from "node:assert/strict";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const MAX_BUDGET_MS = 4294967295;
@@ -62,8 +63,9 @@ const show = (options) => Object.entries(options)
  * null/undefined leave one unset. `path.input` is a clean symbol (or a
  * blank frame) whose final report decodes exactly `path.texts`, and
  * `path.size` its [width, height]. `path.unreadable` is an input the scanner
- * refuses with `path.unreadableCode` once its options are valid: an invalid
- * option beside it must still be QRS-006, reported before the input is read.
+ * refuses with `path.unreadableCode` once its options are valid: every
+ * refused value beside it must still be QRS-006, reported before the input
+ * is read.
  */
 export async function assertOptionDomains(path) {
   const { name, call, input, texts, size, unreadable, unreadableCode } = path;
@@ -86,8 +88,9 @@ export async function assertOptionDomains(path) {
     assert.deepEqual(outcome(await scanned(options, label)), [texts, false], label);
   };
   const refused = async (options, code, bytes = input) => {
+    const where = bytes === input ? "" : " beside the unreadable input";
     // a synchronous throw and a rejected promise are both refusals
-    await assert.rejects(async () => run(options, bytes), code, `${name} ${show(options)}`);
+    await assert.rejects(async () => run(options, bytes), code, `${name} ${show(options)}${where}`);
   };
   const { budgetMs, maxDimension, maxPixels } = DOMAINS;
   for (const value of budgetMs.unset) {
@@ -121,12 +124,14 @@ export async function assertOptionDomains(path) {
     await final({ budgetMs: 0, [option]: domain.ceiling });
   }
   await final({ budgetMs: 0, maxDimension: null, maxPixels: null });
-  // the option is reported before the input is read
+  // every refused value is reported before the input is read; a cap's
+  // boundaries depend on the image, so they run beside the readable input only
   await assert.rejects(async () => run({ budgetMs: 0 }, unreadable), new RegExp(`\\[${unreadableCode}\\]`),
     `${name} the unreadable control`);
-  for (const options of [{ maxDimension: 0 }, { maxPixels: NaN }, { budgetMs: MAX_BUDGET_MS + 2 }]) {
-    const [option] = Object.keys(options);
-    await refused(options, refusedOption(option), unreadable);
+  for (const option of ["maxDimension", "maxPixels", "budgetMs"]) {
+    for (const value of DOMAINS[option].refused) {
+      await refused({ [option]: value }, refusedOption(option), unreadable);
+    }
   }
   return cases;
 }
@@ -153,7 +158,7 @@ const modelLimit = (wire, value, max, unset) => {
 
 /** A scan path over the model (then input.rs's caps), with at most one
  * planted defect: a replaced budget or limit mapping, cap comparison, or
- * the input read before the options. */
+ * the input read before the options `inputFirst(options)` accepts. */
 function modelPath(defect = {}) {
   const budget = defect.budget ?? modelBudget;
   const limit = defect.limit ?? modelLimit;
@@ -161,7 +166,7 @@ function modelPath(defect = {}) {
   const input = { size: [264, 264], texts: ["qrc.ai/v2l"] };
   const unreadable = { unreadable: true };
   const call = (options, image) => {
-    if (defect.inputFirst && image.unreadable) throw fault("QRS-001", "the input cannot be read");
+    if (defect.inputFirst?.(options) && image.unreadable) throw fault("QRS-001", "the input cannot be read");
     const ms = budget(options.budgetMs);
     const maxDimension = limit("max_dimension", options.maxDimension, MAX_DIMENSION, 10_000);
     const maxPixels = limit("max_pixels", options.maxPixels, MAX_PIXELS, 64_000_000);
@@ -211,7 +216,13 @@ export async function selfTest() {
     "null refused": [{ limit: (wire, value, max, unset) => modelLimit(wire, value === null ? NaN : value, max, unset) },
       "maxDimension=null: final"],
     "a cap refusing its exact value": [{ over: (side, cap) => side >= cap }, "maxDimension=264: final"],
-    "the input read before the options": [{ inputFirst: true }, "model maxDimension=0"],
+    "the input read before the options": [{ inputFirst: () => true },
+      "model maxDimension=0 beside the unreadable input"],
+    // one class of value mapped after the input is read (a late check)
+    "a negative cap checked after the input": [{ inputFirst: ({ maxPixels }) => maxPixels < 0 },
+      "model maxPixels=-1 beside the unreadable input"],
+    "an over-range budget checked after the input": [{ inputFirst: ({ budgetMs }) => budgetMs > MAX_BUDGET_MS },
+      "model budgetMs=4294967296 beside the unreadable input"],
   };
   for (const [defect, [planted, expected]] of Object.entries(defects)) {
     await assert.rejects(() => assertOptionDomains(modelPath(planted)), (error) => {
@@ -222,7 +233,18 @@ export async function selfTest() {
   return { cases, refusals: Object.keys(defects).length };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+/** Whether node runs this file. argv[1] keeps the command line's symlinks
+ * (macOS /tmp), and so does the module URL under --preserve-symlinks-main:
+ * compare both real paths. */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false; // no script path: node -e, a REPL
+  }
+};
+
+if (isMain()) {
   if (process.argv.slice(2).join(" ") !== "--self-test") throw new Error("usage: option-domains.mjs --self-test");
   console.log(JSON.stringify({ self_test: "PASS", ...await selfTest() }));
 }

@@ -22,13 +22,25 @@ SCHEMA = "qrscan-consumer-truth/1"
 QR_FAMILY = {"qr_code", "micro_qr_code", "rectangular_micro_qr_code"}
 # points per geometry kind (spec/01-report.md § Occurrences)
 POINTS = {"quad": (4, 4), "segment": (2, 2), "partial": (1, 8), "unavailable": (0, 0)}
+# trace.saturation of a scan that reached no capacity (spec/01-report.md § PipelineTrace)
+UNSATURATED = {"reads": False, "detections": False, "occurrences": False}
 
 
 def load(path=TRUTH):
-    truth = json.loads(Path(path).read_text(encoding="utf-8"))
+    return prepare(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def prepare(truth):
+    """Check a parsed truth; a case without its own tolerance_px takes the document's."""
     assert truth["schema"] == SCHEMA, truth.get("schema")
+    tolerance = truth.get("tolerance_px")
+    pixels = type(tolerance) in (int, float) and math.isfinite(tolerance) and tolerance >= 0
+    assert pixels, f"truth tolerance_px {tolerance!r}"
     ids = [case["id"] for case in truth["cases"]]
     assert len(ids) == len(set(ids)), "duplicate case id"
+    for case in truth["cases"]:
+        if case.get("tolerance_px") is None:
+            case["tolerance_px"] = tolerance
     return truth
 
 
@@ -146,8 +158,10 @@ def judge(case, report, versions):
         problems.append(f"{name}: versions {report.get('versions')} != {versions}")
     if report["trace"]["budget_exhausted"] is not False:
         problems.append(f"{name}: the unbudgeted scan was cut")
-    saturation = report.get("saturation")
-    if saturation and any(saturation.values()):
+    saturation = report["trace"].get("saturation")
+    if saturation is None:
+        problems.append(f"{name}: no trace.saturation")
+    elif canonical(saturation) != canonical(UNSATURATED):
         problems.append(f"{name}: saturated {saturation}")
     detections = report["detections"]
     expected = case["contents"]
@@ -158,16 +172,18 @@ def judge(case, report, versions):
             matches = [i for i, d in enumerate(detections)
                        if d["symbology"] == want["symbology"] and d["content"] == content]
         else:
-            # a text truth: no reader independent of the scanner states the bytes
+            # a text truth states the text and its charset, not the bytes: no
+            # reader independent of the scanner states them
             matches = [i for i, d in enumerate(detections)
-                       if d["symbology"] == want["symbology"] and d["content"]["text"] == want["text"]]
+                       if d["symbology"] == want["symbology"] and d["content"]["text"] == want["text"]
+                       and d["content"].get("charset") == want.get("charset")]
         if len(matches) != 1:
             problems.append(f"{name}: {want['symbology']} {want['text']!r} found {len(matches)} times")
             found.append(None)
             continue
         found.append(matches[0])
         detection = detections[matches[0]]
-        if not _match_occurrences(detection.get("occurrences", []), want["occurrences"], case.get("tolerance_px", 2.0)):
+        if not _match_occurrences(detection.get("occurrences", []), want["occurrences"], case["tolerance_px"]):
             seen = [(o["geometry"]["kind"], [(round(p["x"], 1), round(p["y"], 1)) for p in o["geometry"]["points"]])
                     for o in detection.get("occurrences", [])]
             problems.append(f"{name}: {want['symbology']} occurrences {seen} != {want['occurrences']}")
@@ -226,7 +242,8 @@ def conforming_report(case, versions):
     if isinstance(case.get("primary"), int):
         detections.insert(0, detections.pop(case["primary"]))
     score = None if case["score"] is None else {"value": case["score"] if isinstance(case["score"], int) else 50}
-    return {"versions": versions, "detections": detections, "score": score, "trace": {"budget_exhausted": False}}
+    return {"versions": versions, "detections": detections, "score": score,
+            "trace": {"budget_exhausted": False, "saturation": dict(UNSATURATED)}}
 
 
 def self_test(truth):
@@ -279,8 +296,15 @@ def self_test(truth):
         "a score on nothing": ("valid-empty", lambda r: setitem(r, "score", {"value": 0}), "truth says null"),
         "another value": ("qr-v5q-control", lambda r: setitem(r, "score", {"value": 99}), "score 99 != 100"),
         "a cut scan": ("aztec", lambda r: setitem(r["trace"], "budget_exhausted", True), "was cut"),
-        "a saturated scan": ("aztec", lambda r: setitem(r, "saturation", {"reads": False, "detections": False,
-                                                                           "occurrences": True}), "saturated"),
+        "a saturated scan": ("aztec", lambda r: setitem(r["trace"]["saturation"], "occurrences", True),
+                             "saturated"),
+        "no saturation": ("aztec", lambda r: r["trace"].pop("saturation"), "no trace.saturation"),
+        # only all three flags, each false, are unsaturated (0 == False in Python)
+        "a partial saturation": ("aztec", lambda r: r["trace"]["saturation"].pop("occurrences"), "saturated"),
+        "a non-boolean flag": ("aztec", lambda r: setitem(r["trace"]["saturation"], "reads", 0), "saturated"),
+        "a text truth's charset": ("rescue-occluded",
+                                   lambda r: setitem(r["detections"][0]["content"], "charset", "latin1"),
+                                   "found 0 times"),
         "other versions": ("aztec", lambda r: setitem(r, "versions", {**versions, "pipeline": 4}), "versions"),
     }
     for name, (case_id, change, expected) in refusals.items():
@@ -290,7 +314,17 @@ def self_test(truth):
     report = conforming_report(cases["qr-and-code128"], versions)
     report["detections"].reverse()
     assert any("is not QR family" in p for p in judge(family, report, versions)), "a barcode as the QR-family primary"
-    return len(refusals) + 1
+
+    # a case that states no tolerance takes the document's
+    def shifted(tolerance, dx):
+        case = prepare({**truth, "tolerance_px": tolerance,
+                        "cases": [{**cases["eci4-eci26-equal-text"], "tolerance_px": None}]})["cases"][0]
+        moved = conforming_report(case, versions)
+        point(moved, 0, 0, dx)
+        return judge(case, moved, versions)
+    assert any("occurrences" in p for p in shifted(1, 1.5)), "a corner 1.5 px off at 1 px"
+    assert shifted(3, 2.5) == [], ("a corner 2.5 px off at 3 px", shifted(3, 2.5))
+    return len(refusals) + 2
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
 // occurrence's geometry, the score/null association and the unbudgeted,
 // unsaturated trace. Node built-ins only.
 import { createHash } from "node:crypto";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
@@ -17,12 +17,21 @@ const SCHEMA = "qrscan-consumer-truth/1";
 const QR_FAMILY = new Set(["qr_code", "micro_qr_code", "rectangular_micro_qr_code"]);
 // points per geometry kind (spec/01-report.md § Occurrences)
 const POINTS = { quad: [4, 4], segment: [2, 2], partial: [1, 8], unavailable: [0, 0] };
+// trace.saturation of a scan that reached no capacity (spec/01-report.md § PipelineTrace)
+const UNSATURATED = { reads: false, detections: false, occurrences: false };
 
 export function load(path = TRUTH) {
-  const truth = JSON.parse(readFileSync(path, "utf8"));
+  return prepare(JSON.parse(readFileSync(path, "utf8")));
+}
+
+/** Check a parsed truth; a case without its own tolerance_px takes the document's. */
+function prepare(truth) {
   if (truth.schema !== SCHEMA) throw new Error(`truth schema ${truth.schema}`);
+  const tolerance = truth.tolerance_px;
+  if (!(Number.isFinite(tolerance) && tolerance >= 0)) throw new Error(`truth tolerance_px ${tolerance}`);
   const ids = truth.cases.map(({ id }) => id);
   if (new Set(ids).size !== ids.length) throw new Error("duplicate case id");
+  for (const testCase of truth.cases) testCase.tolerance_px ??= tolerance;
   return truth;
 }
 
@@ -143,15 +152,18 @@ export function judge(testCase, report, versions) {
   const name = testCase.id;
   if (canon(report.versions) !== canon(versions)) problems.push(`${name}: versions ${canon(report.versions)} != ${canon(versions)}`);
   if (report.trace.budget_exhausted !== false) problems.push(`${name}: the unbudgeted scan was cut`);
-  if (report.saturation && Object.values(report.saturation).some(Boolean)) problems.push(`${name}: saturated ${canon(report.saturation)}`);
+  const { saturation } = report.trace;
+  if (saturation == null) problems.push(`${name}: no trace.saturation`);
+  else if (canon(saturation) !== canon(UNSATURATED)) problems.push(`${name}: saturated ${canon(saturation)}`);
   const { detections } = report;
   const expected = testCase.contents;
-  const tolerance = testCase.tolerance_px ?? 2;
+  const tolerance = testCase.tolerance_px;
   const found = expected.map((want) => {
     const matches = detections.flatMap((d, i) => (d.symbology === want.symbology && ("raw_hex" in want
       ? canon(d.content) === canon(wireContent(want))
-      // a text truth: no reader independent of the scanner states the bytes
-      : d.content.text === want.text) ? [i] : []));
+      // a text truth states the text and its charset, not the bytes: no
+      // reader independent of the scanner states them
+      : d.content.text === want.text && d.content.charset === want.charset) ? [i] : []));
     if (matches.length !== 1) {
       problems.push(`${name}: ${want.symbology} ${JSON.stringify(want.text)} found ${matches.length} times`);
       return null;
@@ -201,7 +213,7 @@ export function conformingReport(testCase, versions) {
       reader: o.kind === "unavailable" ? null : "rxing" } })) }));
   if (Number.isInteger(testCase.primary)) detections.unshift(...detections.splice(testCase.primary, 1));
   const score = testCase.score === null ? null : { value: Number.isInteger(testCase.score) ? testCase.score : 50 };
-  return { versions, detections, score, trace: { budget_exhausted: false } };
+  return { versions, detections, score, trace: { budget_exhausted: false, saturation: { ...UNSATURATED } } };
 }
 
 /** The judge accepts every conforming report and names each departure
@@ -238,8 +250,13 @@ export function selfTest(truth) {
     "a score on nothing": ["valid-empty", (r) => { r.score = { value: 0 }; }, "truth says null"],
     "another value": ["qr-v5q-control", (r) => { r.score = { value: 99 }; }, "score 99 != 100"],
     "a cut scan": ["aztec", (r) => { r.trace.budget_exhausted = true; }, "was cut"],
-    "a saturated scan": ["aztec", (r) => { r.saturation = { reads: false, detections: false, occurrences: true }; },
-      "saturated"],
+    "a saturated scan": ["aztec", (r) => { r.trace.saturation.occurrences = true; }, "saturated"],
+    "no saturation": ["aztec", (r) => { delete r.trace.saturation; }, "no trace.saturation"],
+    // only all three flags, each false, are unsaturated
+    "a partial saturation": ["aztec", (r) => { delete r.trace.saturation.occurrences; }, "saturated"],
+    "a non-boolean flag": ["aztec", (r) => { r.trace.saturation.reads = 0; }, "saturated"],
+    "a text truth's charset": ["rescue-occluded", (r) => { r.detections[0].content.charset = "latin1"; },
+      "found 0 times"],
     "other versions": ["aztec", (r) => { r.versions = { ...versions, pipeline: 4 }; }, "versions"],
   };
   for (const [refusal, [id, change, expected]] of Object.entries(refusals)) {
@@ -254,10 +271,31 @@ export function selfTest(truth) {
   if (!judge(family, report, versions).some((p) => p.includes("is not QR family"))) {
     throw new Error("a barcode as the QR-family primary");
   }
-  return Object.keys(refusals).length + 1;
+  // a case that states no tolerance takes the document's
+  const shifted = (tolerance, dx) => {
+    const [testCase] = prepare({ ...truth, tolerance_px: tolerance,
+      cases: [{ ...cases["eci4-eci26-equal-text"], tolerance_px: undefined }] }).cases;
+    const moved = conformingReport(testCase, versions);
+    point(moved, 0, 0, dx);
+    return judge(testCase, moved, versions);
+  };
+  if (!shifted(1, 1.5).some((p) => p.includes("occurrences"))) throw new Error("a corner 1.5 px off at 1 px");
+  if (shifted(3, 2.5).length) throw new Error(`a corner 2.5 px off at 3 px: ${shifted(3, 2.5)}`);
+  return Object.keys(refusals).length + 2;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+/** Whether node runs this file. argv[1] keeps the command line's symlinks
+ * (macOS /tmp), and so does the module URL under --preserve-symlinks-main:
+ * compare both real paths. */
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false; // no script path: node -e, a REPL
+  }
+};
+
+if (isMain()) {
   if (process.argv.slice(2).join(" ") !== "--self-test") throw new Error("usage: consumer-truth.mjs --self-test");
   const truth = load();
   console.log(JSON.stringify({ self_test: "PASS", cases: truth.cases.length, refusals: selfTest(truth) }));

@@ -1,6 +1,6 @@
 {
  "schema": "qrscan-consumer-truth/1",
- "about": "The shared truth set every installed-package consumer runs (QR-28): exact contents, occurrences and score/null association per input. Scan each with the full profile and no budget. Contents compare as a multiset; `primary` is the index of the content detections[0] must be, \"qr_family\" when the contract only fixes its family, null when no contract fixes it. Occurrence `near`/`within` geometry comes from the composition layout; occurrence kinds are the reader-capability contract of this candidate.",
+ "about": "The shared truth set every installed-package consumer runs (QR-28): exact contents, occurrences and score/null association per input. Scan each with the full profile and no budget: every report is final and unsaturated (`trace.budget_exhausted` and each `trace.saturation` flag false). Contents compare as a multiset; a content without `raw_hex` is a text truth, whose text and charset compare but not its bytes. `primary` is the index of the content detections[0] must be, \"qr_family\" when the contract only fixes its family, null when no contract fixes it. Occurrence `near`/`within` geometry comes from the composition layout, within `tolerance_px` unless a case states its own; occurrence kinds are the reader-capability contract of this candidate.",
  "scan": {
   "profile": "full",
   "budget_ms": 0
