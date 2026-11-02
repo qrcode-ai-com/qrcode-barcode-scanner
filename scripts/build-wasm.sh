@@ -73,14 +73,17 @@ python3 "$root/scripts/wasm_provenance.py" write pkg \
 node test.mjs
 node camera.test.mjs
 node camera-replay.test.mjs
+# The overlay's pure helpers and import contract (no browser needed).
+node camera-overlay.unit.test.mjs
 # The destination suites use fake transports and loopback fixtures only: no
 # request leaves this machine.
 node destination.test.mjs
 node destination-node.test.mjs
-# camera-overlay.test.mjs needs a real browser: scripts/packed-wasm-browser.mjs
-# runs it against the packed archive. destination.browser.test.mjs needs one
-# too, and no script or CI job runs it yet: run it by hand (its header lists
-# the Playwright, Vite and package variables it reads).
+# camera-overlay.test.mjs (the rendered overlay) needs a real browser:
+# scripts/packed-wasm-browser.mjs runs it against the packed archive.
+# destination.browser.test.mjs needs one too, and no script or CI job runs it
+# yet: run it by hand (its header lists the Playwright, Vite and package
+# variables it reads).
 
 raw=$(wc -c <pkg/qrcode-ai-scanner_bg.wasm)
 gz=$(gzip -9 -c pkg/qrcode-ai-scanner_bg.wasm | wc -c)
