@@ -1,6 +1,6 @@
-# qrcode-ai-scanner — Kotlin / Android binding
+# qrcode-barcode-scanner — Kotlin / Android binding
 
-The Android library module (AAR) for `qrcode-ai-scanner`, generated from the
+The Android library module (AAR) for `qrcode-barcode-scanner`, generated from the
 shared UniFFI crate `crates/qrcode-ai-scanner-uniffi` (the engine; this is the
 Gradle shell). One crate produces both this Kotlin binding and the Swift one in
 `../swift/`.
@@ -16,19 +16,13 @@ Dual-licensed **AGPL-3.0-or-later OR commercial** — see the repo-root
 almost always closed-source and therefore needs the **commercial** license.
 Contact `studio.supernovae@gmail.com`.
 
-## Install (JitPack)
+## Install
 
-```kotlin
-// settings.gradle.kts (or root build.gradle.kts repositories)
-repositories {
-    maven { url = uri("https://jitpack.io") }
-}
+No JitPack build of this module has been qualified yet, so there is no
+dependency line to copy: build the AAR from source as shown in
+[Build locally](#build-locally).
 
-// app/build.gradle.kts
-dependencies {
-    implementation("com.github.supernovae-st:qrcode-ai-scanner:v0.11.0")
-}
-```
+JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:v0.11.0
 
 ## Usage
 
