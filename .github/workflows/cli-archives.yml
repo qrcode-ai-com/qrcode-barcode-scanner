@@ -1,0 +1,732 @@
+name: cli-archives
+
+# Prebuilt qrscan archives (RELEASING.md § CLI archives): one per target, the
+# corresponding source and SHA256SUMS. Every run builds, assembles, inspects
+# and consumes them, natively on five hosts and in four glibc containers, then
+# qualifies the set; a v* tag alone attaches it, and only into the draft
+# release the owner created before the tag. No job creates, edits, publishes
+# or deletes a release.
+#
+# Dispatch modes: build (a rehearsal on a branch; on a tag, new bytes that
+# attach refuses wherever a same-name asset differs); public-download (after
+# publication, from main or the tag: anonymous downloads judged against the
+# qualified tag run named by `qualified_run`); fetch-rehearsal (the anonymous
+# download path, against an existing release, before tagging).
+#
+# The jobs whose outputs attach uploads pin every action by commit and
+# restore no cache: Zig comes from ziglang.org, checked against its published
+# sha256, as in npm-publish.yml.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/cli-archives.yml
+      - Cargo.toml
+      - Cargo.lock
+      - crates/qrcode-ai-scanner/**
+      - crates/qrcode-ai-scanner-cli/**
+      - distribution/cli/**
+      - scripts/cli-release.py
+      - scripts/packed-cli-consumer.py
+      - scripts/consumer_truth.py
+      - scripts/native-floor.py
+      - scripts/package-inspect.py
+      - fixtures/**
+      - spec/scan-report.schema.json
+      - LICENSE
+      - LICENSING.md
+      - deny.toml
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: build the release set, check a published release, or rehearse the anonymous download
+        type: choice
+        options: [build, public-download, fetch-rehearsal]
+        default: build
+      tag:
+        description: public-download, the published vX.Y.Z
+        type: string
+        default: ""
+      qualified_run:
+        description: public-download, the id of the tag run whose attach uploaded the assets
+        type: string
+        default: ""
+      sums_sha256:
+        description: public-download, an optional cross-check of the anchor's SHA256SUMS sha256
+        type: string
+        default: ""
+      expect_immutable:
+        description: public-download, also verify the release attestation (immutable releases only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # The one toolchain (ci.yml RUST_TOOLCHAIN; RELEASING.md § Toolchain).
+  RUST_TOOLCHAIN: "1.99.1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Each target on its build runner (scripts/cli-release.py TARGETS): the GNU
+  # rows link against glibc 2.28 through cargo-zigbuild and Zig's libunwind,
+  # macOS x86_64 cross-builds on arm64, Windows links its CRT statically.
+  # build refuses an inherited compiler setting or Cargo config, then scans
+  # the binary for every build-host path before the upload.
+  build:
+    if: inputs.mode != 'public-download' && inputs.mode != 'fetch-rehearsal'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04 }
+          - { target: x86_64-apple-darwin, runner: macos-15 }
+          - { target: aarch64-apple-darwin, runner: macos-15 }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      # Zig for the GNU rows, from ziglang.org and checked against the sha256
+      # its download index publishes; its global cache starts empty.
+      - name: Zig 0.14.1, sha256-verified
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/zig-x86_64-linux-0.14.1.tar.xz"
+          curl -sSfL -o "$archive" https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz
+          echo "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  $archive" | sha256sum -c -
+          tar xJf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.14.1" >> "$GITHUB_PATH"
+          mkdir "$RUNNER_TEMP/zig-global-cache"
+          echo "ZIG_GLOBAL_CACHE_DIR=$RUNNER_TEMP/zig-global-cache" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/zig-x86_64-linux-0.14.1/zig" version
+      - name: cargo-zigbuild 0.23.4
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-zigbuild@0.23.4
+      - name: build qrscan, then scan the binary for build-host paths
+        env:
+          TARGET: ${{ matrix.target }}
+        run: python scripts/cli-release.py build --target "$TARGET" --out "$RUNNER_TEMP/cli-build/$TARGET" --target-dir "$RUNNER_TEMP/cli-target"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-build-${{ matrix.target }}
+          path: ${{ runner.temp }}/cli-build/${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 90
+
+  # The release set from the five builds, on one host and toolchain: the
+  # builds agree with each other and with this checkout, the linked crates'
+  # license texts are collected, each archive is written twice and compared,
+  # then the corresponding source (a git archive of the commit) and
+  # SHA256SUMS. The workflow's one upload of cli-release-set.
+  assemble:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cli-build-*
+          path: ${{ runner.temp }}/cli-build
+          digest-mismatch: error
+      # cargo checks each crate against its Cargo.lock checksum; assemble
+      # then reads the graph and the license texts offline.
+      - run: cargo fetch --locked
+      - name: assemble the archives, the source archive and SHA256SUMS
+        run: python scripts/cli-release.py assemble --builds "$RUNNER_TEMP/cli-build" --out "$RUNNER_TEMP/cli-release" --receipt "$RUNNER_TEMP/cli-assemble.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-release-set
+          path: ${{ runner.temp }}/cli-release
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-assemble-receipt
+          path: ${{ runner.temp }}/cli-assemble.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # The set as it would ship, judged from its bytes: names, members, modes,
+  # license copies, build-info against this checkout and Cargo.lock, the
+  # source archive against the commit's tree and SHA256SUMS (on a v* tag, the
+  # tag too); the license texts re-read from the archives; each executable
+  # against its platform floor, whose report qualified reads.
+  inspect:
+    needs: assemble
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-release-set
+          path: cli-release
+          digest-mismatch: error
+      - name: inspect the archives, the source archive and SHA256SUMS
+        run: |
+          set -euo pipefail
+          tag=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag=(--tag "$GITHUB_REF_NAME")
+          fi
+          python scripts/package-inspect.py archive "$PWD"/cli-release/* --release-set --commit "$(git rev-parse 'HEAD^{commit}')" "${tag[@]}" --source-tree . --strict --out "$RUNNER_TEMP/cli-inspect"
+      - name: re-read the license material from the archives
+        run: python scripts/cli-release.py licenses --check-release cli-release --receipt "$RUNNER_TEMP/cli-licenses.json"
+      - name: judge each executable against its platform floor
+        run: python scripts/native-floor.py --policy cli --complete --out "$RUNNER_TEMP/native-floor.json" cli-release/*
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-receipt-floor
+          path: ${{ runner.temp }}/native-floor.json
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-inspect-receipt
+          path: |
+            ${{ runner.temp }}/cli-inspect
+            ${{ runner.temp }}/cli-licenses.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # qrscan run from its archive the way a user would, on each target's own
+  # host: SHA256SUMS checked through hashlib and the OS tool, extraction by
+  # the OS tool outside the checkout, every case in a scrubbed environment,
+  # the shared truth set included (scripts/packed-cli-consumer.py).
+  consume:
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, runner: macos-15-intel }
+          - { target: aarch64-apple-darwin, runner: macos-15 }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-release-set
+          path: cli-release
+          digest-mismatch: error
+      - name: run qrscan from its archive on this host
+        env:
+          TARGET: ${{ matrix.target }}
+        run: python scripts/packed-cli-consumer.py --release-dir cli-release --target "$TARGET" --receipt "$RUNNER_TEMP/cli-receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-receipt-${{ matrix.target }}
+          path: ${{ runner.temp }}/cli-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # The GNU archives in minimal glibc userlands on the runner's own
+  # architecture: AlmaLinux 8.10 at the glibc 2.28 floor, and Debian 12. The
+  # same cases, with no network, a read-only root and every capability
+  # dropped, on the extracted tree mounted read-only.
+  consume-container:
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Per-architecture manifests, resolved 2026-11-02: almalinux:8.10-minimal
+          # amd64 and arm64 (index sha256:3f9b9fdb5957745afcc9269e82c8c43e3140ab8802172967927070c5bc8be907);
+          # debian:bookworm-slim amd64 and arm64 of the 0.10.0 OCI base index
+          # (distribution/docker/Dockerfile, sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587).
+          # public-download-container pins the same four.
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            image: almalinux:8.10-minimal@sha256:0e1d3a40acf7d9e24e7b7bc2ff3f0fd32955adb069b38c45428b628f14664532
+            platform: linux/amd64
+            glibc: "2.28"
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            image: debian:bookworm-slim@sha256:a4672c0cb26fbdde88e38fa2dfb6c681942306680e41e4378b28770b6e79ee91
+            platform: linux/amd64
+            glibc: "2.36"
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            image: almalinux:8.10-minimal@sha256:86d6a54ac3069de11423477832b81824d5b3a22566ddfbf009f15461a66210d7
+            platform: linux/arm64
+            glibc: "2.28"
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            image: debian:bookworm-slim@sha256:a1b86db52ce3daef089e45aabe36dfec4091f82464c25c1fdcf03de197cbe82a
+            platform: linux/arm64
+            glibc: "2.36"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-release-set
+          path: cli-release
+          digest-mismatch: error
+      - name: pull the pinned image
+        env:
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+        run: docker pull --platform "$PLATFORM" "$IMAGE"
+      - name: run qrscan from its archive in the image
+        env:
+          TARGET: ${{ matrix.target }}
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          GLIBC: ${{ matrix.glibc }}
+        run: python scripts/packed-cli-consumer.py --release-dir cli-release --target "$TARGET" --container "$IMAGE" --platform "$PLATFORM" --expect-glibc "$GLIBC" --receipt "$RUNNER_TEMP/cli-receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-receipt-container-${{ matrix.target }}-glibc-${{ matrix.glibc }}
+          path: ${{ runner.temp }}/cli-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # The receipts agree on one set: the nine consumers passed on this run's
+  # SHA256SUMS, each archive equal to its line, the containers' glibc, the
+  # panic unwinding, no engine panic on the truth set, the GNU unwinders the
+  # floor judged, one identities digest. Exports the SHA256SUMS sha256 that
+  # attach re-inspects against.
+  qualified:
+    needs: [inspect, consume, consume-container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      sums_sha256: ${{ steps.qualify.outputs.sums_sha256 }}
+      commit: ${{ steps.qualify.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-release-set
+          path: cli-release
+          digest-mismatch: error
+      # each receipt artifact lands in its own directory below cli-receipts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cli-receipt-*
+          path: cli-receipts
+          digest-mismatch: error
+      - id: qualify
+        name: the receipts agree on the set inspect judged
+        run: python scripts/cli-release.py qualify --release-dir "$PWD/cli-release" --receipts cli-receipts --out "$RUNNER_TEMP/cli-qualification.json" --summary "$GITHUB_STEP_SUMMARY" --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-qualification
+          path: ${{ runner.temp }}/cli-qualification.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # A v* tag only: uploads the qualified set into the draft release the owner
+  # created before the tag (RELEASING.md § 5), and nothing else. The set is
+  # re-inspected against the SHA256SUMS sha256 every consumer judged before
+  # any release call. Only the four gh steps hold the token; the plan and the
+  # readback verdict read the files those steps wrote, without it. A draft
+  # takes the missing CLI assets, SHA256SUMS last; any other state is refused
+  # with nothing uploaded (scripts/cli-release.py attach-plan). The owner
+  # publishes once, by hand.
+  attach:
+    needs: [inspect, consume, consume-container, qualified]
+    if: startsWith(github.ref, 'refs/tags/v') && inputs.mode != 'public-download' && inputs.mode != 'fetch-rehearsal'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # upload the CLI assets into the owner's draft release
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/package-inspect.py versions --tag "$GITHUB_REF" --strict --quiet
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-release-set
+          path: cli-release
+          digest-mismatch: error
+      - name: re-inspect the set the consumers judged, before any release call
+        env:
+          QUALIFIED_SUMS_SHA256: ${{ needs.qualified.outputs.sums_sha256 }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse 'HEAD^{commit}')"
+          python3 scripts/package-inspect.py archive "$PWD"/cli-release/* --release-set --commit "$commit" --tag "$GITHUB_REF_NAME" --sums-sha256 "$QUALIFIED_SUMS_SHA256" --source-tree . --strict --quiet --record "$RUNNER_TEMP/cli-inspected.sha256"
+      - name: list the releases (gh read)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/cli-gh"
+          gh --version > "$RUNNER_TEMP/cli-gh/gh-version.txt"
+          gh release list --limit 1000 --json tagName,isDraft > "$RUNNER_TEMP/cli-gh/list.json"
+      - name: exactly one release carries the tag (no token)
+        run: python3 scripts/cli-release.py attach-plan --phase list --tag "$GITHUB_REF_NAME" --list "$RUNNER_TEMP/cli-gh/list.json"
+      - name: read that release and any CLI asset already on it (gh reads)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/cli-gh/view.json"
+          if gh release view "$GITHUB_REF_NAME" --json assets --jq '[.assets[].name | select(startswith("qrcode-ai-scanner-cli-"))] | length > 0' | grep -qx true; then
+            gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-ai-scanner-cli-*' --dir "$RUNNER_TEMP/cli-gh/present"
+          fi
+      - name: plan the upload from files (no token)
+        run: python3 scripts/cli-release.py attach-plan --phase plan --tag "$GITHUB_REF_NAME" --commit "$(git rev-parse 'HEAD^{commit}')" --view "$RUNNER_TEMP/cli-gh/view.json" --present "$RUNNER_TEMP/cli-gh/present" --release-dir "$PWD/cli-release" --record "$RUNNER_TEMP/cli-inspected.sha256" --out "$RUNNER_TEMP/cli-attach-plan.json" --upload-list "$RUNNER_TEMP/cli-upload.txt"
+      - name: upload the planned assets, each checked against the record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            grep -qxF "$(sha256sum -- "$file")" "$RUNNER_TEMP/cli-inspected.sha256"
+            gh release upload "$GITHUB_REF_NAME" "$file"
+          done < "$RUNNER_TEMP/cli-upload.txt"
+      - name: read back the CLI assets (gh reads)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/cli-gh/readback.json"
+          gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-ai-scanner-cli-*' --dir "$RUNNER_TEMP/cli-readback"
+      - name: judge the readback (no token)
+        run: python3 scripts/cli-release.py readback --tag "$GITHUB_REF_NAME" --commit "$(git rev-parse 'HEAD^{commit}')" --view "$RUNNER_TEMP/cli-gh/readback.json" --dir "$RUNNER_TEMP/cli-readback" --record "$RUNNER_TEMP/cli-inspected.sha256" --summary "$GITHUB_STEP_SUMMARY"
+
+  # public-download only, once the owner has published the release. The
+  # anchor is the qualification the named tag run uploaded, read by run id,
+  # and that run as `gh run view` reports it: this workflow, on the tag, at
+  # the recorded commit, completed with success. Release notes are never an
+  # input. Exports the SHA256SUMS sha256, the commit and the identities
+  # digest every public job is judged against.
+  public-anchor:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'public-download'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # the tag run's qualification artifact and its run record
+    outputs:
+      sums_sha256: ${{ steps.anchor.outputs.sums_sha256 }}
+      commit: ${{ steps.anchor.outputs.commit }}
+      identities_sha256: ${{ steps.anchor.outputs.identities_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: the dispatch inputs (a vX.Y.Z tag, a run id, an optional sha256)
+        env:
+          TAG: ${{ inputs.tag }}
+          QUALIFIED_RUN: ${{ inputs.qualified_run }}
+          SUMS_SHA256: ${{ inputs.sums_sha256 }}
+        run: python scripts/cli-release.py anchor --validate --tag "$TAG" --run "$QUALIFIED_RUN" --sums-sha256 "$SUMS_SHA256"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-qualification
+          path: ${{ runner.temp }}/anchor
+          run-id: ${{ inputs.qualified_run }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          digest-mismatch: error
+      - name: the run behind the anchor (gh read)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFIED_RUN: ${{ inputs.qualified_run }}
+        run: gh run view "$QUALIFIED_RUN" --repo "$GITHUB_REPOSITORY" --json workflowName,headSha,headBranch,event,status,conclusion > "$RUNNER_TEMP/anchor/run.json"
+      - id: anchor
+        name: the qualification and the run agree (no token)
+        env:
+          TAG: ${{ inputs.tag }}
+          QUALIFIED_RUN: ${{ inputs.qualified_run }}
+          SUMS_SHA256: ${{ inputs.sums_sha256 }}
+        run: python scripts/cli-release.py anchor --tag "$TAG" --run "$QUALIFIED_RUN" --qualification "$RUNNER_TEMP/anchor/cli-qualification.json" --run-view "$RUNNER_TEMP/anchor/run.json" --sums-sha256 "$SUMS_SHA256" --github-output "$GITHUB_OUTPUT"
+
+  # The published archives as an anonymous user downloads them, on each
+  # target's own host: SHA256SUMS against the anchor, then the archive
+  # against its line (fetch refuses to start with a token in its
+  # environment). The same consumer follows, its code from the dispatch ref
+  # and its contract data (fixtures, schema, version) from the anchor commit.
+  public-download:
+    needs: public-anchor
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'public-download'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, runner: macos-15-intel }
+          - { target: aarch64-apple-darwin, runner: macos-15 }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.public-anchor.outputs.commit }}
+          path: contract
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: download SHA256SUMS and this target's archive (no token)
+        env:
+          TAG: ${{ inputs.tag }}
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+          TARGET: ${{ matrix.target }}
+        run: python scripts/packed-cli-consumer.py fetch --repository "$GITHUB_REPOSITORY" --tag "$TAG" --sums-sha256 "$ANCHOR_SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/cli-public" --receipt "$RUNNER_TEMP/cli-public-receipt/cli-fetch.json"
+      - name: run qrscan from the downloaded archive on this host
+        env:
+          TARGET: ${{ matrix.target }}
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+        run: python scripts/packed-cli-consumer.py --release-dir "$RUNNER_TEMP/cli-public" --target "$TARGET" --sums-sha256 "$ANCHOR_SUMS_SHA256" --contract-root contract --receipt "$RUNNER_TEMP/cli-public-receipt/cli-receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-public-receipt-${{ matrix.target }}
+          path: ${{ runner.temp }}/cli-public-receipt
+          if-no-files-found: error
+          retention-days: 90
+
+  # The downloaded GNU archives in the four images consume-container pins,
+  # by the same digests.
+  public-download-container:
+    needs: public-anchor
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'public-download'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            image: almalinux:8.10-minimal@sha256:0e1d3a40acf7d9e24e7b7bc2ff3f0fd32955adb069b38c45428b628f14664532
+            platform: linux/amd64
+            glibc: "2.28"
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            image: debian:bookworm-slim@sha256:a4672c0cb26fbdde88e38fa2dfb6c681942306680e41e4378b28770b6e79ee91
+            platform: linux/amd64
+            glibc: "2.36"
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            image: almalinux:8.10-minimal@sha256:86d6a54ac3069de11423477832b81824d5b3a22566ddfbf009f15461a66210d7
+            platform: linux/arm64
+            glibc: "2.28"
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            image: debian:bookworm-slim@sha256:a1b86db52ce3daef089e45aabe36dfec4091f82464c25c1fdcf03de197cbe82a
+            platform: linux/arm64
+            glibc: "2.36"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.public-anchor.outputs.commit }}
+          path: contract
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: download SHA256SUMS and this target's archive (no token)
+        env:
+          TAG: ${{ inputs.tag }}
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+          TARGET: ${{ matrix.target }}
+        run: python scripts/packed-cli-consumer.py fetch --repository "$GITHUB_REPOSITORY" --tag "$TAG" --sums-sha256 "$ANCHOR_SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/cli-public" --receipt "$RUNNER_TEMP/cli-public-receipt/cli-fetch.json"
+      - name: pull the pinned image
+        env:
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+        run: docker pull --platform "$PLATFORM" "$IMAGE"
+      - name: run qrscan from the downloaded archive in the image
+        env:
+          TARGET: ${{ matrix.target }}
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          GLIBC: ${{ matrix.glibc }}
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+        run: python scripts/packed-cli-consumer.py --release-dir "$RUNNER_TEMP/cli-public" --target "$TARGET" --sums-sha256 "$ANCHOR_SUMS_SHA256" --contract-root contract --container "$IMAGE" --platform "$PLATFORM" --expect-glibc "$GLIBC" --receipt "$RUNNER_TEMP/cli-public-receipt/cli-receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-public-receipt-container-${{ matrix.target }}-glibc-${{ matrix.glibc }}
+          path: ${{ runner.temp }}/cli-public-receipt
+          if-no-files-found: error
+          retention-days: 90
+
+  # Every published CLI asset downloaded anonymously, the source archive
+  # included, for public-qualified. Only when the dispatch sets
+  # expect_immutable does a separate step hold the token, to check the
+  # release attestation of the release and of each asset. Immutable releases
+  # stay off until the owner enables them; until then nothing claims one.
+  public-verify:
+    needs: public-anchor
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'public-download'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read # gh release verify and verify-asset, with expect_immutable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: download every published CLI asset (no token)
+        env:
+          TAG: ${{ inputs.tag }}
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+        run: python scripts/packed-cli-consumer.py fetch --repository "$GITHUB_REPOSITORY" --tag "$TAG" --sums-sha256 "$ANCHOR_SUMS_SHA256" --all --out "$RUNNER_TEMP/cli-public" --receipt "$RUNNER_TEMP/cli-public-receipt/cli-fetch.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-public-receipt-all
+          path: ${{ runner.temp }}/cli-public-receipt
+          if-no-files-found: error
+          retention-days: 90
+      - name: verify the release attestation (immutable releases only)
+        if: inputs.expect_immutable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release verify "$TAG" --repo "$GITHUB_REPOSITORY"
+          for file in "$RUNNER_TEMP"/cli-public/qrcode-ai-scanner-cli-*; do
+            gh release verify-asset "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
+          done
+
+  # The public receipts agree with the anchor: the nine consumers passed on
+  # the anchor's SHA256SUMS, each downloaded archive equal to its line, every
+  # asset fetched alike and without a token, one identities digest equal to
+  # the anchor's. Anonymous public success is its own receipt, apart from
+  # the tag run's attach.
+  public-qualified:
+    needs: [public-anchor, public-download, public-download-container, public-verify]
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'public-download'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      # each receipt artifact lands in its own directory below cli-public-receipts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: cli-public-receipt-*
+          path: cli-public-receipts
+          digest-mismatch: error
+      - name: the public receipts agree with the anchor
+        env:
+          ANCHOR_SUMS_SHA256: ${{ needs.public-anchor.outputs.sums_sha256 }}
+          ANCHOR_IDENTITIES: ${{ needs.public-anchor.outputs.identities_sha256 }}
+        run: python scripts/cli-release.py qualify --public --anchor-sums-sha256 "$ANCHOR_SUMS_SHA256" --anchor-identities "$ANCHOR_IDENTITIES" --receipts cli-public-receipts --out "$RUNNER_TEMP/cli-public-qualification.json" --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-public-qualification
+          path: ${{ runner.temp }}/cli-public-qualification.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # fetch-rehearsal only, before a tag: the anonymous download path the public
+  # jobs take (redirects, hosts, no token) on the five consumer hosts, against
+  # an asset this repository already publishes and its line in that release's
+  # SHA256SUMS.
+  fetch-rehearsal:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'fetch-rehearsal'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04-arm }
+          - { target: x86_64-apple-darwin, runner: macos-15-intel }
+          - { target: aarch64-apple-darwin, runner: macos-15 }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: download a published asset and its SHA256SUMS line (no token)
+        run: python scripts/packed-cli-consumer.py fetch --rehearsal --repository "$GITHUB_REPOSITORY" --tag agents-v0.1.0 --asset supernovae-st-qrcode-ai-scanner-mcp-0.1.0.tgz --sha256 c97cc6565d3b5248552c0895cde31d4b204b313fcd9d89c3464fe0fd745556e1 --out "$RUNNER_TEMP/cli-rehearsal" --receipt "$RUNNER_TEMP/cli-rehearsal-receipt/cli-fetch.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: cli-rehearsal-receipt-${{ matrix.target }}
+          path: ${{ runner.temp }}/cli-rehearsal-receipt
+          if-no-files-found: error
+          retention-days: 90

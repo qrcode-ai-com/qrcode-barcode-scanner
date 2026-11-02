@@ -318,6 +318,12 @@ jobs:
       # set with a win32 addon importing the Visual C++ runtime, five of six,
       # a target twice, no addon at all).
       - run: python3 scripts/native-floor.py --self-test
+      # The tooling cli-archives.yml runs: the release commands on stub tools,
+      # clean and planted, with that workflow's matrices held to the release
+      # targets; then the archive consumer and its anonymous fetch, on a
+      # stand-in qrscan.
+      - run: python3 scripts/cli-release.py --self-test
+      - run: python3 scripts/packed-cli-consumer.py --self-test
       # The WASM build record build-wasm.sh writes and package-inspect checks
       # (scripts/wasm_provenance.py): its feature-envelope decoder on planted
       # modules (an immediate is not an opcode; unknown or truncated code is
