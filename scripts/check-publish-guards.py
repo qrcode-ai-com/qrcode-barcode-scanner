@@ -1973,7 +1973,7 @@ SNEAKY_CARGO = """
       - uses: actions/checkout@v7
       - run: |
           cargo \\
-            publish -p qrcode-ai-scanner
+            publish -p qrcode-barcode-scanner
 """
 OIDC_PNPM = """
   sneaky:
@@ -2184,7 +2184,7 @@ MUTATIONS = (
     ("cargo options before the subcommand, in ci › packaging", P, [(
         "ci.yml", "      - run: python3 scripts/package-inspect.py crates --strict --quiet\n",
         "      - run: python3 scripts/package-inspect.py crates --strict --quiet\n      - run: cargo --locked publish "
-        "-p qrcode-ai-scanner\n")], {}, 1, "ci.yml › packaging [guard]"),
+        "-p qrcode-barcode-scanner\n")], {}, 1, "ci.yml › packaging [guard]"),
     ("npm's abbreviation `npm pu`, in a ci job", P, [("ci.yml", "      - run: node test.mjs\n",
                                                       "      - run: node test.mjs\n      - run: npm pu ./x.tgz "
                                                       "--ignore-scripts\n")], {}, 1, "ci.yml › node-smoke [guard]"),
