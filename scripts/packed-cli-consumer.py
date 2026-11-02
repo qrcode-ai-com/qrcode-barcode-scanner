@@ -72,7 +72,7 @@ import zlib
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "qrscan-cli-consumer/1"
 FETCH_SCHEMA = "qrscan-cli-fetch/1"
-PREFIX = "qrcode-ai-scanner-cli-"
+PREFIX = "qrcode-barcode-scanner-cli-"
 # triple: (the OS that runs it, as sys.platform names it; machine; archive extension)
 TARGETS = {
     "x86_64-unknown-linux-gnu": ("linux", "x86_64", "tar.gz"),

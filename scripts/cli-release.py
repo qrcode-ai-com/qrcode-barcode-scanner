@@ -18,11 +18,11 @@
                  --github-output F
   cli-release.py --self-test
 
-One archive per target, qrcode-ai-scanner-cli-<version>-<target>.tar.gz (.zip
+One archive per target, qrcode-barcode-scanner-cli-<version>-<target>.tar.gz (.zip
 for Windows), whose one top directory of that name holds qrscan[.exe] and its
 license and build material; the corresponding source,
-qrcode-ai-scanner-cli-<version>-source.tar.gz, a `git archive` of the commit;
-and qrcode-ai-scanner-cli-<version>-SHA256SUMS, one line per other asset.
+qrcode-barcode-scanner-cli-<version>-source.tar.gz, a `git archive` of the commit;
+and qrcode-barcode-scanner-cli-<version>-SHA256SUMS, one line per other asset.
 
 build runs on the target's build runner (TARGETS). Before cargo starts it
 refuses, with exit 2: an inherited RUSTFLAGS, CARGO_TARGET_DIR,
@@ -124,7 +124,7 @@ import zipfile
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = "qrcode-ai-scanner-cli"
+PACKAGE = "qrcode-barcode-scanner-cli"
 BINARY = "qrscan"
 WORKFLOW = ".github/workflows/cli-archives.yml"
 # The corresponding source ships as a release asset: a git archive of the commit.
@@ -206,7 +206,7 @@ REFUSED_REASON = "build sets the compiler flags, profile and target directory it
 REMAP_TO = {"checkout": "/source", "cargo-home": "/cargo", "target-dir": "/target"}
 CARGO_ARGS = ("--release", "--locked", "-p", PACKAGE, "--bin", BINARY)
 LICENSE_FILE = re.compile(r"(LICEN[CS]E|COPYING|NOTICE|COPYRIGHT|UNLICENSE)([-._].*)?", re.IGNORECASE)
-WORKSPACE_ANCHORS = ("qrcode-ai-scanner", PACKAGE)
+WORKSPACE_ANCHORS = ("qrcode-barcode-scanner", PACKAGE)
 FACTS_KEYS = ("schema", "name", "package", "version", "target", "source", "toolchain", "linker", "profile",
               "rustflags", "command", "deployment_target", "builder", "binary", "checks")
 INFO_KEYS = ("schema", "name", "package", "version", "target", "source", "toolchain", "linker", "profile",
@@ -987,7 +987,7 @@ def parse_third_party(data, version, target):
 # ---------------------------------------------------------------- assemble
 
 # The path crates linked into qrscan, covered by LICENSE, LICENSING.md and THIRD-PARTY.md.
-WORKSPACE_CRATES = frozenset({"qrcode-ai-scanner", PACKAGE})
+WORKSPACE_CRATES = frozenset({"qrcode-barcode-scanner", PACKAGE})
 
 
 def rustc_name(lines):
@@ -1128,7 +1128,7 @@ def source_md(info):
                "the build recipe included."]
     lines = [
         f"# Source of qrscan {version} for {target}", "",
-        "qrscan is the command line of the qrcode-ai-scanner engine. This archive was built from",
+        "qrscan is the command line of the QR Code & Barcode Scanner engine. This archive was built from",
         "the public repository and the commit below.", "",
         f"- Repository: {repository}", f"- Tag: {tag}", f"- Commit: {commit}", f"- Tree: {repository}/tree/{commit}",
         f"- Cargo.lock sha256: {source['cargo_lock_sha256']}",
@@ -2333,7 +2333,7 @@ FIXTURE_CRATES = (
     ("windows-sys", "0.59.0", "MIT OR Apache-2.0", {"license-apache-2.0": APACHE, "license-mit": MIT}, None,
      "windows"),
 )
-FIXTURE_WORKSPACE = (("qrcode-ai-scanner", "crates/qrcode-ai-scanner"), (PACKAGE, "crates/qrcode-ai-scanner-cli"))
+FIXTURE_WORKSPACE = (("qrcode-barcode-scanner", "crates/qrcode-ai-scanner"), (PACKAGE, "crates/qrcode-ai-scanner-cli"))
 # The texts assemble must find for each linked registry crate (CRLF read as LF).
 WANT_TEXTS = {"anes": [ANES], "clap": [APACHE, MIT], "image": [APACHE, MIT], "libc": [APACHE, MIT],
               "rqrr": [MIT_CRLF.replace(b"\r\n", b"\n")], "rxing": [APACHE, RXING_NOTICE], "serde_json": [MIT],
@@ -2414,7 +2414,7 @@ class Fixture:
     def tree(self, target, build):
         side = "windows" if target.endswith("-windows-msvc") else "unix"
         lines = [f"{PACKAGE} v0.11.0 ({self.root}/crates/qrcode-ai-scanner-cli)",
-                 f"qrcode-ai-scanner v0.11.0 ({self.root}/crates/qrcode-ai-scanner)", "image v0.25.6 (*)"]
+                 f"qrcode-barcode-scanner v0.11.0 ({self.root}/crates/qrcode-ai-scanner)", "image v0.25.6 (*)"]
         lines += [f"{name} v{version}" for name, version, *_rest, links in FIXTURE_CRATES if links in ("all", side)]
         return lines + (["cc v1.2.27", "serde_derive v1.0.219 (proc-macro)"] if build else [])
 
@@ -2472,8 +2472,8 @@ def stub_binary(target, plant="", smoke=SMOKE):
 
 def want_command(target, target_dir="<target-dir>"):
     gnu = family(target) == "linux"
-    return ["cargo", "zigbuild" if gnu else "build", "--release", "--locked", "-p", "qrcode-ai-scanner-cli", "--bin",
-            "qrscan", "--target", f"{target}.2.28" if gnu else target, "--target-dir", target_dir]
+    return ["cargo", "zigbuild" if gnu else "build", "--release", "--locked", "-p", "qrcode-barcode-scanner-cli",
+            "--bin", "qrscan", "--target", f"{target}.2.28" if gnu else target, "--target-dir", target_dir]
 
 
 def want_facts(fx, target, binary, actions=False, dirty=False, linker=None):
@@ -2484,8 +2484,8 @@ def want_facts(fx, target, binary, actions=False, dirty=False, linker=None):
     forbid = ["<checkout>", "<home>", "<cargo-home>", *(["<runner-temp>"] if actions else []), "<target-dir>"]
     unwinder = WANT_LINKERS[family(target)]["unwinder"]
     return {
-        "schema": "qrscan-build-facts/1", "name": "qrscan", "package": "qrcode-ai-scanner-cli", "version": "0.11.0",
-        "target": target,
+        "schema": "qrscan-build-facts/1", "name": "qrscan", "package": "qrcode-barcode-scanner-cli",
+        "version": "0.11.0", "target": target,
         "source": {"repository": FIXTURE_REPO, "ref": "refs/tags/v0.11.0" if actions else None,
                    "tag": "v0.11.0" if actions else None, "commit": COMMIT, "source_date_epoch": EPOCH,
                    "cargo_lock_sha256": sha256((fx.root / "Cargo.lock").read_bytes()), "dirty": dirty},
@@ -2552,7 +2552,7 @@ def stop_of(function, *args, **keywords):
 
 
 def archive_file(target):
-    return f"qrcode-ai-scanner-cli-0.11.0-{target}.{'zip' if family(target) == 'windows' else 'tar.gz'}"
+    return f"qrcode-barcode-scanner-cli-0.11.0-{target}.{'zip' if family(target) == 'windows' else 'tar.gz'}"
 
 
 def relevant(calls):
@@ -2710,7 +2710,7 @@ def _build_planted(t, fx):
 COPY_MEMBERS = {"LICENSE": "LICENSE", "LICENSE-APACHE-2.0": "crates/qrcode-ai-scanner/LICENSE-APACHE-2.0",
                 "LICENSING.md": "LICENSING.md", "README.md": "distribution/cli/README.md",
                 "THIRD-PARTY.md": "crates/qrcode-ai-scanner/THIRD-PARTY.md"}
-UNIX_NAMES = ["anes", "clap", "image", "libc", "qrcode-ai-scanner", "qrcode-ai-scanner-cli", "rqrr", "rxing",
+UNIX_NAMES = ["anes", "clap", "image", "libc", "qrcode-barcode-scanner", "qrcode-barcode-scanner-cli", "rqrr", "rxing",
               "serde_json", "unicode-ident"]
 
 
@@ -2743,7 +2743,7 @@ def archive_rows(raw, zipped):
 
 def check_archive(t, fx, label, raw, builds, target, actions):
     zipped, name = family(target) == "windows", "qrscan.exe" if family(target) == "windows" else "qrscan"
-    stem, build = f"qrcode-ai-scanner-cli-0.11.0-{target}", builds / f"cli-build-{target}"
+    stem, build = f"qrcode-barcode-scanner-cli-0.11.0-{target}", builds / f"cli-build-{target}"
     members = ["COPYRIGHT-rust-std.html", "LICENSE", "LICENSE-APACHE-2.0", "LICENSING.md", "README.md", "SOURCE.md",
                "THIRD-PARTY-LICENSES.txt", "THIRD-PARTY.md", "build-info.json", name]
     head, rows, data = archive_rows(raw, zipped)
@@ -2785,13 +2785,13 @@ def check_archive(t, fx, label, raw, builds, target, actions):
     tag, run = ("v0.11.0", RUN_URL) if actions else ("not a release tag (None)", "none (built outside GitHub Actions)")
     t.check(f"{label} {target}: SOURCE.md facts", inner.get("SOURCE.md", b"").decode().split("\n")[:13], [
         f"# Source of qrscan 0.11.0 for {target}", "",
-        "qrscan is the command line of the qrcode-ai-scanner engine. This archive was built from",
+        "qrscan is the command line of the QR Code & Barcode Scanner engine. This archive was built from",
         "the public repository and the commit below.", "", f"- Repository: {FIXTURE_REPO}", f"- Tag: {tag}",
         f"- Commit: {COMMIT}", f"- Tree: {FIXTURE_REPO}/tree/{COMMIT}",
         f"- Cargo.lock sha256: {sha256((fx.root / 'Cargo.lock').read_bytes())}", f"- Workflow run: {run}",
         "- Build recipe: .github/workflows/cli-archives.yml and scripts/cli-release.py at that commit",
-        "- Corresponding source: qrcode-ai-scanner-cli-0.11.0-source.tar.gz (its sha256 is in "
-        "qrcode-ai-scanner-cli-0.11.0-SHA256SUMS)"])
+        "- Corresponding source: qrcode-barcode-scanner-cli-0.11.0-source.tar.gz (its sha256 is in "
+        "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS)"])
     t.check(f"{label} {target}: members holding a host path or a CR",
             sorted(member for member, value in inner.items() if str(fx.base).encode() in value
                    or (member.endswith((".md", ".txt", ".json")) and b"\r" in value)), [])
@@ -2811,7 +2811,7 @@ def assemble_case(fx, label, builds, actions=False, partial=False, env=None, **c
 def check_release_set(t, fx, label, result, builds, actions=False, targets=TRIPLES):
     """A release set that passes: files, SHA256SUMS, receipt, each archive and the source asset."""
     code, receipt, _calls, out = result
-    sums, source = "qrcode-ai-scanner-cli-0.11.0-SHA256SUMS", "qrcode-ai-scanner-cli-0.11.0-source.tar.gz"
+    sums, source = "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS", "qrcode-barcode-scanner-cli-0.11.0-source.tar.gz"
     names = [archive_file(target) for target in targets] + [source]
     if not t.check(f"{label}: exit and files", (code, listing(out)), (0, sorted([*names, sums]))):
         return {}
@@ -2831,7 +2831,7 @@ def check_release_set(t, fx, label, result, builds, actions=False, targets=TRIPL
         "sums": {"name": sums, "sha256": sha256(files[sums])}, "problems": []})
     for target in targets:
         check_archive(t, fx, label, files[archive_file(target)], builds, target, actions)
-    prefix = "qrcode-ai-scanner-cli-0.11.0-source/"
+    prefix = "qrcode-barcode-scanner-cli-0.11.0-source/"
     with tarfile.open(fileobj=io.BytesIO(files[source]), mode="r:gz") as archive:
         found = [(member.name, member.isdir()) for member in archive.getmembers()]
         contents = {member.name: archive.extractfile(member).read().decode() for member in archive.getmembers()
@@ -2855,12 +2855,12 @@ def _assemble_clean(t, fx):
     t.check("assemble: git archive call", [call["argv"] for call in calls if call["tool"] == "git" and
                                            "archive" in call["argv"]], [
         ["-C", str(fx.root), "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-c", "tar.umask=0002", "archive",
-         "--format=tar", "--prefix=qrcode-ai-scanner-cli-0.11.0-source/", COMMIT]])
+         "--format=tar", "--prefix=qrcode-barcode-scanner-cli-0.11.0-source/", COMMIT]])
     cargo = [call["argv"] for call in calls if call["tool"] == "cargo"]
     t.check("assemble: cargo calls", (len(cargo), cargo[:2]), (11, [
         ["metadata", "--format-version", "1", "--locked", "--offline"],
-        ["tree", "-p", "qrcode-ai-scanner-cli", "--target", "x86_64-unknown-linux-gnu", "-e", "normal,no-proc-macro",
-         "--prefix", "none", "--format", "{p}", "--locked", "--offline"]]))
+        ["tree", "-p", "qrcode-barcode-scanner-cli", "--target", "x86_64-unknown-linux-gnu", "-e",
+         "normal,no-proc-macro", "--prefix", "none", "--format", "{p}", "--locked", "--offline"]]))
     again = assemble_case(fx, "clean-again", local)[3]
     t.check("assemble: a rerun writes the same bytes", {name: (again / name).read_bytes() for name in listing(again)
                                                        or []}, files)
@@ -3022,7 +3022,7 @@ def _writer_cases(t, fx):
                  for target in TRIPLES]))
     fx.arm()
     t.check("assemble: a varying gzip", stop_of(assemble, args, fx.env(), fx.root, compress=varying_gzip), (1, [
-        "the archive writer is not deterministic: qrcode-ai-scanner-cli-0.11.0-source.tar.gz differs between "
+        "the archive writer is not deterministic: qrcode-barcode-scanner-cli-0.11.0-source.tar.gz differs between "
         "two writes"]))
     t.check("assemble: nothing written by a varying writer", (out.exists(), len(writes), len(packs)), (False, 10, 2))
 
@@ -3068,12 +3068,13 @@ def _license_cases(t, fx, release):
 WANT_NOTES = "\n".join([
     "## 0.11.0 — 2026-11-02", "", "### Added", "", "- Prebuilt qrscan archives.", "",
     "### Prebuilt qrscan archives", "",
-    "The `qrcode-ai-scanner-cli-0.11.0-<target>` archives hold the qrscan command line for",
+    "The `qrcode-barcode-scanner-cli-0.11.0-<target>` archives hold the qrscan command line for",
     "Linux x86_64 (glibc 2.28 or later), Linux aarch64 (glibc 2.28 or later), macOS x86_64 (10.15 or later), "
     "macOS arm64 (11.0 or later) and Windows x86_64.",
-    "`qrcode-ai-scanner-cli-0.11.0-SHA256SUMS` lists the sha256 of every other CLI asset. It is an asset of",
+    "`qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS` lists the sha256 of every other CLI asset. It is an asset of",
     "this same release, so it detects a damaged download, not a substituted release.",
-    "`qrcode-ai-scanner-cli-0.11.0-source.tar.gz` is the corresponding source, a git archive of the tagged commit.",
+    "`qrcode-barcode-scanner-cli-0.11.0-source.tar.gz` is the corresponding source, a git archive of the tagged "
+    "commit.",
     "", "The binaries are not code-signed or notarized: there is no Apple Developer ID signature, no",
     "notarization and no Authenticode signature. Each archive's README.md gives the steps to verify",
     "the download and run the binary.", ""])
@@ -3084,9 +3085,10 @@ def _command_cases(t, fx):
     code, text, _calls = fx.invoke(["targets"])
     receipt = json.loads(text)
     t.check("targets", (code, {key: value for key, value in receipt.items() if key != "targets"}), (0, {
-        "schema": "qrscan-cli-targets/1", "package": "qrcode-ai-scanner-cli", "binary": "qrscan", "version": "0.11.0",
-        "source_asset": True, "assets": [*map(archive_file, TRIPLES), "qrcode-ai-scanner-cli-0.11.0-source.tar.gz",
-                                         "qrcode-ai-scanner-cli-0.11.0-SHA256SUMS"]}))
+        "schema": "qrscan-cli-targets/1", "package": "qrcode-barcode-scanner-cli", "binary": "qrscan",
+        "version": "0.11.0", "source_asset": True,
+        "assets": [*map(archive_file, TRIPLES), "qrcode-barcode-scanner-cli-0.11.0-source.tar.gz",
+                   "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS"]}))
     keys = ("target", "ext", "build_runner", "build_host", "linker", "unwinder", "deployment_target", "rustflags",
             "consumer_runner")
     t.check("targets: rows", [tuple(row[key] for key in keys) for row in receipt["targets"]], [
@@ -3123,11 +3125,11 @@ def _command_cases(t, fx):
                                                         "problems": problems}))
 
 
-SOURCE_FILE = "qrcode-ai-scanner-cli-0.11.0-source.tar.gz"
-SUMS_FILE = "qrcode-ai-scanner-cli-0.11.0-SHA256SUMS"
+SOURCE_FILE = "qrcode-barcode-scanner-cli-0.11.0-source.tar.gz"
+SUMS_FILE = "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS"
 NAMES = [*map(archive_file, TRIPLES), SOURCE_FILE, SUMS_FILE]  # the upload order: archives, source, SHA256SUMS
 IOS = ["QRCodeScanner.xcframework.zip", "checksum.txt"]  # another lane's assets on the same draft
-MUSL = "qrcode-ai-scanner-cli-0.11.0-x86_64-unknown-linux-musl.tar.gz"
+MUSL = "qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-musl.tar.gz"
 PUBLISHED_TEXT = "a published release is never completed in place; ship the next patch version (RELEASING §6)"
 DRAFT_TEXT = ("nothing was uploaded: the owner deletes the CLI assets from the draft, then dispatches mode build on "
               "the tag (RELEASING §6)")
@@ -3147,7 +3149,7 @@ def gh_files(fx, label, on_release, draft=True, target=COMMIT, changes=None, tag
     put(where / "view.json", json.dumps({"tagName": tag, "isDraft": draft, "targetCommitish": target, "assets": [
         gh_asset(name, data, **(changes or {}).get(name, {})) for name, data in on_release.items()]}))
     for name, data in on_release.items():
-        if name.startswith("qrcode-ai-scanner-cli-"):
+        if name.startswith("qrcode-barcode-scanner-cli-"):
             put(where / "present" / name, data)
     return where / "view.json", where / "present"
 
@@ -3463,7 +3465,7 @@ def floor_fixture(judged=None, verdict="PASS"):
         unwinder = (judged or {}).get(target, "zig-libunwind" if gnu else None)
         if unwinder is not False:
             exe = "qrscan.exe" if family(target) == "windows" else "qrscan"
-            binaries.append({"input": f"{archive_file(target)}!qrcode-ai-scanner-cli-0.11.0-{target}/{exe}",
+            binaries.append({"input": f"{archive_file(target)}!qrcode-barcode-scanner-cli-0.11.0-{target}/{exe}",
                              "target": target, "unwinder": unwinder,
                              "unwinder_from": "build-info.json" if gnu else None})
     return {"verdict": verdict, "policy": "cli", "binaries": binaries, "skipped": [SOURCE_FILE, SUMS_FILE],
@@ -3553,7 +3555,7 @@ def _qualify_cases(t, fx, release):
     path = {label: where for label, _target, _box, where in QUALIFY_ROWS}
     linux, darwin, windows, alma, deb = LABELS[0], LABELS[2], LABELS[4], LABELS[5], LABELS[8]
     unwind_134 = {"id": "unwind", "exit": 134, "expected_exit": 101, "ok": False, "detail": ["exit 134, expected 101"]}
-    member = f"{archive_file(darwin)}!qrcode-ai-scanner-cli-0.11.0-{darwin}/qrscan"
+    member = f"{archive_file(darwin)}!qrcode-barcode-scanner-cli-0.11.0-{darwin}/qrscan"
 
     def receipt_of(label, *keys, value):
         def edit(receipts):
@@ -3617,7 +3619,8 @@ def _qualify_cases(t, fx, release):
 
 
 def _qualify_more(t, fx, release, want):
-    """Receipts of another commit, a JSON file of another kind, and the usage errors."""
+    """Receipts of another commit, a JSON file of another kind, a release directory holding an archive
+    under the old package name, and the usage errors."""
     code, receipt, _written, _summary, output = qualify_case(fx, "another commit", release, commit=OTHER)
     t.check("qualify: receipts of another commit", (code, receipt["commit"], receipt["problems"], output), (
         1, OTHER, [f"{label}: {key} {COMMIT}, expected {OTHER}" for label in LABELS
@@ -3626,6 +3629,15 @@ def _qualify_more(t, fx, release, want):
     code, receipt, *_rest = qualify_case(fx, "another kind of JSON", release,
                                          lambda r: r.update({"cli-receipt-inspect/inspect.json": inspection}))
     t.check("qualify: a JSON file of another kind is not a receipt", (code, receipt), (0, want))
+    label, stale = "an archive under the old package name", f"qrcode-ai-scanner-cli-0.11.0-{TRIPLES[0]}.tar.gz"
+    old = fx.base / "qualify" / "old-name-release"
+    shutil.copytree(release, old)
+    shutil.copyfile(release / archive_file(TRIPLES[0]), old / stale)
+    github = fx.base / "qualify" / f"{label}.result" / "github-output"
+    code, receipt, written, _summary, output = qualify_case(
+        fx, label, release, options=["--release-dir", str(old), "--github-output", str(github)])
+    t.check(f"qualify: {label}", (code, receipt["verdict"], receipt["problems"], written == receipt, output),
+            (1, "FAIL", [f"the release directory holds {stale}, not an asset of this set"], True, None))
     env = fx.env(True, GH_TOKEN="fixture", **QUALIFY_ENV)
     bad = IDENTITIES.upper()
     cases = [  # (label, options, keywords, problems)

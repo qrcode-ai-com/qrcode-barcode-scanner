@@ -427,8 +427,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/cli-gh/view.json"
-          if gh release view "$GITHUB_REF_NAME" --json assets --jq '[.assets[].name | select(startswith("qrcode-ai-scanner-cli-"))] | length > 0' | grep -qx true; then
-            gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-ai-scanner-cli-*' --dir "$RUNNER_TEMP/cli-gh/present"
+          if gh release view "$GITHUB_REF_NAME" --json assets --jq '[.assets[].name | select(startswith("qrcode-barcode-scanner-cli-"))] | length > 0' | grep -qx true; then
+            gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-barcode-scanner-cli-*' --dir "$RUNNER_TEMP/cli-gh/present"
           fi
       - name: plan the upload from files (no token)
         run: python3 scripts/cli-release.py attach-plan --phase plan --tag "$GITHUB_REF_NAME" --commit "$(git rev-parse 'HEAD^{commit}')" --view "$RUNNER_TEMP/cli-gh/view.json" --present "$RUNNER_TEMP/cli-gh/present" --release-dir "$PWD/cli-release" --record "$RUNNER_TEMP/cli-inspected.sha256" --out "$RUNNER_TEMP/cli-attach-plan.json" --upload-list "$RUNNER_TEMP/cli-upload.txt"
@@ -447,7 +447,7 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/cli-gh/readback.json"
-          gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-ai-scanner-cli-*' --dir "$RUNNER_TEMP/cli-readback"
+          gh release download "$GITHUB_REF_NAME" --pattern 'qrcode-barcode-scanner-cli-*' --dir "$RUNNER_TEMP/cli-readback"
       - name: judge the readback (no token)
         run: python3 scripts/cli-release.py readback --tag "$GITHUB_REF_NAME" --commit "$(git rev-parse 'HEAD^{commit}')" --view "$RUNNER_TEMP/cli-gh/readback.json" --dir "$RUNNER_TEMP/cli-readback" --record "$RUNNER_TEMP/cli-inspected.sha256" --summary "$GITHUB_STEP_SUMMARY"
 
@@ -659,7 +659,7 @@ jobs:
         run: |
           set -euo pipefail
           gh release verify "$TAG" --repo "$GITHUB_REPOSITORY"
-          for file in "$RUNNER_TEMP"/cli-public/qrcode-ai-scanner-cli-*; do
+          for file in "$RUNNER_TEMP"/cli-public/qrcode-barcode-scanner-cli-*; do
             gh release verify-asset "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
           done
 

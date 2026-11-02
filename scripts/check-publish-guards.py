@@ -275,8 +275,8 @@ CLI_TOKEN_RUNS = (
         'gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > '
         '"$RUNNER_TEMP/cli-gh/view.json"',
         'if gh release view "$GITHUB_REF_NAME" --json assets --jq \'[.assets[].name | '
-        'select(startswith("qrcode-ai-scanner-cli-"))] | length > 0\' | grep -qx true; then',
-        '  gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-ai-scanner-cli-*\' --dir '
+        'select(startswith("qrcode-barcode-scanner-cli-"))] | length > 0\' | grep -qx true; then',
+        '  gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-barcode-scanner-cli-*\' --dir '
         '"$RUNNER_TEMP/cli-gh/present"',
         "fi",
     )),
@@ -291,7 +291,7 @@ CLI_TOKEN_RUNS = (
         "set -euo pipefail",
         'gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > '
         '"$RUNNER_TEMP/cli-gh/readback.json"',
-        'gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-ai-scanner-cli-*\' --dir '
+        'gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-barcode-scanner-cli-*\' --dir '
         '"$RUNNER_TEMP/cli-readback"',
     )),
 )

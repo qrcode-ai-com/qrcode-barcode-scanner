@@ -21,10 +21,10 @@ This README is identical in every archive and in the source tree, at
 For version `X.Y.Z`, seven assets of the release tagged `vX.Y.Z` belong to
 `qrscan`:
 
-- `qrcode-ai-scanner-cli-X.Y.Z-<target>.tar.gz`, or `.zip` for Windows: the
+- `qrcode-barcode-scanner-cli-X.Y.Z-<target>.tar.gz`, or `.zip` for Windows: the
   program with its license and build records, one archive per target;
-- `qrcode-ai-scanner-cli-X.Y.Z-source.tar.gz`: the corresponding source;
-- `qrcode-ai-scanner-cli-X.Y.Z-SHA256SUMS`: one line for each of the six files
+- `qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`: the corresponding source;
+- `qrcode-barcode-scanner-cli-X.Y.Z-SHA256SUMS`: one line for each of the six files
   above, made of its SHA-256 in lowercase hexadecimal, two spaces and its name.
 
 The Windows program contains its C runtime, so it needs no Visual C++
@@ -46,8 +46,8 @@ version (see [Updates](#updates)). On Linux or macOS:
 ```sh
 V=X.Y.Z                       # the version to install
 T=x86_64-unknown-linux-gnu    # your target, from the table above
-A="qrcode-ai-scanner-cli-$V-$T.tar.gz"
-S="qrcode-ai-scanner-cli-$V-SHA256SUMS"
+A="qrcode-barcode-scanner-cli-$V-$T.tar.gz"
+S="qrcode-barcode-scanner-cli-$V-SHA256SUMS"
 U="https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v$V"
 curl -fLO "$U/$A"
 curl -fLO "$U/$S"
@@ -56,7 +56,7 @@ grep -F "  $A" "$S" | shasum -a 256 -c -    # macOS
 ```
 
 Continue only when the check prints
-`qrcode-ai-scanner-cli-X.Y.Z-<target>.tar.gz: OK`. On macOS, use `shasum`: the
+`qrcode-barcode-scanner-cli-X.Y.Z-<target>.tar.gz: OK`. On macOS, use `shasum`: the
 `sha256sum` that recent macOS versions include succeeds silently when it
 receives no line, for example after a mistyped target.
 
@@ -64,8 +64,8 @@ On Windows, in PowerShell:
 
 ```powershell
 $V = 'X.Y.Z'
-$A = "qrcode-ai-scanner-cli-$V-x86_64-pc-windows-msvc.zip"
-$S = "qrcode-ai-scanner-cli-$V-SHA256SUMS"
+$A = "qrcode-barcode-scanner-cli-$V-x86_64-pc-windows-msvc.zip"
+$S = "qrcode-barcode-scanner-cli-$V-SHA256SUMS"
 $U = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v$V"
 curl.exe -fLO "$U/$A"
 curl.exe -fLO "$U/$S"
@@ -91,7 +91,7 @@ assets when it was published, and the GitHub CLI checks a downloaded file
 against that attestation:
 
 ```sh
-gh release verify-asset vX.Y.Z qrcode-ai-scanner-cli-X.Y.Z-<target>.tar.gz \
+gh release verify-asset vX.Y.Z qrcode-barcode-scanner-cli-X.Y.Z-<target>.tar.gz \
   --repo qrcode-ai-com/qrcode-barcode-scanner
 ```
 
@@ -138,7 +138,7 @@ On Linux or macOS, after the check above:
 
 ```sh
 tar -xzf "$A"
-cd "qrcode-ai-scanner-cli-$V-$T"
+cd "qrcode-barcode-scanner-cli-$V-$T"
 ```
 
 On Windows, in PowerShell, after the check above:
@@ -146,7 +146,7 @@ On Windows, in PowerShell, after the check above:
 ```powershell
 Unblock-File -LiteralPath $A
 Expand-Archive -LiteralPath $A -DestinationPath .
-Set-Location "qrcode-ai-scanner-cli-$V-x86_64-pc-windows-msvc"
+Set-Location "qrcode-barcode-scanner-cli-$V-x86_64-pc-windows-msvc"
 ```
 
 ## Run
@@ -232,7 +232,7 @@ program, each archive holds:
 | `README.md` | this file |
 
 The corresponding source of the binaries is the release asset
-`qrcode-ai-scanner-cli-X.Y.Z-source.tar.gz`, whose SHA-256 is a line of the
+`qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`, whose SHA-256 is a line of the
 checksum file. It is a `git archive` of the whole tree of the commit the
 binaries were built from, including the workflow and script that build and
 package them (`.github/workflows/cli-archives.yml`, `scripts/cli-release.py`).
@@ -240,7 +240,7 @@ With git installed, this prints that commit, which `SOURCE.md` and
 `build-info.json` also name:
 
 ```sh
-gzip -dc qrcode-ai-scanner-cli-X.Y.Z-source.tar.gz | git get-tar-commit-id
+gzip -dc qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz | git get-tar-commit-id
 ```
 
 The same tree is at

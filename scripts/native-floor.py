@@ -14,7 +14,7 @@ LC_MAIN, LC_LOAD_DYLINKER, LC_RPATH and LC_CODE_SIGNATURE. PE32+: machine,
 characteristics, subsystem, DllCharacteristics, OS/subsystem versions,
 imported and delay-imported DLLs. Archives (.tgz, .whl) are read in place:
 their .node, .so, .pyd, .dylib and .dll members. A CLI release archive
-(qrcode-ai-scanner-cli-<version>-<triple>.tar.gz, .zip for Windows) yields
+(qrcode-barcode-scanner-cli-<version>-<triple>.tar.gz, .zip for Windows) yields
 its <stem>/qrscan or <stem>/qrscan.exe.
 
 `--policy node` judges each `<name>.<napi-suffix>.node` against the platform
@@ -241,9 +241,9 @@ def inspect(data):
 
 # CLI release assets: <stem>.tar.gz holds <stem>/qrscan and <stem>.zip holds
 # <stem>/qrscan.exe; the source archive and SHA256SUMS hold no executable.
-CLI_ARCHIVE = re.compile(r"^qrcode-ai-scanner-cli-(?P<version>\d+\.\d+\.\d+)-(?P<triple>[a-z0-9_]+(?:-[a-z0-9_]+)+)"
-                         r"\.(?P<ext>tar\.gz|zip)$")
-CLI_NOT_EXECUTABLE = re.compile(r"^qrcode-ai-scanner-cli-\d+\.\d+\.\d+-(?:source\.tar\.gz|SHA256SUMS)$")
+CLI_ARCHIVE = re.compile(r"^qrcode-barcode-scanner-cli-(?P<version>\d+\.\d+\.\d+)"
+                         r"-(?P<triple>[a-z0-9_]+(?:-[a-z0-9_]+)+)\.(?P<ext>tar\.gz|zip)$")
+CLI_NOT_EXECUTABLE = re.compile(r"^qrcode-barcode-scanner-cli-\d+\.\d+\.\d+-(?:source\.tar\.gz|SHA256SUMS)$")
 ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".zip", ".whl")
 
 
@@ -586,7 +586,7 @@ def judge_cli(paths, complete, target, unwinder, forbid):
             skipped.append(path.name)
             continue
         if kind == "foreign":
-            problems.append(f"{path.name}: not a qrcode-ai-scanner-cli-<version>-<triple>.tar.gz or .zip archive")
+            problems.append(f"{path.name}: not a qrcode-barcode-scanner-cli-<version>-<triple>.tar.gz or .zip archive")
             continue
         entries, refused = cli_entries(path, target, unwinder)
         problems += refused
@@ -905,7 +905,7 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
             executable unless DATA is None (`link`: a symlink in its place). Copies repeat a member."""
             if ext is None:
                 ext = CLI_FLOOR[triple]["ext"] if triple in CLI_FLOOR else "tar.gz"
-            stem = f"qrcode-ai-scanner-cli-1.2.3-{triple}"
+            stem = f"qrcode-barcode-scanner-cli-1.2.3-{triple}"
             exe = f"{stem}/{'qrscan.exe' if ext == 'zip' else 'qrscan'}"
             if facts is None:
                 linker = {"unwinder": unwinder if triple.endswith("-linux-gnu") else None}
@@ -935,7 +935,7 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
             return str(path)
 
         def member(triple):
-            stem, ext = f"qrcode-ai-scanner-cli-1.2.3-{triple}", CLI_FLOOR[triple]["ext"]
+            stem, ext = f"qrcode-barcode-scanner-cli-1.2.3-{triple}", CLI_FLOOR[triple]["ext"]
             return f"{stem}.{ext}!{stem}/" + ("qrscan.exe" if ext == "zip" else "qrscan")
 
         every = {target: release(target, data) for target, data in clean.items()}
@@ -943,12 +943,12 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
         def but(*left_out):
             return [path for target, path in every.items() if target not in left_out]
 
-        source = root / "qrcode-ai-scanner-cli-1.2.3-source.tar.gz"
+        source = root / "qrcode-barcode-scanner-cli-1.2.3-source.tar.gz"
         with tarfile.open(source, "w:gz") as archive:
-            info = tarfile.TarInfo("qrcode-ai-scanner-cli-1.2.3-source/README.md")
+            info = tarfile.TarInfo("qrcode-barcode-scanner-cli-1.2.3-source/README.md")
             info.size = 7
             archive.addfile(info, io.BytesIO(b"source\n"))
-        sums = root / "qrcode-ai-scanner-cli-1.2.3-SHA256SUMS"
+        sums = root / "qrcode-barcode-scanner-cli-1.2.3-SHA256SUMS"
         sums.write_bytes(b"".join(b"0" * 64 + b"  " + Path(path).name.encode() + b"\n"
                                   for path in (*every.values(), str(source))))
         npm = root / "qrcode-ai-scanner-linux-x64-gnu-1.2.3.tgz"
@@ -959,10 +959,10 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
         leaky = root / "remap" / "qrscan"
         leaky.parent.mkdir()
         leaky.write_bytes(make_executable_macho(extra=b"/tmp/qr-build-7/target/release/build/qrscan-0/out"))
-        arm_stem, with_gcc_s = f"qrcode-ai-scanner-cli-1.2.3-{arm}", gnu_elf(needed=(*glibc, "libgcc_s.so.1"))
+        arm_stem, with_gcc_s = f"qrcode-barcode-scanner-cli-1.2.3-{arm}", gnu_elf(needed=(*glibc, "libgcc_s.so.1"))
         pdb = b"D:\\a\\scanner\\scanner\\target\\release\\deps\\qrscan.pdb"
-        corrupt_tar = root / "corrupt" / f"qrcode-ai-scanner-cli-1.2.3-{x64}.tar.gz"
-        corrupt_zip = root / "corrupt" / f"qrcode-ai-scanner-cli-1.2.3-{win}.zip"
+        corrupt_tar = root / "corrupt" / f"qrcode-barcode-scanner-cli-1.2.3-{x64}.tar.gz"
+        corrupt_zip = root / "corrupt" / f"qrcode-barcode-scanner-cli-1.2.3-{win}.zip"
         corrupt_tar.parent.mkdir()
         corrupt_tar.write_bytes(b"not a gzip stream")
         corrupt_zip.write_bytes(b"not a zip archive")
@@ -976,13 +976,16 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
         truncated = root / "truncated" / "qrscan"
         truncated.parent.mkdir()
         truncated.write_bytes(b"\x7fELF\x02\x01")
+        old_name = root / "old-name" / f"qrcode-ai-scanner-cli-1.2.3-{x64}.tar.gz"
+        old_name.parent.mkdir()
+        old_name.write_bytes(Path(every[x64]).read_bytes())
         runs = [
             ("the release set", ["--complete", *every.values(), str(source), str(sums)], []),
             ("four targets", ["--complete", *but(win)], [f"{win}: 0 executables, expected 1"]),
             ("a target twice", ["--complete", *every.values(), release(x64, clean[x64], folder="twice")],
              [f"{x64}: 2 executables, expected 1"]),
             ("an unknown triple", ["--complete", *every.values(), release("x86_64-unknown-freebsd", clean[x64])],
-             ["qrcode-ai-scanner-cli-1.2.3-x86_64-unknown-freebsd.tar.gz:"
+             ["qrcode-barcode-scanner-cli-1.2.3-x86_64-unknown-freebsd.tar.gz:"
               " x86_64-unknown-freebsd is not a release target"]),
             ("a PDB path in the Windows archive",
              ["--complete", *but(win), release(win, console_pe(extra=pdb), folder="pdb")],
@@ -1017,13 +1020,16 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
              [f"{corrupt_tar.name}: unreadable archive (not a gzip file)",
               f"{corrupt_zip.name}: unreadable archive (File is not a zip file)", "no native binary among the inputs"]),
             ("an encrypted executable", [str(encrypted)],
-             [f"{encrypted.name}: unreadable archive (qrcode-ai-scanner-cli-1.2.3-{win}/qrscan.exe is encrypted)",
+             [f"{encrypted.name}: unreadable archive (qrcode-barcode-scanner-cli-1.2.3-{win}/qrscan.exe is encrypted)",
               "no native binary among the inputs"]),
             ("a .tar.gz on the Windows row", [release(win, console_pe(), folder="ext", ext="tar.gz")],
-             [f"qrcode-ai-scanner-cli-1.2.3-{win}.tar.gz: a .tar.gz archive, but {win} ships as .zip",
+             [f"qrcode-barcode-scanner-cli-1.2.3-{win}.tar.gz: a .tar.gz archive, but {win} ships as .zip",
               "no native binary among the inputs"]),
             ("an npm tarball", [str(npm)],
-             [f"{npm.name}: not a qrcode-ai-scanner-cli-<version>-<triple>.tar.gz or .zip archive",
+             [f"{npm.name}: not a qrcode-barcode-scanner-cli-<version>-<triple>.tar.gz or .zip archive",
+              "no native binary among the inputs"]),
+            ("an archive under the old package name", [str(old_name)],
+             [f"{old_name.name}: not a qrcode-barcode-scanner-cli-<version>-<triple>.tar.gz or .zip archive",
               "no native binary among the inputs"]),
             ("the build step's binary",
              ["--target", x64, "--unwinder", zig, "--forbid", "/tmp/qr-build-7", str(raw)], []),
