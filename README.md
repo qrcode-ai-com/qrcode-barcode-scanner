@@ -85,8 +85,8 @@ and its [`ScanReport`](spec/) contract.
 | **Browser · WASM** | [`@supernovae-st/qrcode-ai-scanner-wasm`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner-wasm)<br>`npm i @supernovae-st/qrcode-ai-scanner-wasm` |
 | **Python** | [`qrcode-ai-scanner`](https://pypi.org/project/qrcode-ai-scanner/)<br>`pip install qrcode-ai-scanner` |
 
-Browser integrations can use the automatic SIMD/compatible loader via
-`@supernovae-st/qrcode-ai-scanner-wasm/auto`.
+Browser integrations load the one portable module (no SIMD) with checked
+initialization via `@supernovae-st/qrcode-ai-scanner-wasm/auto`.
 
 Per-runtime guides in [`docs/`](docs/) · code examples in [Quick start](#quick-start).
 
@@ -360,7 +360,7 @@ can differ by registry; a source version does not establish a successful release
 | [`qrcode-ai-scanner`](crates/qrcode-ai-scanner) (core lib) | crates.io |
 | [`qrcode-ai-scanner-cli`](crates/qrcode-ai-scanner-cli) (`qrscan`) | crates.io |
 | [`qrcode-ai-scanner-node`](crates/qrcode-ai-scanner-node) (`@supernovae-st/qrcode-ai-scanner`, napi async) | npm |
-| [`qrcode-ai-scanner-wasm`](crates/qrcode-ai-scanner-wasm) (`@supernovae-st/qrcode-ai-scanner-wasm`, SIMD128) | npm |
+| [`qrcode-ai-scanner-wasm`](crates/qrcode-ai-scanner-wasm) (`@supernovae-st/qrcode-ai-scanner-wasm`, one portable WASM) | npm |
 | [`qrcode-ai-scanner-py`](crates/qrcode-ai-scanner-py) (`qrcode-ai-scanner` on PyPI, PyO3 abi3) | PyPI |
 
 ## Contributing & security

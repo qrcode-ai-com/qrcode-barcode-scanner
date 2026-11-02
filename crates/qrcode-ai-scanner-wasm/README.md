@@ -1,6 +1,6 @@
 # @supernovae-st/qrcode-ai-scanner-wasm
 
-Browser WASM builds (SIMD128 and compatible) of the
+One portable browser WASM build of the
 [qrcode-ai-scanner](https://crates.io/crates/qrcode-ai-scanner) engine —
 QR decoding + scannability scoring for artistic / AI-generated QR codes,
 fully client-side, no server roundtrip.
@@ -12,22 +12,23 @@ import { loadScanner } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
 
 const scanner = await loadScanner();
 const report = scanner.scan_image(pngBytes, "full");
-const loadedVariant = scanner.variant; // "simd" | "compatible"
+const loadedVariant = scanner.variant; // "portable"
 const scannerVersion = scanner.version();
 ```
 
 Run this same code inside a module Worker for UI responsiveness. Capability
 detection runs in that worker's realm before the scanner is compiled. It uses
 small real WASM validation probes, never user-agent, browser-version or CPU
-guesses. SIMD unavailable to this runtime selects the compatible binary. This
-does not identify whether SIMD was disabled by policy, the runtime, or its host.
+guesses. The package holds one module and it uses no SIMD, so an engine without
+SIMD loads the same bytes as every other supported engine.
+`scannerCapabilities().simd` remains a diagnostic only.
 
-Vite resolves both literal asset URLs at build time, but loading fetches only
-the selected binary. No remote service is involved. Importing `/auto` is safe
+Vite resolves the one literal asset URL at build time; nothing is fetched before
+the loader is called. No remote service is involved. Importing `/auto` is safe
 during SSR; calling it requires browser/worker WebAssembly and fetch support.
-The existing root import below remains the explicit accelerated API, including
-its original default initialization and `initSync` behavior. Automatic selection
-is additive: both worker and main-thread fallback consumers must adopt `/auto`.
+The root import below loads the same module through wasm-pack's default
+initialization and `initSync`; `/auto` adds the feature checks and typed
+errors. Use `/auto` in both the worker and any main-thread fallback.
 
 Concurrent or repeated `loadScanner()` calls share one promise and instance.
 An initialization rejection also stays cached. There are no automatic retries,
@@ -40,26 +41,29 @@ const retry = createScannerLoader();
 const scanner = await retry();
 ```
 
-The factory also accepts `{variant: "compatible"}` for controlled qualification
-or a deliberate host choice, and an optional `wasmUrl` for an asset pipeline
-that cannot process package URLs. Keep that override on the same exact package
-version and variant. Standard Vite/module-worker use needs no URL override.
+The factory also accepts an optional `wasmUrl` for an asset pipeline that
+cannot process package URLs. Keep that override on the same exact package
+version. Standard Vite/module-worker use needs no URL override. `variant`
+accepts `"auto"`, `"portable"` and `"compatible"`, the 0.10 name of this same
+no-SIMD feature set; any other value, `"simd"` included, rejects with
+`invalid_options`. The 0.10 export paths `compatible/qrcode-ai-scanner.js` and
+`compatible/qrcode-ai-scanner_bg.wasm` resolve to the same portable files.
 
 `ScannerInitError` carries a stable `code`, selected `variant`, optional HTTP
 `status`, and original `cause`. Codes distinguish `wasm_unavailable`,
-`wasm_features_unsupported`, `simd_unavailable` (an explicitly requested SIMD
-variant), `loader_import_failed`, `asset_network_failed`, `asset_http_failed`,
-`asset_read_failed`, `binary_invalid`, `wasm_validation_failed`, `wasm_compile_failed`,
-`wasm_instantiate_failed` and `invalid_options`. Preserve the native cause for
-diagnosis; do not label every compile failure as SIMD incompatibility. These
-are JS loading diagnostics, separate from the unchanged Rust/report/QRS error
-contract. Serialize stable fields explicitly when crossing a worker boundary.
+`wasm_features_unsupported`, `loader_import_failed`, `asset_network_failed`,
+`asset_http_failed`, `asset_read_failed`, `binary_invalid`,
+`wasm_validation_failed`, `wasm_compile_failed`, `wasm_instantiate_failed` and
+`invalid_options`. Preserve the native cause for diagnosis; do not label every
+compile failure as a browser or CPU incompatibility. These are JS loading
+diagnostics, separate from the unchanged Rust/report/QRS error contract.
+Serialize stable fields explicitly when crossing a worker boundary.
 `binary_invalid` means the bytes lack a valid WASM magic/version header.
 `wasm_validation_failed` retains ambiguity between malformed code and unexpected
 requirements in a wrong/stale asset. Inspect its native cause and the actual
-failing bytes rather than guessing SIMD or CPU incompatibility.
+failing bytes rather than guessing a feature or CPU incompatibility.
 
-The compatible build is **not an MVP-only WASM binary**. Automatic loading uses
+The portable build is **not an MVP-only WASM binary**. Automatic loading uses
 a conservative supported baseline: mutable globals, bulk memory, sign extension,
 nontrapping float-to-int, multivalue and reference types. The probe tests these
 together; it is not a measurement of the optimized binary's minimum requirements:
@@ -76,21 +80,22 @@ together; it is not a measurement of the optimized binary's minimum requirements
     i32.const 0 i32.const 0))
 ```
 
-Builds use the same Cargo features, lockfile and report types. The owning build
-script restricts optimization to that feature profile, adding SIMD only for the
-accelerated variant, then validates the compatible artifact with SIMD forbidden.
-Inspect each actual artifact before attributing a failure to a feature. For the
-qualified 0.10.1 builds, individually omitting features from Binaryen validation
-identifies bulk memory, sign extension and nontrapping float-to-int as required;
-the accelerated binary additionally requires SIMD. Mutable globals, multivalue
-and reference types can each be omitted from that validation profile without
-invalidating these exact binaries. The broader loader baseline remains a declared
-support policy, not evidence that an unknown failing asset uses all six features.
-Compatibility claims require actual browser evidence; this path alone does not
-qualify historical browser floors, real Safari, mobile devices, arbitrary CSP
-rules, or a consumer's deployed binary.
+The owning build script compiles this crate and every dependency with SIMD
+disabled, restricts optimization to that feature profile, then validates the
+optimized module with SIMD forbidden. The package's `build-info.json` records
+the module's SHA-256, the features its code actually uses (read instruction by
+instruction), a digest of the compiled sources and locks, the build recipe and
+the tool versions; the release inspection refuses a package whose bytes, inputs
+or features disagree with it. Inspect each actual artifact before attributing a
+failure to a feature: the 0.11.0 module's code uses bulk memory, sign extension
+and nontrapping float-to-int, and Binaryen validation fails without each of
+them. Mutable globals, multivalue and reference types complete the declared
+loader baseline, a support policy rather than evidence that an unknown failing
+asset uses all six features. Compatibility claims require actual browser
+evidence; this path alone does not qualify historical browser floors, real
+Safari, mobile devices, arbitrary CSP rules, or a consumer's deployed binary.
 
-## Existing accelerated entry
+## Direct entry
 
 ```js
 import init, { scan_image, scan_frame } from "@supernovae-st/qrcode-ai-scanner-wasm";

@@ -101,9 +101,19 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - Build and CI compiler pins use Rust 1.99.1. The minimum supported Rust
   version remains 1.88; typed slice chunks and C buffer declarations match
   the compiler checks without suppressing warnings.
-- Consolidated the compatible WASM/automatic loader and exact historical registry
+- Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.
+- The browser package ships one portable WASM module, compiled without SIMD
+  for every supported engine, instead of a SIMD and a compatible module. Its
+  `build-info.json` records the module's SHA-256, the features its code uses
+  (bulk memory, sign extension and nontrapping float-to-int), a digest of the
+  compiled sources and locks, the recipe and the tool versions. The release
+  inspection refuses a second module, and bytes, inputs or features that
+  disagree with that record. Measured locally on twelve 1280×720 frames
+  (Node 22, V8, darwin-arm64), the portable build took 1.09× the SIMD build's
+  time in `frame` and 1.03× in `fast`, with identical reports, and is about
+  2 % smaller.
 - Cleared open dependency advisories outside the scanner's own graph: the
   Flutter Rust lock moves tokio 1.34.0 to 1.38.2 (GHSA-rr8g-9fpq-6wmg), the
   packed Python consumer suite pins Pillow 13.0.0 with every wheel hashed
@@ -115,6 +125,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   stays `0` in the bindings and `None` in Rust. In Node and WASM a fractional
   `max_dimension`/`max_pixels` is refused instead of truncated, and a
   negative one instead of becoming no cap or the default.
+- **Upgrade note (browser).** `scanner.variant` is `"portable"`.
+  `{variant: "compatible"}` loads that same module; `{variant: "simd"}` rejects
+  with `invalid_options`, and `simd_unavailable` is no longer a code. The
+  `compatible/qrcode-ai-scanner.js` and `compatible/qrcode-ai-scanner_bg.wasm`
+  export paths resolve to the root files; the `compatible/` directory is no
+  longer shipped. The root import loads the portable module.
 
 ## 0.10.1 — 2026-10-20
 

@@ -21,7 +21,7 @@ const onVerify = async () => {
   const canvas = previewRef.value?.canvas;
   if (!canvas) return;
 
-  // The loader selects SIMD or compatible in this execution realm. Handle
+  // The loader checks WASM support in this execution realm. Handle
   // ScannerInitError separately from scan errors in the calling UI. Its failed
   // attempt stays cached; retry only after an explicit user action with a fresh
   // createScannerLoader(), rather than retrying every verify/render.

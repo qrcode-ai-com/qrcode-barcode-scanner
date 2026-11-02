@@ -82,7 +82,11 @@ prepare` generated for that side.
   A pair whose embedded compiler, wasm-opt version or flags, RUSTFLAGS,
   module recipe (producers, wasm-bindgen, SIMD) or build environment
   differ is refused; the published npm package stays a correctness
-  reference.
+  reference. From 0.11 the release recipe builds one portable module
+  (`RUSTFLAGS="-C target-feature=-simd128,-relaxed-simd"`, `wasm-opt -O3
+  --mvp-features` plus the floor's features and `--disable-simd`), so a
+  v0.9.0 SIMD base and a 0.11 candidate are a refused pair, never a
+  speed comparison.
 - **Build manifests come from the build.** `bench stamp` runs the build
   itself and writes, next to the artifact, `<file>.build.json` (a package
   directory: `build.json`): `rustc -vV`, the compiler commits embedded in

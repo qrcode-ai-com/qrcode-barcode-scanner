@@ -119,10 +119,14 @@ WASM_FILES = frozenset({
     "qrcode-ai-scanner.js", "qrcode-ai-scanner.d.ts", "qrcode-ai-scanner_bg.wasm",
     "report-types.d.ts",
     "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
-    "auto.js", "auto.d.ts", "compatible/qrcode-ai-scanner.js",
-    "compatible/qrcode-ai-scanner.d.ts", "compatible/qrcode-ai-scanner_bg.wasm",
-    "compatible/report-types.d.ts",
+    "auto.js", "auto.d.ts", "build-info.json",
 })
+# 0.10.x exported its no-SIMD module under compatible/; from 0.11 these export
+# keys name the one portable module's own files, never a second file.
+WASM_LEGACY_ALIASES = {
+    "./compatible/qrcode-ai-scanner.js": "./qrcode-ai-scanner.js",
+    "./compatible/qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm",
+}
 # The keys wasm-pack 0.13.1 writes and scripts/patch-wasm-pkg.mjs renames or
 # adds; a wasm package.json may carry no other key. A `dependencies` or a
 # `publishConfig` is planted — nothing here writes one, and some would run or
@@ -627,7 +631,7 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         check_exact_set(art, files, WASM_FILES, "wasm-pack output + patch allowlist")
         check_wasm_manifest(art, pkg)
         check_equal_file(art, "report-types.d.ts", files.get("report-types.d.ts"), CANON_TYPES)
-        check_equal_file(art, "compatible/report-types.d.ts", files.get("compatible/report-types.d.ts"), CANON_TYPES)
+        check_wasm_build(art, files, pkg.get("version"))
         for notice in ("LICENSE-APACHE-2.0", "THIRD-PARTY.md"):
             check_equal_file(art, notice, files.get(notice), ROOT / "crates/qrcode-ai-scanner" / notice)
         for source in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts"):
@@ -638,8 +642,6 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         )
         art.check("qrcode-ai-scanner.d.ts re-exports report-types and returns ScanReport",
                   'export * from "./report-types"' in dts and retyped)
-        art.check("both variants expose identical typed scanner APIs",
-                  files.get("compatible/qrcode-ai-scanner.d.ts") == files.get("qrcode-ai-scanner.d.ts"))
         check_equal_file(art, "README.md", files.get("README.md"), WASM_DIR / "README.md")
     elif name.startswith(NODE_NAME + "-"):
         binaries = sorted(f for f in files if f.endswith(".node"))
@@ -703,6 +705,11 @@ def check_wasm_manifest(art: Artifact, pkg: dict) -> None:
               exports.get("./auto") == {"types": "./auto.d.ts", "import": "./auto.js", "default": "./auto.js"}
               and exports.get(".") == {"types": "./qrcode-ai-scanner.d.ts", "import": "./qrcode-ai-scanner.js", "default": "./qrcode-ai-scanner.js"}
               and exports.get("./*") == "./*")
+    art.check("one WASM export and its build record; legacy compatible/ paths alias the same files",
+              exports.get("./qrcode-ai-scanner_bg.wasm") == "./qrcode-ai-scanner_bg.wasm"
+              and exports.get("./build-info.json") == "./build-info.json"
+              and {key: value for key, value in exports.items() if "compatible" in key} == WASM_LEGACY_ALIASES,
+              json.dumps(sorted(exports)))
     art.check("camera capture, tracking and visual overlay exports are retained",
               all(exports.get(f"./{name}") == {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
                   for name in ("camera", "camera-overlay"))
@@ -1203,6 +1210,33 @@ def parse_pub_tree(output: str) -> list:
 
 
 @functools.cache
+def wasm_provenance():
+    spec = importlib.util.spec_from_file_location("wasm_provenance", ROOT / "scripts" / "wasm_provenance.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def check_wasm_build(art: Artifact, files: dict, version) -> None:
+    """One physical WASM, and it is the recorded, current build of this checkout."""
+    modules = sorted(name for name in files if name.endswith(".wasm"))
+    art.check("exactly one WASM binary (qrcode-ai-scanner_bg.wasm)", modules == ["qrcode-ai-scanner_bg.wasm"],
+              ", ".join(modules))
+    try:
+        info = json.loads(files.get("build-info.json", b""))
+    except ValueError as error:
+        art.check("build-info.json records this build", False, f"unreadable: {error}")
+        return
+    wasm = files.get("qrcode-ai-scanner_bg.wasm", b"")
+    problems = wasm_provenance().check(info, wasm, version, ROOT)
+    art.check("WASM bytes, compiled inputs and feature envelope match build-info.json (no stale or modified build)",
+              not problems, " · ".join(problems))
+    if not problems:
+        art.notes.append(f"build-info: wasm sha256 {info['wasm']['sha256']} · inputs {info['inputs']['sha256']} "
+                         f"· features {', '.join(info['wasm']['features']) or 'none'} · revision {info.get('source_revision')}")
+
+
+@functools.cache
 def flutter_staging():
     spec = importlib.util.spec_from_file_location("flutter_staging", ROOT / "scripts" / "stage-flutter-package.py")
     module = importlib.util.module_from_spec(spec)
@@ -1659,19 +1693,21 @@ def _npm_wasm(version: str) -> dict:
            "exports": {".": {"types": "./qrcode-ai-scanner.d.ts", "import": "./qrcode-ai-scanner.js", "default": "./qrcode-ai-scanner.js"},
                        **{f"./{name}": {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
                           for name in ("auto", "camera", "camera-overlay")},
-                       "./report-types": {"types": "./report-types.d.ts"}, "./*": "./*"}}
+                       "./report-types": {"types": "./report-types.d.ts"},
+                       "./qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm", **WASM_LEGACY_ALIASES,
+                       "./build-info.json": "./build-info.json", "./*": "./*"}}
+    wasm = b"\0asm\1\0\0\0"
+    info = {"schema": wasm_provenance().SCHEMA, "version": version, "inputs": wasm_provenance().inputs_digest(ROOT),
+            "wasm": {"sha256": hashlib.sha256(wasm).hexdigest(), "features": []}}
     dts = ('export * from "./report-types";\n'
            "export function scan_frame(data: Uint8Array, width: number, height: number): ScanReport;\n"
            "export function scan_image(bytes: Uint8Array): ScanReport;\n")
     return {"package.json": json.dumps(pkg, indent=2).encode(), "README.md": (WASM_DIR / "README.md").read_bytes(),
             "LICENSE": LICENSE.read_bytes(), "qrcode-ai-scanner.js": b"export {};\n",
             **{notice: (ROOT / "crates/qrcode-ai-scanner" / notice).read_bytes() for notice in ("LICENSE-APACHE-2.0", "THIRD-PARTY.md")},
-            "qrcode-ai-scanner.d.ts": dts.encode(), "qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0",
+            "qrcode-ai-scanner.d.ts": dts.encode(), "qrcode-ai-scanner_bg.wasm": wasm,
+            "build-info.json": json.dumps(info).encode(),
             "report-types.d.ts": CANON_TYPES.read_bytes(),
-            "compatible/qrcode-ai-scanner.js": b"export {};\n",
-            "compatible/qrcode-ai-scanner.d.ts": dts.encode(),
-            "compatible/qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0",
-            "compatible/report-types.d.ts": CANON_TYPES.read_bytes(),
             **{f"{name}.{ext}": (WASM_DIR / f"{name}.{ext}").read_bytes()
                for name in ("auto", "camera", "camera-overlay") for ext in ("js", "d.ts")}}
 
@@ -1786,9 +1822,35 @@ def self_test() -> int:
         judge("clean platform package", [npm("platform", _npm_platform(version, "linux-x64-gnu"))], PASS)
         judge("clean main package", [npm("main", _npm_main(version))], PASS)
         judge("clean wasm package", [npm("wasm", _npm_wasm(version))], PASS)
-        for missing in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts", "LICENSE-APACHE-2.0", "THIRD-PARTY.md", "compatible/qrcode-ai-scanner_bg.wasm", "compatible/report-types.d.ts"):
+        for missing in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts", "LICENSE-APACHE-2.0", "THIRD-PARTY.md", "build-info.json"):
             incomplete = {key: value for key, value in _npm_wasm(version).items() if key != missing}
             judge(f"wasm package missing {missing}", [npm("wasm-incomplete", incomplete)], FAIL, missing)
+        # One physical module, and the recorded current build: a second binary,
+        # changed bytes or a record of other inputs are each refused.
+        judge("wasm package + a second compiled module",
+              [npm("wasm-second", _npm_wasm(version) | {"compatible/qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0"})],
+              FAIL, "exactly one WASM binary")
+        retargeted = json.loads(_npm_wasm(version)["package.json"])
+        retargeted["exports"]["./compatible/qrcode-ai-scanner_bg.wasm"] = "./compatible/qrcode-ai-scanner_bg.wasm"
+        judge("wasm package whose legacy compatible/ export names another file",
+              [npm("wasm-alias", _npm_wasm(version) | {"package.json": json.dumps(retargeted, indent=2).encode()})],
+              FAIL, "legacy compatible/ paths alias the same files")
+        judge("wasm package with modified WASM bytes",
+              [npm("wasm-modified", _npm_wasm(version) | {"qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0\0\x01\0"})],
+              FAIL, "modified WASM")
+        stale = json.loads(_npm_wasm(version)["build-info.json"])
+        stale["inputs"]["sha256"] = "0" * 64
+        judge("wasm package recorded from other compiled inputs (stale same-version build)",
+              [npm("wasm-stale", _npm_wasm(version) | {"build-info.json": json.dumps(stale).encode()})],
+              FAIL, "stale build")
+        simd_module = bytes(json.loads("[" + re.search(r"SIMD_PROBE = new Uint8Array\(\[([0-9,]+)\]\)",
+                                                         (WASM_DIR / "auto.js").read_text()).group(1) + "]"))
+        simd_info = json.loads(_npm_wasm(version)["build-info.json"])
+        simd_info["wasm"] = {"sha256": hashlib.sha256(simd_module).hexdigest(), "features": ["simd128"]}
+        judge("wasm package whose module needs SIMD",
+              [npm("wasm-simd", _npm_wasm(version) | {"qrcode-ai-scanner_bg.wasm": simd_module,
+                                                     "build-info.json": json.dumps(simd_info).encode()})],
+              FAIL, "outside the floor")
 
         for i, planted in enumerate(PLANTED):
             ran += 1

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -27,8 +27,30 @@ if (process.env.QRSCAN_INSTALL_BROWSERS === '1') {
     ...(process.env.QRSCAN_TEST_FIREFOX === '1' ? ['firefox'] : [])], { cwd: consumer, stdio: 'pipe', timeout: 240_000 });
 }
 const vite = await import(pathToFileURL(require.resolve('vite')));
-const manifest = JSON.parse(readFileSync(join(consumer, 'node_modules/@supernovae-st/qrcode-ai-scanner-wasm/package.json')));
+const installed = join(consumer, 'node_modules/@supernovae-st/qrcode-ai-scanner-wasm');
+const manifest = JSON.parse(readFileSync(join(installed, 'package.json')));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const passed = [];
+// One physical WASM, and it is the recorded build: build-info.json names the
+// bytes, compiled-input digest, recipe and tools of the module it shipped with.
+const listFiles = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
+  entry.isDirectory() ? listFiles(join(dir, entry.name)).map(name => `${entry.name}/${name}`) : [entry.name]);
+const wasmFiles = listFiles(installed).filter(name => name.endsWith('.wasm'));
+assert.deepEqual(wasmFiles, ['qrcode-ai-scanner_bg.wasm'], 'the installed package holds exactly one WASM binary');
+const buildInfo = JSON.parse(readFileSync(join(installed, 'build-info.json')));
+const installedWasmSha256 = sha(readFileSync(join(installed, wasmFiles[0])));
+assert.equal(buildInfo.wasm.sha256, installedWasmSha256, 'installed WASM bytes are the recorded build');
+assert.equal(buildInfo.version, manifest.version);
+assert.deepEqual(buildInfo.wasm.features.filter(feature => !['bulk-memory', 'mutable-globals', 'multivalue',
+  'nontrapping-fptoint', 'reference-types', 'sign-ext'].includes(feature)), [], 'recorded features stay inside the floor');
+passed.push(`Installed package holds one WASM (${installedWasmSha256}) matching build-info.json`);
+// The 0.10.x compatible/ export paths resolve to that same module's own files.
+for (const [legacy, file] of [['compatible/qrcode-ai-scanner_bg.wasm', 'qrcode-ai-scanner_bg.wasm'],
+  ['compatible/qrcode-ai-scanner.js', 'qrcode-ai-scanner.js']]) {
+  assert.equal(realpathSync(require.resolve(`@supernovae-st/qrcode-ai-scanner-wasm/${legacy}`)),
+    realpathSync(join(installed, file)), `${legacy} resolves to the one portable ${file}`);
+}
+passed.push('Legacy compatible/ export paths resolve to the one portable module');
 const fixtures = [
   ['clean', 'fixtures/clean/OK_68ms_100_4e875a2c.png', 'clean-url'],
   ['artistic', 'fixtures/artistic/blob-style-monkey-logo.webp', 'artistic-blob'],
@@ -41,7 +63,7 @@ const fixtures = [
   expected: JSON.parse(readFileSync(join(root, `spec/examples/${golden}.json`))).detections.map(d => d.content) }));
 const normalize = value => Array.isArray(value) ? value.map(normalize) : value && typeof value === 'object'
   ? Object.fromEntries(Object.entries(value).filter(([key]) => !['ms', 'total_ms', 'elapsed_ms'].includes(key)).map(([key, child]) => [key, normalize(child)])) : value;
-const passed = [], runs = [];
+const runs = [];
 const mixedBytes = [...readFileSync(join(root, 'fixtures/symbology/mixed-code128-qr.png'))];
 const linearCases = [
   ['symbology/code39-short-j.png', [['code39', 'J']]],
@@ -91,14 +113,17 @@ try {
     const browser = await runtime.browserType.launch({ headless: true, timeout: 30_000, ...runtime.options });
     try {
       const page = await browser.newPage(); const requests = [], errors = [];
+      const served = [];
       page.on('request', request => { if (/\.wasm(?:\?|$)/.test(request.url())) requests.push(request.url()); });
+      page.on('response', response => { if (/\.wasm(?:\?|$)/.test(response.url()) && response.ok())
+        served.push(response.body().then(body => sha(body))); });
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(base); await page.waitForFunction(() => !!window.harness);
       const capabilities = await page.evaluate(() => window.harness.scannerCapabilities());
       assert.equal(capabilities.wasm, true); assert.equal(capabilities.baseline, true);
       const disabled = runtime.disabled;
       assert.equal(capabilities.simd, !disabled, 'The real runtime, not a mocked detector, must have the expected capability');
-      const selected = disabled ? 'compatible' : 'simd';
+      const selected = 'portable';
       const initStarted = performance.now();
       const init = await page.evaluate(async () => { window.autoWorker = window.harness.startWorker(); return Promise.all(Array.from({length:4}, () => window.autoWorker.request())); });
       const initializationWallMs = performance.now() - initStarted;
@@ -114,26 +139,20 @@ try {
         assert.deepEqual(response.result.versions, { scanner: manifest.version, pipeline: 5, score_contract: 5 });
         reports.push(response.result); latency.push({ fixture: fixture.name, wallMs: performance.now() - started });
       }
-      if (!disabled) {
-        const compatibleLatency = [];
-        await page.evaluate(() => { window.compatibleWorker = window.harness.startWorker('compatible'); });
-        const warm = await page.evaluate(() => window.compatibleWorker.request());
-        assert.equal(warm.ok, true); assert.equal(warm.variant, 'compatible');
-        for (let index = 0; index < fixtures.length; index++) {
-          const started = performance.now();
-          const response = await page.evaluate(bytes => window.compatibleWorker.request({ bytes }), fixtures[index].bytes);
-          assert.equal(response.ok, true); assert.equal(response.variant, 'compatible');
-          assert.deepEqual(normalize(response.result), normalize(reports[index]), `${fixtures[index].name}: functional parity excludes only timings`);
-          compatibleLatency.push({ fixture: fixtures[index].name, wallMs: performance.now() - started });
-        }
-        latency.push({ variant: 'compatible', cases: compatibleLatency });
-        passed.push('SIMD and compatible reports agree on exact content and every non-timing field across seven fixture classes');
-      } else {
-        const forced = await page.evaluate(async () => window.harness.startWorker('simd').request());
-        assert.equal(forced.ok, false); assert.equal(forced.code, 'simd_unavailable'); assert.equal(forced.phase, 'initialization');
+      // The pre-0.11 'compatible' name loads the same portable module; a SIMD
+      // module no longer exists, so asking for one is an option error.
+      await page.evaluate(() => { window.compatibleWorker = window.harness.startWorker('compatible'); });
+      const warm = await page.evaluate(() => window.compatibleWorker.request());
+      assert.equal(warm.ok, true); assert.equal(warm.variant, 'portable');
+      for (let index = 0; index < fixtures.length; index++) {
+        const response = await page.evaluate(bytes => window.compatibleWorker.request({ bytes }), fixtures[index].bytes);
+        assert.equal(response.ok, true); assert.equal(response.variant, 'portable');
+        assert.deepEqual(normalize(response.result), normalize(reports[index]), `${fixtures[index].name}: one module, same reports`);
       }
+      const forced = await page.evaluate(async () => window.harness.startWorker('simd').request());
+      assert.equal(forced.ok, false); assert.equal(forced.code, 'invalid_options'); assert.equal(forced.phase, 'initialization');
       const main = await page.evaluate(() => window.harness.mainLoad());
-      for (const worker of disabled ? ['autoWorker'] : ['autoWorker', 'compatibleWorker']) {
+      for (const worker of ['autoWorker', 'compatibleWorker']) {
         for (const profile of ['fast', 'frame', 'full']) {
           const mixed = await page.evaluate(({ worker, profile, bytes }) => window[worker].request({ bytes, profile }),
             { worker, profile, bytes: mixedBytes });
@@ -147,8 +166,8 @@ try {
           assert.deepEqual(result.result.detections.map(d => [d.symbology, d.content.text]).sort(), test.expected, test.file);
         }
       }
-      passed.push(`${runtime.name}: mixed QR and Code128 exact contents in fast/frame/full through installed worker variants`);
-      passed.push(`${runtime.name}: Code93 and DataBar positives and invalid-checksum/finder negatives through installed variants`);
+      passed.push(`${runtime.name}: mixed QR and Code128 exact contents in fast/frame/full through the installed portable module`);
+      passed.push(`${runtime.name}: Code93 and DataBar positives and invalid-checksum/finder negatives through the installed portable module`);
       assert.equal(main.samePromise, true); assert.equal(main.variant, selected);
       const scanError = await page.evaluate(() => window.autoWorker.request({ bytes: [1,2,3] }));
       assert.equal(scanError.ok, false); assert.equal(scanError.phase, 'scan'); assert.match(scanError.message, /QRS-001/);
@@ -165,14 +184,17 @@ try {
       assert.equal(invalid.ok, false); assert.equal(invalid.code, 'binary_invalid'); assert.equal(invalid.nativeError.name, 'CompileError');
       assert.deepEqual(errors, []);
       await page.evaluate(() => window.harness.stop());
+      const servedSha256 = [...new Set(await Promise.all(served))];
+      assert.deepEqual(servedSha256, [installedWasmSha256], 'every served WASM response is the one recorded module');
       runs.push({ runtime: runtime.name, browser: await browser.version(), options: runtime.options, capabilities, selected, initializationWallMs, latency,
-        reports: reports.map((report,index) => ({ fixture: fixtures[index].name, normalizedSha256: sha(JSON.stringify(normalize(report))) })), requests, errors });
-      passed.push(`${runtime.name}: real worker/main capability selection, exact seven-fixture decoding, one initial asset, concurrent init and distinct failures`);
+        reports: reports.map((report,index) => ({ fixture: fixtures[index].name, normalizedSha256: sha(JSON.stringify(normalize(report))) })), requests, servedSha256, errors });
+      passed.push(`${runtime.name}: one portable module served and loaded (${disabled ? 'SIMD disabled in the real runtime' : 'SIMD available but unused'}), exact seven-fixture decoding, one initial asset, concurrent init and distinct failures`);
     } finally { await browser.close(); }
   }
 } finally { await new Promise(resolveClose => server.httpServer.close(resolveClose)); }
 mkdirSync(dirname(output), { recursive: true });
 const receipt = { checkedAt: new Date().toISOString(), consumer, artifact: { archive, sha256: sha(readFileSync(archive)), name: manifest.name, version: manifest.version },
+  buildInfo: { source_revision: buildInfo.source_revision, inputs: buildInfo.inputs.sha256, wasm: buildInfo.wasm, toolchain: buildInfo.toolchain },
   passed, runs, fixtures: fixtures.map(({name,file,bytes}) => ({name,file,sha256:sha(new Uint8Array(bytes))})),
   unverified: [...(!process.env.QRSCAN_NO_SIMD_BROWSER ? ['Actual SIMD-unavailable browser not supplied'] : []), 'Exact reported Windows10/Chrome109 and Windows10/Firefox158', 'Real Safari and physical phones', 'Production app and customer exports'] };
 writeFileSync(output, JSON.stringify(receipt, null, 2) + '\n'); console.log(JSON.stringify({ output, consumer, passed: passed.length, runs: runs.map(({runtime,browser,selected}) => ({runtime,browser,selected})) }));

@@ -7,7 +7,7 @@ the **real output you should expect** at each step.
 
 ```text
 qrcode-ai-scanner
-├── crates/        core lib · CLI (qrscan) · node (napi) · wasm (SIMD128)
+├── crates/        core lib · CLI (qrscan) · node (napi) · wasm (portable)
 ├── docs/          Mintlify site   → cd docs && mint dev        → http://localhost:3000
 ├── playground/    Vite wasm app   → cd playground && npm run dev → http://localhost:5173
 ├── fixtures/      ground-truth images (clean · degraded · symbology · artistic)

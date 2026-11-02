@@ -13,11 +13,11 @@ const CANON = join(ROOT, "bindings/report-types.d.ts");
 copyFileSync(CANON, join(ROOT, "crates/qrcode-ai-scanner-node/report-types.d.ts"));
 console.log("synced → crates/qrcode-ai-scanner-node/report-types.d.ts");
 
-// wasm package: copy into pkg/ + retype the two scan functions
-for (const folder of ["pkg", "pkg/compatible"]) {
-const wasmDts = join(ROOT, `crates/qrcode-ai-scanner-wasm/${folder}/qrcode-ai-scanner.d.ts`);
+// wasm package (one module): copy into pkg/ + retype the two scan functions
+{
+const wasmDts = join(ROOT, "crates/qrcode-ai-scanner-wasm/pkg/qrcode-ai-scanner.d.ts");
 if (existsSync(wasmDts)) {
-  copyFileSync(CANON, join(ROOT, `crates/qrcode-ai-scanner-wasm/${folder}/report-types.d.ts`));
+  copyFileSync(CANON, join(ROOT, "crates/qrcode-ai-scanner-wasm/pkg/report-types.d.ts"));
   let dts = readFileSync(wasmDts, "utf8");
   if (!dts.includes("./report-types")) {
     dts = dts.replace(

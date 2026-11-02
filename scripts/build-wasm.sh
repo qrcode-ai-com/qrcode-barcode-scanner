@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the browser wasm package: wasm-pack (no bundled wasm-opt — its cached
 # binaryen is too old for Rust ≥1.87 wasm features) + manual wasm-opt + size
-# report. Run from the repo root. Requires: wasm-pack, binaryen (wasm-opt).
+# report. Run from the repo root. Requires: wasm-pack, binaryen (wasm-opt),
+# python3 (build-info) and node.
 set -euo pipefail
 
 if ! command -v wasm-opt >/dev/null; then
@@ -17,43 +18,50 @@ if [ -z "$opt_version" ] || [ "$opt_version" -lt 130 ]; then
   exit 1
 fi
 
-cd "$(dirname "$0")/../crates/qrcode-ai-scanner-wasm"
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root/crates/qrcode-ai-scanner-wasm"
 echo "toolchain: $(rustc --version) · $(wasm-pack --version) · wasm-opt version ${opt_version}"
 
-# The two variants use the same features, source and lock. Disable SIMD
-# explicitly for the compatible build, including dependencies; do not let an
-# ambient RUSTFLAGS or an optimizer's all-features setting reintroduce it.
+# ONE portable module. The supported browser floor includes engines without
+# SIMD, and no JavaScript branch can make a SIMD instruction validate in such
+# an engine: SIMD stays off for this crate and every dependency, whatever an
+# ambient RUSTFLAGS or an optimizer's all-features setting would add.
 # wasm-pack skips its old bundled optimizer; validation happens after Binaryen.
-RUSTFLAGS="-C target-feature=+simd128,-relaxed-simd" wasm-pack build \
+# The literal RUSTFLAGS and wasm-opt lines below are the recipe: the bench
+# (xtask/src/bench/manifest.rs `script_recipe`) reads them from this text, and
+# build-info.json records the same strings (keep the `write` call identical).
+started=$(date +%s)
+inputs=$(python3 "$root/scripts/wasm_provenance.py" digest)
+rm -rf pkg
+RUSTFLAGS="-C target-feature=-simd128,-relaxed-simd" wasm-pack build \
   --target web --release --out-name qrcode-ai-scanner -- --locked
-
 wasm-opt pkg/qrcode-ai-scanner_bg.wasm \
   -O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
-  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --enable-simd \
+  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
   -o pkg/qrcode-ai-scanner_bg.wasm.opt
 mv pkg/qrcode-ai-scanner_bg.wasm.opt pkg/qrcode-ai-scanner_bg.wasm
-
-RUSTFLAGS="-C target-feature=-simd128,-relaxed-simd" wasm-pack build \
-  --target web --release --out-dir pkg/compatible --out-name qrcode-ai-scanner -- --locked
-wasm-opt pkg/compatible/qrcode-ai-scanner_bg.wasm \
-  -O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
-  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
-  -o pkg/compatible/qrcode-ai-scanner_bg.wasm.opt
-mv pkg/compatible/qrcode-ai-scanner_bg.wasm.opt pkg/compatible/qrcode-ai-scanner_bg.wasm
-# This validation rejects SIMD instructions/types, even if a dependency or
-# optimizer accidentally emitted them. The browser acceptance also disables
-# SIMD in the actual runtime rather than mocking the detector.
-wasm-opt pkg/compatible/qrcode-ai-scanner_bg.wasm \
+# This validation rejects any instruction or type outside the floor (SIMD
+# included), even if a dependency or the optimizer emitted one. build-info then
+# reads the module's own code for the features it actually needs, and the
+# browser acceptance disables SIMD in the real runtime rather than mocking it.
+wasm-opt pkg/qrcode-ai-scanner_bg.wasm \
   --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
   --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
   -o /dev/null
 
-node ../../scripts/patch-wasm-pkg.mjs
-(cd ../.. && node scripts/sync-report-types.mjs)
+node "$root/scripts/patch-wasm-pkg.mjs"
+(cd "$root" && node scripts/sync-report-types.mjs)
+# Written once, from these freshly built and validated bytes, and only if the
+# compiled inputs did not change while they were being built.
+python3 "$root/scripts/wasm_provenance.py" write pkg \
+  --rustflags "-C target-feature=-simd128,-relaxed-simd" \
+  --wasm-opt-flags "-O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd" \
+  --inputs "$inputs" --built-after "$started"
 
 node test.mjs
-WASM_VARIANT=compatible node test.mjs
 node camera.test.mjs
+# camera-overlay.test.mjs needs a real browser: scripts/packed-wasm-browser.mjs
+# runs it against the packed archive.
 
 raw=$(wc -c <pkg/qrcode-ai-scanner_bg.wasm)
 gz=$(gzip -9 -c pkg/qrcode-ai-scanner_bg.wasm | wc -c)

@@ -2,8 +2,8 @@
 //! (toolchain, wasm-bindgen, post-processors), its `target_features`
 //! section when present, and whether its code uses SIMD. A base / candidate
 //! pair built by different recipes is refused — a plain `wasm-pack` build
-//! against the release script's `+simd128` and `wasm-opt -O3` would differ
-//! for build reasons alone.
+//! against the release script's `RUSTFLAGS` and `wasm-opt` flags would
+//! differ for build reasons alone.
 //!
 //! SIMD is read from the code itself: every function body is decoded
 //! instruction by instruction (so immediates are never mistaken for

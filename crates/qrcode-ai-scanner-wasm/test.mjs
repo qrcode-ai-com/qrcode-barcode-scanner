@@ -6,10 +6,9 @@
 // a score runs unbudgeted (budget_ms 0).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const variant = process.env.WASM_VARIANT === "compatible" ? "compatible/" : "";
-const { initSync, scan_image, scan_frame, version } = await import(`./pkg/${variant}qrcode-ai-scanner.js`);
+const { initSync, scan_image, scan_frame, version } = await import("./pkg/qrcode-ai-scanner.js");
 
-initSync({ module: readFileSync(new URL(`./pkg/${variant}qrcode-ai-scanner_bg.wasm`, import.meta.url)) });
+initSync({ module: readFileSync(new URL("./pkg/qrcode-ai-scanner_bg.wasm", import.meta.url)) });
 
 const here = (rel) => new URL(rel, import.meta.url);
 const pkg = JSON.parse(readFileSync(here("./pkg/package.json"), "utf8"));
@@ -20,7 +19,7 @@ const texts = (report) => report.detections.map((d) => d.content.text);
 const AXES = ["resolution", "blur", "contrast", "perspective", "rotation", "lighting"];
 
 // A readable matrix code must not end the pyramid before a neighboring 1D
-// symbol gets a sufficient-resolution read. Run in both package variants.
+// symbol gets a sufficient-resolution read.
 for (const profile of ["fast", "frame", "full"]) {
   const control = scan_image(fixture("symbology/code128-stock-4827.png"), profile, undefined, undefined, 0);
   assert.deepEqual(control.detections.map(d => [d.symbology, d.content.text]), [["code128", "STOCK-4827"]]);
@@ -35,7 +34,7 @@ for (const profile of ["fast", "frame", "full"]) {
   assert.deepEqual(artistic.detections.map(d => [d.symbology, d.content.text]), [["qr_code", "https://qrc-ai.com/QVR9a"]],
     "QR texture must not become a false Code39 J");
 }
-console.log(`PASS ${process.env.WASM_VARIANT ?? 'simd'} mixed QR + Code128: fast, frame, full`);
+console.log("PASS mixed QR + Code128: fast, frame, full");
 
 // one version end to end: the generated manifest, the module, the report
 assert.equal(version(), pkg.version);

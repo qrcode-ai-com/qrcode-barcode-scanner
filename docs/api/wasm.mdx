@@ -1,6 +1,6 @@
 ---
 title: "Browser — @supernovae-st/qrcode-ai-scanner-wasm"
-description: "Automatic SIMD or compatible WASM loading for verify flows and live camera."
+description: "One portable WASM for verify flows and live camera, with checked loading."
 ---
 
 ```bash
@@ -10,39 +10,43 @@ npm i @supernovae-st/qrcode-ai-scanner-wasm
 `wasm-pack` web target: the `.wasm` resolves via `import.meta.url`.
 Typed returns (`ScanReport`) ship in the package.
 
-## Compatible initialization
+## Automatic initialization
 
 ```ts
 import { loadScanner } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
 const scanner = await loadScanner();
 const report = scanner.scan_image(bytes, "full");
-const loadedVariant = scanner.variant; // simd | compatible
+const loadedVariant = scanner.variant; // "portable"
 ```
 
-Use this additive entry in both the module worker and any main-thread fallback.
-It checks real WASM features in the calling realm before compiling the scanner,
-then fetches only one binary. Imports are safe during SSR; initialization still
-belongs to client/worker execution. Repeated and concurrent calls share one
-promise, including an initialization failure. An explicit user retry can create
-one fresh `createScannerLoader()`; there is no blind retry or automatic reload.
+Use this entry in both the module worker and any main-thread fallback. It
+checks real WASM features in the calling realm before compiling the scanner,
+then fetches the package's one module. Imports are safe during SSR;
+initialization still belongs to client/worker execution. Repeated and
+concurrent calls share one promise, including an initialization failure. An
+explicit user retry can create one fresh `createScannerLoader()`; there is no
+blind retry or automatic reload.
 
 `ScannerInitError` preserves its native `cause`, stable `code`, selected
 `variant` and optional HTTP `status`. Missing WASM, unsupported baseline features,
-explicitly unavailable SIMD, loader imports, asset network/HTTP/read failures,
-invalid headers, ambiguous WASM validation, compilation and instantiation have
-separate codes. A validation failure in an unknown asset can reflect malformed
-code or unexpected features. Inspect the actual asset and native cause instead
-of attributing every error to SIMD, browser age or CPU. These JS-only diagnostics
-do not change the Rust `QRS-xxx` catalog or any scan report fields.
+loader imports, asset network/HTTP/read failures, invalid headers, ambiguous
+WASM validation, compilation and instantiation have separate codes. A
+validation failure in an unknown asset can reflect malformed code or unexpected
+features. Inspect the actual asset and native cause instead of attributing every
+error to a feature, browser age or CPU. These JS-only diagnostics do not change
+the Rust `QRS-xxx` catalog or any scan report fields.
 
-The compatible module requires mutable globals, bulk memory, sign extension,
-nontrapping conversions, multivalue and reference types. It removes the SIMD
-requirement; it does not promise compatibility with every WASM-capable browser.
-The package README documents the baseline probe, feature-limited build and
-factory options. Physical devices, real Safari and historical browser floors
-need their own acceptance evidence.
+The loader requires mutable globals, bulk memory, sign extension, nontrapping
+conversions, multivalue and reference types, and the module uses no SIMD. That
+baseline does not promise compatibility with every WASM-capable browser. The
+package's `build-info.json` records the module's hash, the features its code
+uses, the compiled inputs and the build recipe. `variant: "compatible"` and the
+0.10 `compatible/` export paths name this same module; `"simd"` is no longer a
+variant and rejects with `invalid_options`. The package README documents the
+baseline probe, the build and the factory options. Physical devices, real
+Safari and historical browser floors need their own acceptance evidence.
 
-## Existing explicit SIMD API
+## Direct API
 
 ```ts
 import init, { scan_image, scan_frame, version }

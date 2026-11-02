@@ -1815,9 +1815,9 @@ mod tests {
                     String::from("--enable-sign-ext"),
                     String::from("--enable-reference-types"),
                     String::from("--enable-multivalue"),
-                    String::from("--enable-simd"),
+                    String::from("--disable-simd"),
                 ],
-                Some(String::from("-C target-feature=+simd128,-relaxed-simd"))
+                Some(String::from("-C target-feature=-simd128,-relaxed-simd"))
             )
         );
         assert_eq!(
