@@ -2083,7 +2083,7 @@ MUTATIONS = (
      "npm-publish.yml › publish-native [npm-operand]"),
     ("the operand check without its absolute-path test", P, [
         ("npm-publish.yml", OPERAND_CHECK, OPERAND_CHECK.replace('[[ "$1" == /* ]] && ', ""))], {}, 1,
-     "npm-publish.yml › publish-native [npm-operand] (step 7) the step must define `inspected` once"),
+     "npm-publish.yml › publish-native [npm-operand] (step 8) the step must define `inspected` once"),
     # -- how the operand is spelled: npm reads a relative dir/file.tgz as the
     #    GitHub repository dir/file.tgz, so every spelling is absolute and the
     #    same in the publishing step, the record and the operand proof
