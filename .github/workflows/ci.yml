@@ -285,6 +285,9 @@ jobs:
       # each judged on every case, compiled by RUST_TOOLCHAIN exported as
       # RUSTUP_TOOLCHAIN (the receipt records rustc -vV and cargo -V).
       - run: python3 scripts/consumer_truth.py --self-test
+      # The native platform-floor judge npm-publish runs on every release
+      # addon: synthesized ELF, Mach-O and PE files, clean and planted.
+      - run: python3 scripts/native-floor.py --self-test
       - name: install the inspected .crate files outside the checkout and run consumers
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')

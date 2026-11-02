@@ -8,6 +8,17 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ### Fixed
 
+- The native Node addon for Windows (`win32-x64-msvc`) links the C runtime
+  statically, as `node.exe` does, so it imports no Visual C++ runtime DLL.
+  0.10.0's addon imported `VCRUNTIME140.dll`, which a Windows install without
+  the Visual C++ Redistributable lacks; GitHub's Windows runners carry it, so
+  the consumer jobs could not see the difference.
+  `scripts/native-floor.py` reads each release addon's bytes (ELF, Mach-O,
+  PE) and refuses one that needs more than Node 18 needs on its platform:
+  glibc 2.28, macOS 10.15 on x64 and 11 on arm64, no Visual C++ runtime DLL
+  and no library outside the operating system. `npm-publish` runs it on the
+  packed release set and again on the tarballs about to be uploaded; CI runs
+  its planted-defect self-test.
 - A QR code found in the downscaled pyramid no longer suppresses a readable
   neighboring barcode or small matrix code. One budgeted non-QR read at input resolution
   completes QR pyramid results before the early return.

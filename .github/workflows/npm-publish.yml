@@ -165,6 +165,17 @@ jobs:
         run: >
           python3 scripts/package-inspect.py node --platform-dirs crates/qrcode-ai-scanner-node/npm
           --release-set --strict --quiet --out "$RUNNER_TEMP/npm-release"
+      # What each packed addon needs from the system that loads it, read from
+      # its bytes: no more than Node 18 (engines.node) needs on that platform,
+      # i.e. glibc 2.28, macOS 10.15 on x64 and 11 on arm64, and on Windows no
+      # Visual C++ runtime DLL, which node.exe does not import. Each of the six
+      # targets exactly once. Runners carry the redistributable; this does not.
+      - name: every packed addon within Node 18's platform floor
+        working-directory: .
+        run: >
+          python3 scripts/native-floor.py --policy node --complete
+          --out "$RUNNER_TEMP/native-floor.json"
+          "$RUNNER_TEMP"/npm-release/archives/*/*.tgz
       - uses: actions/upload-artifact@v7
         with:
           name: npm-native-tarballs
@@ -226,6 +237,8 @@ jobs:
           python3 scripts/package-inspect.py archive "$PWD"/npm-release/*/*.tgz
           --release-set --strict --quiet
           --record "$RUNNER_TEMP/npm-inspected.sha256"
+      - name: every addon about to be uploaded within Node 18's platform floor
+        run: python3 scripts/native-floor.py --policy node --complete "$PWD"/npm-release/*/*.tgz
       # Every platform package missing at this version is uploaded, and one
       # that cannot be stops the job before the main package. Then every pin
       # must resolve on the registry; only then does the main package go up.
