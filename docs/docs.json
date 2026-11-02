@@ -42,6 +42,7 @@
             "group": "Guides",
             "pages": [
               "guides/choosing-a-surface",
+              "guides/migrate-to-qrcode-barcode-scanner",
               "guides/nuxt-verify",
               "guides/agents"
             ]
