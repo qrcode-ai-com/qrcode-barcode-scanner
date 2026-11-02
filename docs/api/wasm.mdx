@@ -119,7 +119,7 @@ const camera = createCameraScanner({
   video,
   scanFrame: scanFrameInWorker,
   onResult(report, frame) {
-    overlay.update(tracker.update(report.detections, frame), frame);
+    overlay.update(tracker.update(report.detections, frame));
   },
   onError(error) { showCameraError(error); },
 });

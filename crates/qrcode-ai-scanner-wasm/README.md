@@ -147,7 +147,7 @@ const tracker = createDetectionTracker();
 const overlay = createCameraOverlay({ video, container });
 const camera = createCameraScanner({ video, scanFrame: scanFrameInWorker,
   onResult(report, frame) {
-    overlay.update(tracker.update(report.detections, frame), frame);
+    overlay.update(tracker.update(report.detections, frame));
   }, onError: showCameraError });
 await camera.start(); // call from the camera button
 // Component teardown: camera.stop(); tracker.clear(); overlay.destroy();
