@@ -15,7 +15,7 @@ dry run never yields a verdict.
 
 | runtime | what runs | base | candidate |
 |---|---|---|---|
-| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner` 0.10.1 from crates.io (dependency key `qrcode-barcode-scanner`) | worker built against this tree by path |
+| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner = "=0.10.1"` | worker built against this tree by path |
 | `cli` | one `qrscan` process per scan | the published 0.10.1 CLI crate, built `--locked` | this tree's CLI |
 | `node` | the napi package's public `scan()` in Node | the v0.10.1 package files with the addon rebuilt from the v0.10.1 source | this tree's package + addon |
 | `wasm` | the wasm package's `scan_image()` in Node | the v0.10.1 portable module (`pkg/compatible`) rebuilt from its source by the release recipe | a package built by `scripts/build-wasm.sh` |
