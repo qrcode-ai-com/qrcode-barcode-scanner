@@ -1411,11 +1411,13 @@ mod tests {
 
     /// The fixtures under `symbology/` holding several symbols: where the
     /// upstream post-filter and `multi_reader` are meant to differ.
-    const SEVERAL_SYMBOLS: [&str; 4] = [
+    const SEVERAL_SYMBOLS: [&str; 6] = [
         "datamatrix-pair-japanese.png",
         "ean13-addon5-code128.png",
         "maxicode-over-code128.png",
         "mixed-code128-qr.png",
+        "qr-small-datamatrix.png",
+        "qr-twins-code128.png",
     ];
 
     #[test]

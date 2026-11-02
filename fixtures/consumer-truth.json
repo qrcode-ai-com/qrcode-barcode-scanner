@@ -1,0 +1,1057 @@
+{
+ "schema": "qrscan-consumer-truth/1",
+ "about": "The shared truth set every installed-package consumer runs (QR-28): exact contents, occurrences and score/null association per input. Scan each with the full profile and no budget. Contents compare as a multiset; `primary` is the index of the content detections[0] must be, \"qr_family\" when the contract only fixes its family, null when no contract fixes it. Occurrence `near`/`within` geometry comes from the composition layout; occurrence kinds are the reader-capability contract of this candidate.",
+ "scan": {
+  "profile": "full",
+  "budget_ms": 0
+ },
+ "tolerance_px": 2.0,
+ "cases": [
+  {
+   "id": "qr-v5q-control",
+   "file": "clean/gen_v5_q.png",
+   "sha256": "1dc399cad19623a145b20251cf1c0da42ea4f54fd79871a4dd796c9554822dd6",
+   "size": [
+    360,
+    360
+   ],
+   "source": "corpus.toml; xtask gen-fixtures",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrcode-ai.com/c/v5q",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         32,
+         32
+        ],
+        [
+         328,
+         32
+        ],
+        [
+         328,
+         328
+        ],
+        [
+         32,
+         328
+        ]
+       ]
+      }
+     ],
+     "raw_hex": "68747470733a2f2f7172636f64652d61692e636f6d2f632f763571"
+    }
+   ],
+   "primary": 0,
+   "score": 100
+  },
+  {
+   "id": "micro-qr",
+   "file": "symbology/microqr.png",
+   "sha256": "a158966d9261b85112f63b377ddca4e5e5176a668413c71fb555d934135971a2",
+   "size": [
+    210,
+    210
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "micro_qr_code",
+     "text": "HELLO42",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ],
+     "raw_hex": "48454c4c4f3432"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "data-matrix",
+   "file": "symbology/datamatrix.png",
+   "sha256": "0ab5c1c5d8d8f465242570f3a81728d96966bfa73aef0616ed65492d522d7dae",
+   "size": [
+    240,
+    240
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "data_matrix",
+     "text": "https://qrcode-ai.com/dm",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ],
+     "raw_hex": "68747470733a2f2f7172636f64652d61692e636f6d2f646d"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "aztec",
+   "file": "symbology/aztec.png",
+   "sha256": "443ea720d5905d369a9738135162942d8afb94262c3fe3acd91b9dfc4a4c45f2",
+   "size": [
+    240,
+    240
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "aztec",
+     "text": "https://qrcode-ai.com/aztec",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ],
+     "raw_hex": "68747470733a2f2f7172636f64652d61692e636f6d2f617a746563"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "pdf417",
+   "file": "symbology/pdf417.png",
+   "sha256": "222d8c16f7c4cd5f814215d7d55760866b177c19beb21621375b431801dbba09",
+   "size": [
+    290,
+    72
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "pdf417",
+     "text": "https://qrcode-ai.com/pdf417",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ],
+     "raw_hex": "68747470733a2f2f7172636f64652d61692e636f6d2f706466343137"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "ean13",
+   "file": "symbology/ean13.png",
+   "sha256": "fa2206274e1c0a83405d879eb9306a82f10e6817a9937f69436963367ee59605",
+   "size": [
+    320,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "ean13",
+     "text": "9506000134352",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "39353036303030313334333532"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "ean8",
+   "file": "symbology/ean8.png",
+   "sha256": "860787ca11af7565fe445a1147f7bc35e4614f58d2dacbb96c06b2c959365ddc",
+   "size": [
+    240,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "ean8",
+     "text": "96385074",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "3936333835303734"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "upc-a",
+   "file": "symbology/upca.png",
+   "sha256": "51f40dfc6f820994cc51e6e0f36c82576dab66739f1d6a757f2da25ef4b4e1ff",
+   "size": [
+    320,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "upc_a",
+     "text": "036000291452",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "303336303030323931343532"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "code128",
+   "file": "symbology/code128.png",
+   "sha256": "b8cc3d26014d7dae0ddd802697fac8fba99cabeb33e30f8cfd56ce03c48da9d1",
+   "size": [
+    360,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "code128",
+     "text": "QRCAI-0042",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "51524341492d30303432"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "code39",
+   "file": "symbology/code39.png",
+   "sha256": "26a3bbfbd0d9a5e047cef649633817020af0356370c2e27834af379cb04ae6fd",
+   "size": [
+    360,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "code39",
+     "text": "SCANNER-39",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "5343414e4e45522d3339"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "itf",
+   "file": "symbology/itf14.png",
+   "sha256": "f3b75d6517d024accec39e3f4f9ba288be292ffe02d112db9b88806d5f357d6d",
+   "size": [
+    360,
+    140
+   ],
+   "source": "corpus.toml (R12)",
+   "contents": [
+    {
+     "symbology": "itf",
+     "text": "15400141288763",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "3135343030313431323838373633"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "rmqr",
+   "file": "symbology/rmqr-url-kanji.png",
+   "sha256": "97bcf495768b09cbcdd870deeac2497c03d7d4bebc90adfba81b5e667797995b",
+   "size": [
+    282,
+    102
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1, Kanji mode: Shift JIS 93FA 967B)",
+   "contents": [
+    {
+     "symbology": "rectangular_micro_qr_code",
+     "text": "https://qrc-ai.com/日本",
+     "raw_hex": "68747470733a2f2f7172632d61692e636f6d2f93fa967b",
+     "charset": "shift_jis",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "upc-e",
+   "file": "symbology/upce.png",
+   "sha256": "397c6c02f8974b64e27c52fa927c8efb46dc3ffbc5351286e1fe63fce0719e90",
+   "size": [
+    268,
+    220
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1 writer input; its reader expands it to 0012345000065)",
+   "contents": [
+    {
+     "symbology": "upc_e",
+     "text": "01234565",
+     "raw_hex": "3031323334353635",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "code93",
+   "file": "symbology/code93-bwipp-checked.png",
+   "sha256": "2aaec1b0c11ab80b3387be94f40386403ce3ddf3917510e83bbcf93a6db9f3b4",
+   "size": [
+    604,
+    385
+   ],
+   "source": "CONTENT-FIXTURES.md (bwip-js 4.11.4, C and K check characters)",
+   "contents": [
+    {
+     "symbology": "code93",
+     "text": "SCANNER-93",
+     "raw_hex": "5343414e4e45522d3933",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "codabar",
+   "file": "symbology/codabar.png",
+   "sha256": "5efff3c933372e70262d054d6ff12d674e50172468ed6d12694805c9c8e0486b",
+   "size": [
+    276,
+    150
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1 A40156B: start/stop A, B are not data)",
+   "contents": [
+    {
+     "symbology": "codabar",
+     "text": "40156",
+     "raw_hex": "3430313536",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "unavailable"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "data-bar",
+   "file": "symbology/databar-gtin.png",
+   "sha256": "026567259bfd62ffeccad16af1db7baff651436a4e6746ce795f8ad8a0614157",
+   "size": [
+    384,
+    200
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1)",
+   "contents": [
+    {
+     "symbology": "data_bar",
+     "text": "09506000134352",
+     "raw_hex": "3039353036303030313334333532",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "partial"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "data-bar-expanded",
+   "file": "symbology/databar-expanded-bwipp-regression.png",
+   "sha256": "1a25822c10eb5aaef326cacbc665d0c7b9e9ab7777ad14a99c2c5f8b90d7c08d",
+   "size": [
+    892,
+    233
+   ],
+   "source": "CONTENT-FIXTURES.md (bwip-js 4.11.4)",
+   "contents": [
+    {
+     "symbology": "data_bar_expanded",
+     "text": "(01)09506000134352(10)DEMO",
+     "raw_hex": "2830312930393530363030303133343335322831302944454d4f",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "partial"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "telepen",
+   "file": "symbology/telepen.png",
+   "sha256": "f54a1bb0deb2ae7239bb71df262f9bb7c0bb4f03e13145ee6981bf0c347ccbff",
+   "size": [
+    780,
+    150
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1)",
+   "contents": [
+    {
+     "symbology": "telepen",
+     "text": "TELEPEN-4827",
+     "raw_hex": "54454c4550454e2d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "unavailable"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "maxicode-over-code128",
+   "file": "symbology/maxicode-over-code128.png",
+   "sha256": "27c8f262a060e2f0b384e2e2523cbc35a99c7d3851afa6237103408a1c82a0d8",
+   "size": [
+    359,
+    478
+   ],
+   "source": "CONTENT-FIXTURES.md § Occurrence fixtures (zxing-cpp 3.1.1, stacked; Code 128 rows 358-457)",
+   "contents": [
+    {
+     "symbology": "maxi_code",
+     "text": "MAXI-4827",
+     "raw_hex": "4d4158492d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "unavailable"
+      }
+     ]
+    },
+    {
+     "symbology": "code128",
+     "text": "STOCK-4827",
+     "raw_hex": "53544f434b2d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment",
+       "within": [
+        0,
+        358,
+        359,
+        100
+       ]
+      }
+     ]
+    }
+   ],
+   "primary": null,
+   "score": "present"
+  },
+  {
+   "id": "qr-and-code128",
+   "file": "symbology/mixed-code128-qr.png",
+   "sha256": "c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8",
+   "size": [
+    1666,
+    1120
+   ],
+   "source": "CONTENT-FIXTURES.md § Linear and mixed-family (bwip-js Code 128 at (48, 405), QR image at (594, 48))",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrc-ai.com/76xMa",
+     "raw_hex": "68747470733a2f2f7172632d61692e636f6d2f3736784d61",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad",
+       "within": [
+        594,
+        48,
+        1024,
+        1024
+       ]
+      }
+     ]
+    },
+    {
+     "symbology": "code128",
+     "text": "STOCK-4827",
+     "raw_hex": "53544f434b2d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment",
+       "within": [
+        48,
+        405,
+        498,
+        310
+       ]
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "qr-and-small-data-matrix",
+   "file": "symbology/qr-small-datamatrix.png",
+   "sha256": "645add40ae7c2524e93d86f58d35c3b3933c0b691d7ab9bac9bfae433a4beeb6",
+   "size": [
+    1600,
+    600
+   ],
+   "source": "xtask gen-fixtures (v3-M QR 12 px modules at (40, 40); bwip-js Data Matrix DM-4827, 3 px modules, at (1300, 240))",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrc-ai.com/mixed-symbols",
+     "raw_hex": "68747470733a2f2f7172632d61692e636f6d2f6d697865642d73796d626f6c73",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         88,
+         88
+        ],
+        [
+         436,
+         88
+        ],
+        [
+         436,
+         436
+        ],
+        [
+         88,
+         436
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "symbology": "data_matrix",
+     "text": "DM-4827",
+     "raw_hex": "444d2d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         1312,
+         252
+        ],
+        [
+         1348,
+         252
+        ],
+        [
+         1348,
+         288
+        ],
+        [
+         1312,
+         288
+        ]
+       ]
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "qr-twins-and-code128",
+   "file": "symbology/qr-twins-code128.png",
+   "sha256": "4fe4cbd4b186dcab6f3f129b406010122975f3adf0cd8961e842ee849e4cf318",
+   "size": [
+    988,
+    390
+   ],
+   "source": "xtask gen-fixtures (two identical v3-M QR copies, 5 px modules, at (40, 40) and (265, 40); the bwip-js Code 128 at (470, 60)): two contents, three occurrences",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrc-ai.com/occurrences",
+     "raw_hex": "68747470733a2f2f7172632d61692e636f6d2f6f6363757272656e636573",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         60,
+         60
+        ],
+        [
+         205,
+         60
+        ],
+        [
+         205,
+         205
+        ],
+        [
+         60,
+         205
+        ]
+       ]
+      },
+      {
+       "kind": "quad",
+       "near": [
+        [
+         285,
+         60
+        ],
+        [
+         430,
+         60
+        ],
+        [
+         430,
+         205
+        ],
+        [
+         285,
+         205
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "symbology": "code128",
+     "text": "STOCK-4827",
+     "raw_hex": "53544f434b2d34383237",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment",
+       "within": [
+        470,
+        60,
+        498,
+        310
+       ]
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "eci4-eci26-equal-text",
+   "file": "eci/eci4-eci26-equal-text.png",
+   "sha256": "b3c7efb4849ae3e333ff802f8c924914d373bd7caa1d84ce6cd169ed0e21ac02",
+   "size": [
+    490,
+    265
+   ],
+   "source": "xtask gen-fixtures (ECI 4 over A1 and ECI 26 over C4 84, v3-M, 5 px modules): one text, two contents",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "Ą",
+     "raw_hex": "a1",
+     "charset": "eci",
+     "eci": [
+      {
+       "designator": 4,
+       "start": 0
+      }
+     ],
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         60,
+         60
+        ],
+        [
+         205,
+         60
+        ],
+        [
+         205,
+         205
+        ],
+        [
+         60,
+         205
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "symbology": "qr_code",
+     "text": "Ą",
+     "raw_hex": "c484",
+     "charset": "utf8",
+     "eci": [
+      {
+       "designator": 26,
+       "start": 0
+      }
+     ],
+     "occurrences": [
+      {
+       "kind": "quad",
+       "near": [
+        [
+         285,
+         60
+        ],
+        [
+         430,
+         60
+        ],
+        [
+         430,
+         205
+        ],
+        [
+         285,
+         205
+        ]
+       ]
+      }
+     ]
+    }
+   ],
+   "primary": "qr_family",
+   "score": "present"
+  },
+  {
+   "id": "eci899-binary",
+   "file": "eci/eci899-binary.png",
+   "sha256": "f4f65f70737ffbeab5eb1be4018b1b1788abfe9a85dae2398b102e9a7a29f54c",
+   "size": [
+    296,
+    296
+   ],
+   "source": "spec/examples/eci-undecodable.json; xtask gen-fixtures (ECI 899 over 00 FF 80 7F)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "����",
+     "raw_hex": "00ff807f",
+     "charset": "unknown",
+     "eci": [
+      {
+       "designator": 899,
+       "start": 0
+      }
+     ],
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "hanzi-gb18030",
+   "file": "eci/hanzi-zhongwen.png",
+   "sha256": "c1ffd447d57737f974de1044066954c8ec2c1ce10fc63c61b3dbd0db2be69c14",
+   "size": [
+    264,
+    264
+   ],
+   "source": "spec/examples/hanzi-gb18030.json; xtask gen-fixtures (one Hanzi segment, GB 2312 D6D0 CEC4)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "中文",
+     "raw_hex": "d6d0cec4",
+     "charset": "gb18030",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "qr-gs1-fnc1",
+   "file": "clean/gs1-fnc1.png",
+   "sha256": "50fbcf47d7c237cb0c8bc968ff01feb11f4abd60c2b54d498f40168416646eeb",
+   "size": [
+    296,
+    296
+   ],
+   "source": "spec/examples/gs1-fnc1.json; xtask gen-fixtures (ECI 26, FNC1 first, numeric GTIN element string)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "0109506000134352",
+     "raw_hex": "30313039353036303030313334333532",
+     "charset": "utf8",
+     "eci": [
+      {
+       "designator": 26,
+       "start": 0
+      }
+     ],
+     "fnc1": "first",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "data-matrix-gs1-fnc1",
+   "file": "symbology/datamatrix-gs1-fnc1.png",
+   "sha256": "11b2ba0fb1b9d4cd7e547055c09d6b8cf2e6c4c771a7d5bb6fea28e62bbe1228",
+   "size": [
+    256,
+    144
+   ],
+   "source": "CONTENT-FIXTURES.md (zxing-cpp 3.1.1 GS1 (01)09506000134352(10)AB12, FNC1 first)",
+   "contents": [
+    {
+     "symbology": "data_matrix",
+     "text": "010950600013435210AB12",
+     "raw_hex": "30313039353036303030313334333532313041423132",
+     "charset": "utf8",
+     "fnc1": "first",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "jpeg-exif-qr",
+   "file": "degraded/exif6-rotated-qr.jpg",
+   "sha256": "e1dd4503d6c963883f9f5958b1e1f273a8297831d09b6ff5426a3d6242e8b0ad",
+   "source": "corpus.toml (R16)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrcode-ai.com/exif-pin",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ],
+     "raw_hex": "68747470733a2f2f7172636f64652d61692e636f6d2f657869662d70696e"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "jpeg-exif-ean13",
+   "file": "symbology/exif6-rotated-ean.jpg",
+   "sha256": "d61c24cee3d98d812c793fb7e643f0264148faabd91865a070333e0377d1213e",
+   "source": "corpus.toml (R16)",
+   "contents": [
+    {
+     "symbology": "ean13",
+     "text": "9506000134352",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "segment"
+      }
+     ],
+     "raw_hex": "39353036303030313334333532"
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "webp-artistic",
+   "file": "artistic/blob-style-monkey-logo.webp",
+   "sha256": "b7dfdc16c880b4def4e56882c196e93a36ffbd3b5362b54abbad496d53ec0477",
+   "source": "corpus.toml (a text truth: no independent reader states the bytes)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrc-ai.com/Uo54C",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "partial"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "rescue-occluded",
+   "file": "degraded/logo-occluded-rescue.png",
+   "sha256": "6068de0ab7c5a5739934ffca7acfcd53cccb67607b42238d683b7dde908794e9",
+   "size": [
+    360,
+    360
+   ],
+   "source": "corpus.toml (R9, a text truth; the S5 rescue reads it)",
+   "contents": [
+    {
+     "symbology": "qr_code",
+     "text": "https://qrcode-ai.com/rescue-pin",
+     "charset": "utf8",
+     "occurrences": [
+      {
+       "kind": "quad"
+      }
+     ]
+    }
+   ],
+   "primary": 0,
+   "score": "present"
+  },
+  {
+   "id": "code93-without-checks",
+   "file": "invalid/code93-missing-checks.png",
+   "sha256": "06099048adc91d97c4a1ff6dd51b75a52e0c96c2f388988058a2faf98d4a62bc",
+   "size": [
+    532,
+    385
+   ],
+   "source": "tests/linear_formats.rs: missing required check characters must be refused",
+   "contents": [],
+   "primary": null,
+   "score": null
+  },
+  {
+   "id": "data-bar-expanded-illegal-finders",
+   "file": "invalid/databar-expanded-acfd.png",
+   "sha256": "bde63c056beb1b439a51155f229afae5ecbe2b20212dd606ff7130b3fd8a6a4a",
+   "size": [
+    892,
+    233
+   ],
+   "source": "tests/linear_formats.rs: illegal finder sequence A,C,F,D must be refused",
+   "contents": [],
+   "primary": null,
+   "score": null
+  },
+  {
+   "id": "valid-empty",
+   "synthetic": {
+    "kind": "white_png",
+    "width": 64,
+    "height": 64
+   },
+   "size": [
+    64,
+    64
+   ],
+   "source": "a valid image with no symbol: an empty result, not an error",
+   "contents": [],
+   "primary": null,
+   "score": null
+  },
+  {
+   "id": "malformed",
+   "synthetic": {
+    "kind": "bytes",
+    "utf8": "not an image"
+   },
+   "source": "spec/03-errors.md",
+   "error": "QRS-001"
+  }
+ ]
+}

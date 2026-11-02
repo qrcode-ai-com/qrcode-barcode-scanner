@@ -1,8 +1,13 @@
-"""Install a produced wheel into a new venv and exercise its imported extension."""
+"""Install a produced wheel into a new venv and exercise its imported extension.
+
+Beyond the FIXTURE control (gen_v5_q.png), the installed module runs the shared
+truth set, fixtures/consumer-truth.json (consumer_truth.py).
+"""
 import argparse
 import base64
 import hashlib
 import importlib.metadata
+import importlib.util
 from importlib.machinery import EXTENSION_SUFFIXES
 import json
 import os
@@ -71,12 +76,36 @@ def probe(args):
             assert re.search(r"\[" + code + r"\]$", str(error)), str(error)
         else:
             raise AssertionError(f"expected {code}")
+    # the shared truth set through the installed module, inputs staged in the
+    # consumer: exact contents, primary, occurrences and score/null per case
+    spec = importlib.util.spec_from_file_location("consumer_truth", Path(__file__).resolve().parent / "consumer_truth.py")
+    truth_lib = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(truth_lib)
+    truth = truth_lib.load()
+    problems, identities = [], {}
+    for case, path in truth_lib.stage(truth, Path(args.receipt).parent / "truth"):
+        data = path.read_bytes()
+        if "error" in case:
+            try:
+                qr.scan(data, truth["scan"]["profile"], budget_ms=truth["scan"]["budget_ms"])
+            except ValueError as error:
+                if not str(error).endswith(f"[{case['error']}]"):
+                    problems.append(f"{case['id']}: {error}")
+            else:
+                problems.append(f"{case['id']}: no {case['error']}")
+            continue
+        report = qr.scan(data, truth["scan"]["profile"], budget_ms=truth["scan"]["budget_ms"])
+        problems += truth_lib.judge(case, report, full["versions"])
+        identities[case["id"]] = truth_lib.identity(report)
+    assert not problems, "\n".join(problems)
     receipt = {"verdict": "PASS", "python": sys.version, "platform": platform.platform(),
                "prefix": str(prefix), "imported": str(imported), "extension": str(extension),
                "extension_sha256": sha256(extension),
                "version": args.version, "full_score": full["score"]["value"],
                "wheel": args.wheel, "wheel_sha256": sha256(Path(args.wheel)),
-               "fixture_sha256": sha256(Path(args.fixture))}
+               "fixture_sha256": sha256(Path(args.fixture)),
+               "truth": {"file": "fixtures/consumer-truth.json", "sha256": sha256(truth_lib.TRUTH),
+                         "cases": len(truth["cases"]), "identities_sha256": truth_lib.identities_digest(identities)}}
     Path(args.receipt).write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

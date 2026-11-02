@@ -1,5 +1,7 @@
 // Install the produced tarballs in an empty directory, then import by package
 // name there. Neither the checkout's loader nor the registry can supply code.
+// Beyond the FIXTURE control (gen_v5_q.png), the installed API runs the shared
+// truth set, fixtures/consumer-truth.json (consumer-truth.mjs).
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -8,6 +10,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { identitiesDigest, identity, judge, load as loadTruth, stage, TRUTH } from "./consumer-truth.mjs";
 
 const [mode, archivesArg, fixtureArg, expectedVersion, suffix] = process.argv.slice(2);
 assert.ok(["native", "wasm"].includes(mode) && archivesArg && fixtureArg && expectedVersion,
@@ -142,8 +145,34 @@ assert.deepEqual(empty.detections, []);
 assert.equal(empty.score, null);
 assert.equal(empty.trace.budget_exhausted, false);
 assert.throws(() => scan(Buffer.from("garbage"), "full"), /\[QRS-001\]/);
+// The shared truth set through the installed API, inputs staged in the
+// consumer: exact contents, primary, occurrences and score/null per case.
+const truth = loadTruth();
+const truthScan = mode === "native"
+  ? (input) => qr.scan(input, { profile: truth.scan.profile, budgetMs: truth.scan.budget_ms })
+  : async (input) => qr.scan_image(input, truth.scan.profile, undefined, undefined, truth.scan.budget_ms);
+const problems = [];
+const identities = {};
+for (const { testCase, path } of stage(truth, join(consumer, "truth"))) {
+  const input = readFileSync(path);
+  if (testCase.error) {
+    await assert.rejects(() => truthScan(input), new RegExp(`\\[${testCase.error}\\]`), testCase.id);
+    continue;
+  }
+  const report = await truthScan(input);
+  problems.push(...judge(testCase, report, full.versions));
+  identities[testCase.id] = identity(report);
+  if (mode === "native") {
+    // the blocking call publishes the same contents and occurrences
+    assert.deepEqual(identity(qr.scanSync(input, { profile: truth.scan.profile, budgetMs: truth.scan.budget_ms })),
+      identities[testCase.id], testCase.id);
+  }
+}
+assert.deepEqual(problems, [], problems.join("\n"));
 const receipt = { verdict: "PASS", mode, node: process.version, platform: process.platform, arch: process.arch,
   consumer, imported, version: expectedVersion, full_score: full.score.value, fixture_sha256: digest(fixture),
+  truth: { file: "fixtures/consumer-truth.json", sha256: digest(TRUTH), cases: truth.cases.length,
+    identities_sha256: identitiesDigest(identities) },
   installed_tarballs: selected.map(({ path, sha256 }) => ({ path, sha256 })),
   platform_version_mismatch_refused: mode === "native" ? true : null,
   loaded: loaded.map((path) => ({ path, sha256: digest(path) })) };

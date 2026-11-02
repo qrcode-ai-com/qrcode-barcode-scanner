@@ -107,6 +107,21 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - `/camera-overlay` provides framework-free corner brackets, stable keyboard
   target selection and an explicit HTTP(S) payload action, with host theming,
   contain/cover/fill geometry, mirroring and complete teardown.
+- **Installed-package truth set**: `fixtures/consumer-truth.json`, 35 inputs
+  with their exact contents as a multiset, primary, occurrence geometry and
+  score/null association under the full profile with no budget: every
+  symbology, two identical QRs beside a Code 128, an ECI 4/ECI 26 equal-text
+  witness, QR with a small Data Matrix, Hanzi, GS1, EXIF orientation, a
+  partial artistic read, the rescue path, refusals, a valid empty image and a
+  malformed input. Twin Python and JavaScript judges
+  (`scripts/consumer_truth.py`, `scripts/consumer-truth.mjs`) refuse each
+  departure in their self-tests. The packed Rust (library on the packaged and
+  the latest-compatible graph, installed CLI), native Node, WASM and Python
+  consumers run every input through the installed package and record one
+  identity digest; CI runs the Rust consumer and the native Node
+  (linux-x64-gnu) and WASM ones on Node 22 and 24 for every pull request.
+  New fixtures: `symbology/upce.png`, `symbology/qr-twins-code128.png`,
+  `symbology/qr-small-datamatrix.png` and `eci/eci4-eci26-equal-text.png`.
 
 ### Changed
 
@@ -117,6 +132,10 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - Build and CI compiler pins use Rust 1.99.1. The minimum supported Rust
   version remains 1.88; typed slice chunks and C buffer declarations match
   the compiler checks without suppressing warnings.
+- The temporary Rust consumer names its compiler: the caller's
+  `RUSTUP_TOOLCHAIN`, else `RUST_TOOLCHAIN`, else the one CI pin, exported to
+  every Cargo call and checked against `rustc -vV`. Its receipt records
+  `rustc -vV` and `cargo -V`, so a local rustup default no longer selects it.
 - Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.

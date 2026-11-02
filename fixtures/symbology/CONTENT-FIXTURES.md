@@ -26,6 +26,7 @@ Text written as UTF-8 bytes means `create_barcode(text.encode('utf-8'), …)`.
 | `microqr-kanji-nihon.png` | segno, M3-M | `日本` (93 FA 96 7B) | `make_micro('日本', mode='kanji')` | `0f946999b2d65a63f4d6540dca0bd8d11ac91813cd4e8374cb1456732e8e5cd9` |
 | `microqr-kanji-tesuto.png` | segno, M3-M | `テスト` (83 65 83 58 83 67) | `make_micro('テスト', mode='kanji')` | `554ff99dc319d0e793d5d34abab9f8bd30decc4a92d1b5080829e56b3ee131ed` |
 | `datamatrix-gs1-fnc1.png` | zxing-cpp, DataMatrix, GS1 (FNC1 in first position; zxing-cpp reads it back as `]d2`) | `(01)09506000134352(10)AB12` | `create_barcode(…, gs1=True)`, `write_barcode_to_image(scale=8)`, 16 px white border, 8-bit greyscale PNG | `11b2ba0fb1b9d4cd7e547055c09d6b8cf2e6c4c771a7d5bb6fea28e62bbe1228` |
+| `upce.png` | zxing-cpp, UPCE | `01234565` (number system 0, check digit 5; zxing-cpp's reader returns the expanded GTIN `0012345000065`, the writer input is the 8-digit UPC-E) | `to_image(scale=4, add_quiet_zones=True)`, converted to luma (268 × 220) | `397c6c02f8974b64e27c52fa927c8efb46dc3ffbc5351286e1fe63fce0719e90` |
 
 `datamatrix-gs1.png` (a corpus fixture) is not GS1 mode: it carries the
 element string after a literal GS character, with no FNC1 codeword.
@@ -70,3 +71,20 @@ row was regenerated with those options and matched the committed bytes.
 
 The composite's PNG bytes depend on the browser's encoder: a fresh render
 gives the same pixels and other bytes, so only this sha256 names the file.
+
+## Installed-package composites
+
+Inputs of the shared truth set every installed-package consumer runs,
+[`../consumer-truth.json`](../consumer-truth.json): the layouts of the
+`occurrences` and `mixed_symbols` rows, as files. Written by `cargo run -p
+xtask -- gen-fixtures` (re-running it is byte-identical); every symbol is
+written there or by an independent maker, and pasted where its expected
+geometry is known. QR symbols: the `qrcode` crate, EC M, with a four-module
+quiet zone. The ECI witness of the same family is `../eci/eci4-eci26-equal-text.png`
+(ECI 4 over byte A1 and ECI 26 over C4 84, both `Ą`, 5 px modules, pasted at
+(40, 40) and (265, 40) on 490 × 265).
+
+| File | Symbols | Layout | sha256 |
+|---|---|---|---|
+| `qr-twins-code128.png` | two identical QRs `https://qrc-ai.com/occurrences` (v3, 5 px modules) and the bwip-js Code 128 `STOCK-4827` beside them | QRs at (40, 40) and (265, 40), the Code 128 at (470, 60), 988 × 390: two contents, three occurrences | `4fe4cbd4b186dcab6f3f129b406010122975f3adf0cd8961e842ee849e4cf318` |
+| `qr-small-datamatrix.png` | a QR `https://qrc-ai.com/mixed-symbols` (v3, 12 px modules) and the bwip-js 4.11.4 Data Matrix `DM-4827` (`raw({bcid: "datamatrix", text: "DM-4827", scale: 1})`, 3 px modules, four-module quiet zone) | QR at (40, 40), the Data Matrix at (1300, 240), 1600 × 600 | `645add40ae7c2524e93d86f58d35c3b3933c0b691d7ab9bac9bfae433a4beeb6` |
