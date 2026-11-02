@@ -44,8 +44,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - The S5 rescue keeps identically damaged twins at different places as
   separate candidates and rescues each place, instead of stopping at the
   first recovered stream.
-- An unparsed QR Code read that stands publishes no copy where a refusal of
-  its content was placed: a copy proved malformed is never an occurrence.
+- An unparsed QR Code read that stands, by its other places or on a parse
+  made elsewhere, publishes no copy where a refusal of its content was
+  placed: a copy proved malformed is never an occurrence.
 - The DataBar Expanded reader clears the rows of its upright pass before the
   rotated pass, so it never assembles a symbol from rows of two frames.
 - Preserved the console candidate's Code 93 checksum rejection, small DataBar
@@ -184,6 +185,38 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   need a browser and are not claimed there. The Node API page states the
   package's scope: encoded images through `scan`/`scanSync`, no raw-frame or
   camera interface, a load failure distinct from `[QRS-xxx]` rejections.
+- **Prebuilt `qrscan` archives** on the GitHub release:
+  `qrcode-ai-scanner-cli-0.11.0-<target>.tar.gz` for
+  `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` (glibc 2.28 or
+  later), `x86_64-apple-darwin` (macOS 10.15 or later) and
+  `aarch64-apple-darwin` (macOS 11.0 or later), and
+  `qrcode-ai-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip` (C runtime linked
+  statically), beside `qrcode-ai-scanner-cli-0.11.0-source.tar.gz`, their
+  corresponding source as a `git archive` of the tagged commit, and
+  `qrcode-ai-scanner-cli-0.11.0-SHA256SUMS`. Each archive holds `qrscan`,
+  `LICENSE`, `LICENSING.md`, the third-party notices and license texts,
+  `SOURCE.md`, `build-info.json` and a README (`distribution/cli/README.md`).
+  The binaries are not code-signed or notarized: there is no Apple Developer
+  ID signature, no notarization and no Authenticode signature, so macOS
+  refuses a copy a browser downloaded until its quarantine attribute is
+  removed, and Windows can warn of an unknown publisher; the README gives the
+  steps. SHA256SUMS is an asset of the same release: it detects a damaged
+  download, not a substituted release, and no GPG or minisign signature or
+  build provenance attestation covers the archives. No musl, Windows on Arm
+  or universal macOS archive is built.
+- `.github/workflows/cli-archives.yml` builds the five archives on every pull
+  request that touches their inputs and on every push to main, inspects them
+  (`scripts/package-inspect.py archive`, `scripts/cli-release.py licenses`,
+  `scripts/native-floor.py --policy cli`) and runs each one from its archive
+  as a user would (`scripts/packed-cli-consumer.py`): on its own platform,
+  and the Linux archives also in AlmaLinux 8.10 (glibc 2.28) and Debian 12
+  containers, with the installed-package truth set and no engine panic
+  allowed. On a `v*` tag it uploads the qualified set into the draft release
+  the owner created before the tag; after publication, a `public-download`
+  dispatch downloads every asset anonymously and runs the same checks.
+  `scripts/check-publish-guards.py` refuses, in every publishing job, a
+  release created, edited, published or deleted and an asset replaced
+  (RELEASING.md § 5 to § 7, § CLI archives).
 
 ### Changed
 
@@ -268,6 +301,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `compatible/qrcode-ai-scanner.js` and `compatible/qrcode-ai-scanner_bg.wasm`
   export paths resolve to the root files; the `compatible/` directory is no
   longer shipped. The root import loads the portable module.
+- `mobile › ios-release` no longer creates the GitHub release: it uploads the
+  xcframework zip and `checksum.txt` only into the owner's draft, the one
+  release that carries the tag and targets the tagged commit, and
+  `bindings/swift/release.sh` prints the draft-first steps instead of
+  `gh release create`. The owner creates that draft before pushing the tag
+  and publishes it once (RELEASING.md § 5 to § 7).
 
 ## 0.10.1 — 2026-10-20
 

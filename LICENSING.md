@@ -36,6 +36,16 @@ They do not bundle or relicense the engine. Installing the scanner as a separate
 dependency retains its AGPL-3.0-or-later or agreed commercial terms. The MCP
 adapter and CLI container retain the engine's AGPL source/license materials.
 
+## Prebuilt `qrscan` archives
+
+The `qrcode-ai-scanner-cli-X.Y.Z-<target>` archives attached to a release hold `LICENSE`,
+`LICENSING.md` and the third-party notices and license texts beside the program. Their
+corresponding source is the same release's `qrcode-ai-scanner-cli-X.Y.Z-source.tar.gz`, a
+`git archive` of the commit they were built from, whose SHA-256 is a line of
+`qrcode-ai-scanner-cli-X.Y.Z-SHA256SUMS`. The third-party Rust crates linked into `qrscan`
+are not bundled: each archive's `build-info.json` lists them with their `Cargo.lock`
+checksums, and its `SOURCE.md` gives their crates.io download address.
+
 ## Contributions
 
 By submitting a contribution (e.g. a pull request) you agree that it is licensed under
