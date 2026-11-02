@@ -238,6 +238,15 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   packed Python consumer suite pins Pillow 13.0.0 with every wheel hashed
   (it needs Python 3.11, the consumer matrix's floor), and the browser test
   host and playground resolve vite 6.4.4, postcss 8.5.31 and source-map-js 1.2.2.
+  The MCP adapter's test graph moves fast-uri to 3.1.9, qs to 6.16.1 and
+  body-parser to 2.4.0 (GHSA-27r3-jxmh-p828); its production tree is unchanged.
+- The MCP adapter's packed gate compares the schema it ships with the schema
+  of the engine release it pins (still 0.10), recorded by hash, instead of
+  this checkout's specification, which now describes 0.11 reports.
+- The weekly mutation suite runs in 128 shards instead of 85: on the 0.11
+  candidate (4421 mutants) two shards reached the 85-minute limit. The
+  measured per-mutant costs, replayed over 128 shards, put the slowest at
+  58 minutes; the limit itself is unchanged.
 - **Upgrade note.** A `budget_ms` above 4 294 967 295 ms (about 49.7 days) is
   refused with `QRS-006` in Rust, Python and Kotlin/Swift, which accepted any
   `u64` before: this is the range the CLI and Node already carried. Unbounded

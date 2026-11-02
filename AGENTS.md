@@ -85,7 +85,7 @@ without `--check`, and `cargo fmt --all`. Use them for the intended owned change
 Dependency/core changes also require the runbook's four excluded lock-root
 checks; a workspace pass does not cover Python, UniFFI, Flutter Rust or fuzz.
 
-Deep checks (weekly `deep-checks.yml`): cargo-mutants in 85 shards, judged
+Deep checks (weekly `deep-checks.yml`): cargo-mutants in 128 shards, judged
 by the `mutants-summary` job — red on a baseline failure or on any missed /
 timed-out mutant absent from `.cargo/mutants-dispositions.toml` (after an
 edit there: `python3 scripts/check-mutants-outcome.py --self-test`) · fuzz

@@ -40,6 +40,12 @@ jobs:
   # shard at 45.4 min (median 33.2), and every shard gets 35 or 36 mutants
   # while there are at least 85.
   #
+  # 85→128: run 41376357942 (2026-11-02, 4421 mutants on the 0.11 candidate)
+  # lost shards 0 and 45 at the 85-min wall. Its measured per-mutant costs
+  # (51 shards in, the rest imputed by file), replayed round-robin, put the
+  # slowest of 85 shards at 90.7 min (16 above 70) and the slowest of 128
+  # at 57.6 min (p90 47.9): more shards, the same wall.
+  #
   # The timeout lives on the WORK STEP, not the job: a job-level timeout
   # kills the upload-artifact step too — `if: always()` cannot save it —
   # and a timed-out shard then reports NOTHING (shards 0+5 vanished from
@@ -55,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 0..84: the `--shard N/85` of the work step and mutants-summary's
+        # 0..127: the `--shard N/128` of the work step and mutants-summary's
         # directory list name the same count.
         shard:
           - 0
@@ -143,6 +149,49 @@ jobs:
           - 82
           - 83
           - 84
+          - 85
+          - 86
+          - 87
+          - 88
+          - 89
+          - 90
+          - 91
+          - 92
+          - 93
+          - 94
+          - 95
+          - 96
+          - 97
+          - 98
+          - 99
+          - 100
+          - 101
+          - 102
+          - 103
+          - 104
+          - 105
+          - 106
+          - 107
+          - 108
+          - 109
+          - 110
+          - 111
+          - 112
+          - 113
+          - 114
+          - 115
+          - 116
+          - 117
+          - 118
+          - 119
+          - 120
+          - 121
+          - 122
+          - 123
+          - 124
+          - 125
+          - 126
+          - 127
     steps:
       - uses: actions/checkout@v7
       # Forensic history of the silent runner deaths (6 runs, always the same
@@ -187,11 +236,11 @@ jobs:
       # let every shard finish and report, so no continue-on-error is needed.
       # --cargo-arg=--locked reaches every cargo call cargo-mutants makes: a
       # stale lockfile is a baseline failure, never a silent re-resolution.
-      - name: cargo mutants (shard ${{ matrix.shard }}/85)
+      - name: cargo mutants (shard ${{ matrix.shard }}/128)
         run: |
           ulimit -v 6291456
           status=0
-          cargo mutants -p qrcode-ai-scanner --in-place --cargo-arg=--locked --sharding round-robin --shard ${{ matrix.shard }}/85 --minimum-test-timeout 120 -- --all-features || status=$?
+          cargo mutants -p qrcode-ai-scanner --in-place --cargo-arg=--locked --sharding round-robin --shard ${{ matrix.shard }}/128 --minimum-test-timeout 120 -- --all-features || status=$?
           echo "$status" > mutants-exit-code.txt
           case "$status" in
             0|2|3)
@@ -214,7 +263,7 @@ jobs:
             mutants-exit-code.txt
             mem-telemetry.log
 
-  # The mutation verdict: all 85 shards judged together. A missing or
+  # The mutation verdict: all 128 shards judged together. A missing or
   # unfinished shard, a baseline failure, a tool-level exit code, or any
   # MISSED / TIMEOUT mutant without a covering entry in
   # .cargo/mutants-dispositions.toml fails this job, and with it the run.
@@ -237,7 +286,7 @@ jobs:
           path: mutants-shards
       - name: the gate's own scenarios
         run: python3 scripts/check-mutants-outcome.py --self-test
-      # 0..84 spelled out (= the matrix): a shard whose artifact never
+      # 0..127 spelled out (= the matrix): a shard whose artifact never
       # arrived is a named failure, not a silently shorter list.
       - name: every missed or timed-out mutant is dispositioned
         if: ${{ !cancelled() }}
@@ -246,7 +295,7 @@ jobs:
           --dispositions .cargo/mutants-dispositions.toml
           --exclusions .cargo/mutants.toml
           --markdown "$GITHUB_STEP_SUMMARY"
-          mutants-shards/mutants-report-shard-{0..84}
+          mutants-shards/mutants-report-shard-{0..127}
 
   fuzz:
     runs-on: ubuntu-24.04
