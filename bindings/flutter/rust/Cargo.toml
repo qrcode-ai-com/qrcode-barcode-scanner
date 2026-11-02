@@ -30,7 +30,7 @@ serde_json = "1"
 # The core, aliased to dodge a name clash with this crate's lib name (both
 # default to `qrcode_ai_scanner`) — same trick as the py/uniffi bindings. The
 # `serde` feature is the JSON wire contract shared by every surface.
-scanner-core = { package = "qrcode-ai-scanner", path = "../../../crates/qrcode-ai-scanner", features = ["serde"] }
+scanner-core = { package = "qrcode-barcode-scanner", path = "../../../crates/qrcode-ai-scanner", features = ["serde"] }
 
 # The flutter crate is workspace-excluded, so the root [profile.release]
 # (lto/strip) does NOT apply — restate it or the native lib ships unstripped and

@@ -9,9 +9,9 @@ Swift bindings (one serde wire contract).
 
 ## Install
 
-```bash
-flutter pub add qrcode_ai_scanner
-```
+Not yet published on pub.dev, so there is no dependency line to copy: build it
+from source as shown in
+[Packaging from a candidate checkout](#packaging-from-a-candidate-checkout) below.
 
 > **Toolchain prerequisite.** This package compiles the Rust core at *your* app's
 > build time (via cargokit) — the building machine needs the **Rust toolchain
@@ -59,7 +59,7 @@ symbology does not report it — not proof that the symbol declares none.
 
 The development binding uses the workspace core by relative path. A pub.dev
 package instead bundles the **same candidate's sources**, from Cargo's normalized
-package archive, under `rust/vendor/qrcode-ai-scanner`. No published registry
+package archive, under `rust/vendor/qrcode-barcode-scanner`. No published registry
 version is substituted. From a clean, committed checkout, with Python 3.11+:
 
 ```bash
