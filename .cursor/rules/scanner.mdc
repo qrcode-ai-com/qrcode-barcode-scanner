@@ -6,8 +6,12 @@ alwaysApply: true
 # Scanner laws (full brief: AGENTS.md)
 
 - One multiformat scan engine, one package family: QR Code & Barcode Scanner.
-  Source: `qrcode-ai-com/qrcode-barcode-scanner`; existing install names retain
-  `qrcode-ai-scanner`. No QR/barcode engine extraction or alias/wrapper packages.
+  Source: `qrcode-ai-com/qrcode-barcode-scanner`. Releases through 0.10.x keep
+  their `qrcode-ai-scanner` install names; 0.11.0 onward publishes the
+  `qrcode-barcode-scanner` family (npm scope `@qrcode-ai-com`), never a former
+  name. No QR/barcode engine extraction or alias/wrapper packages. Directories,
+  never-published Cargo packages (node, wasm, uniffi, fuzz), UniFFI/Kotlin/Swift/
+  Android module names and Flutter example ids keep their earlier spelling.
   QR Code AI and its creation engine have separate release processes; a scanner
   binding is not an app. See SOURCE-AND-EXTRACTION.md. Preserve dated receipts
   and component licenses.

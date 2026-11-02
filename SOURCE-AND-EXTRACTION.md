@@ -6,10 +6,38 @@ contract. QR and barcode use cases do not require separate engine repositories.
 
 The source repository is
 [`qrcode-ai-com/qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner).
-The repository retains its identity, commits and tags across renames. Existing
-crates, npm packages, Python packages, commands and OCI images keep their
-`qrcode-ai-scanner` names. Use the coordinates in [README.md](README.md) and the
-[distribution guide](distribution/README.md), not the repository name, to install.
+The repository retains its identity, commits and tags across renames.
+
+## Package names
+
+Releases through 0.10.x keep their `qrcode-ai-scanner` names and stay available
+under them. From 0.11.0 the packages carry the `qrcode-barcode-scanner` family
+names: `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` on crates.io,
+`qrcode-barcode-scanner` on PyPI, and `@qrcode-ai-com/qrcode-barcode-scanner`,
+its six platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm` on
+npm. Nothing from 0.11.0 on is published under a former name, and there are no
+alias or wrapper packages. The `qrscan` command keeps its name. The Flutter
+package is not yet published. Container images, the agent skill and the MCP
+adapter already published keep their names; their next releases take names
+from the new family.
+
+These spellings stay as they were in 0.11; none of them is an install name:
+
+- the repository directories: `crates/qrcode-ai-scanner*`,
+  `bindings/kotlin/qrcodeaiscanner` and `bindings/swift/Sources/QrcodeAiScanner`;
+- the Cargo packages that are never published: `qrcode-ai-scanner-node`,
+  `qrcode-ai-scanner-wasm`, `qrcode-ai-scanner-uniffi` and `qrcode-ai-scanner-fuzz`;
+- the UniFFI, Kotlin, Swift and Android module names: the UniFFI library
+  `qrcode_ai_scanner_uniffi`, the Kotlin package `uniffi.qrcode_ai_scanner_uniffi`,
+  the Gradle module `:qrcodeaiscanner`, the Swift package `QrcodeAiScanner` with
+  its `QrcodeAiScannerFFI` binary target, and the Android namespaces of the
+  Kotlin and Flutter bindings;
+- the platform identifiers of the Flutter example app.
+
+Install from the coordinates in [README.md](README.md), the documentation and
+the [distribution guide](distribution/README.md), not from the repository name.
+The [migration guide](docs/guides/migrate-to-qrcode-barcode-scanner.mdx) maps
+each former name to its new one.
 
 ## Development and delivery
 
