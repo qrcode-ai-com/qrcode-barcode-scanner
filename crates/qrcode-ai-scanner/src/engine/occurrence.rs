@@ -1397,4 +1397,778 @@ mod tests {
         assert_eq!(grouped[0].footprint, line);
         assert_eq!(grouped[0].rank, rank(0, 0));
     }
+
+    #[test]
+    fn validation_keeps_points_within_two_percent_of_the_longer_side_around_the_image() {
+        // 300 × 100: 6 px (2% of 300, past the 2 px floor) beyond each side,
+        // the width bounding x and the height bounding y
+        let points = vec![
+            p(-5.5, 50.0),
+            p(-6.5, 50.0),
+            p(305.5, 50.0),
+            p(306.5, 50.0),
+            p(150.0, -5.5),
+            p(150.0, -6.5),
+            p(150.0, 105.5),
+            p(150.0, 106.5),
+        ];
+        let kept =
+            Footprint::candidate(Kind::Partial, points, EngineKind::Rxing).validated((300, 100));
+        let inside = vec![
+            p(-5.5, 50.0),
+            p(305.5, 50.0),
+            p(150.0, -5.5),
+            p(150.0, 105.5),
+        ];
+        assert_eq!(kept, partial(inside, EngineKind::Rxing));
+        // a small image keeps the 2 px floor
+        let small = Footprint::candidate(
+            Kind::Partial,
+            vec![p(-1.5, 25.0), p(-2.5, 25.0)],
+            EngineKind::Rxing,
+        )
+        .validated((50, 50));
+        assert_eq!(small.points, vec![p(-1.5, 25.0)]);
+    }
+
+    #[test]
+    fn a_segment_off_the_image_or_of_another_size_keeps_its_points_as_partial() {
+        let segment = |points: Vec<Point>| {
+            Footprint::candidate(Kind::Segment, points, EngineKind::Rxing).validated((100, 100))
+        };
+        let off = segment(vec![p(10.0, 20.0), p(180.0, 20.0)]);
+        assert_eq!(off, partial(vec![p(10.0, 20.0)], EngineKind::Rxing));
+        let three = vec![p(10.0, 20.0), p(50.0, 20.0), p(80.0, 20.0)];
+        assert_eq!(segment(three.clone()), partial(three, EngineKind::Rxing));
+        // one pixel long is a segment, drawn either way
+        for points in [
+            vec![p(11.0, 20.0), p(10.0, 20.0)],
+            vec![p(10.0, 20.0), p(11.0, 20.0)],
+        ] {
+            let pixel_long = segment(points);
+            assert_eq!(pixel_long.kind, Kind::Segment);
+            assert_eq!(pixel_long.points, vec![p(10.0, 20.0), p(11.0, 20.0)]);
+        }
+    }
+
+    #[test]
+    fn a_reader_that_measured_nothing_publishes_no_point_and_no_reader() {
+        let claimed = Footprint::candidate(
+            Kind::Unavailable,
+            vec![p(10.0, 10.0), p(20.0, 10.0)],
+            EngineKind::Rqrr,
+        );
+        assert_eq!(claimed.validated((100, 100)), Footprint::unavailable());
+    }
+
+    #[test]
+    fn a_linear_footprints_axis_is_its_two_farthest_points() {
+        let axis = |points: Vec<Point>| {
+            Footprint::candidate(Kind::Partial, points, EngineKind::Rxing).axis()
+        };
+        // an EAN read with its add-on: the main symbol's two points, then
+        // the add-on's two, on one row
+        let ean = vec![
+            p(10.0, 50.0),
+            p(100.0, 50.0),
+            p(110.0, 50.0),
+            p(150.0, 50.0),
+        ];
+        assert_eq!(axis(ean), Some([p(10.0, 50.0), p(150.0, 50.0)]));
+        // farthest by the full distance, neither coordinate alone
+        let steep = vec![p(0.0, 10.0), p(3.0, 50.0), p(20.0, 10.0)];
+        assert_eq!(axis(steep), Some([p(3.0, 50.0), p(20.0, 10.0)]));
+        let flat = vec![p(0.0, 100.0), p(30.0, 100.0), p(15.0, 110.0)];
+        assert_eq!(axis(flat), Some([p(0.0, 100.0), p(30.0, 100.0)]));
+        // of two equally long pairs, the first
+        let square = vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0), p(0.0, 10.0)];
+        assert_eq!(axis(square), Some([p(0.0, 0.0), p(10.0, 10.0)]));
+        // a pixel apart is an axis; less, or a single point, is none
+        let pixel = vec![p(10.0, 10.0), p(11.0, 10.0)];
+        assert_eq!(axis(pixel), Some([p(10.0, 10.0), p(11.0, 10.0)]));
+        assert_eq!(axis(vec![p(10.0, 10.0), p(10.5, 10.5)]), None);
+        assert_eq!(axis(vec![p(10.0, 10.0)]), None);
+    }
+
+    /// rqrr bounds of a 20-unit grid at (100, 50) whose first row runs
+    /// along `row` and first column along `column`.
+    fn grid_bounds(row: (f32, f32), column: (f32, f32)) -> [Point; 4] {
+        let at = |u: f32, v: f32| {
+            p(
+                100.0 + 20.0 * (u * row.0 + v * column.0),
+                50.0 + 20.0 * (u * row.1 + v * column.1),
+            )
+        };
+        [at(0.0, 0.0), at(1.0, 0.0), at(1.0, 1.0), at(0.0, 1.0)]
+    }
+
+    #[test]
+    fn rqrr_anchor_moves_one_plane_pixel_along_each_axis_the_symbol_extends_back_along() {
+        // a plane pixel of 2 × 3 bounds pixels (a read on a downscaled plane)
+        let pixel = p(2.0, 3.0);
+        let anchor = |row, column| rqrr_anchor(grid_bounds(row, column), pixel);
+        assert_eq!(anchor((1.0, 0.0), (0.0, 1.0)), Some((0.0, 0.0)), "upright");
+        assert_eq!(
+            anchor((0.0, 1.0), (-1.0, 0.0)),
+            Some((2.0, 0.0)),
+            "quarter turn"
+        );
+        assert_eq!(
+            anchor((-1.0, 0.0), (0.0, -1.0)),
+            Some((2.0, 3.0)),
+            "half turn"
+        );
+        assert_eq!(
+            anchor((0.0, -1.0), (1.0, 0.0)),
+            Some((0.0, 3.0)),
+            "three quarters"
+        );
+        assert_eq!(anchor((0.0, 1.0), (1.0, 0.0)), Some((0.0, 0.0)), "mirrored");
+        assert_eq!(
+            anchor((1.0, 0.0), (0.0, -1.0)),
+            Some((0.0, 3.0)),
+            "mirrored, flipped"
+        );
+        // continuous between quarter turns: an eighth, ½(1 − 0) and ½(1 − √2)
+        let (s, c) = std::f32::consts::FRAC_PI_4.sin_cos();
+        let (dx, dy) = anchor((c, s), (-s, c)).unwrap();
+        assert!((dx - 1.0).abs() < 1e-5, "{dx}");
+        assert!(
+            (dy - 1.5 * (1.0 - std::f32::consts::SQRT_2)).abs() < 1e-5,
+            "{dy}"
+        );
+    }
+
+    #[test]
+    fn rqrr_anchor_has_no_direction_along_a_first_row_or_column_of_no_length() {
+        let pixel = UNIT_PIXEL;
+        let mut bounds = grid_bounds((1.0, 0.0), (0.0, 1.0));
+        bounds[1] = bounds[0];
+        assert_eq!(rqrr_anchor(bounds, pixel), None, "a row of no length");
+        let mut bounds = grid_bounds((1.0, 0.0), (0.0, 1.0));
+        bounds[3] = bounds[0];
+        assert_eq!(rqrr_anchor(bounds, pixel), None, "a column of no length");
+        let mut bounds = grid_bounds((1.0, 0.0), (0.0, 1.0));
+        bounds[1].x = f32::INFINITY;
+        assert_eq!(rqrr_anchor(bounds, pixel), None, "a row without an end");
+        // a guard pin, not a spec threshold: a first row whose length rounds
+        // to the f64 1e-9 the guard compares with has no direction. No f32
+        // corners span exactly that length; these lie about 1.1e-7 ulp below
+        // it, so any hypot within 0.99 ulp returns it: macOS's does, and so
+        // do glibc 2.39's two kernels, replayed exactly
+        let origin = p(0.0, f32::from_bits(0x1e10_6e46));
+        let end = p(f32::from_bits(0x3089_705f), f32::from_bits(0x2a85_e325));
+        let edge = [origin, end, p(1.0, 1.0), p(0.0, origin.y + 1.0)];
+        assert_eq!(rqrr_anchor(edge, pixel), None, "a row of 1e-9 px");
+    }
+
+    #[test]
+    fn rqrr_footprint_shifts_the_bounds_off_the_anchor_and_shrinks_them_to_the_outer_corners() {
+        // a half-turned 21-module grid at 10 bounds pixels a module, read on
+        // a plane of 2 px: anchored two pixels short along x and y
+        let bounds = [
+            p(260.0, 260.0),
+            p(40.0, 260.0),
+            p(40.0, 40.0),
+            p(260.0, 40.0),
+        ];
+        let footprint = rqrr_footprint(bounds, 21, p(2.0, 2.0));
+        assert_eq!(footprint.kind, Kind::Quad);
+        assert_eq!(footprint.detector, Some(EngineKind::Rqrr));
+        let want = [
+            p(262.0, 262.0),
+            p(52.0, 262.0),
+            p(52.0, 52.0),
+            p(262.0, 52.0),
+        ];
+        for (got, want) in footprint.points.iter().zip(want) {
+            assert!(
+                (got.x - want.x).abs() < 1e-3 && (got.y - want.y).abs() < 1e-3,
+                "{:?}",
+                footprint.points
+            );
+        }
+        // degenerate bounds keep their points, as partial
+        let flat = rqrr_footprint([p(5.0, 5.0); 4], 21, UNIT_PIXEL);
+        assert_eq!(flat.kind, Kind::Partial);
+        assert_eq!(flat.points, vec![p(5.0, 5.0); 4]);
+    }
+
+    #[test]
+    fn corners_spanning_next_to_no_area_have_no_projective_map() {
+        // a square of 1e-5 px sides: the sides meeting at its (1,1) corner
+        // span 1e-10 square pixels
+        let tiny = [p(0.0, 0.0), p(1e-5, 0.0), p(1e-5, 1e-5), p(0.0, 1e-5)];
+        assert!(square_to_quad(tiny).is_none());
+        assert_eq!(rqrr_outer_corners(tiny, 21), None);
+        // a guard pin, not a spec threshold: a sliver whose sides meeting at
+        // its (1,1) corner span exactly the 1e-9 the guard compares with
+        // (exact IEEE arithmetic, no libm call) still maps, corner to corner
+        let x1 = f32::from_bits(0x3909_704d);
+        let y3 = f32::from_bits(0x3700_0011);
+        let q = f32::from_bits(0xa018_f550);
+        let sliver = [p(x1, 1.0 + y3), p(x1, 1.0), p(0.0, 0.0), p(q, y3)];
+        let map = square_to_quad(sliver).expect("1e-9 is not degenerate");
+        let unit = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
+        for ((u, v), corner) in unit.into_iter().zip(sliver) {
+            let got = map(u, v).unwrap();
+            assert!(
+                (got.x - corner.x).abs() < 1e-9 && (got.y - corner.y).abs() < 1e-6,
+                "{got:?} {corner:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_centre_within_the_tolerance_of_a_quads_outline_or_a_boxes_edges_is_inside() {
+        let at = |x: f32, y: f32| partial(vec![p(x, y)], EngineKind::Rqrr);
+        let near = [(150.0, 98.5), (201.5, 150.0), (150.0, 201.5), (98.5, 150.0)];
+        let beyond = [(150.0, 97.5), (202.5, 150.0), (150.0, 202.5), (97.5, 150.0)];
+        // a clockwise 100 px square's outline, and the box of two corners:
+        // 1.5 px past each edge is within 2 px, 2.5 px is not
+        let square = quad([
+            (100.0, 100.0),
+            (200.0, 100.0),
+            (200.0, 200.0),
+            (100.0, 200.0),
+        ])
+        .validated((400, 400));
+        let corners = partial(vec![p(100.0, 100.0), p(200.0, 200.0)], EngineKind::Rqrr);
+        for b in [&square, &corners] {
+            for (x, y) in near {
+                assert!(centre_inside(&at(x, y), b, 2.0), "({x}, {y}) {b:?}");
+            }
+            for (x, y) in beyond {
+                assert!(!centre_inside(&at(x, y), b, 2.0), "({x}, {y}) {b:?}");
+            }
+            // in the box's column or row, far past it
+            assert!(!centre_inside(&at(150.0, 300.0), b, 2.0));
+            assert!(!centre_inside(&at(300.0, 150.0), b, 2.0));
+        }
+        // a quad turned 45°: a corner of its box is outside its outline
+        let diamond = quad([(150.0, 50.0), (250.0, 150.0), (150.0, 250.0), (50.0, 150.0)])
+            .validated((400, 400));
+        assert_eq!(diamond.kind, Kind::Quad);
+        assert!(!centre_inside(&at(70.0, 70.0), &diamond, 2.0));
+        assert!(centre_inside(&at(150.0, 150.0), &diamond, 2.0));
+        // four points that are no quad compare by their box, in any order
+        let unordered = partial(
+            vec![
+                p(100.0, 100.0),
+                p(100.0, 200.0),
+                p(200.0, 200.0),
+                p(200.0, 100.0),
+            ],
+            EngineKind::Rxing,
+        );
+        assert!(centre_inside(&at(150.0, 150.0), &unordered, 2.0));
+        assert!(centre_inside(&at(98.5, 150.0), &unordered, 2.0));
+        // nothing measured is inside nothing
+        let none = Footprint::unavailable();
+        assert!(!centre_inside(&none, &square, 2.0));
+        assert!(!centre_inside(&at(150.0, 150.0), &none, 2.0));
+    }
+
+    #[test]
+    fn matrix_footprints_compare_within_one_coarse_plane_pixel_plus_one() {
+        // on an 800 px image a 200 px plane measures in 4 px steps: points
+        // 4.5 px apart are one symbol, 5.5 px apart two; on the full plane
+        // the tolerance is 1 + 1 px
+        let luma = blank(800, 800);
+        let at = |x: f32, side: u32| {
+            observed_on(
+                partial(vec![p(x, 100.0)], EngineKind::Rqrr),
+                rank(0, 0),
+                side,
+            )
+        };
+        let mut bridges = MAX_BRIDGES;
+        for (x, side, want) in [
+            (104.5, 200, Verdict::Same),
+            (105.5, 200, Verdict::Different),
+            (101.5, 800, Verdict::Same),
+            (102.5, 800, Verdict::Different),
+        ] {
+            for (a, b) in [(at(100.0, 800), at(x, side)), (at(x, side), at(100.0, 800))] {
+                let got = same_symbol(Symbology::QrCode, &a, &b, &luma, &mut bridges);
+                assert_eq!(got, want, "{x} on {side}");
+            }
+        }
+        assert_eq!(bridges, MAX_BRIDGES, "geometry spends no pixel comparison");
+    }
+
+    #[test]
+    fn a_finder_centre_inside_a_quad_is_its_symbol_whichever_comes_first() {
+        // the quad's centre is far from the lone point, the point is inside
+        // the quad: either inside the other is one symbol
+        let luma = blank(400, 400);
+        let square = quad([(50.0, 50.0), (250.0, 50.0), (250.0, 250.0), (50.0, 250.0)])
+            .validated((400, 400));
+        let finder = partial(vec![p(80.0, 80.0)], EngineKind::Rxing);
+        let mut bridges = MAX_BRIDGES;
+        let (a, b) = (
+            observed(square.clone(), rank(0, 0)),
+            observed(finder.clone(), rank(1, 0)),
+        );
+        for (x, y) in [(&a, &b), (&b, &a)] {
+            let got = same_symbol(Symbology::QrCode, x, y, &luma, &mut bridges);
+            assert_eq!(got, Verdict::Same);
+        }
+        for observations in [vec![a.clone(), b.clone()], vec![b, a]] {
+            let (grouped, saturated) = group(Symbology::QrCode, observations, &luma);
+            assert_eq!((grouped.len(), saturated), (1, false));
+            assert_eq!(grouped[0].footprint, square, "the quad before the point");
+            assert_eq!(grouped[0].rank, rank(0, 0));
+        }
+    }
+
+    #[test]
+    fn a_detection_flags_a_footprint_left_out_by_a_read_or_by_its_own_capacity() {
+        let footprints: Vec<Observation> = (0..=MAX_GROUPED as u32)
+            .map(|i| {
+                observed(
+                    partial(vec![p(i as f32, 0.0)], EngineKind::Rxing),
+                    rank(i, 0),
+                )
+            })
+            .collect();
+        // the read past capacity had itself left one out: both at once
+        let (kept, dropped) = union([
+            (&footprints[..MAX_GROUPED], false),
+            (&footprints[MAX_GROUPED..], true),
+        ]);
+        assert!(dropped);
+        assert_eq!(kept, footprints[..MAX_GROUPED]);
+        assert!(union([(&footprints[..], false)]).1, "capacity alone");
+        assert!(union([(&footprints[..1], true)]).1, "a read alone");
+        assert!(!union([(&footprints[..MAX_GROUPED], false)]).1, "neither");
+    }
+
+    fn close(got: f64, want: f64) -> bool {
+        (got - want).abs() < 1e-9
+    }
+
+    #[test]
+    fn two_scan_lines_compare_in_the_frame_of_the_first() {
+        // the first line 100 px along (0.6, 0.8) from (10, 20); the second
+        // from 80 px along it and 10 px across back to 20 px along, 5 across
+        let lines = Lines::of(
+            [p(10.0, 20.0), p(70.0, 100.0)],
+            [p(50.0, 90.0), p(18.0, 39.0)],
+        );
+        assert_eq!(lines.origin, (10.0, 20.0));
+        assert!(
+            close(lines.unit.0, 0.6) && close(lines.unit.1, 0.8),
+            "{:?}",
+            lines.unit
+        );
+        let second = 3625.0_f64.sqrt();
+        assert!(close(lines.lengths.0, 100.0) && close(lines.lengths.1, second));
+        assert!(close(lines.cos, 60.0 / second), "{}", lines.cos);
+        assert!(close(lines.start, 20.0) && close(lines.overlap, 60.0));
+        assert!(close(lines.offset, 7.5), "{}", lines.offset);
+        assert!(!lines.crossing);
+        // a second line past both ends of the first shares its whole stretch
+        let past = Lines::of(
+            [p(10.0, 20.0), p(70.0, 100.0)],
+            [p(24.0, -3.0), p(96.0, 93.0)],
+        );
+        assert!(close(past.start, 0.0) && close(past.overlap, 100.0));
+        assert!(close(past.cos, 1.0) && close(past.offset, -25.0));
+        // a line of no length keeps a finite frame: the x axis, parallel
+        let point = Lines::of([p(5.0, 5.0); 2], [p(5.0, 5.0); 2]);
+        assert_eq!(
+            (point.unit, point.lengths, point.cos),
+            ((1.0, 0.0), (0.0, 0.0), 1.0)
+        );
+        assert_eq!((point.start, point.overlap, point.offset), (0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn geometry_decides_lines_too_short_too_far_apart_in_angle_or_stretch_or_on_each_other() {
+        let row = [p(40.0, 50.0), p(360.0, 50.0)];
+        let decided = |a, b| Lines::of(a, b).decided();
+        // under one pixel long, either line: undecidable; one pixel decides
+        let short = [p(100.0, 50.0), p(100.5, 50.0)];
+        assert_eq!(decided(short, row), Some(Verdict::Unproven));
+        assert_eq!(decided(row, short), Some(Verdict::Unproven));
+        let pixel = [p(100.0, 50.0), p(101.0, 50.0)];
+        assert_eq!(decided(pixel, row), Some(Verdict::Same));
+        assert_eq!(decided(row, pixel), Some(Verdict::Same));
+        // 30° apart, overlapping and not crossing: two symbols; 14° apart:
+        // the pixels decide
+        assert_eq!(
+            decided(row, [p(100.0, 60.0), p(300.0, 175.0)]),
+            Some(Verdict::Different)
+        );
+        assert_eq!(decided(row, [p(100.0, 60.0), p(300.0, 110.0)]), None);
+        // sharing less than half the shorter stretch: two symbols; exactly
+        // half: compared further (here at 1 px: one symbol)
+        let first = [p(0.0, 50.0), p(200.0, 50.0)];
+        assert_eq!(
+            decided(first, [p(110.0, 51.0), p(310.0, 51.0)]),
+            Some(Verdict::Different)
+        );
+        assert_eq!(
+            decided(first, [p(100.0, 51.0), p(300.0, 51.0)]),
+            Some(Verdict::Same)
+        );
+        // at most 1.5 px apart: one symbol; past it, the pixels decide
+        assert_eq!(
+            decided(row, [p(40.0, 51.5), p(360.0, 51.5)]),
+            Some(Verdict::Same)
+        );
+        assert_eq!(decided(row, [p(40.0, 51.6), p(360.0, 51.6)]), None);
+    }
+
+    #[test]
+    fn lines_cross_when_each_has_an_endpoint_strictly_on_either_side_of_the_other() {
+        // geometry alone decides here: a blank plane
+        let luma = blank(400, 300);
+        let verdict = |a: [Point; 2], b: [Point; 2]| same_linear(&luma, a, b);
+        // crossing at any tilt, either way along each line: one symbol
+        for (a, b) in [
+            (
+                [p(10.0, 10.0), p(110.0, 110.0)],
+                [p(30.0, 90.0), p(90.0, 30.0)],
+            ),
+            (
+                [p(10.0, 20.0), p(110.0, 60.0)],
+                [p(30.0, 70.0), p(90.0, 10.0)],
+            ),
+            (
+                [p(110.0, 20.0), p(10.0, 60.0)],
+                [p(30.0, 70.0), p(90.0, 10.0)],
+            ),
+        ] {
+            assert_eq!(verdict(a, b), Verdict::Same, "{a:?} {b:?}");
+            assert_eq!(verdict(b, a), Verdict::Same, "{b:?} {a:?}");
+        }
+        // stopping short of the other, or an endpoint only touching it: no
+        // crossing, and lines this far apart in angle are two symbols
+        let row = [p(40.0, 50.0), p(360.0, 50.0)];
+        for (a, b) in [
+            (
+                [p(10.0, 20.0), p(110.0, 60.0)],
+                [p(30.0, 70.0), p(55.0, 45.0)],
+            ),
+            (row, [p(200.0, 50.0), p(200.0, 99.0)]),
+            (row, [p(200.0, 0.0), p(200.0, 50.0)]),
+            (
+                [p(200.0, 50.0), p(360.0, 50.0)],
+                [p(200.0, 0.0), p(200.0, 99.0)],
+            ),
+            (
+                [p(40.0, 50.0), p(200.0, 50.0)],
+                [p(200.0, 99.0), p(200.0, 0.0)],
+            ),
+        ] {
+            assert_eq!(verdict(a, b), Verdict::Different, "{a:?} {b:?}");
+        }
+    }
+
+    /// Bars of `width` px over rows `rows` and columns 40..360 of a 400 px
+    /// wide image: `dark` where `x / width` is odd, `light` elsewhere.
+    fn shaded(data: &mut [u8], rows: std::ops::Range<u32>, width: u32, (dark, light): (u8, u8)) {
+        for y in rows {
+            for x in 40..360 {
+                data[(y * 400 + x) as usize] = if (x / width) % 2 == 1 { dark } else { light };
+            }
+        }
+    }
+
+    /// Two copies of 5 px bars, rows 20..120 and 180..280 of a 400 × 300
+    /// image, white elsewhere.
+    fn two_copies() -> Vec<u8> {
+        let mut data = vec![255u8; 400 * 300];
+        bars(&mut data, 400, 20..120, 5);
+        bars(&mut data, 400, 180..280, 5);
+        data
+    }
+
+    fn row_at(y: f32) -> [Point; 2] {
+        [p(40.0, y), p(360.0, y)]
+    }
+
+    #[test]
+    fn a_uniform_band_between_two_copies_is_a_gap_at_any_grey_level() {
+        // white, black, and the mid-grey that sits exactly on the bars'
+        // threshold (127, between 0 and 255): no band carries bars
+        for level in [255, 0, 127] {
+            let mut data = two_copies();
+            data[120 * 400..180 * 400].fill(level);
+            let luma = LumaImage::new(data, 400, 300);
+            let two = same_linear(&luma, row_at(60.0), row_at(240.0));
+            assert_eq!(two, Verdict::Different, "a band at {level}");
+        }
+    }
+
+    #[test]
+    fn a_footprint_finds_its_bars_up_to_four_pixels_either_side_of_its_line() {
+        let luma = LumaImage::new(two_copies(), 400, 300);
+        let verdict = |a: f32, b: f32| same_linear(&luma, row_at(a), row_at(b));
+        // a line 4 px below its copy's last bar row, or 4 px above the
+        // other's first: still two copies
+        assert_eq!(verdict(123.5, 240.5), Verdict::Different);
+        assert_eq!(verdict(60.5, 176.5), Verdict::Different);
+        // 5 px off, its bars are out of reach: nothing to compare
+        assert_eq!(verdict(124.5, 240.5), Verdict::Unproven);
+        assert_eq!(verdict(60.5, 175.5), Verdict::Unproven);
+        // thin copies, two rows just above one line and three just below
+        // the other: each line finds its own
+        let mut data = vec![255u8; 400 * 300];
+        bars(&mut data, 400, 121..123, 5);
+        bars(&mut data, 400, 178..181, 5);
+        let thin = LumaImage::new(data, 400, 300);
+        let two = same_linear(&thin, row_at(123.5), row_at(177.5));
+        assert_eq!(two, Verdict::Different);
+    }
+
+    #[test]
+    fn of_rows_tied_either_side_of_a_line_its_pattern_is_the_nearest_above() {
+        // a line on a white row between a crisp copy's last rows (above) and
+        // four rows of the same bars faded to 150 (below): every one of them
+        // crosses as many bars on its own, the nearest above is the line's
+        // pattern (searched first), and the rows down to the other copy are
+        // a gap
+        let mut data = vec![255u8; 400 * 300];
+        bars(&mut data, 400, 20..100, 5);
+        shaded(&mut data, 101..105, 5, (150, 255));
+        bars(&mut data, 400, 180..280, 5);
+        let luma = LumaImage::new(data, 400, 300);
+        let two = same_linear(&luma, row_at(100.5), row_at(240.5));
+        assert_eq!(two, Verdict::Different);
+    }
+
+    #[test]
+    fn bars_under_32_grey_levels_prove_nothing_and_32_levels_are_enough() {
+        for (contrast, want) in [(20, Verdict::Unproven), (32, Verdict::Different)] {
+            let light = 100 + contrast;
+            let mut data = vec![light; 400 * 300];
+            shaded(&mut data, 20..120, 5, (100, light));
+            shaded(&mut data, 180..280, 5, (100, light));
+            let luma = LumaImage::new(data, 400, 300);
+            let got = same_linear(&luma, row_at(60.5), row_at(240.5));
+            assert_eq!(got, want, "{contrast} levels");
+        }
+        // a copy at exactly 32 levels read on its top row keeps its own bars
+        // over a stray dark mark on the row above it
+        let mut data = vec![255u8; 400 * 300];
+        shaded(&mut data, 81..120, 5, (100, 132));
+        data[80 * 400 + 150..80 * 400 + 250].fill(0);
+        bars(&mut data, 400, 180..280, 5);
+        let luma = LumaImage::new(data, 400, 300);
+        let two = same_linear(&luma, row_at(81.5), row_at(240.5));
+        assert_eq!(two, Verdict::Different);
+    }
+
+    #[test]
+    fn copies_ten_pixels_apart_split_at_a_four_pixel_gap() {
+        // a 40 px stretch (8% of it, 3.2 px, is under the 4 px floor) read on
+        // two lines 10 px apart, compared on ten lines between them 10/11 px
+        // apart: four white rows lose five of them (4.5 px, a gap), three
+        // lose four (3.6 px: past 8%, short of the floor, one symbol)
+        for (white, want) in [
+            (103..107_u32, Verdict::Different),
+            (104..107, Verdict::Same),
+        ] {
+            let mut data = vec![255u8; 200 * 200];
+            for y in 90..121_u32 {
+                for x in 40..80_u32 {
+                    if (x / 5) % 2 == 1 && !white.contains(&y) {
+                        data[(y * 200 + x) as usize] = 0;
+                    }
+                }
+            }
+            let luma = LumaImage::new(data, 200, 200);
+            let got = same_linear(
+                &luma,
+                [p(40.0, 100.5), p(80.0, 100.5)],
+                [p(40.0, 110.5), p(80.0, 110.5)],
+            );
+            assert_eq!(got, want, "white rows {white:?}");
+        }
+    }
+
+    #[test]
+    fn a_gap_splits_a_wide_symbol_at_eight_percent_of_its_stretch() {
+        // 8% of 320 px is 25.6 px: a 10 px interruption is one symbol, a
+        // 30 px one two
+        for (white, want) in [(145..155, Verdict::Same), (135..165, Verdict::Different)] {
+            let mut data = vec![255u8; 400 * 300];
+            bars(&mut data, 400, 20..white.start, 5);
+            bars(&mut data, 400, white.end..280, 5);
+            let luma = LumaImage::new(data, 400, 300);
+            let got = same_linear(&luma, row_at(60.0), row_at(240.0));
+            assert_eq!(got, want, "white rows {white:?}");
+        }
+    }
+
+    #[test]
+    fn a_pixel_spans_its_unit_square_and_no_coordinate_outside_the_image_reads_one() {
+        // 4 × 3, row by row: 0, 10, …, 110
+        let luma = LumaImage::new((0..12).map(|v| v * 10).collect(), 4, 3);
+        assert_eq!(pixel(&luma, 0.0, 0.0), Some(0));
+        assert_eq!(pixel(&luma, 2.7, 1.2), Some(60));
+        assert_eq!(pixel(&luma, 3.999, 2.999), Some(110));
+        for (x, y) in [
+            (4.0, 0.0),
+            (0.0, 3.0),
+            (-0.5, 1.0),
+            (1.0, -0.5),
+            (f64::NAN, 1.0),
+            (1.0, f64::NAN),
+            (f64::INFINITY, 1.0),
+            (1.0, f64::NEG_INFINITY),
+        ] {
+            assert_eq!(pixel(&luma, x, y), None, "({x}, {y})");
+        }
+    }
+
+    #[test]
+    fn the_bridge_reads_the_whole_shared_stretch_of_its_lines() {
+        // the band between two copies keeps their bars over the first 128 px
+        // (40%) of the 320 px stretch, or over its last 192 px (60%): each
+        // line crosses 63 bar edges, the band 26 or 39, so only the first
+        // band is a gap
+        for ((from, to), want) in [((40, 168), Verdict::Different), ((168, 360), Verdict::Same)] {
+            let mut data = two_copies();
+            for y in 120..180_u32 {
+                for x in (from..to).filter(|x| (x / 5) % 2 == 1) {
+                    data[(y * 400 + x) as usize] = 0;
+                }
+            }
+            let luma = LumaImage::new(data, 400, 300);
+            let got = same_linear(&luma, row_at(60.0), row_at(240.0));
+            assert_eq!(got, want, "bars kept over {from}..{to}");
+        }
+    }
+
+    #[test]
+    fn copies_side_by_side_read_down_vertical_lines_are_compared_across_them() {
+        // two copies turned a quarter: 5 px stripes over rows 40..360 of a
+        // 300 × 400 image, columns 20..120 and 180..280, read down x = 60
+        // and x = 240; one wide copy over columns 20..280 is one symbol
+        let luma = |columns: &[(u32, u32)]| {
+            let mut data = vec![255u8; 300 * 400];
+            for &(from, to) in columns {
+                for x in from..to {
+                    for y in (40..360_u32).filter(|y| (y / 5) % 2 == 1) {
+                        data[(y * 300 + x) as usize] = 0;
+                    }
+                }
+            }
+            LumaImage::new(data, 300, 400)
+        };
+        let down = |x: f32| [p(x, 40.0), p(x, 360.0)];
+        let two = luma(&[(20, 120), (180, 280)]);
+        assert_eq!(
+            same_linear(&two, down(60.0), down(240.0)),
+            Verdict::Different
+        );
+        let one = luma(&[(20, 280)]);
+        assert_eq!(same_linear(&one, down(60.0), down(240.0)), Verdict::Same);
+    }
+
+    #[test]
+    fn four_bar_edges_are_enough_to_compare_and_two_are_not() {
+        // copies of two 10 px bars (four edges) are two symbols; copies of a
+        // single bar (two edges) prove nothing
+        for (spans, want) in [
+            (&[(150_u32, 160_u32), (200, 210)][..], Verdict::Different),
+            (&[(150, 160)][..], Verdict::Unproven),
+        ] {
+            let mut data = vec![255u8; 400 * 300];
+            for y in (20..120_u32).chain(180..280) {
+                for &(from, to) in spans {
+                    for x in from..to {
+                        data[(y * 400 + x) as usize] = 0;
+                    }
+                }
+            }
+            let luma = LumaImage::new(data, 400, 300);
+            let got = same_linear(&luma, row_at(60.5), row_at(240.5));
+            assert_eq!(got, want, "bars {spans:?}");
+        }
+    }
+
+    #[test]
+    fn a_band_keeping_half_the_bar_edges_of_its_lines_joins_them() {
+        // four 20 px bars (eight edges) on both lines; the band between them
+        // keeps two (four edges, half: one symbol) or one (two: a gap)
+        let four = [(80_u32, 100_u32), (140, 160), (200, 220), (260, 280)];
+        for (kept, want) in [(&[0, 2][..], Verdict::Same), (&[0][..], Verdict::Different)] {
+            let mut data = vec![255u8; 400 * 300];
+            for y in 20..280_u32 {
+                let band = (120..180).contains(&y);
+                for (i, &(from, to)) in four.iter().enumerate() {
+                    if !band || kept.contains(&i) {
+                        for x in from..to {
+                            data[(y * 400 + x) as usize] = 0;
+                        }
+                    }
+                }
+            }
+            let luma = LumaImage::new(data, 400, 300);
+            let got = same_linear(&luma, row_at(60.5), row_at(240.5));
+            assert_eq!(got, want, "bars {kept:?} kept");
+        }
+    }
+
+    #[test]
+    fn lines_exactly_20_degrees_apart_are_compared_further() {
+        let lines = Lines {
+            origin: (0.0, 0.0),
+            unit: (1.0, 0.0),
+            lengths: (100.0, 100.0),
+            cos: 20.0_f64.to_radians().cos(),
+            start: 0.0,
+            overlap: 100.0,
+            offset: 1.0,
+            crossing: false,
+        };
+        assert_eq!(lines.decided(), Some(Verdict::Same));
+    }
+
+    #[test]
+    fn a_projective_map_sends_the_squares_centre_to_the_crossing_of_the_quads_diagonals() {
+        // a convex quad in perspective: its diagonals y = x and x + y = 100
+        // cross at (50, 50), where the square's diagonals cross
+        let quad = [p(0.0, 0.0), p(100.0, 0.0), p(80.0, 80.0), p(0.0, 100.0)];
+        let map = square_to_quad(quad).expect("a proper quad");
+        assert_eq!(map(0.5, 0.5), Some(p(50.0, 50.0)));
+        let unit = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
+        for ((u, v), corner) in unit.into_iter().zip(quad) {
+            assert_eq!(map(u, v), Some(corner), "({u}, {v})");
+        }
+    }
+
+    #[test]
+    fn a_quad_with_a_corner_inside_the_others_triangle_maps_no_point_past_its_horizon() {
+        // (2, 2) inside the triangle of the other corners: the map's horizon
+        // (w = 0 on u + v = 3/4) crosses the square, so the three corners
+        // beyond it map to no point, and the bounds give no outer corners
+        let concave = [p(0.0, 0.0), p(10.0, 0.0), p(2.0, 2.0), p(0.0, 10.0)];
+        let map = square_to_quad(concave).expect("its sides cross");
+        assert_eq!(map(0.0, 0.0), Some(p(0.0, 0.0)));
+        for (u, v) in [(1.0, 0.0), (1.0, 1.0), (0.0, 1.0)] {
+            assert_eq!(map(u, v), None, "({u}, {v})");
+        }
+        assert_eq!(rqrr_outer_corners(concave, 21), None);
+    }
+
+    #[test]
+    fn a_projective_map_publishes_no_point_beyond_the_f32_range() {
+        // 1e37 squares of 220 px along either side is past f32::MAX
+        let square = [
+            p(40.0, 40.0),
+            p(260.0, 40.0),
+            p(260.0, 260.0),
+            p(40.0, 260.0),
+        ];
+        let map = square_to_quad(square).expect("a proper quad");
+        assert_eq!(map(0.5, 0.5), Some(p(150.0, 150.0)));
+        assert_eq!(map(1e37, 0.0), None);
+        assert_eq!(map(0.0, 1e37), None);
+    }
 }

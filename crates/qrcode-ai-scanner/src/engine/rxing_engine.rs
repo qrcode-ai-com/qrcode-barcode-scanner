@@ -1555,4 +1555,189 @@ mod tests {
             found.iter().map(|d| d.symbology).collect::<Vec<_>>()
         );
     }
+
+    /// rxing result points at `pairs`.
+    fn rxing_points(pairs: &[(f32, f32)]) -> Vec<rxing::Point> {
+        pairs.iter().map(|&(x, y)| rxing::Point { x, y }).collect()
+    }
+
+    /// The footprint an rxing reader measured at `pairs`, before validation.
+    fn measured(kind: super::Kind, pairs: &[(f32, f32)]) -> super::Footprint {
+        super::Footprint {
+            kind,
+            points: pairs
+                .iter()
+                .map(|&(x, y)| crate::report::Point { x, y })
+                .collect(),
+            detector: Some(EngineKind::Rxing),
+        }
+    }
+
+    #[test]
+    fn only_the_samplers_exact_origin_default_is_unprojected() {
+        // rxing 0.9.3's grid sampler leaves a corner no sampling region
+        // covers at exactly (0,0); a corner on one edge of the image, or
+        // anywhere else, is a measurement
+        let at = |x, y| rxing::Point { x, y };
+        assert!(super::unprojected(at(0.0, 0.0)));
+        for (x, y) in [(0.0, 12.5), (12.5, 0.0), (0.5, 0.5), (12.5, 30.5)] {
+            assert!(!super::unprojected(at(x, y)), "({x}, {y})");
+        }
+    }
+
+    #[test]
+    fn footprints_keep_what_each_reader_measured() {
+        // never completed or extended: the port's four sampler corners (TL,
+        // TR, BL, BR, half a pixel in) become the outer-corner quad TL, TR,
+        // BR, BL; any other QR-family point set is partial as measured, an
+        // unprojected corner dropped; each other symbology keeps its own
+        // shape, and two points are a scan line only for a linear reader
+        use super::Kind::{Partial, Quad, Segment};
+        let footprint = |symbology, reader, pairs: &[(f32, f32)]| {
+            super::footprint(symbology, reader, &rxing_points(pairs))
+        };
+        let port = Some(Reader::Port);
+        let corners = [(10.5, 10.5), (50.5, 10.5), (10.5, 50.5), (50.5, 50.5)];
+        let outer = [(10.0, 10.0), (50.0, 10.0), (50.0, 50.0), (10.0, 50.0)];
+        for symbology in [
+            Symbology::QrCode,
+            Symbology::MicroQrCode,
+            Symbology::RectangularMicroQrCode,
+        ] {
+            let quad = footprint(symbology, port, &corners);
+            assert_eq!(quad, measured(Quad, &outer), "{symbology:?}");
+        }
+        let [top_left, top_right, _, bottom_right] = corners;
+        assert_eq!(
+            footprint(
+                Symbology::QrCode,
+                port,
+                &[top_left, top_right, (0.0, 0.0), bottom_right]
+            ),
+            measured(Partial, &[top_left, top_right, bottom_right])
+        );
+        let three = &corners[..3];
+        assert_eq!(
+            footprint(Symbology::QrCode, port, three),
+            measured(Partial, three)
+        );
+        // the lineage reader's finder centres (BL, TL, TR), then its
+        // alignment pattern when found
+        let lineage = Some(Reader::Codewords(EcLevel::M));
+        let centres = [(20.5, 40.5), (20.5, 20.5), (40.5, 20.5), (37.5, 37.5)];
+        for n in [3, 4] {
+            let points = &centres[..n];
+            assert_eq!(
+                footprint(Symbology::QrCode, lineage, points),
+                measured(Partial, points)
+            );
+        }
+        // Data Matrix and Aztec: their four corners as measured
+        let square = [(5.0, 5.0), (25.0, 5.0), (25.0, 25.0), (5.0, 25.0)];
+        for symbology in [Symbology::DataMatrix, Symbology::Aztec] {
+            assert_eq!(footprint(symbology, None, &square), measured(Quad, &square));
+            let three = &square[..3];
+            assert_eq!(footprint(symbology, None, three), measured(Partial, three));
+        }
+        // PDF417: TL, BL, TR, BR, then the codeword area's four vertices —
+        // the symbol corners TL, TR, BR, BL when all eight are present
+        let vertices = [
+            (2.0, 3.0),
+            (2.0, 30.0),
+            (60.0, 3.0),
+            (60.0, 30.0),
+            (8.0, 3.0),
+            (8.0, 30.0),
+            (54.0, 3.0),
+            (54.0, 30.0),
+        ];
+        let symbol = [(2.0, 3.0), (60.0, 3.0), (60.0, 30.0), (2.0, 30.0)];
+        let pdf417 = |points: &[(f32, f32)]| footprint(Symbology::Pdf417, None, points);
+        assert_eq!(pdf417(&vertices), measured(Quad, &symbol));
+        assert_eq!(pdf417(&vertices[..4]), measured(Partial, &vertices[..4]));
+        for symbology in [
+            Symbology::DataMatrix,
+            Symbology::Aztec,
+            Symbology::Pdf417,
+            Symbology::MaxiCode,
+            Symbology::DataBar,
+            Symbology::DataBarExpanded,
+        ] {
+            let two = &square[..2];
+            let partial = footprint(symbology, None, two);
+            assert_eq!(partial, measured(Partial, two), "{symbology:?}");
+        }
+        // linear symbologies: the scan line's two points; any other count
+        // (an add-on's points appended) is partial
+        let line = [(3.0, 20.0), (45.0, 20.0), (90.0, 20.0), (120.0, 20.0)];
+        for symbology in [Symbology::Ean13, Symbology::Code128, Symbology::Itf] {
+            let two = &line[..2];
+            assert_eq!(footprint(symbology, None, two), measured(Segment, two));
+            for n in [1, 3, 4] {
+                let points = &line[..n];
+                assert_eq!(
+                    footprint(symbology, None, points),
+                    measured(Partial, points),
+                    "{symbology:?} {n}"
+                );
+            }
+        }
+        for (symbology, reader) in [
+            (Symbology::QrCode, port),
+            (Symbology::Pdf417, None),
+            (Symbology::Ean13, None),
+        ] {
+            let nothing = footprint(symbology, reader, &[]);
+            assert_eq!(nothing, super::Footprint::unavailable(), "{symbology:?}");
+        }
+    }
+
+    #[test]
+    fn only_the_ports_four_projected_corners_frame_a_matrix_region() {
+        // the matrix region masks a decoded QR symbol out of the non-QR
+        // completion plane: only the port's four sampler corners measure its
+        // outline. An unprojected (0,0) corner, three points, or the lineage
+        // reader's finder centres (inside the outline, the fourth corner
+        // completed) frame none. The port's sampler always returns four
+        // corners: what three port points locate is recorded, not a contract
+        let corner = |(x, y): (f32, f32)| crate::report::Point { x, y };
+        let port = |pairs: &[(f32, f32)]| {
+            let result = port_result("abc", b"abc".to_vec(), "]Q1").with_point(rxing_points(pairs));
+            let read = observe(&result).expect("a plain port read of its own text");
+            (read.location, read.matrix_region)
+        };
+        // TL, TR, BL, BR as the port reports them; located TL, TR, BR, BL
+        let [top_left, top_right, bottom_left, bottom_right] =
+            [(10.5, 10.5), (50.5, 10.5), (10.5, 50.5), (50.5, 50.5)];
+        let outline = [top_left, top_right, bottom_right, bottom_left].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, bottom_left, bottom_right]),
+            (Some(outline), Some(outline))
+        );
+        let unprojected = [top_left, top_right, bottom_right, (0.0, 0.0)].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, (0.0, 0.0), bottom_right]),
+            (Some(unprojected), None)
+        );
+        // incidental, not a completion: the lineage rule for finder centres
+        // (BL, TL, TR) applied to the port's TL, TR, BL order
+        let incidental = [top_left, top_right, (-29.5, 50.5), bottom_left].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, bottom_left]),
+            (Some(incidental), None)
+        );
+        let lineage = |pairs: &[(f32, f32)]| {
+            let result = general_reader_result(mixed_codewords(), "0", &[b"abc"])
+                .with_point(rxing_points(pairs));
+            let read = observe(&result).expect("the reader's own codewords");
+            (read.location, read.matrix_region)
+        };
+        // the finder centres BL, TL, TR, then an alignment pattern
+        let centres = [(20.5, 40.5), (20.5, 20.5), (40.5, 20.5)];
+        let [bottom_left, top_left, top_right] = centres;
+        let completed = [bottom_left, top_left, top_right, (40.5, 40.5)].map(corner);
+        assert_eq!(lineage(&centres), (Some(completed), None));
+        let aligned = [bottom_left, top_left, top_right, (37.5, 37.5)];
+        assert_eq!(lineage(&aligned), (Some(aligned.map(corner)), None));
+    }
 }

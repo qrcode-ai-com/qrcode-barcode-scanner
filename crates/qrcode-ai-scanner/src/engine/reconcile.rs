@@ -1873,15 +1873,14 @@ mod tests {
         assert_eq!(published(&store).len(), 0);
     }
 
-    #[test]
-    fn a_standing_read_publishes_no_copy_where_its_refusal_holds() {
-        // an unparsed read made at both places stands by the copy elsewhere;
-        // the refused copy is not one of its occurrences
-        let observed = |x: f32, attempt: u32| occurrence::Observation {
+    /// The quad footprint `detector` measured of the 100 px square at `x`,
+    /// in `attempt`, on a 1000 px plane.
+    fn seen_at(x: f32, attempt: u32, detector: EngineKind) -> occurrence::Observation {
+        occurrence::Observation {
             footprint: occurrence::Footprint::candidate(
                 occurrence::Kind::Quad,
                 square_at(x).to_vec(),
-                Rxing,
+                detector,
             )
             .validated((1000, 1000)),
             rank: Rank {
@@ -1890,10 +1889,16 @@ mod tests {
                 index: 0,
             },
             side: 1000,
-        };
+        }
+    }
+
+    #[test]
+    fn a_standing_read_publishes_no_copy_where_its_refusal_holds() {
+        // an unparsed read made at both places stands by the copy elsewhere;
+        // the refused copy is not one of its occurrences
         let at = |n: u32, x: Option<f32>| {
             let mut hit = read(n, b"abc", Signalled, X, x);
-            hit.observations.push(observed(x.unwrap(), n));
+            hit.observations.push(seen_at(x.unwrap(), n, Rxing));
             hit
         };
         let mut twice = at(0, R);
@@ -1902,7 +1907,7 @@ mod tests {
         let [detection] = &store.reconcile()[..] else {
             panic!("{:?}", store.reconcile());
         };
-        assert_eq!(detection.observations, vec![observed(L.unwrap(), 1)]);
+        assert_eq!(detection.observations, vec![seen_at(L.unwrap(), 1, Rxing)]);
         // a refusal of another content holds nothing of it
         let store = store_with(twice.clone(), port(b"xyz", R));
         assert_eq!(store.reconcile()[0].observations.len(), 2);
@@ -2490,5 +2495,86 @@ mod tests {
             with(1, Q, EngineReading::Gb18030),
         ]);
         assert_eq!(found[0].engine_reading, EngineReading::Gb18030);
+    }
+
+    #[test]
+    fn a_standing_read_publishes_no_copy_where_rqrr_refused_its_bytes() {
+        // rqrr decoded the read's bytes from the stream refused at R: that
+        // copy's stream was proved malformed. An rqrr read made at R and L
+        // stands by L — rqrr's bytes withhold a read only where every copy
+        // of it lies inside the refused symbol — and publishes L alone
+        let at = |n: u32, x: Option<f32>| {
+            let mut hit = read(n, b"abc", NoEci, Q, x);
+            hit.observations.push(seen_at(x.unwrap(), n, Rqrr));
+            hit
+        };
+        let rqrr = |raw: &[u8]| Refusal {
+            port: None,
+            rqrr: Some(raw.to_vec()),
+            place: R.map(square_at),
+        };
+        let mut twice = at(0, R);
+        twice.fold(at(1, L));
+        let store = store_with(twice.clone(), rqrr(b"abc"));
+        let [detection] = &store.reconcile()[..] else {
+            panic!("{:?}", store.reconcile());
+        };
+        assert_eq!(detection.engines, [Rqrr]);
+        assert_eq!(detection.observations, [seen_at(L.unwrap(), 1, Rqrr)]);
+        // other bytes refused there hold no copy of it
+        let store = store_with(twice, rqrr(b"xyz"));
+        let [detection] = &store.reconcile()[..] else {
+            panic!("{:?}", store.reconcile());
+        };
+        assert_eq!(
+            detection.observations,
+            [seen_at(R.unwrap(), 0, Rqrr), seen_at(L.unwrap(), 1, Rqrr)]
+        );
+    }
+
+    #[test]
+    fn a_fold_flags_a_footprint_left_out_by_either_read_or_by_itself() {
+        // a read's occurrences are incomplete once a footprint was left out
+        // past MAX_OBSERVATIONS: the flag survives every fold, whichever
+        // read carried it, and a fold that crowds a footprint out raises it
+        let with = |n: u32, copies: std::ops::Range<u16>, dropped: bool| {
+            let mut hit = read(n, A1, NoEci, X, L);
+            hit.observations = copies.map(|x| seen_at(f32::from(x), n, Rxing)).collect();
+            hit.observations_dropped = dropped;
+            hit
+        };
+        let folded = |mut own: Read, other: Read| {
+            own.fold(other);
+            (own.observations.len(), own.observations_dropped)
+        };
+        assert_eq!(occurrence::MAX_OBSERVATIONS, 128);
+        // room for both: nothing left out
+        assert_eq!(
+            folded(with(0, 0..64, false), with(1, 64..128, false)),
+            (128, false)
+        );
+        // one footprint too many: the fold leaves one out and says so
+        assert_eq!(
+            folded(with(0, 0..64, false), with(1, 64..129, false)),
+            (128, true)
+        );
+        // a folded-in read had left one out: flagged, though the fold had room
+        assert_eq!(folded(with(0, 0..1, false), with(1, 1..2, true)), (2, true));
+        // both left one out: still flagged
+        assert_eq!(
+            folded(with(0, 0..64, false), with(1, 64..129, true)),
+            (128, true)
+        );
+        // the read's own flag survives a fold that leaves nothing out
+        assert_eq!(folded(with(0, 0..1, true), with(1, 1..2, false)), (2, true));
+        // and the walk's publication says so: the store folds the two reads
+        let store = store([with(0, 0..64, false), with(1, 64..129, false)], &[]);
+        let [detection] = &store.reconcile()[..] else {
+            panic!("{:?}", store.reconcile());
+        };
+        assert_eq!(
+            (detection.observations.len(), detection.observations_dropped),
+            (128, true)
+        );
     }
 }

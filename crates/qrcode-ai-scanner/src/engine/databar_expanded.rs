@@ -1041,3 +1041,1160 @@ impl RSSExpandedReader {
         Ok(())
     }
 }
+
+/// Synthetic rows built by an independent encoder (ISO/IEC 24724 Annex B
+/// widths, the reader's own element order), so each test places every
+/// module and knows every value, checksum portion and finder edge.
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use rxing::common::HybridBinarizer;
+    use rxing::{BinaryBitmap, Luma8LuminanceSource};
+
+    /// `n` choose `r`, Annex B's `combins`.
+    fn combins(n: i64, r: i64) -> i64 {
+        let (min_denom, max_denom) = if n - r > r { (r, n - r) } else { (n - r, r) };
+        let (mut val, mut j, mut i) = (1, 1, n);
+        while i > max_denom {
+            val *= i;
+            if j <= min_denom {
+                val /= j;
+                j += 1;
+            }
+            i -= 1;
+        }
+        while j <= min_denom {
+            val /= j;
+            j += 1;
+        }
+        val
+    }
+
+    /// Annex B `getRSSwidths`: the four widths of RSS value `val` over `n`
+    /// modules, none wider than `max_width` — what `getRSSvalue` inverts.
+    fn rss_widths(mut val: i64, mut n: i64, max_width: i64, no_narrow: bool) -> [u32; 4] {
+        const ELEMENTS: i64 = 4;
+        let mut widths = [0; 4];
+        let mut narrow_mask = 0;
+        for bar in 0..ELEMENTS - 1 {
+            narrow_mask |= 1 << bar;
+            let mut width = 1;
+            let mut sub_val;
+            loop {
+                sub_val = combins(n - width - 1, ELEMENTS - bar - 2);
+                if no_narrow
+                    && narrow_mask == 0
+                    && n - width - (ELEMENTS - bar - 1) >= ELEMENTS - bar - 1
+                {
+                    sub_val -= combins(n - width - (ELEMENTS - bar), ELEMENTS - bar - 2);
+                }
+                if ELEMENTS - bar - 1 > 1 {
+                    let mut less_val = 0;
+                    let mut widest = n - width - (ELEMENTS - bar - 2);
+                    while widest > max_width {
+                        less_val += combins(n - width - widest - 1, ELEMENTS - bar - 3);
+                        widest -= 1;
+                    }
+                    sub_val -= less_val * (ELEMENTS - 1 - bar);
+                } else if n - width > max_width {
+                    sub_val -= 1;
+                }
+                val -= sub_val;
+                if val < 0 {
+                    break;
+                }
+                width += 1;
+                narrow_mask &= !(1 << bar);
+            }
+            val += sub_val;
+            n -= width;
+            widths[bar as usize] = width as u32;
+        }
+        widths[3] = n as u32;
+        widths
+    }
+
+    /// The odd and even module counts of data character `value`: its group,
+    /// then the odd and even RSS values its arithmetic combines.
+    fn counts(value: u32) -> ([u32; 4], [u32; 4]) {
+        let group = (0..5)
+            .rev()
+            .find(|&g| RSSExpandedReader::GSUM[g] <= value)
+            .unwrap();
+        let odd_widest = RSSExpandedReader::SYMBOL_WIDEST[group];
+        let subset = RSSExpandedReader::EVEN_TOTAL_SUBSET[group];
+        let rest = value - RSSExpandedReader::GSUM[group];
+        let odd_sum = 12 - 2 * group as i64;
+        let odd = rss_widths((rest / subset).into(), odd_sum, odd_widest.into(), true);
+        let even = rss_widths(
+            (rest % subset).into(),
+            17 - odd_sum,
+            (9 - odd_widest).into(),
+            false,
+        );
+        // the encoder is the decoder's exact inverse, or nothing below holds
+        assert_eq!(
+            rss_utils::getRSSvalue(&odd, odd_widest, true),
+            rest / subset
+        );
+        assert_eq!(
+            rss_utils::getRSSvalue(&even, 9 - odd_widest, false),
+            rest % subset
+        );
+        (odd, even)
+    }
+
+    /// The checksum portion decodeDataCharacter weighs out of `value` read
+    /// beside finder `finder` (none for the check character, A1 left).
+    fn portion(value: u32, finder: u32, odd_pattern: bool, left: bool) -> u32 {
+        if finder == FINDER_PAT_A && odd_pattern && left {
+            return 0;
+        }
+        let row = (4 * finder + if odd_pattern { 0 } else { 2 } + u32::from(!left) - 1) as usize;
+        let (odd, even) = counts(value);
+        (0..4)
+            .map(|i| {
+                odd[i] * RSSExpandedReader::WEIGHTS[row][2 * i]
+                    + even[i] * RSSExpandedReader::WEIGHTS[row][2 * i + 1]
+            })
+            .sum()
+    }
+
+    /// A character's eight elements left to right, in modules: a left
+    /// character is recorded forward, a right one backward.
+    fn char_modules(value: u32, left: bool) -> [u32; 8] {
+        let (o, e) = counts(value);
+        let mut forward = [o[0], e[0], o[1], e[1], o[2], e[2], o[3], e[3]];
+        if !left {
+            forward.reverse();
+        }
+        forward
+    }
+
+    /// A finder's five elements left to right: an odd pair's reads forward
+    /// (white first), an even pair's is mirrored (black first).
+    fn finder_modules(value: u32, odd_pattern: bool) -> [u32; 5] {
+        let [a, b, c, d] = RSSExpandedReader::FINDER_PATTERNS[value as usize];
+        if odd_pattern {
+            [a, b, c, d, 1]
+        } else {
+            [1, d, c, b, a]
+        }
+    }
+
+    /// One pair of a symbol: left character, right character, finder value.
+    #[derive(Clone, Copy)]
+    struct Spec {
+        left: u32,
+        right: Option<u32>,
+        finder: u32,
+    }
+
+    /// The four data characters of "(01)09506000134352", the BWIPP
+    /// regression's GTIN alone: linkage 0, method 1 (AI 01 and other AIs),
+    /// two variable-length bits, the first digit 0, then 950 600 013 435 in
+    /// ten bits each — 48 bits, twelve per character.
+    const GTIN_DATA: [u32; 4] = [1038, 3493, 2051, 1459];
+    const GTIN_TEXT: &str = "(01)09506000134352";
+
+    /// That symbol: three pairs on finders A1 B2 B1 (the second legal
+    /// sequence), the last without a right character, and the check
+    /// character, 211 * (5 - 4) plus the data's weighted sum mod 211.
+    fn gtin_symbol() -> [Spec; 3] {
+        let [d1, d2, d3, d4] = GTIN_DATA;
+        let (a, b) = (FINDER_PAT_A, FINDER_PAT_B);
+        let sum = portion(d1, a, true, false)
+            + portion(d2, b, false, true)
+            + portion(d3, b, false, false)
+            + portion(d4, b, true, true);
+        [
+            Spec {
+                left: 211 + sum % 211,
+                right: Some(d1),
+                finder: a,
+            },
+            Spec {
+                left: d2,
+                right: Some(d3),
+                finder: b,
+            },
+            Spec {
+                left: d4,
+                right: None,
+                finder: b,
+            },
+        ]
+    }
+
+    const QUIET: u32 = 12;
+
+    /// The run widths in modules — a white quiet zone first, then
+    /// alternating — of `pairs` placed from symbol pair index `first`, and
+    /// the module where each finder begins.
+    fn layout(pairs: &[Spec], first: usize) -> (Vec<u32>, Vec<u32>) {
+        let mut runs = vec![QUIET];
+        if first % 2 == 0 {
+            runs.push(1); // the guard bar before an odd pair's leading space
+        }
+        let mut finders = Vec::new();
+        for (i, pair) in pairs.iter().enumerate() {
+            runs.extend(char_modules(pair.left, true));
+            finders.push(runs.iter().sum());
+            runs.extend(finder_modules(pair.finder, (first + i) % 2 == 0));
+            if let Some(right) = pair.right {
+                runs.extend(char_modules(right, false));
+            }
+        }
+        if runs.len() % 2 == 1 {
+            runs.push(1); // a guard bar after a trailing space
+        }
+        runs.push(QUIET);
+        (runs, finders)
+    }
+
+    /// A row of `runs` pixels, white first.
+    fn bits(runs: &[u32]) -> BitArray {
+        let mut row = BitArray::with_size(runs.iter().sum::<u32>() as usize);
+        let mut x = 0;
+        for (i, &run) in runs.iter().enumerate() {
+            for _ in 0..run {
+                if i % 2 == 1 {
+                    row.set(x);
+                }
+                x += 1;
+            }
+        }
+        row
+    }
+
+    /// `pairs` drawn one pixel per module, and where each finder begins.
+    fn symbol_row(pairs: &[Spec], first: usize) -> (BitArray, Vec<u32>) {
+        let (runs, finders) = layout(pairs, first);
+        (bits(&runs), finders)
+    }
+
+    /// The characters a decoded pair should hold, from the encoder.
+    fn expected(spec: Spec, index: usize) -> (Option<DataCharacter>, Option<DataCharacter>) {
+        let odd = index % 2 == 0;
+        let character =
+            |value, left| DataCharacter::new(value, portion(value, spec.finder, odd, left));
+        (
+            Some(character(spec.left, true)),
+            spec.right.map(|right| character(right, false)),
+        )
+    }
+
+    /// A pair's characters, finder value and finder edges.
+    type Seen = (
+        (Option<DataCharacter>, Option<DataCharacter>),
+        u32,
+        [usize; 2],
+    );
+
+    /// What a pair holds, as a comparable value.
+    fn seen(pair: &ExpandedPair) -> Seen {
+        let finder = pair.getFinderPattern().as_ref().unwrap();
+        let &[start, end] = finder.getStartEnd() else {
+            unreachable!()
+        };
+        (
+            (*pair.getLeftChar(), *pair.getRightChar()),
+            finder.getValue(),
+            [start, end],
+        )
+    }
+
+    /// A stored pair: characters without portions, finder `finder`.
+    fn pair(left: u32, right: Option<u32>, finder: u32) -> ExpandedPair {
+        ExpandedPair::new(
+            Some(DataCharacter::new(left, 0)),
+            right.map(|value| DataCharacter::new(value, 0)),
+            Some(FinderPattern::new(finder, [0, 15], 0, 15, 0)),
+        )
+    }
+
+    /// `row` drawn vertically, `width` pixels wide, read top to bottom or
+    /// bottom to top.
+    fn vertical(
+        row: &BitArray,
+        width: usize,
+        bottom_up: bool,
+    ) -> BinaryBitmap<HybridBinarizer<Luma8LuminanceSource>> {
+        let length = row.get_size();
+        let mut luma = Vec::with_capacity(length * width);
+        for y in 0..length {
+            let x = if bottom_up { length - 1 - y } else { y };
+            luma.extend(std::iter::repeat_n(if row.get(x) { 0 } else { 255 }, width));
+        }
+        let source = Luma8LuminanceSource::new(luma, width as u32, length as u32).unwrap();
+        BinaryBitmap::new(HybridBinarizer::new(source))
+    }
+
+    /// The four result points as (x, y).
+    fn points(result: &RXingResult) -> Vec<(f32, f32)> {
+        result.getPoints().iter().map(|p| (p.x, p.y)).collect()
+    }
+
+    fn orientation(result: &RXingResult) -> Option<i32> {
+        match result
+            .getRXingResultMetadata()
+            .get(&RXingResultMetadataType::ORIENTATION)
+        {
+            Some(RXingResultMetadataValue::Orientation(degrees)) => Some(*degrees),
+            _ => None,
+        }
+    }
+
+    /// A clean one-row symbol: its three pairs read in order, the check
+    /// character and the whole finder sequence accept them at once (nothing
+    /// is stored for stacking), and the points span its outer finders.
+    #[test]
+    fn a_one_row_symbol_reads_its_element_string_between_its_outer_finders() {
+        let symbol = gtin_symbol();
+        let (row, finders) = symbol_row(&symbol, 0);
+        assert_eq!((finders, row.get_size()), (vec![30, 79, 128], 156));
+        let mut reader = RSSExpandedReader::new();
+        let pairs = reader.decodeRow2pairs(7, &row).unwrap();
+        let found: Vec<_> = pairs.iter().map(seen).collect();
+        let edges = [[30, 45], [79, 94], [128, 143]];
+        let want: Vec<_> = (0..3)
+            .map(|i| (expected(symbol[i], i), symbol[i].finder, edges[i]))
+            .collect();
+        assert_eq!(found, want);
+        let result = reader.decode_row(7, &row, &DecodeHints::default()).unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(result.getBarcodeFormat(), &BarcodeFormat::RSS_EXPANDED);
+        assert_eq!(
+            points(&result),
+            [(30., 7.), (45., 7.), (128., 7.), (143., 7.)]
+        );
+        assert!(matches!(
+            result
+                .getRXingResultMetadata()
+                .get(&RXingResultMetadataType::SYMBOLOGY_IDENTIFIER),
+            Some(RXingResultMetadataValue::SymbologyIdentifier(id)) if id == "]e0"
+        ));
+        assert!(reader.rows.is_empty());
+    }
+
+    /// Stacked rows A1 B2 | B1: the first row alone fails its check and is
+    /// stored; the second completes the symbol from the stored row, in
+    /// order, each point keeping the row it was measured on.
+    #[test]
+    fn a_stacked_symbol_is_assembled_from_its_stored_rows() {
+        let symbol = gtin_symbol();
+        let (top, _) = symbol_row(&symbol[..2], 0);
+        let (bottom, finders) = symbol_row(&symbol[2..], 2);
+        assert_eq!(finders, [30]);
+        let hints = DecodeHints::default();
+        let mut reader = RSSExpandedReader::new();
+        assert_eq!(
+            reader.decode_row(10, &top, &hints).err(),
+            Some(Exceptions::NOT_FOUND)
+        );
+        let stored: Vec<_> = reader
+            .getRows()
+            .iter()
+            .map(|r| (r.getRowNumber(), r.getPairs().len()))
+            .collect();
+        assert_eq!(stored, [(10, 2)]);
+        let result = reader.decode_row(11, &bottom, &hints).unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(
+            points(&result),
+            [(30., 10.), (45., 10.), (30., 11.), (45., 11.)]
+        );
+    }
+
+    /// Stacked rows A1 | B2 B1: the second row starts on an even pair, which
+    /// only the retry from an even finder reads (finder mirrored, its
+    /// characters weighed as an even pair's).
+    #[test]
+    fn a_stacked_row_starting_on_an_even_pair_is_read_by_the_even_retry() {
+        let symbol = gtin_symbol();
+        let (top, _) = symbol_row(&symbol[..1], 0);
+        let (bottom, finders) = symbol_row(&symbol[1..], 1);
+        assert_eq!(finders, [29, 78]);
+        let hints = DecodeHints::default();
+        let mut reader = RSSExpandedReader::new();
+        assert_eq!(
+            reader.decode_row(20, &top, &hints).err(),
+            Some(Exceptions::NOT_FOUND)
+        );
+        let result = reader.decode_row(21, &bottom, &hints).unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(
+            points(&result),
+            [(30., 20.), (45., 20.), (78., 21.), (93., 21.)]
+        );
+        // the row's own pairs, before any stacking
+        let mut alone = RSSExpandedReader::new();
+        alone.startFromEven = true;
+        assert!(alone.decodeRow2pairs(21, &bottom).is_err());
+        let got: Vec<_> = alone.pairs.iter().map(seen).collect();
+        assert_eq!(
+            got,
+            [
+                (expected(symbol[1], 1), FINDER_PAT_B, [29, 44]),
+                (expected(symbol[2], 2), FINDER_PAT_B, [78, 93])
+            ]
+        );
+    }
+
+    /// The reader keeps rows across calls for stacking; reset forgets them,
+    /// so a later image never completes a symbol with an earlier one's row.
+    #[test]
+    fn after_reset_a_stored_row_no_longer_completes_a_symbol() {
+        let symbol = gtin_symbol();
+        let (top, _) = symbol_row(&symbol[..2], 0);
+        let (bottom, _) = symbol_row(&symbol[2..], 2);
+        let hints = DecodeHints::default();
+        let mut reader = RSSExpandedReader::new();
+        assert!(reader.decode_row(10, &top, &hints).is_err());
+        reader.reset();
+        assert!(reader.rows.is_empty() && reader.pairs.is_empty());
+        assert_eq!(
+            reader.decode_row(11, &bottom, &hints).err(),
+            Some(Exceptions::NOT_FOUND)
+        );
+    }
+
+    fn try_harder() -> DecodeHints {
+        DecodeHints {
+            TryHarder: Some(true),
+            ..Default::default()
+        }
+    }
+
+    /// Printed reading top to bottom, the symbol leaves the upright pass
+    /// uniform rows; the TryHarder pass reads it rotated a quarter turn
+    /// counter-clockwise, reports 270° and maps every point back: the
+    /// rotated middle row 5 is image column 10 - 5 - 1.
+    #[test]
+    fn a_vertical_symbol_is_read_rotated_with_its_points_in_the_image_frame() {
+        let (row, _) = symbol_row(&gtin_symbol(), 0);
+        let mut image = vertical(&row, 10, false);
+        let result = RSSExpandedReader::new()
+            .decode_with_hints(&mut image, &try_harder())
+            .unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(orientation(&result), Some(270));
+        assert_eq!(
+            points(&result),
+            [(4., 30.), (4., 45.), (4., 128.), (4., 143.)]
+        );
+    }
+
+    /// Printed reading bottom to top, the rotated image holds the symbol
+    /// upside down: the reversed row reads it at 180°, added to the
+    /// rotation's 270° modulo a full turn; the first finder's edges come back
+    /// flipped along the image column.
+    #[test]
+    fn an_upside_down_rotated_read_adds_its_half_turn_modulo_a_full_turn() {
+        let (row, _) = symbol_row(&gtin_symbol(), 0);
+        let mut image = vertical(&row, 10, true);
+        let result = RSSExpandedReader::new()
+            .decode_with_hints(&mut image, &try_harder())
+            .unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(orientation(&result), Some(90));
+        assert_eq!(points(&result)[..2], [(4., 125.), (4., 110.)]);
+    }
+
+    /// The rotated pass is TryHarder's alone.
+    #[test]
+    fn without_try_harder_a_vertical_symbol_is_not_found() {
+        let (row, _) = symbol_row(&gtin_symbol(), 0);
+        let mut image = vertical(&row, 10, false);
+        let found = RSSExpandedReader::new().decode_with_hints(&mut image, &DecodeHints::default());
+        assert_eq!(found.err(), Some(Exceptions::NOT_FOUND));
+    }
+
+    /// The left character's value of each stored row, with its number.
+    fn stored(reader: &RSSExpandedReader) -> Vec<(u32, u32)> {
+        let left = |row: &ExpandedRow| row.getPairs()[0].getLeftChar().unwrap().getValue();
+        reader
+            .rows
+            .iter()
+            .map(|row| (row.getRowNumber(), left(row)))
+            .collect()
+    }
+
+    /// storeRow files each new row by row number, after the rows of the same
+    /// number (decode_row stores one row twice, from odd then even finders).
+    #[test]
+    fn rows_are_stored_by_row_number_after_their_equals() {
+        let mut reader = RSSExpandedReader::new();
+        reader.rows = vec![ExpandedRow::new(vec![pair(1, Some(2), FINDER_PAT_A)], 5)];
+        for (left, finder, number) in [
+            (3, FINDER_PAT_B, 3),
+            (5, FINDER_PAT_C, 9),
+            (7, FINDER_PAT_D, 5),
+        ] {
+            reader.pairs = vec![pair(left, Some(left + 1), finder)];
+            reader.storeRow(number);
+        }
+        assert_eq!(stored(&reader), [(3, 3), (5, 1), (5, 7), (9, 5)]);
+    }
+
+    /// A row equal to a stored one, or contained in one, adds nothing; a row
+    /// containing stored shorter rows replaces them.
+    #[test]
+    fn repeated_or_partial_rows_are_not_stored_and_containing_rows_replace_them() {
+        let (a, b, c) = (
+            pair(1, Some(2), FINDER_PAT_A),
+            pair(3, Some(4), FINDER_PAT_B),
+            pair(5, None, FINDER_PAT_B),
+        );
+        let mut reader = RSSExpandedReader::new();
+        reader.rows = vec![ExpandedRow::new(vec![a.clone(), b.clone()], 5)];
+        for (pairs, number) in [(vec![a.clone(), b.clone()], 6), (vec![b.clone()], 7)] {
+            reader.pairs = pairs;
+            reader.storeRow(number);
+        }
+        assert_eq!(stored(&reader), [(5, 1)]);
+        reader.pairs = vec![c.clone()];
+        reader.storeRow(8);
+        assert_eq!(stored(&reader), [(5, 1), (8, 5)]);
+        reader.pairs = vec![a, b, c];
+        reader.storeRow(9);
+        assert_eq!(stored(&reader), [(9, 1)]);
+        assert_eq!(reader.rows[0].getPairs().len(), 3);
+    }
+
+    /// Equivalence is pair-for-pair equality, in order.
+    #[test]
+    fn a_row_is_equivalent_to_its_own_pairs_only_and_keeps_its_number() {
+        let (a, b) = (
+            pair(1, Some(2), FINDER_PAT_A),
+            pair(3, Some(4), FINDER_PAT_B),
+        );
+        let row = ExpandedRow::new(vec![a.clone(), b.clone()], 42);
+        assert_eq!(row.getRowNumber(), 42);
+        assert!(row.isEquivalent(&[a.clone(), b.clone()]));
+        assert!(!row.isEquivalent(&[b.clone(), a.clone()]));
+        assert!(!row.isEquivalent(&[a]));
+    }
+
+    /// Partial: one stored row holds every pair — not pairs spread across rows.
+    #[test]
+    fn a_row_is_partial_only_when_one_stored_row_holds_all_its_pairs() {
+        let (a, b, c) = (
+            pair(1, Some(2), FINDER_PAT_A),
+            pair(3, Some(4), FINDER_PAT_B),
+            pair(5, None, FINDER_PAT_B),
+        );
+        let rows = [
+            ExpandedRow::new(vec![a.clone(), b.clone()], 1),
+            ExpandedRow::new(vec![c.clone()], 2),
+        ];
+        let partial = RSSExpandedReader::isPartialRow;
+        assert!(partial(&[b.clone()], &rows));
+        assert!(partial(&[a.clone(), b.clone()], &rows));
+        assert!(!partial(&[b, c], &rows));
+        // a row holding none of the pairs holds no part of them
+        assert!(!partial(&[a.clone()], &rows[1..]));
+        assert!(!partial(&[a], &[]));
+    }
+
+    /// The check character is 211 * (characters - 4) plus the other
+    /// characters' portions mod 211; any other value is refused. Four, five
+    /// and six characters each carry their own multiple of 211.
+    #[test]
+    fn the_check_character_must_equal_the_weighted_sum_of_the_others() {
+        let character = DataCharacter::new;
+        let finder = || Some(FinderPattern::new(FINDER_PAT_A, [0, 15], 0, 15, 0));
+        // after the check character, portions 100, 150, 7, 80, then 1
+        let symbol = |check, characters| {
+            let mut pairs = vec![
+                ExpandedPair::new(Some(character(check, 0)), Some(character(9, 100)), finder()),
+                ExpandedPair::new(Some(character(9, 150)), Some(character(9, 7)), finder()),
+                ExpandedPair::new(Some(character(9, 80)), Some(character(9, 1)), finder()),
+            ];
+            match characters {
+                4 => pairs.truncate(2),
+                5 => pairs[2] = ExpandedPair::new(Some(character(9, 80)), None, finder()),
+                _ => {}
+            }
+            pairs
+        };
+        let mut reader = RSSExpandedReader::new();
+        // 257 ≡ 46, 337 ≡ 126 and 338 ≡ 127 (mod 211)
+        for (characters, check, valid) in [
+            (4, 46, true),
+            (4, 47, false),
+            (4, 211 + 46, false),
+            (5, 211 + 126, true),
+            (5, 211 + 125, false),
+            (5, 126, false),
+            (6, 422 + 127, true),
+            (6, 422 + 128, false),
+            (6, 211 + 127, false),
+        ] {
+            reader.pairs = symbol(check, characters);
+            assert_eq!(reader.checkChecksum(), valid, "{characters}: {check}");
+        }
+        reader.pairs.clear();
+        assert!(!reader.checkChecksum());
+    }
+
+    /// Finder values must follow one of the ten legal sequences: exactly,
+    /// for a complete symbol, or as a prefix while rows are assembled.
+    #[test]
+    fn finder_sequences_match_a_legal_one_whole_or_as_a_prefix() {
+        let (a, b, c, d) = (FINDER_PAT_A, FINDER_PAT_B, FINDER_PAT_C, FINDER_PAT_D);
+        let (e, f) = (FINDER_PAT_E, FINDER_PAT_F);
+        let valid = |finders: &[u32], complete| {
+            let pairs: Vec<_> = finders.iter().map(|&v| pair(1, Some(1), v)).collect();
+            RSSExpandedReader::isValidSequence(&pairs, complete)
+        };
+        assert!(valid(&[a], false));
+        assert!(valid(&[a, b], false));
+        assert!(!valid(&[a, b], true));
+        assert!(valid(&[a, b, b], true));
+        assert!(valid(&[a, a, b, b, c, d, d, e, e, f, f], true));
+        assert!(!valid(&[a, a, b, b, c, d, d, e, e, f, f, f], false));
+        // the regression fixture's order, legal in no sequence
+        assert!(!valid(&[a, c, f, d], false));
+        assert!(!valid(&[b], false));
+    }
+
+    /// The data bits are the characters after the check character, twelve
+    /// bits each, most significant first; a last pair without a right
+    /// character adds none.
+    #[test]
+    fn the_data_bits_are_twelve_per_character_after_the_check_character() {
+        let symbol = gtin_symbol();
+        let pairs: Vec<_> = symbol
+            .iter()
+            .map(|s| pair(s.left, s.right, s.finder))
+            .collect();
+        let text = |bits: BitArray| -> String {
+            (0..bits.get_size())
+                .map(|i| if bits.get(i) { '1' } else { '0' })
+                .collect()
+        };
+        let data = bit_array_builder::buildBitArray(&pairs).unwrap();
+        let gtin = format!(
+            "0100{:04b}{:010b}{:010b}{:010b}{:010b}",
+            0, 950, 600, 13, 435
+        );
+        assert_eq!(text(data), gtin);
+        let two = bit_array_builder::buildBitArray(&pairs[..2]).unwrap();
+        assert_eq!(text(two), &gtin[..36]);
+    }
+
+    /// Diagnostics print a character as value(portion), a row as its pairs.
+    #[test]
+    fn characters_and_rows_print_their_contents() {
+        assert_eq!(DataCharacter::new(1038, 47).to_string(), "1038(47)");
+        let row = ExpandedRow::new(vec![pair(1, None, FINDER_PAT_C)], 3);
+        assert_eq!(
+            row.to_string(),
+            "{ [ Some(DataCharacter { value: 1, checksumPortion: 0 }) , None : 2 ] }"
+        );
+    }
+
+    /// 1038 (odd 3 1 4 2, even 2 1 1 3) and 4000 (odd 1 1 1 1, even 1 2 8 2,
+    /// an eight-module element): each module count, left to right.
+    const D1: [u32; 8] = [3, 2, 1, 1, 4, 1, 2, 3];
+    const WIDE: [u32; 8] = [1, 1, 1, 2, 1, 8, 1, 2];
+
+    /// A left character of `elements` pixels (white first, after a guard
+    /// bar) where a B finder of `finder_width` pixels begins.
+    fn left_character(elements: [u32; 8], finder_width: usize) -> (BitArray, FinderPattern) {
+        let mut runs = vec![10, 10];
+        runs.extend(elements);
+        let start = runs.iter().sum::<u32>() as usize;
+        runs.push(20);
+        let end = start + finder_width;
+        (
+            bits(&runs),
+            FinderPattern::new(FINDER_PAT_B, [start, end], start, end, 0),
+        )
+    }
+
+    /// That character read as an odd pair's left one.
+    fn read_left(elements: [u32; 8], finder_width: usize) -> Result<DataCharacter> {
+        let (row, finder) = left_character(elements, finder_width);
+        RSSExpandedReader::new().decodeDataCharacter(&row, &finder, true, true)
+    }
+
+    /// The character's module must match the finder's within 30%, bound
+    /// included: 7-pixel modules beside a 150-pixel finder are exactly 30%
+    /// off, a 151-pixel finder puts them past it.
+    #[test]
+    fn a_character_module_within_thirty_percent_of_the_finders_is_read() {
+        let at_seven = D1.map(|m| m * 7);
+        assert_eq!(read_left(at_seven, 150), Ok(DataCharacter::new(1038, 1837)));
+        assert_eq!(read_left(at_seven, 151), Err(Exceptions::NOT_FOUND));
+        assert_eq!(
+            read_left(D1.map(|m| m * 10), 150),
+            Ok(DataCharacter::new(1038, 1837))
+        );
+    }
+
+    /// Ten-pixel modules (170 pixels): a narrow element down to 0.3 module
+    /// rounds up to one, below 0.3 it is refused. The pixels the narrow
+    /// elements lose sit where rounding keeps every other count.
+    #[test]
+    fn a_narrow_element_down_to_three_tenths_of_a_module_counts_as_one() {
+        let narrow = [34, 21, 3, 4, 44, 10, 20, 34];
+        assert_eq!(read_left(narrow, 150), Ok(DataCharacter::new(1038, 1837)));
+        let too_narrow = [34, 20, 2, 10, 44, 10, 20, 30];
+        assert_eq!(read_left(too_narrow, 150), Err(Exceptions::NOT_FOUND));
+    }
+
+    /// A wide element up to 8.7 modules counts as eight, past it the
+    /// character is refused.
+    #[test]
+    fn a_wide_element_up_to_eight_point_seven_modules_counts_as_eight() {
+        let clean = WIDE.map(|m| m * 10);
+        assert_eq!(read_left(clean, 150), Ok(DataCharacter::new(4000, 1521)));
+        let wide = [10, 10, 10, 16, 10, 87, 10, 17];
+        assert_eq!(read_left(wide, 150), Ok(DataCharacter::new(4000, 1521)));
+        let too_wide = [10, 10, 10, 16, 10, 88, 10, 16];
+        assert_eq!(read_left(too_wide, 150), Err(Exceptions::NOT_FOUND));
+    }
+
+    /// Odd 14 and even 4 (18 modules) each lose a module to the repair,
+    /// which leaves an odd sum of 13: refused, never valued.
+    #[test]
+    fn a_character_left_with_an_odd_sum_by_its_repair_is_refused() {
+        let elements = [5, 1, 5, 1, 2, 1, 2, 1].map(|m| m * 17);
+        let (row, finder) = left_character(elements, 270);
+        let mut reader = RSSExpandedReader::new();
+        let read = reader.decodeDataCharacter(&row, &finder, true, true);
+        assert_eq!(read, Err(Exceptions::NOT_FOUND));
+        assert_eq!(
+            (reader.oddCounts, reader.evenCounts),
+            ([4, 5, 2, 2], [0, 1, 1, 1])
+        );
+    }
+
+    /// adjustOddEvenCounts with rounding errors whose extremes sit at
+    /// opposite ends — the odd ones peak at index 3 and bottom at 0, the even
+    /// ones the other way round — so every repair shows which errors it
+    /// weighed: an increment lands on the largest error, a decrement on the
+    /// smallest. An odd increment lands on index 3, an odd decrement on 0, an
+    /// even decrement on 3; an even increment weighs the ODD errors, as
+    /// upstream ZXing does, and lands on 3 where the even ones would pick 0.
+    fn adjusted(odd: [u32; 4], even: [u32; 4]) -> Option<([u32; 4], [u32; 4])> {
+        let mut reader = RSSExpandedReader::new();
+        (reader.oddCounts, reader.evenCounts) = (odd, even);
+        reader.oddRoundingErrors = [-0.4, -0.1, 0.1, 0.4];
+        reader.evenRoundingErrors = [0.3, -0.2, 0.2, -0.3];
+        reader.adjustOddEvenCounts(17).ok()?;
+        Some((reader.oddCounts, reader.evenCounts))
+    }
+
+    /// The parity repair moves one module toward an even odd sum, an odd
+    /// even sum and 17 in all; two modules off is refused.
+    #[test]
+    fn the_parity_repair_moves_one_module_toward_legal_sums() {
+        let unchanged = ([1, 1, 1, 1], [8, 2, 2, 1]);
+        assert_eq!(adjusted(unchanged.0, unchanged.1), Some(unchanged));
+        // one module short: the side with the wrong parity grows (the even
+        // side by the odd errors: index 3, not the even errors' index 0)
+        assert_eq!(
+            adjusted([3, 3, 3, 3], [1, 1, 1, 1]),
+            Some(([3, 3, 3, 3], [1, 1, 1, 2]))
+        );
+        assert_eq!(
+            adjusted([3, 3, 3, 2], [2, 1, 1, 1]),
+            Some(([3, 3, 3, 3], [2, 1, 1, 1]))
+        );
+        // both parities wrong at 17: the smaller side grows, the larger shrinks
+        assert_eq!(
+            adjusted([4, 3, 3, 3], [1, 1, 1, 1]),
+            Some(([3, 3, 3, 3], [1, 1, 1, 2]))
+        );
+        assert_eq!(
+            adjusted([1, 1, 1, 2], [4, 3, 3, 2]),
+            Some(([1, 1, 1, 3], [4, 3, 3, 1]))
+        );
+        assert_eq!(adjusted([3, 3, 3, 3], [2, 2, 2, 1]), None);
+    }
+
+    /// The range repairs are strict: an odd sum of 13 and an even sum of 4
+    /// are in range, only past them does a side shrink or grow (the zero
+    /// count no row produces probes the function's own table).
+    #[test]
+    fn the_range_repairs_start_past_thirteen_and_below_four() {
+        // odd 14 shrinks; the wrong even parity of 4 shrinks the even side
+        assert_eq!(
+            adjusted([5, 4, 3, 2], [1, 1, 1, 1]),
+            Some(([4, 4, 3, 2], [1, 1, 1, 0]))
+        );
+        // odd 13, one short with its parity wrong, grows; even 3 grows
+        assert_eq!(
+            adjusted([4, 3, 3, 3], [1, 1, 1, 0]),
+            Some(([4, 3, 3, 4], [1, 1, 1, 1]))
+        );
+    }
+
+    /// One finder between quiet zones: an odd pair's after a guard bar and
+    /// before a closing bar, or an even pair's, mirrored.
+    fn lone_finder(value: u32, odd_pattern: bool) -> BitArray {
+        let mut runs = vec![12];
+        if odd_pattern {
+            runs.push(1);
+        }
+        runs.extend(finder_modules(value, odd_pattern));
+        if odd_pattern {
+            runs.push(5);
+        }
+        runs.push(12);
+        bits(&runs)
+    }
+
+    /// The search skips the quiet zone, then slides bar by bar until four
+    /// elements (an odd finder's 2 to 5) have a finder's proportions.
+    #[test]
+    fn the_finder_search_skips_the_quiet_zone_and_records_elements_two_to_five() {
+        let row = lone_finder(FINDER_PAT_A, true);
+        let mut reader = RSSExpandedReader::new();
+        assert_eq!(reader.findNextPair(&row, &[], -1), Ok(()));
+        assert_eq!(
+            (reader.startEnd, reader.decodeFinderCounters),
+            ([14, 28], [8, 4, 1, 1])
+        );
+        // forced onto that bar, the search starts there
+        reader.startEnd = [0, 0];
+        assert_eq!(reader.findNextPair(&row, &[], 14), Ok(()));
+        assert_eq!(reader.startEnd, [14, 28]);
+    }
+
+    /// An odd finder's first element is the space before the window.
+    #[test]
+    fn an_odd_finder_takes_its_first_element_from_the_space_before_the_window() {
+        let row = lone_finder(FINDER_PAT_A, true);
+        let mut reader = RSSExpandedReader::new();
+        reader.findNextPair(&row, &[], -1).unwrap();
+        let finder = reader.parseFoundFinderPattern(&row, 3, true, &[]).unwrap();
+        assert_eq!(
+            (finder.getValue(), finder.getStartEnd()),
+            (FINDER_PAT_A, &[13, 28][..])
+        );
+        let at: Vec<_> = finder.getPoints().iter().map(|p| (p.x, p.y)).collect();
+        assert_eq!(at, [(13., 3.), (28., 3.)]);
+    }
+
+    /// An even search matches the window mirrored, and its finder's first
+    /// element is the bar after the window.
+    #[test]
+    fn an_even_finder_is_matched_mirrored_with_its_first_element_after_the_window() {
+        let row = lone_finder(FINDER_PAT_B, false);
+        let mut reader = RSSExpandedReader::new();
+        reader.startFromEven = true;
+        reader.findNextPair(&row, &[], -1).unwrap();
+        assert_eq!(
+            (reader.startEnd, reader.decodeFinderCounters),
+            ([12, 24], [6, 4, 1, 1])
+        );
+        let finder = reader.parseFoundFinderPattern(&row, 3, false, &[]).unwrap();
+        assert_eq!(
+            (finder.getValue(), finder.getStartEnd()),
+            (FINDER_PAT_B, &[12, 27][..])
+        );
+    }
+
+    /// No finder past the last bar: a search forced to the row's end (the
+    /// next bar after a rejected candidate there) or beyond finds nothing.
+    /// The row fills two storage words, so its end is a word boundary.
+    #[test]
+    fn a_search_from_the_row_end_or_beyond_finds_nothing() {
+        let row = bits(&[12, 1, 1, 8, 4, 1, 1, 5, 95]);
+        assert_eq!(row.get_size(), 128);
+        let mut reader = RSSExpandedReader::new();
+        for offset in [128, 140] {
+            let found = reader.findNextPair(&row, &[], offset);
+            assert_eq!(found, Err(Exceptions::NOT_FOUND), "{offset}");
+        }
+        let blank = bits(&[128]);
+        assert_eq!(
+            reader.findNextPair(&blank, &[], -1),
+            Err(Exceptions::NOT_FOUND)
+        );
+    }
+
+    /// The previous pair as decoded from A1 at modules 30..45.
+    fn after_a1(right: Option<DataCharacter>) -> [ExpandedPair; 1] {
+        let a1 = FinderPattern::new(FINDER_PAT_A, [30, 45], 30, 45, 7);
+        [ExpandedPair::new(
+            Some(DataCharacter::new(223, 0)),
+            right,
+            Some(a1),
+        )]
+    }
+
+    /// Two 17-module characters lie between consecutive finders: a
+    /// finder-shaped run inside them (here a perfect A, mirrored, three
+    /// modules past A1) is passed over and the search goes on to B2.
+    #[test]
+    fn an_internal_finder_too_close_to_the_previous_one_is_passed_over() {
+        let symbol = gtin_symbol();
+        let (mut runs, _) = layout(&symbol[..2], 0);
+        // A1's right character becomes B2 S1 B1 S1 B4 S8: still 17 modules
+        runs.splice(15..23, [2, 1, 1, 1, 4, 8]);
+        let row = bits(&runs);
+        let previous = after_a1(Some(DataCharacter::new(1038, 824)));
+        let mut reader = RSSExpandedReader::new();
+        reader.findNextPair(&row, &previous, -1).unwrap();
+        assert_eq!(reader.startEnd, [48, 62]);
+        let candidate = reader.parseFoundFinderPattern(&row, 7, false, &[]).unwrap();
+        assert_eq!(
+            (candidate.getValue(), candidate.getStartEnd()),
+            (FINDER_PAT_A, &[48, 63][..])
+        );
+        assert!(
+            reader
+                .parseFoundFinderPattern(&row, 7, false, &previous)
+                .is_none()
+        );
+        let next = reader.retrieveNextPair(&row, &previous, 7).unwrap();
+        assert_eq!(
+            seen(&next),
+            (expected(symbol[1], 1), FINDER_PAT_B, [79, 94])
+        );
+    }
+
+    /// A pair without a right character ends the symbol: the next finder is
+    /// read, but no pair follows it.
+    #[test]
+    fn no_pair_follows_a_pair_without_a_right_character() {
+        let symbol = gtin_symbol();
+        let (row, _) = symbol_row(&symbol, 0);
+        let mut reader = RSSExpandedReader::new();
+        let next = reader.retrieveNextPair(&row, &after_a1(Some(DataCharacter::new(1038, 824))), 7);
+        assert_eq!(
+            seen(&next.unwrap()),
+            (expected(symbol[1], 1), FINDER_PAT_B, [79, 94])
+        );
+        let last = reader.retrieveNextPair(&row, &after_a1(None), 7);
+        assert_eq!(last.err(), Some(Exceptions::NOT_FOUND));
+    }
+
+    /// A row's first pair is searched from its first pixel: a mirrored A
+    /// there is found though no character fits before it, and the pair is
+    /// refused, where a search from the second pixel would reach B2.
+    #[test]
+    fn a_first_pair_is_searched_from_the_first_pixel_of_its_row() {
+        let symbol = gtin_symbol();
+        let (mut runs, _) = layout(&symbol[1..], 1);
+        runs.splice(0..0, [0, 1, 1, 4, 8, 1]);
+        let row = bits(&runs);
+        let mut reader = RSSExpandedReader::new();
+        reader.startFromEven = true;
+        let first = reader.retrieveNextPair(&row, &[], 5);
+        assert_eq!(
+            (first.err(), reader.startEnd),
+            (Some(Exceptions::NOT_FOUND), [0, 14])
+        );
+    }
+
+    /// After a rejected candidate the search resumes at the second edge from
+    /// the candidate's start: past its bar and the space after it, or past
+    /// its space and the bar after it.
+    #[test]
+    fn the_search_resumes_two_edges_after_a_rejected_candidate() {
+        // white 0..3, black 3..5, white 5..9, black 9, white 10..15
+        let row = bits(&[3, 2, 4, 1, 5]);
+        assert_eq!(RSSExpandedReader::getNextSecondBar(&row, 3), 9);
+        assert_eq!(RSSExpandedReader::getNextSecondBar(&row, 6), 10);
+    }
+
+    /// The next finder starts two characters (34 modules) after the previous
+    /// one ends, within 10% either way, both bounds included: after a
+    /// 75-pixel finder (five pixels a module), 153 to 187 pixels after it.
+    #[test]
+    fn the_next_finder_starts_two_characters_after_the_previous_within_ten_percent() {
+        let previous = [ExpandedPair::new(
+            Some(DataCharacter::new(223, 0)),
+            Some(DataCharacter::new(1038, 824)),
+            Some(FinderPattern::new(FINDER_PAT_A, [10, 85], 10, 85, 7)),
+        )];
+        for (start, kept) in [(237, false), (238, true), (272, true), (273, false)] {
+            // an even B finder, mirrored, one pixel a module, at `start`
+            let row = bits(&[start, 1, 1, 4, 6, 3, 12]);
+            let mut reader = RSSExpandedReader::new();
+            reader.findNextPair(&row, &previous, -1).unwrap();
+            assert_eq!(reader.startEnd, [start, start + 12], "{start}");
+            let found = reader.parseFoundFinderPattern(&row, 7, false, &previous);
+            let edges = found.map(|f| (f.getValue(), f.getStartEnd().to_vec()));
+            let at = start as usize;
+            assert_eq!(
+                edges,
+                kept.then(|| (FINDER_PAT_B, vec![at, at + 15])),
+                "{start}"
+            );
+        }
+    }
+
+    /// A module count one off is repaired on the element whose pixels were
+    /// rounded up the most (the largest negative rounding error): odd 11
+    /// with even 7 loses it on the odd 4.6, odd 10 with even 8 on the even
+    /// 3.5 — both reads come back to 1038, as from clean modules.
+    #[test]
+    fn a_surplus_module_comes_off_the_element_rounded_up_the_most() {
+        // odd 2.8 1.0 4.6 1.8, even 1.8 1.0 1.0 3.0 (ten-pixel modules)
+        let odd_surplus = [28, 18, 10, 10, 46, 10, 18, 30];
+        // odd 2.9 1.0 3.9 1.9, even 2.0 0.8 1.0 3.5
+        let even_surplus = [29, 20, 10, 8, 39, 10, 19, 35];
+        for elements in [odd_surplus, even_surplus] {
+            let read = read_left(elements, 150);
+            assert_eq!(read, Ok(DataCharacter::new(1038, 1837)), "{elements:?}");
+        }
+    }
+
+    /// Every character contributes its twelve bits, most significant first,
+    /// bit 11 included: the first data character (4095), then a later
+    /// pair's left (2048) and right (3071).
+    #[test]
+    fn each_character_contributes_twelve_bits_from_bit_eleven() {
+        let pairs = [
+            pair(5, Some(4095), FINDER_PAT_A),
+            pair(2048, Some(3071), FINDER_PAT_B),
+        ];
+        let data = bit_array_builder::buildBitArray(&pairs).unwrap();
+        let text: String = (0..data.get_size())
+            .map(|i| if data.get(i) { '1' } else { '0' })
+            .collect();
+        assert_eq!(text, format!("{:012b}{:012b}{:012b}", 4095, 2048, 3071));
+    }
+
+    /// Rows compare and hash by their pairs in order, whatever their numbers.
+    #[test]
+    fn rows_compare_and_hash_by_their_pairs_in_order() {
+        use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
+        let (a, b) = (
+            pair(1, Some(2), FINDER_PAT_A),
+            pair(3, Some(4), FINDER_PAT_B),
+        );
+        let row = ExpandedRow::new(vec![a.clone(), b.clone()], 1);
+        let renumbered = ExpandedRow::new(vec![a.clone(), b.clone()], 2);
+        let swapped = ExpandedRow::new(vec![b, a], 1);
+        assert!(row == renumbered);
+        assert!(row != swapped);
+        let hash = |r: &ExpandedRow| BuildHasherDefault::<DefaultHasher>::default().hash_one(r);
+        assert_eq!(hash(&row), hash(&renumbered));
+        assert_ne!(hash(&row), hash(&swapped));
+    }
+
+    /// `decode` is `decode_with_hints` with default hints: a symbol printed
+    /// across a ten-row image is read on row 5, the middle row scanned first.
+    #[test]
+    fn decode_reads_an_upright_symbol_with_default_hints() {
+        let (row, _) = symbol_row(&gtin_symbol(), 0);
+        let width = row.get_size();
+        let line: Vec<u8> = (0..width)
+            .map(|x| if row.get(x) { 0 } else { 255 })
+            .collect();
+        let source = Luma8LuminanceSource::new(line.repeat(10), width as u32, 10).unwrap();
+        let mut image = BinaryBitmap::new(HybridBinarizer::new(source));
+        let result = RSSExpandedReader::new().decode(&mut image).unwrap();
+        assert_eq!(result.getText(), GTIN_TEXT);
+        assert_eq!(orientation(&result), None);
+        assert_eq!(
+            points(&result),
+            [(30., 5.), (45., 5.), (128., 5.), (143., 5.)]
+        );
+    }
+
+    /// A complete finder sequence whose check character disagrees with the
+    /// other characters is no symbol: the row is kept for stacking instead.
+    #[test]
+    fn a_complete_sequence_with_a_wrong_check_character_is_stored_not_read() {
+        let mut symbol = gtin_symbol();
+        symbol[0].left += 1;
+        let (row, _) = symbol_row(&symbol, 0);
+        let mut reader = RSSExpandedReader::new();
+        let read = reader.decodeRow2pairs(4, &row);
+        assert_eq!(read.err(), Some(Exceptions::NOT_FOUND));
+        let finders: Vec<_> = reader.pairs.iter().map(|p| seen(p).1).collect();
+        assert_eq!(finders, [FINDER_PAT_A, FINDER_PAT_B, FINDER_PAT_B]);
+        assert_eq!(stored(&reader), [(4, symbol[0].left)]);
+    }
+
+    /// The pairs a stacked read assembles, as `seen` shows them.
+    fn assembled(pairs: Option<Vec<ExpandedPair>>) -> Option<Vec<Seen>> {
+        pairs.map(|pairs| pairs.iter().map(seen).collect())
+    }
+
+    /// Pair `index` of `spec` as decoded: its characters with their portions.
+    fn decoded(spec: Spec, index: usize) -> ExpandedPair {
+        let (left, right) = expected(spec, index);
+        let finder = FinderPattern::new(spec.finder, [0, 15], 0, 15, 0);
+        ExpandedPair::new(left, right, Some(finder))
+    }
+
+    /// Stacking walks the stored rows in order: a row that starts no legal
+    /// sequence is passed over, one that completes the sequence with a
+    /// misread character is backed out of, and the next row completes it.
+    /// Twenty-five stored rows are walked; a twenty-sixth means the symbol
+    /// will never come together, and every row is dropped.
+    #[test]
+    fn stacking_skips_foreign_rows_backs_out_of_a_misread_one_up_to_twenty_five() {
+        let symbol = gtin_symbol();
+        let pairs: Vec<_> = (0..3).map(|i| decoded(symbol[i], i)).collect();
+        let mut misread = symbol[2];
+        misread.left += 1;
+        let foreign = ExpandedRow::new(vec![pair(1, Some(1), FINDER_PAT_C)], 0);
+        let mut reader = RSSExpandedReader::new();
+        reader.rows = vec![foreign.clone(); 22];
+        reader.rows.extend([
+            ExpandedRow::new(pairs[..2].to_vec(), 1),
+            ExpandedRow::new(vec![decoded(misread, 2)], 2),
+            ExpandedRow::new(pairs[2..].to_vec(), 3),
+        ]);
+        let want = assembled(Some(pairs));
+        assert_eq!(assembled(reader.checkRows(false)), want);
+        assert_eq!(reader.rows.len(), 25);
+        reader.rows.push(foreign);
+        assert_eq!(assembled(reader.checkRows(false)), None);
+        assert_eq!(reader.rows.len(), 0);
+    }
+
+    /// The backtracking keeps the rows of its current path: a row it backs
+    /// out of leaves the path, and the row that completes the symbol is
+    /// returned through the pairs without joining it.
+    #[test]
+    fn a_row_backed_out_of_leaves_the_backtracking_path() {
+        let symbol = gtin_symbol();
+        let pairs: Vec<_> = (0..3).map(|i| decoded(symbol[i], i)).collect();
+        let mut misread = symbol[2];
+        misread.left += 1;
+        let mut reader = RSSExpandedReader::new();
+        reader.rows = vec![
+            ExpandedRow::new(pairs[..2].to_vec(), 1),
+            ExpandedRow::new(vec![decoded(misread, 2)], 2),
+            ExpandedRow::new(pairs[2..].to_vec(), 3),
+        ];
+        let mut path = Vec::new();
+        let found = reader.checkRowsDetails(&mut path, 0).ok();
+        assert_eq!(assembled(found), assembled(Some(pairs)));
+        let numbers: Vec<_> = path.iter().map(ExpandedRow::getRowNumber).collect();
+        assert_eq!(numbers, [1]);
+    }
+
+    /// Each stored row joins a stacked symbol at most once: a lone row whose
+    /// pair, doubled, would pass both the checksum and the A1 A2 sequence is
+    /// still no symbol.
+    #[test]
+    fn a_stored_row_never_completes_a_symbol_with_itself() {
+        let lone = ExpandedPair::new(
+            Some(DataCharacter::new(5, 5)),
+            Some(DataCharacter::new(9, 0)),
+            Some(FinderPattern::new(FINDER_PAT_A, [0, 15], 0, 15, 0)),
+        );
+        let mut reader = RSSExpandedReader::new();
+        reader.pairs = vec![lone.clone(), lone.clone()];
+        let doubled = RSSExpandedReader::isValidSequence(&reader.pairs, true);
+        assert_eq!((reader.checkChecksum(), doubled), (true, true));
+        reader.rows = vec![ExpandedRow::new(vec![lone], 1)];
+        assert_eq!(assembled(reader.checkRows(false)), None);
+        assert_eq!(assembled(reader.checkRows(true)), None);
+    }
+}

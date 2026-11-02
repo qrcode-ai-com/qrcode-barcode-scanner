@@ -1598,4 +1598,40 @@ mod tests {
         let back: ScanReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report, back);
     }
+
+    #[test]
+    fn two_saturations_keep_every_capacity_either_reached() {
+        // the alpha fallback folds its walk's saturation into the first
+        // walk's: a capacity either reached stays reached, flag by flag, and
+        // none is invented; `any` reads each flag
+        let none = Saturation::default();
+        let reads = Saturation {
+            reads: true,
+            ..none
+        };
+        let detections = Saturation {
+            detections: true,
+            ..none
+        };
+        let occurrences = Saturation {
+            occurrences: true,
+            ..none
+        };
+        for one in [reads, detections, occurrences] {
+            assert_eq!(Saturation::either(one, none), one, "{one:?} first");
+            assert_eq!(Saturation::either(none, one), one, "{one:?} second");
+            assert_eq!(Saturation::either(one, one), one, "{one:?} both");
+            assert!(one.any(), "{one:?}");
+        }
+        assert_eq!(Saturation::either(none, none), none);
+        assert!(!none.any());
+        assert_eq!(
+            Saturation::either(reads, Saturation::either(detections, occurrences)),
+            Saturation {
+                reads: true,
+                detections: true,
+                occurrences: true,
+            }
+        );
+    }
 }

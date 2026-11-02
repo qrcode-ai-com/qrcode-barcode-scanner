@@ -4095,4 +4095,127 @@ mod ladder_mutant_kills {
         assert!(run.store.settled());
         assert_eq!(run.confirmations.len(), 0);
     }
+
+    #[test]
+    #[cfg(feature = "engine-rxing")]
+    fn matrix_exclusion_whitens_the_covered_pixels_of_convex_regions_only() {
+        // an upright square (the port's usual corners) on a plane wider than
+        // high: exactly the pixels whose centres it covers, in rows of the
+        // plane's own width; regions past the plane's edges are clipped to
+        // it, and every region of the call applies. A concave or a flat
+        // outline is no symbol's and excludes nothing
+        let at = |pairs: [(f32, f32); 4]| pairs.map(|(x, y)| Point { x, y });
+        let original = LumaImage::new(vec![17; 7 * 5], 7, 5);
+        let upright = at([(1.0, 1.0), (5.0, 1.0), (5.0, 4.0), (1.0, 4.0)]);
+        #[rustfmt::skip]
+        let covered = [
+            17, 17, 17, 17, 17, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 17, 17, 17, 17, 17, 17,
+        ];
+        assert_eq!(
+            exclude_matrix_regions(&original, &[upright]).data(),
+            covered
+        );
+        let past_top_left = at([(-3.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-3.0, 2.0)]);
+        let past_bottom_right = at([(4.0, 2.0), (9.0, 2.0), (9.0, 8.0), (4.0, 8.0)]);
+        #[rustfmt::skip]
+        let clipped = [
+            255, 255, 17, 17, 17, 17, 17,
+            255, 255, 17, 17, 17, 17, 17,
+            17, 17, 17, 17, 255, 255, 255,
+            17, 17, 17, 17, 255, 255, 255,
+            17, 17, 17, 17, 255, 255, 255,
+        ];
+        let both = [past_top_left, past_bottom_right];
+        assert_eq!(exclude_matrix_regions(&original, &both).data(), clipped);
+        let concave = at([(0.0, 0.0), (4.0, 2.0), (0.0, 4.0), (1.0, 2.0)]);
+        let flat = at([(0.0, 0.0), (1.0, 1.0), (4.0, 4.0), (2.0, 2.0)]);
+        for region in [concave, flat] {
+            assert_eq!(exclude_matrix_regions(&original, &[region]), original);
+        }
+    }
+
+    // ---- Run::finish ----
+
+    #[test]
+    fn the_reads_saturate_when_a_read_was_dropped_or_the_walk_failed_closed() {
+        // (01-report § PipelineTrace) distinct reads past the walk's
+        // capacity, or refused streams past every record (the walk failed
+        // closed), leave reads unreconciled: what they held is unknown, not
+        // absent. Neither: not saturated
+        let cancel = CancelToken::new();
+        let saturation = |dropped: u32, closed: bool| {
+            let seed = Seed {
+                closed,
+                ..Seed::default()
+            };
+            let mut run = Run::new(&cancel, None, (8, 8), seed);
+            run.store.dropped = dropped;
+            let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
+            walked.trace.saturation
+        };
+        let reads = |reads| {
+            Some(Saturation {
+                reads,
+                detections: false,
+                occurrences: false,
+            })
+        };
+        assert_eq!(saturation(0, false), reads(false));
+        assert_eq!(saturation(1, false), reads(true));
+        assert_eq!(saturation(0, true), reads(true));
+        assert_eq!(saturation(3, true), reads(true));
+    }
+
+    #[test]
+    fn the_occurrences_saturate_past_sixteen_copies_whatever_the_footprints_kept() {
+        // (01-report § Occurrences) one content read at more places than it
+        // publishes occurrences (16) is flagged, and still flagged when its
+        // footprints also passed what one read keeps (128): either capacity
+        // leaves copies unknown. A single copy is complete
+        let cancel = CancelToken::new();
+        let plane = LumaImage::new(vec![255; 200 * 120], 200, 120);
+        let walk = |copies: u16| {
+            let mut run = fresh_run(&cancel, (200, 120));
+            let detections = (0..copies)
+                .map(|i| {
+                    // ten-pixel squares twelve pixels apart, sixteen a row
+                    let x = f32::from(i % 16) * 12.0 + 1.0;
+                    let y = f32::from(i / 16) * 12.0 + 1.0;
+                    let corners = vec![
+                        Point { x, y },
+                        Point { x: x + 10.0, y },
+                        Point {
+                            x: x + 10.0,
+                            y: y + 10.0,
+                        },
+                        Point { x, y: y + 10.0 },
+                    ];
+                    let mut hit = RawDetection::qr(
+                        b"copy",
+                        EciEvidence::NoEci,
+                        Fnc1::None,
+                        EngineKind::Rxing,
+                    );
+                    hit.footprint = Footprint::candidate(Kind::Quad, corners, EngineKind::Rxing);
+                    hit
+                })
+                .collect();
+            let outcome = engine::EngineOutcome {
+                detections,
+                ..engine::EngineOutcome::default()
+            };
+            run.collect_attempt(&plane, outcome, false);
+            let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
+            assert_eq!(walked.merged.len(), 1, "{copies} copies of one content");
+            let occurrences = walked.merged[0].occurrences.len();
+            (occurrences, walked.trace.saturation.map(|s| s.occurrences))
+        };
+        assert_eq!(walk(1), (1, Some(false)));
+        assert_eq!(walk(17), (16, Some(true)));
+        assert_eq!(walk(129), (16, Some(true)));
+    }
 }
