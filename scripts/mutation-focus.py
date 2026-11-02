@@ -62,7 +62,7 @@ def run(args):
     source = pathlib.Path(FILE).read_bytes()
     production, separator, _ = source.partition(b"#[cfg(test)]")
     require(bool(separator), "missing test-module boundary")
-    command = cargo + ["mutants", "-p", "qrcode-ai-scanner", "--in-place", "--cargo-arg=--locked",
+    command = cargo + ["mutants", "-p", "qrcode-barcode-scanner", "--in-place", "--cargo-arg=--locked",
                        "--test-tool", "nextest", "--timeout", "120", "--build-timeout", "900",
                        "--file", FILE, "-o", str(out)] + filters + [
                            "--", "--all-features", "--lib", "-E", "test(/^score::warp::tests::/)"

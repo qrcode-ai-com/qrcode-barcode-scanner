@@ -81,13 +81,13 @@ def main():
     if re.fullmatch(r"\d+\.\d+\.\d+", selected):
         assert release == selected, f"the consumer compiles with rustc {release}, not {selected}"
     archives = {}
-    for name in ("qrcode-ai-scanner", "qrcode-ai-scanner-cli"):
+    for name in ("qrcode-barcode-scanner", "qrcode-barcode-scanner-cli"):
         file = (args.archives / f"{name}-{args.version}.crate").resolve()
         archives[name] = {"path": str(file), "sha256": sha(file)}
         with tarfile.open(file) as archive:
             archive.extractall(consumer, filter="data")
-    core = consumer / f"qrcode-ai-scanner-{args.version}"
-    cli = consumer / f"qrcode-ai-scanner-cli-{args.version}"
+    core = consumer / f"qrcode-barcode-scanner-{args.version}"
+    cli = consumer / f"qrcode-barcode-scanner-cli-{args.version}"
     for root in (core, cli):
         package = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]
         assert package["version"] == args.version
@@ -106,10 +106,10 @@ def main():
     (app / "src").mkdir(parents=True)
     (app / "Cargo.toml").write_text(
         '[package]\nname = "packed-scanner-consumer"\nversion = "0.0.0"\nedition = "2024"\n'
-        'rust-version = "1.88"\n[dependencies]\nqrcode-ai-scanner = { path = '
+        'rust-version = "1.88"\n[dependencies]\nqrcode-barcode-scanner = { path = '
         + json.dumps(str(core)) + ', features = ["serde"] }\nserde_json = "1"\n'
         '[profile.release.package.rxing]\noverflow-checks = true\n', encoding="utf-8")
-    (app / "src/main.rs").write_text('''use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
+    (app / "src/main.rs").write_text('''use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut config = ScanProfile::Full.config();
@@ -175,7 +175,7 @@ fn main() {
     # The normalized CLI pins a core not yet live. Modify only this extracted
     # scratch copy; retain both original archive/lock hashes in the receipt.
     cli_lock = sha(cli / "Cargo.lock")
-    patch = 'patch.crates-io.qrcode-ai-scanner.path=' + json.dumps(str(core))
+    patch = 'patch.crates-io.qrcode-barcode-scanner.path=' + json.dumps(str(core))
     run(["cargo", "metadata", "--format-version", "1", "--config", patch], cli, env)
     run(["cargo", "install", "--path", str(cli), "--locked", "--root", str(consumer / "installed"),
          "--config", patch], consumer, env)

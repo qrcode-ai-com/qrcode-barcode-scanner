@@ -240,7 +240,7 @@ jobs:
         run: |
           ulimit -v 6291456
           status=0
-          cargo mutants -p qrcode-ai-scanner --in-place --cargo-arg=--locked --sharding round-robin --shard ${{ matrix.shard }}/128 --minimum-test-timeout 120 -- --all-features || status=$?
+          cargo mutants -p qrcode-barcode-scanner --in-place --cargo-arg=--locked --sharding round-robin --shard ${{ matrix.shard }}/128 --minimum-test-timeout 120 -- --all-features || status=$?
           echo "$status" > mutants-exit-code.txt
           case "$status" in
             0|2|3)

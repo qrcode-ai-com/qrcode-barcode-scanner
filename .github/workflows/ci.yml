@@ -55,9 +55,9 @@ jobs:
       # fired in Capabilities::current() without rxing).
       - name: clippy · the core with one engine (rqrr only, rxing only)
         run: |
-          cargo clippy -p qrcode-ai-scanner --locked --no-default-features \
+          cargo clippy -p qrcode-barcode-scanner --locked --no-default-features \
             --features engine-rqrr,serde --lib
-          cargo clippy -p qrcode-ai-scanner --locked --no-default-features \
+          cargo clippy -p qrcode-barcode-scanner --locked --no-default-features \
             --features engine-rxing,serde --lib
 
   test:
@@ -83,10 +83,10 @@ jobs:
       - name: capabilities · the core with one engine (rqrr only, rxing only)
         if: runner.os == 'Linux'
         run: |
-          cargo nextest run -p qrcode-ai-scanner --locked --no-default-features \
+          cargo nextest run -p qrcode-barcode-scanner --locked --no-default-features \
             --features engine-rqrr,serde --lib --test capabilities \
             -E 'binary(capabilities) | test(/^capabilities::/)'
-          cargo nextest run -p qrcode-ai-scanner --locked --no-default-features \
+          cargo nextest run -p qrcode-barcode-scanner --locked --no-default-features \
             --features engine-rxing,serde --test capabilities
 
   # MSRV floor — every manifest says rust-version 1.88 and jitpack.yml PINS
@@ -104,8 +104,8 @@ jobs:
       # a fresh re-resolution can pull a dep whose MSRV floor moved (image
       # 0.25.10 → 1.88 did exactly that) and fail the job for the wrong
       # reason. Lockfile drift then fails loudly here instead.
-      - run: cargo check -p qrcode-ai-scanner --all-features --locked
-      - run: cargo check -p qrcode-ai-scanner-cli --locked
+      - run: cargo check -p qrcode-barcode-scanner --all-features --locked
+      - run: cargo check -p qrcode-barcode-scanner-cli --locked
 
   wasm-shape:
     runs-on: ubuntu-24.04
@@ -120,7 +120,7 @@ jobs:
       # the wasm binding crate (phase C) owns that wiring; the core shape
       # check runs rqrr-only to pin "core compiles single-thread, no rayon".
       - run: >
-          cargo check -p qrcode-ai-scanner --locked
+          cargo check -p qrcode-barcode-scanner --locked
           --target wasm32-unknown-unknown
           --no-default-features --features engine-rqrr,serde
       # The PUBLISHED wasm crate was previously never built on PRs — breakage
@@ -167,7 +167,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/bindings-x86_64-unknown-linux-gnu
-          cp qrcode-ai-scanner.linux-x64-gnu.node artifacts/bindings-x86_64-unknown-linux-gnu/
+          cp qrcode-barcode-scanner.linux-x64-gnu.node artifacts/bindings-x86_64-unknown-linux-gnu/
           pnpm exec napi create-npm-dirs
           pnpm exec napi artifacts
           cp LICENSE npm/linux-x64-gnu/
