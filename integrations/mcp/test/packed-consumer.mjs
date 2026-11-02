@@ -32,7 +32,12 @@ assert.ok(white, "reuse the established public negative PNG fixture");
 writeFileSync(join(consumer, "white.png"), Buffer.from(white[1], "base64"));
 const installed = join(consumer, "node_modules/@supernovae-st/qrcode-ai-scanner-mcp");
 for (const file of ["LICENSE", "scan-report.schema.json", "src/cli.mjs", "src/server.mjs"]) assert.deepEqual(readFileSync(join(installed, file)), readFileSync(join(pkg, file)), `installed ${file} matches packed source bytes`);
-assert.deepEqual(readFileSync(join(installed, "scan-report.schema.json")), readFileSync(join(source, "spec/scan-report.schema.json")));
+// The schema resource is the pinned engine release's schema, not this
+// checkout's spec, which moves ahead of the published runtime between
+// releases. spec/scan-report.schema.json at v0.10.0 (2d3b577) and v0.10.1
+// (af44088) are this same file; move the hash with the engine pin below.
+const pinnedEngineSchemaSha256 = "2a9be74224ad120f239392c70ead224dae069ff76eade144c9b186e488a54094";
+assert.equal(createHash("sha256").update(readFileSync(join(installed, "scan-report.schema.json"))).digest("hex"), pinnedEngineSchemaSha256, "the packaged schema is the pinned engine release's schema");
 assert.deepEqual(readFileSync(join(installed, "LICENSE")), readFileSync(join(source, "LICENSE")));
 const locked = JSON.parse(readFileSync(join(consumer, "package-lock.json")));
 assert.equal(locked.packages["node_modules/@supernovae-st/qrcode-ai-scanner"].version, "0.10.0");
