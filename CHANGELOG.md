@@ -138,6 +138,22 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   (linux-x64-gnu) and WASM ones on Node 22 and 24 for every pull request.
   New fixtures: `symbology/upce.png`, `symbology/qr-twins-code128.png`,
   `symbology/qr-small-datamatrix.png` and `eci/eci4-eci26-equal-text.png`.
+- **Load and initialization phases** of the installed packages
+  (`scripts/loader-phases.mjs`), run by every packed Node consumer, each case
+  in a fresh process. Native: the main package installed without its
+  platform package throws `Cannot find native binding` at `require`, its
+  cause naming that package, with no WASI binding standing in; on one pool
+  thread, an aborted queued scan rejects with `AbortError` while an aborted
+  running scan resolves with its report. WASM: through the installed `./auto`
+  loader, each `ScannerInitError` code a Node realm can reach
+  (`invalid_options`, `asset_network_failed`, `asset_http_failed` with its
+  status, `asset_read_failed`, `binary_invalid`, `wasm_validation_failed`,
+  `wasm_instantiate_failed`, `wasm_unavailable`, `wasm_features_unsupported`)
+  in one attempt whose promise a second call shares, beside one load of the
+  installed bytes that scans. `loader_import_failed` and `wasm_compile_failed`
+  need a browser and are not claimed there. The Node API page states the
+  package's scope: encoded images through `scan`/`scanSync`, no raw-frame or
+  camera interface, a load failure distinct from `[QRS-xxx]` rejections.
 
 ### Changed
 

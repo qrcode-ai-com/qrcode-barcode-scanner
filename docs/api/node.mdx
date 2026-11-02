@@ -10,6 +10,19 @@ npm i @supernovae-st/qrcode-ai-scanner
 Prebuilt for macOS (arm64/x64), Linux (gnu+musl, arm64/x64), Windows
 (x64). Full TypeScript types included.
 
+The package reads encoded images (PNG/JPEG/WebP/GIF) through `scan` and
+`scanSync`. It has no raw-frame entry and no camera or overlay interface:
+those are the [browser package](/api/wasm)'s `scan_frame`, `/camera` and
+`/camera-overlay`.
+
+Each platform's addon is an optional dependency of the main package. When
+the host's addon is absent (an install with `--omit=optional`, or a
+platform without a prebuilt addon), `require` or `import` throws `Cannot
+find native binding`; its `cause` chain names the platform package it
+looked for, or the unsupported platform. That is a load failure, before
+any scan, with no WASI fallback; scan rejections carry `[QRS-xxx]` codes
+instead.
+
 ## API
 
 ```ts

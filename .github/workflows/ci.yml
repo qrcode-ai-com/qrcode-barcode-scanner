@@ -165,9 +165,10 @@ jobs:
   # supported Node majors, as npm-publish.yml consume-native and consume-wasm
   # run them at tag time: the tarballs the smoke jobs packed and read back,
   # installed offline outside the checkout, then the option table
-  # (scripts/option-domains.mjs) on every scan path. The judges' own
-  # planted-defect scenarios run first. The native rows start at the floor
-  # the package advertises (engines.node >= 18).
+  # (scripts/option-domains.mjs) on every scan path and the load,
+  # cancellation and initialization phases (scripts/loader-phases.mjs). The
+  # judges' own planted-defect scenarios run first. The native rows start at
+  # the floor the package advertises (engines.node >= 18).
   node-consumer:
     needs: node-smoke
     runs-on: ubuntu-24.04

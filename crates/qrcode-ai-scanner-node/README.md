@@ -31,6 +31,13 @@ if (report.detections.length) {
   `engines` and the `symbologies` they can return (not that an image decodes).
 - "No QR found" **resolves** with empty `detections`; rejections carry
   `[QRS-xxx]` codes (invalid input only).
+- Encoded images (PNG/JPEG/WebP/GIF) only: raw camera frames and the
+  camera/overlay modules belong to the wasm package below.
+- Each platform's addon is an optional dependency. When the host's addon is
+  absent (`--omit=optional`, or a platform without a prebuilt addon),
+  `require` throws `Cannot find native binding`, its `cause` naming the
+  package it looked for or the unsupported platform: a load failure, with
+  no WASI fallback, distinct from `[QRS-xxx]` rejections.
 - Full TypeScript contract in `index.d.ts` — the same versioned shape as the
   [core crate](https://crates.io/crates/qrcode-ai-scanner), CLI, and wasm package.
 

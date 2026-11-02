@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { identitiesDigest, identity, judge, load as loadTruth, stage, TRUTH } from "./consumer-truth.mjs";
+import { nativeCancellation, nativeLoadPhase, wasmLoaderPhases } from "./loader-phases.mjs";
 import { assertOptionDomains, pngSize } from "./option-domains.mjs";
 
 const [mode, archivesArg, fixtureArg, expectedVersion, suffix] = process.argv.slice(2);
@@ -50,7 +51,7 @@ const nodeDir = dirname(realpathSync(process.execPath));
 const npmCli = [join(nodeDir, "node_modules/npm/bin/npm-cli.js"),
   join(nodeDir, "../lib/node_modules/npm/bin/npm-cli.js")].find(existsSync);
 assert.ok(npmCli, "npm must be the CLI shipped with this Node runtime");
-for (const key of ["NODE_PATH", "NAPI_RS_NATIVE_LIBRARY_PATH"]) {
+for (const key of ["NODE_PATH", "NAPI_RS_NATIVE_LIBRARY_PATH", "NAPI_RS_FORCE_WASI"]) {
   assert.equal(process.env[key], undefined, `${key} would bypass the clean installation`);
 }
 execFileSync(process.execPath, [npmCli, "install", "--offline", "--ignore-scripts", "--omit=optional",
@@ -65,7 +66,7 @@ const bytes = readFileSync(fixture);
 const text = "https://qrcode-ai.com/c/v5q";
 const axes = ["resolution", "blur", "contrast", "perspective", "rotation", "lighting"];
 const white = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAXklEQVR4nO3PMQ0AMAzAsPInvYLYYVWKESTzjhsd8KsBrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BbQHKU9LC7/CP1AAAAABJRU5ErkJggg==", "base64");
-let qr, scan, full, loaded;
+let qr, scan, full, loaded, loaderPhases;
 if (mode === "native") {
   process.env.NAPI_RS_ENFORCE_VERSION_CHECK = "1";
   qr = require(name);
@@ -103,6 +104,9 @@ if (mode === "native") {
     writeFileSync(platformManifest, original);
     assert.deepEqual(readFileSync(platformManifest), original, "restore only the consumer manifest, byte for byte");
   }
+  // load and cancellation phases (loader-phases.mjs), each in a fresh process
+  loaderPhases = { load: nativeLoadPhase({ npmCli, mainTarball: main.path, name, platformName: selected[1].manifest.name }),
+    cancellation: nativeCancellation({ consumer, name }) };
 } else {
   assert.equal(typeof globalThis.window, "undefined", "this is a Node SSR import");
   qr = await import(pathToFileURL(imported));
@@ -116,6 +120,8 @@ if (mode === "native") {
   // (their domains: the option table below)
   const blank = new Uint8Array(16 * 16 * 4).fill(255);
   assert.throws(() => qr.scan_frame(blank, 16, 16, "full", 0, undefined, undefined, ["tilt"]), /unknown stress axis/);
+  // initialization phases of the installed ./auto loader (loader-phases.mjs)
+  loaderPhases = wasmLoaderPhases({ consumer, packageName: name, wasmPath: wasm, fixturePath: fixture, text });
 }
 // The option table (option-domains.mjs) through the installed API, on every
 // path a JavaScript number reaches the core by.
@@ -189,6 +195,7 @@ const receipt = { verdict: "PASS", mode, node: process.version, platform: proces
     identities_sha256: identitiesDigest(identities) },
   installed_tarballs: selected.map(({ path, sha256 }) => ({ path, sha256 })),
   platform_version_mismatch_refused: mode === "native" ? true : null,
+  loader_phases: loaderPhases,
   loaded: loaded.map((path) => ({ path, sha256: digest(path) })) };
 writeFileSync(join(consumer, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(JSON.stringify(receipt));
