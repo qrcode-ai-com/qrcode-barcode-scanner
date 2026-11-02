@@ -528,12 +528,13 @@ impl ReadStore {
     /// The read as it stands: `None` when withheld; rqrr's part removed when
     /// only that is withheld.
     fn standing(&self, read: &Read) -> Option<Read> {
-        if self.protected(read) {
-            return Some(read.clone());
-        }
-        if self
-            .closed
-            .is_some_and(|closed| read.last_attempt <= closed)
+        // a parse of its content protects the read from being withheld, not
+        // its refused copies (below)
+        let protected = self.protected(read);
+        if !protected
+            && self
+                .closed
+                .is_some_and(|closed| read.last_attempt <= closed)
             && read.symbology == Symbology::QrCode
             && !read.parsed
         {
@@ -547,11 +548,13 @@ impl ReadStore {
             )
         };
         let mut rqrr_withheld = false;
-        for refusal in refusals() {
-            match cover(refusal, read) {
-                Cover::Whole => return None,
-                Cover::Rqrr => rqrr_withheld = true,
-                Cover::Nothing => {}
+        if !protected {
+            for refusal in refusals() {
+                match cover(refusal, read) {
+                    Cover::Whole => return None,
+                    Cover::Rqrr => rqrr_withheld = true,
+                    Cover::Nothing => {}
+                }
             }
         }
         let mut read = read.clone();
@@ -560,9 +563,9 @@ impl ReadStore {
                 .retain(|(engine, _)| *engine != EngineKind::Rqrr);
             read.rank = read.engines.iter().map(|(_, rank)| *rank).min()?;
         }
-        // an unparsed QR Code read standing by its other places publishes
-        // no copy where a placed refusal of its content holds: that copy's
-        // stream was proved malformed
+        // an unparsed QR Code read standing by its other places, or on a
+        // parse made elsewhere, publishes no copy where a placed refusal of
+        // its content holds: that copy's stream was proved malformed
         if read.symbology == Symbology::QrCode && !read.parsed {
             let holding: Vec<&Refused> = refusals()
                 .filter(|refused| refused.places.is_some() && refused.names_content(&read))
@@ -2530,6 +2533,45 @@ mod tests {
             detection.observations,
             [seen_at(R.unwrap(), 0, Rqrr), seen_at(L.unwrap(), 1, Rqrr)]
         );
+    }
+
+    #[test]
+    fn a_read_standing_on_a_parse_elsewhere_publishes_no_refused_copy() {
+        // the scanner parsed the content at L and refused the stream at R
+        // under the port's account of it: rxing's read at R stands on that
+        // parse, yet its copy at R is not one of its occurrences
+        let refused = Refusal {
+            port: Some(key(b"abc", NoEci, Fnc1::None)),
+            rqrr: None,
+            place: R.map(square_at),
+        };
+        let mut at_r = read(0, b"abc", NoEci, X, R);
+        at_r.observations.push(seen_at(R.unwrap(), 0, Rxing));
+        let mut at_l = parsed(read(1, b"abc", NoEci, Q, L));
+        at_l.observations.push(seen_at(L.unwrap(), 1, Rqrr));
+        let store = store([at_r.clone(), at_l], std::slice::from_ref(&refused));
+        let [detection] = &store.reconcile()[..] else {
+            panic!("{:?}", store.reconcile());
+        };
+        assert_eq!(detection.engines, [Rxing, Rqrr]);
+        assert_eq!(detection.observations, [seen_at(L.unwrap(), 1, Rqrr)]);
+        // the other walk's parse (the alpha seed) protects it the same way:
+        // a read made at R and L stands, without its copy at R
+        let mut seeded = ReadStore::seeded(Seed {
+            refusals: vec![refused],
+            protection: vec![(Symbology::QrCode, key(b"abc", NoEci, Fnc1::None))],
+            ..Seed::default()
+        });
+        let mut at_l = read(2, b"abc", NoEci, X, L);
+        at_l.observations.push(seen_at(L.unwrap(), 2, Rxing));
+        let mut twice = at_r;
+        twice.fold(at_l);
+        seeded.collect(twice);
+        let [detection] = &seeded.reconcile()[..] else {
+            panic!("{:?}", seeded.reconcile());
+        };
+        assert_eq!(detection.engines, [Rxing]);
+        assert_eq!(detection.observations, [seen_at(L.unwrap(), 2, Rxing)]);
     }
 
     #[test]
