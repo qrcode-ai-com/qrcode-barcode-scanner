@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  Development-only capture page (10.2); never shipped. It records each report the
+  tracker receives (salted digests, no pixels, no payloads) and offers a JSONL v1 download for
+  replay/run.mjs --input.
+
+  Serve the crate directory over HTTP(S) and open /replay/capture.html. The import map points at
+  the built package in ../pkg/; to test an installed package, point it at its directory under
+  node_modules instead. A phone needs an HTTPS origin: which one to use (a LAN server with a
+  locally trusted certificate, or a preview deployment) is an open decision for the owner.
+  The camera starts only from the Start button. Decoding runs on the main thread here; product
+  integrations should use a worker.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replay capture (development only)</title>
+<script type="importmap">
+{
+  "imports": {
+    "@supernovae-st/qrcode-ai-scanner-wasm/auto": "../pkg/auto.js",
+    "@supernovae-st/qrcode-ai-scanner-wasm/camera": "../pkg/camera.js",
+    "@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay": "../pkg/camera-overlay.js"
+  }
+}
+</script>
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; margin: 0; padding: 12px; background: #111;
+    color: #eee; }
+  #stage { position: relative; max-width: 960px; background: #000; }
+  #stage video { display: block; width: 100%; height: auto; object-fit: contain;
+    object-position: center; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  button { font: inherit; padding: 8px 12px; }
+  button[aria-pressed='true'] { outline: 3px solid #4cc2ff; }
+  input { font: inherit; padding: 6px; width: 18em; }
+</style>
+</head>
+<body>
+<main>
+  <div id="stage"><video id="video" playsinline muted></video></div>
+  <div id="rail"></div>
+  <p><label>Device label <input id="device" placeholder="phone model and browser"></label></p>
+  <div class="controls">
+    <button id="start" type="button">Start camera</button>
+    <button id="stop" type="button" disabled>Stop</button>
+    <button type="button" data-span="static" aria-pressed="false">Static span</button>
+    <button type="button" data-span="motion" aria-pressed="false">Motion span</button>
+    <button type="button" data-span="" aria-pressed="true">No span</button>
+    <button id="download" type="button" disabled>Download JSONL</button>
+  </div>
+  <p id="status" role="status" aria-live="polite">Idle. Nothing is recorded before Start.</p>
+</main>
+<script type="module">
+import { loadScanner } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import { createCameraScanner, createDetectionTracker }
+  from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+import { createCameraOverlay } from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+import { createRecorder } from './recorder.js';
+
+const $ = id => document.getElementById(id);
+const video = $('video'), stage = $('stage'), status = $('status');
+const spanButtons = [...document.querySelectorAll('[data-span]')];
+let recorder = null, camera = null, overlay = null, tracker = null, frames = 0, scanner = null;
+
+const say = text => { status.textContent = text; };
+const showSpan = span => spanButtons.forEach(b => b.setAttribute('aria-pressed',
+  String(b.dataset.span === (span || ''))));
+
+// One loaded scanner for the whole page; the controller sends one frame at a time.
+async function scanFrame(rgba, width, height) {
+  scanner = scanner || await loadScanner();
+  return scanner.scan_frame(new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+    width, height);
+}
+
+$('start').addEventListener('click', async () => {
+  $('start').disabled = true;
+  const scene = `capture-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+  recorder = createRecorder({ scene, device: $('device').value.trim() || null });
+  recorder.mark(null);
+  showSpan(null);
+  frames = 0;
+  // A tracker left from a failed start would keep its timer: destroy it before the new one.
+  if (tracker) tracker.destroy();
+  if (overlay) overlay.destroy();
+  overlay = createCameraOverlay({ video, container: stage, mount: { rail: $('rail') } });
+  tracker = recorder.track(createDetectionTracker, { onChange(snapshot) {
+    overlay.update(snapshot);
+    if (snapshot.status === 'updated' || snapshot.status === 'content_only') {
+      frames++;
+      say(`Recording ${scene}: ${frames} frames, span ${recorder.span || 'none'}.`);
+    }
+  } });
+  camera = createCameraScanner({ video, scanFrame, tracker,
+    onError: error => say(`Camera error: ${error.code || error.name}: ${error.message}`),
+    onState: change => { if (change.state !== 'running') say(`Camera ${change.state}.`); } });
+  try {
+    await camera.start();
+    $('stop').disabled = false;
+    $('download').disabled = false;
+  } catch (error) {
+    say(`Could not start: ${error.code || error.name}: ${error.message}`);
+    $('start').disabled = false;
+  }
+});
+
+$('stop').addEventListener('click', () => {
+  if (camera) camera.stop();
+  // stop() resets the tracker, which stays armed for result presence: its timer would send
+  // this session's snapshots to the next session's overlay.
+  if (tracker) tracker.destroy();
+  tracker = null;
+  $('stop').disabled = true;
+  $('start').disabled = false;
+  say(`Stopped after ${frames} frames. Download keeps this session until the next Start.`);
+});
+
+for (const button of spanButtons) {
+  button.addEventListener('click', () => {
+    if (!recorder) return;
+    recorder.mark(button.dataset.span || null);
+    showSpan(recorder.span);
+  });
+}
+
+$('download').addEventListener('click', () => {
+  if (recorder) recorder.download();
+});
+</script>
+</body>
+</html>
