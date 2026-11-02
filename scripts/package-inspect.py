@@ -23,7 +23,7 @@ workspace version, no credential.
   package-inspect.py wasm [--no-build]         the wasm npm tarball (builds pkg/ first)
   package-inspect.py python                    wheel + sdist through maturin
   package-inspect.py flutter --package-root D the staged pub.dev package
-  package-inspect.py archive FILE...           already-built .crate · .tgz · .whl · .tar.gz
+  package-inspect.py archive FILE...           already-built .crate · .tgz · .whl · .tar.gz · CLI release files
   package-inspect.py pypi-live FILE...         wheels + sdist against what PyPI already serves at this version
   package-inspect.py licenses [--sync]         every LICENSE copy against the root text
   package-inspect.py profiles [--nightly TC]   effective release profile per build root
@@ -41,6 +41,20 @@ matrix and one sdist) · --record FILE (archive: once nothing failed, one
 `<sha256>  <file>` line per archive given, in sha256sum's format, so a later
 step can prove it holds the very bytes inspected; removed when anything
 failed; flutter records each published file instead).
+
+CLI release files (archive): qrcode-ai-scanner-cli-<version>-<triple>.tar.gz
+(.zip for Windows), the -source.tar.gz git archive and the -SHA256SUMS over
+them. Each archive holds exactly one top directory of license copies, the
+generated SOURCE.md, THIRD-PARTY-LICENSES.txt and build-info.json, and qrscan,
+in the one writer's layout (bytewise order, owner 0, the build's time, modes by
+policy); build-info is held to the checkout's Cargo.lock, release profile and
+toolchain pin, and no text member may name a build host. They need --commit ID
+(the full commit they were built from); the source archive also --source-tree
+DIR (a checkout holding that commit), whose git tree it must match file for
+file. --tag T, --sums-sha256 H (SHA256SUMS must hash to H) and --forbid S (a
+string no text member may hold, never echoed; repeatable) are optional.
+--release-set: the five archives, the source archive and SHA256SUMS, from one
+commit and toolchain, and nothing else.
 
 Verdicts: PASS · FAIL · UNAVAILABLE (a tool or input this host lacks, named,
 never a pass) · BLOCKED (a known structural blocker that packaging metadata
@@ -70,7 +84,9 @@ import tarfile
 import tempfile
 import urllib.error
 import urllib.request
+import warnings
 import zipfile
+import zlib
 
 try:
     import tomllib
@@ -324,15 +340,16 @@ _TAR_KINDS = {tarfile.SYMTYPE: "symlink", tarfile.LNKTYPE: "hard link", tarfile.
               tarfile.BLKTYPE: "block device", tarfile.FIFOTYPE: "FIFO"}
 
 
-def _tar_anomalies(path: pathlib.Path, members: list) -> list:
+def _tar_anomalies(path: pathlib.Path, members: list, raw: bytes = None) -> list:
     """Ways the archive's bytes differ from the single clean tar stream npm's
     node-tar (the consumer's extractor, and `npm publish <tgz>`'s manifest read)
     reads past but Python's default tarfile parse does not: a member that only a
     lenient (ignore_zeros) parse lists — after an all-zero block or a
     bad-checksum block, both of which stop the default parse — any non-NUL byte
     after the last member's data, and a duplicate member name (last wins for
-    both readers, but it is never legitimate here)."""
-    raw = path.read_bytes()
+    both readers, but it is never legitimate here). RAW: the tar already
+    unpacked from PATH (CLI files read their one gzip member themselves)."""
+    raw = path.read_bytes() if raw is None else raw
     if raw[:2] == b"\x1f\x8b":
         raw = gzip.decompress(raw)
     problems = []
@@ -767,12 +784,16 @@ def check_pypi_release_set(host: Host) -> None:
 def check_release_set(host: Host) -> None:
     """--release-set: the set about to publish is complete and holds nothing else."""
     kinds = {a.kind for a in host.artifacts}
+    if kinds & CLI_KINDS:  # one release set per run: the CLI set refuses npm or Python files beside it
+        check_cli_release_set(host)
+        return
     if "npm" in kinds:
         check_npm_release_set(host)
     if kinds & {"wheel", "sdist"}:
         check_pypi_release_set(host)
     if not kinds & {"npm", "wheel", "sdist"}:
-        host.add(Artifact("release set", "archive")).check("npm or Python archives given", False, ", ".join(kinds))
+        host.add(Artifact("release set", "archive")).check("npm, Python or CLI release files given", False,
+                                                           ", ".join(kinds))
 
 
 def check_npm_release_set(host: Host) -> None:
@@ -1501,6 +1522,896 @@ def cmd_profiles(host: Host) -> None:
         art.check("root units at opt-level 3", all(str(u["profile"].get("opt_level")) == "3" for u in root_units))
 
 
+# ---------------------------------------------------------------- CLI release files
+
+# What a v* release carries for the command line: one prebuilt qrscan archive
+# per target, a git archive of the same commit (the corresponding source) and
+# one SHA256SUMS over those six. Each file is judged as given; nothing here
+# builds, signs or uploads.
+CLI_PACKAGE = "qrcode-ai-scanner-cli"
+CLI_TARGETS = {  # triple: archive extension
+    "x86_64-unknown-linux-gnu": "tar.gz",
+    "aarch64-unknown-linux-gnu": "tar.gz",
+    "x86_64-apple-darwin": "tar.gz",
+    "aarch64-apple-darwin": "tar.gz",
+    "x86_64-pc-windows-msvc": "zip",
+}
+CLI_KINDS = frozenset({"cli", "cli-source", "cli-sums"})
+CLI_ARCHIVE = re.compile(r"qrcode-ai-scanner-cli-(?P<version>[^-]+)-(?P<triple>.+?)\.(?P<ext>tar\.gz|zip)")
+CLI_SOURCE = re.compile(r"qrcode-ai-scanner-cli-(?P<version>.+)-source\.tar\.gz")
+CLI_SUMS = re.compile(r"qrcode-ai-scanner-cli-(?P<version>.+)-SHA256SUMS")
+CLI_SUMS_LINE = re.compile(r"(?P<sha256>[0-9a-f]{64})  (?P<name>[^\s/\\]+)")
+FULL_COMMIT = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+# The members below each archive's one top directory, which is named like the
+# archive: tracked files copied verbatim, then what assembly generates.
+CLI_COPIES = {
+    "LICENSE": "LICENSE",
+    "LICENSE-APACHE-2.0": "crates/qrcode-ai-scanner/LICENSE-APACHE-2.0",
+    "LICENSING.md": "LICENSING.md",
+    "README.md": "distribution/cli/README.md",
+    "THIRD-PARTY.md": "crates/qrcode-ai-scanner/THIRD-PARTY.md",
+}
+CLI_GENERATED = ("COPYRIGHT-rust-std.html", "SOURCE.md", "THIRD-PARTY-LICENSES.txt", "build-info.json")
+# Build-host paths and a plan directory, which no text member may hold (ASCII
+# case ignored). Private markers never appear here: they arrive at run time
+# through --forbid.
+CLI_LEAKS = ("/home/runner", "/Users/runner", "runneradmin", "D:\\a\\", "/__w/", "/home/", "/Users/", "C:\\Users\\",
+             "/private/var/folders/", "plans/")
+CLI_BUILD_INFO = "qrscan-build-info/1"
+BUILD_INFO_KEYS = {  # "" is the top level
+    "": frozenset({"schema", "name", "package", "version", "target", "source", "toolchain", "linker", "profile",
+                   "rustflags", "command", "deployment_target", "builder", "binary", "dependencies",
+                   "build_dependencies"}),
+    "source": frozenset({"repository", "ref", "tag", "commit", "source_date_epoch", "cargo_lock_sha256", "dirty"}),
+    "toolchain": frozenset({"rustc", "cargo", "std_notice_sha256"}),
+    "builder": frozenset({"runner_os", "runner_arch", "image_os", "image_version", "workflow_run"}),
+    "binary": frozenset({"path", "sha256", "size"}),
+}
+DEPENDENCY_KEYS = frozenset({"name", "version", "source", "checksum", "license"})
+# In every linked inventory: an inventory read wrong cannot pass empty.
+CLI_ANCHORS = ("clap", "image", "rqrr", "rxing", "serde_json")
+# build-info names each --remap-path-prefix source by placeholder, never by
+# the build host's path; the row flags follow.
+CLI_PLACEHOLDERS = ("<cargo-home>", "<checkout>", "<target-dir>")
+CLI_ROW_FLAGS = {"x86_64-unknown-linux-gnu": ["-Clinker-features=-lld"],
+                 "x86_64-pc-windows-msvc": ["-Ctarget-feature=+crt-static"]}
+CLI_DEPLOYMENT_TARGETS = {"x86_64-apple-darwin": "10.15", "aarch64-apple-darwin": "11.0"}
+CLI_UNWINDERS = ("zig-libunwind", "libgcc_s")
+THIRD_PARTY_FIELDS = (("license", r".+"), ("source", r"\S+"), ("checksum", r"[0-9a-f]{64}"),
+                      ("texts", r"[0-9a-f]{64}(?: [0-9a-f]{64})*"))
+THIRD_PARTY_TEXT = re.compile(r"--- text (?P<sha256>[0-9a-f]{64}) (?P<size>\d+) bytes ---")
+
+
+def cli_kind(name: str):
+    """The CLI release kind a file name claims (its grammar is judged later), or None."""
+    if not name.startswith(CLI_PACKAGE + "-"):
+        return None
+    if name.endswith("-SHA256SUMS"):
+        return "cli-sums"
+    if name.endswith("-source.tar.gz"):
+        return "cli-source"
+    return "cli" if name.endswith((".tar.gz", ".zip")) else None
+
+
+def cli_usage(args) -> str:
+    """Why the CLI options do not fit the files given (a usage error), or ''."""
+    kinds = {cli_kind(pathlib.Path(name).name) for name in args.files} - {None}
+    options = {"--commit": args.commit, "--sums-sha256": args.sums_sha256, "--source-tree": args.source_tree,
+               "--forbid": args.forbid}
+    if not kinds:
+        given = [flag for flag, value in options.items() if value is not None]
+        return f"{', '.join(given)}: only with CLI release files" if given else ""
+    if args.commit is None or not FULL_COMMIT.fullmatch(args.commit):
+        return f"CLI release files need --commit, a full lowercase commit id (got {args.commit!r})"
+    if "cli-source" in kinds and args.source_tree is None:
+        return "the source archive needs --source-tree, a checkout of --commit"
+    if args.sums_sha256 is not None and not re.fullmatch(r"[0-9a-f]{64}", args.sums_sha256):
+        return f"--sums-sha256 {args.sums_sha256!r} is not 64 lowercase hex"
+    if args.sums_sha256 is not None and "cli-sums" not in kinds:
+        return "--sums-sha256 needs the SHA256SUMS file among the files"
+    if any(not value.strip() for value in args.forbid or []):
+        return "--forbid needs a non-blank string"
+    return ""
+
+
+def obj(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+@functools.cache
+def lock_packages() -> dict:
+    """{(name, version): package} of the workspace Cargo.lock."""
+    lock = tomllib.loads((ROOT / "Cargo.lock").read_text())
+    return {(package.get("name"), package.get("version")): package for package in lock.get("package", [])}
+
+
+def workspace_repository():
+    return root_manifest()["workspace"]["package"].get("repository")
+
+
+@functools.cache
+def rust_pin():
+    """The one RUST_TOOLCHAIN, from ci.yml's top-level env (the publish guard holds every workflow to it)."""
+    found = re.search(r'^  RUST_TOOLCHAIN:\s*"?(\d+\.\d+\.\d+)"?\s*$',
+                      (ROOT / ".github" / "workflows" / "ci.yml").read_text(), re.MULTILINE)
+    return found.group(1) if found else None
+
+
+@functools.cache
+def root_manifest() -> dict:
+    """The root Cargo.toml, parsed once (never changed by a caller)."""
+    return tomllib.loads((ROOT / "Cargo.toml").read_text())
+
+
+def cli_profile() -> dict:
+    """The release profile build-info records: the root manifest's, cargo's defaults elsewhere (a fresh dict:
+    callers may change it)."""
+    release = root_manifest().get("profile", {}).get("release", {})
+    return {"opt_level": str(release.get("opt-level", 3)), "lto": release.get("lto", False),
+            "codegen_units": release.get("codegen-units", 16), "strip": release.get("strip", False),
+            "panic": release.get("panic", "unwind"),
+            "overflow_checks": {name: package["overflow-checks"] for name, package in
+                                sorted(release.get("package", {}).items()) if "overflow-checks" in package}}
+
+
+@functools.cache
+def deny_allowed() -> frozenset:
+    """deny.toml's license allow list, each entry with single spaces."""
+    allow = tomllib.loads((ROOT / "deny.toml").read_text()).get("licenses", {}).get("allow", [])
+    return frozenset(" ".join(entry.split()) for entry in allow)
+
+
+def dos_time(epoch: int) -> tuple:
+    """A zip entry's date_time for EPOCH: UTC, seconds rounded down to even."""
+    moment = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc)
+    return (moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second - moment.second % 2)
+
+
+def spdx_allowed(expression: str, allowed: frozenset) -> bool:
+    """Whether some choice in EXPRESSION (OR, AND, WITH, parentheses, legacy `/` for OR) needs only ALLOWED
+    licenses, each `ID` or `ID WITH EXCEPTION` exactly; ValueError when it does not parse."""
+    tokens = re.findall(r"[()/]|[^\s()/]+", expression)
+    pos = 0
+
+    def peek(*words: str) -> bool:
+        return pos < len(tokens) and (tokens[pos] in words or tokens[pos].upper() in words)
+
+    def take() -> str:
+        nonlocal pos
+        if pos >= len(tokens):
+            raise ValueError(f"{expression!r} ends early")
+        pos += 1
+        return tokens[pos - 1]
+
+    def simple() -> bool:
+        token = take()
+        if token == "(":
+            value = either()
+            if take() != ")":
+                raise ValueError(f"unbalanced parentheses in {expression!r}")
+            return value
+        if token in ("(", ")", "/") or token.upper() in ("OR", "AND", "WITH"):
+            raise ValueError(f"a license expected at {token!r} in {expression!r}")
+        if peek("WITH"):
+            take()
+            exception = take()
+            if exception in ("(", ")", "/") or exception.upper() in ("OR", "AND", "WITH"):
+                raise ValueError(f"an exception expected at {exception!r} in {expression!r}")
+            return f"{token} WITH {exception}" in allowed
+        return token in allowed
+
+    def both() -> bool:
+        values = [simple()]
+        while peek("AND"):
+            take()
+            values.append(simple())
+        return all(values)
+
+    def either() -> bool:
+        values = [both()]
+        while peek("OR", "/"):
+            take()
+            values.append(both())
+        return any(values)
+
+    value = either()
+    if pos != len(tokens):
+        raise ValueError(f"unexpected {tokens[pos]!r} in {expression!r}")
+    return value
+
+
+def gunzip(raw: bytes) -> tuple:
+    """(the data of RAW's first gzip member, how the stream differs from the one writer's: header flags 0 (no
+    FNAME, FEXTRA, FCOMMENT or FHCRC), mtime 0, OS byte 255, nothing after the member). ValueError or
+    zlib.error when RAW is no complete gzip stream."""
+    if raw[:3] != b"\x1f\x8b\x08":
+        raise ValueError("not a gzip (deflate) stream")
+    problems = []
+    if raw[3] & 0x08:
+        problems.append("gzip FNAME set (a file name in the header)")
+    if raw[3] & 0xF7:
+        problems.append(f"gzip flags {raw[3] & 0xF7:#04x} set (FTEXT, FHCRC, FEXTRA or FCOMMENT)")
+    if int.from_bytes(raw[4:8], "little"):
+        problems.append(f"gzip mtime {int.from_bytes(raw[4:8], 'little')}, not 0")
+    if raw[9] != 255:
+        problems.append(f"gzip OS byte {raw[9]}, not 255")
+    stream = zlib.decompressobj(wbits=31)
+    data = stream.decompress(raw) + stream.flush()
+    if not stream.eof:
+        raise ValueError("the gzip stream is cut short")
+    if stream.unused_data:
+        problems.append(f"{len(stream.unused_data)} byte(s) after the gzip member")
+    return data, problems
+
+
+def ustar_problems(raw: bytes, members: list, global_headers: dict) -> list:
+    """How the tar stream RAW differs from plain POSIX ustar: a pax global or per-member header, a GNU header
+    or magic, or a member type other than a regular file or a directory."""
+    problems = [f"a pax global header ({', '.join(sorted(global_headers))})"] if global_headers else []
+    end = 0
+    for member in members:
+        block = raw[member.offset:member.offset + 512]
+        if member.offset != end or member.offset_data != member.offset + 512:
+            problems.append(f"{member.name}: an extended (pax or GNU) header before it")
+        if block[257:265] != b"ustar\x0000":
+            problems.append(f"{member.name}: magic {bytes(block[257:265])!r}, not POSIX ustar")
+        if block[156:157] not in (b"0", b"5"):
+            problems.append(f"{member.name}: header type {bytes(block[156:157])!r}")
+        end = member.offset_data + member.size + (-member.size % 512)
+    return problems
+
+
+def read_cli_tar(path: pathlib.Path) -> tuple:
+    """A CLI .tar.gz → (TarInfo list, {name: bytes} of regular files, the tar bytes, gzip problems, pax
+    global headers)."""
+    tar, problems = gunzip(path.read_bytes())
+    with tarfile.open(fileobj=io.BytesIO(tar)) as archive:
+        members = archive.getmembers()
+        files = {m.name: archive.extractfile(m).read() for m in members if m.isfile()}
+        global_headers = dict(archive.pax_headers)
+    return members, files, tar, problems, global_headers
+
+
+def read_cli_zip(path: pathlib.Path) -> tuple:
+    """A CLI .zip → (ZipInfo list, {name: bytes} of the files it can read, problems): one clean stream of
+    stored or deflated entries, each local header where the central directory says, no byte between them."""
+    raw, problems, files = path.read_bytes(), [], {}
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        infos = archive.infolist()
+        names = [info.orig_filename for info in infos]
+        problems += [f"{name}: a duplicate entry" for name in sorted({n for n in names if names.count(n) > 1})]
+        if archive.comment:
+            problems.append("an archive comment")
+        end = 0
+        for info in sorted(infos, key=lambda i: i.header_offset):
+            name, kind = info.orig_filename, (info.external_attr >> 16) & 0o170000
+            problems += [f"{name!r}: {why}" for bad, why in (
+                ("\\" in name, "a backslash"), ("\0" in name, "a NUL byte"),
+                (name.startswith("/") or re.match(r"[A-Za-z]:", name) is not None, "an absolute name"),
+                (".." in name.split("/"), "a `..` component"), (kind == 0o120000, "a symlink"),
+                (info.flag_bits & 0x1, "encrypted"), (info.flag_bits & 0x8, "a data descriptor"),
+                (info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED),
+                 f"compression {info.compress_type} (stored or deflate only)"),
+                (info.extra, "an extra field"), (info.comment, "an entry comment")) if bad]
+            local = raw[info.header_offset:info.header_offset + 30]
+            encoded = name.encode("utf-8" if info.flag_bits & 0x800 else "cp437")
+            name_size, extra_size = int.from_bytes(local[26:28], "little"), int.from_bytes(local[28:30], "little")
+            if local[:4] != b"PK\x03\x04" or raw[info.header_offset + 30:][:name_size] != encoded:
+                problems.append(f"{name!r}: no matching local header at its offset")
+            if extra_size:
+                problems.append(f"{name!r}: a local extra field")
+            if info.header_offset != end:
+                problems.append(f"{name!r}: {info.header_offset - end:+d} byte(s) before its local header")
+            end = info.header_offset + 30 + name_size + extra_size + info.compress_size
+            if not info.is_dir() and not info.flag_bits & 0x1 and \
+                    info.compress_type in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                files[info.filename] = archive.read(info)
+        if archive.start_dir != end:
+            problems.append(f"{archive.start_dir - end:+d} byte(s) between the last entry and the central directory")
+    if raw[-22:-18] != b"PK\x05\x06":
+        problems.append("data after the end-of-central-directory record")
+    return infos, files, problems
+
+
+def cli_headers(entries: list, zipped: bool, stem: str, binary: str, epoch) -> tuple:
+    """(owner and time problems, mode problems) of a CLI archive's entries: uid/gid 0 and no user or group
+    name (tar) or create_system 3 (zip), times from EPOCH, modes by policy rather than from any filesystem."""
+    owner, modes = [], []
+    for entry in entries:
+        name = entry.orig_filename if zipped else entry.name + ("/" if entry.isdir() else "")
+        directory = name.endswith("/")
+        want = 0o755 if directory or name == f"{stem}/{binary}" else 0o644
+        if zipped:
+            want |= 0o040000 if directory else 0o100000
+            if entry.create_system != 3:
+                owner.append(f"{name}: create_system {entry.create_system}")
+            if type(epoch) is not int or entry.date_time != dos_time(epoch):
+                owner.append(f"{name}: time {entry.date_time}")
+            mode = entry.external_attr >> 16
+        else:
+            if (entry.uid, entry.gid) != (0, 0):
+                owner.append(f"{name}: uid/gid {entry.uid}/{entry.gid}")
+            if entry.uname or entry.gname:
+                owner.append(f"{name}: uname {entry.uname!r}, gname {entry.gname!r}")
+            if entry.mtime != epoch:
+                owner.append(f"{name}: mtime {entry.mtime}")
+            mode = entry.mode
+        if mode != want:
+            modes.append(f"{name}: mode {mode:o}, want {want:o}")
+    return owner, modes
+
+
+def check_cli_build_info(host: Host, art: Artifact, data, triple: str, binary: str, program) -> dict:
+    """build-info.json against the archive, the options and the checkout; returns it ({} when unreadable)."""
+    try:
+        info = json.loads(data)
+    except (TypeError, ValueError) as err:
+        art.check("build-info.json reads as a JSON object", False, "absent" if data is None else str(err))
+        return {}
+    if not art.check("build-info.json reads as a JSON object", isinstance(info, dict), type(info).__name__):
+        return {}
+    shape = [] if info.get("schema") == CLI_BUILD_INFO else [f"schema {info.get('schema')!r}"]
+    for where, want in BUILD_INFO_KEYS.items():
+        value = info.get(where) if where else info
+        if not isinstance(value, dict):
+            shape.append(f"{where} is not an object")
+            continue
+        shape += [f"unexpected key {where}{'.' if where else ''}{key}" for key in sorted(set(value) - want)]
+        shape += [f"missing key {where}{'.' if where else ''}{key}" for key in sorted(want - set(value))]
+    if not {"kind", "unwinder"} <= set(obj(info.get("linker"))):
+        shape.append("linker is no object with kind and unwinder")
+    for label in ("dependencies", "build_dependencies"):
+        entries = info.get(label)
+        shape += [f"{label} is not a list"] if not isinstance(entries, list) else [
+            f"{label}[{i}] keys {sorted(entry) if isinstance(entry, dict) else type(entry).__name__}"
+            for i, entry in enumerate(entries) if not isinstance(entry, dict) or set(entry) != DEPENDENCY_KEYS]
+    for label in ("rustflags", "command", "toolchain.rustc"):
+        value = obj(info.get("toolchain")).get("rustc") if label == "toolchain.rustc" else info.get(label)
+        if not isinstance(value, list) or not value or not all(isinstance(item, str) for item in value):
+            shape.append(f"{label} is no list of strings")
+    art.check(f"build-info.json: schema {CLI_BUILD_INFO}, exactly its keys", not shape, "; ".join(shape))
+    named = {"name": "qrscan", "package": CLI_PACKAGE, "version": host.version, "target": triple}
+    off = [f"{key} {info.get(key)!r}, want {value!r}" for key, value in named.items() if info.get(key) != value]
+    art.check("build-info names this archive: qrscan, its package, version and target", not off, "; ".join(off))
+    source = obj(info.get("source"))
+    art.check("build-info source.commit = --commit", source.get("commit") == host.args.commit,
+              f"source.commit {source.get('commit')!r}")
+    tag = source.get("tag")
+    if host.args.tag:
+        release_tag = host.args.tag.removeprefix("refs/tags/")
+        art.check(f"build-info source.tag = --tag {release_tag}", tag == release_tag, f"source.tag {tag!r}")
+    if tag is not None:
+        art.check("a tagged build's tag names the workspace version and its ref",
+                  tag == f"v{host.version}" and source.get("ref") == f"refs/tags/{tag}",
+                  f"tag {tag!r}, ref {source.get('ref')!r}")
+    lock = sha256((ROOT / "Cargo.lock").read_bytes())
+    epoch = source.get("source_date_epoch")
+    origin = [f"{why}: {source.get(key)!r}" for key, bad, why in (
+        ("repository", source.get("repository") != workspace_repository(), "repository"),
+        ("cargo_lock_sha256", source.get("cargo_lock_sha256") != lock,
+         f"Cargo.lock sha256 ≠ checkout {lock[:16]}…"),
+        ("dirty", source.get("dirty") is not False, "dirty"),
+        ("source_date_epoch", type(epoch) is not int or epoch < 0, "source_date_epoch")) if bad]
+    art.check("build-info source: this repository, the checkout's Cargo.lock sha256, a clean tree, an integer "
+              "source_date_epoch", not origin, "; ".join(origin))
+    toolchain = obj(info.get("toolchain"))
+    rustc = toolchain.get("rustc") if isinstance(toolchain.get("rustc"), list) else []
+    releases = [line.split(":", 1)[1].strip() for line in rustc
+                if isinstance(line, str) and line.startswith("release:")]
+    pin = rust_pin()
+    art.check(f"build-info rustc release = RUST_TOOLCHAIN {pin}", pin is not None and releases == [pin],
+              f"rustc -vV release lines {releases}")
+    record = obj(info.get("binary"))
+    want = {"path": binary, "sha256": sha256(program or b""), "size": len(program or b"")}
+    off = [f"{key} {record.get(key)!r}" for key, value in want.items() if record.get(key) != value]
+    art.check(f"build-info binary = the {binary} member (path, sha256, size)", program is not None and not off,
+              "; ".join(off) or ("" if program is not None else f"no {binary} member"))
+    profile = cli_profile()
+    art.check("build-info profile = the root manifest's release profile", info.get("profile") == profile,
+              "" if info.get("profile") == profile else f"{info.get('profile')!r}, want {profile!r}")
+    given = info.get("rustflags") if isinstance(info.get("rustflags"), list) else []
+    flags = [flag for flag in given if isinstance(flag, str)]
+    remaps = [re.fullmatch(r"--remap-path-prefix=(<[a-z-]+>)=[^\s<>]*", flag) for flag in flags[:len(CLI_PLACEHOLDERS)]]
+    art.check("build-info rustflags: one placeholder remap each for <cargo-home>, <checkout> and <target-dir>, then "
+              "the row's own flags", len(flags) == len(given)
+              and sorted(m.group(1) if m else "?" for m in remaps) == sorted(CLI_PLACEHOLDERS)
+              and flags[len(CLI_PLACEHOLDERS):] == CLI_ROW_FLAGS.get(triple, []), f"{info.get('rustflags')!r}")
+    if triple.endswith("-linux-gnu"):
+        unwinder = obj(info.get("linker")).get("unwinder")
+        art.check(f"build-info linker names the GNU row's unwinder ({' or '.join(CLI_UNWINDERS)})",
+                  unwinder in CLI_UNWINDERS, f"unwinder {unwinder!r}")
+    target = CLI_DEPLOYMENT_TARGETS.get(triple)
+    art.check(f"build-info deployment_target = {json.dumps(target)}", info.get("deployment_target") == target,
+              json.dumps(info.get("deployment_target")))
+    check_cli_inventory(art, info)
+    return info
+
+
+def check_cli_inventory(art: Artifact, info: dict) -> None:
+    """Each linked and build-only dependency is its Cargo.lock entry (source, checksum), once, with a license."""
+    problems, seen = [], set()
+    for label in ("dependencies", "build_dependencies"):
+        for dep in info.get(label) if isinstance(info.get(label), list) else []:
+            dep = obj(dep)
+            key = (dep.get("name"), dep.get("version"))
+            label_key = f"{label}: {key[0]} {key[1]}"
+            if not all(isinstance(part, str) for part in key):
+                problems.append(f"{label_key}: a name or version that is no string")
+                continue
+            if key in seen:
+                problems.append(f"{label_key} listed twice")
+                continue
+            seen.add(key)
+            lock = lock_packages().get(key)
+            if lock is None:
+                problems.append(f"{label_key} is not in Cargo.lock")
+                continue
+            problems += [f"{label_key} {field} {dep.get(field)!r}, Cargo.lock {lock.get(field)!r}"
+                         for field in ("source", "checksum") if dep.get(field) != lock.get(field)]
+            if not isinstance(dep.get("license"), str) or not dep["license"].strip():
+                problems.append(f"{label_key} has no license expression")
+    art.check("build-info dependencies: each is its Cargo.lock entry (source, checksum), once, with a license",
+              not problems, "; ".join(problems))
+    deps = info.get("dependencies") if isinstance(info.get("dependencies"), list) else []
+    linked = {name for name in (obj(dep).get("name") for dep in deps) if isinstance(name, str)}
+    missing = [name for name in CLI_ANCHORS if name not in linked]
+    art.check(f"build-info links the anchors {', '.join(CLI_ANCHORS)}", not missing, f"missing: {', '.join(missing)}"
+              if missing else "")
+
+
+def check_cli_source_md(host: Host, art: Artifact, data, info: dict) -> None:
+    """SOURCE.md holds each fact line exactly once, with the value this inspection knows."""
+    source, builder, repository = obj(info.get("source")), obj(info.get("builder")), workspace_repository()
+    tag = host.args.tag.removeprefix("refs/tags/") if host.args.tag else source.get("tag")
+    run, version = builder.get("workflow_run"), host.version
+    facts = {
+        "Repository": repository,
+        "Tag": tag if tag else f"not a release tag ({source.get('ref')})",
+        "Commit": host.args.commit,
+        "Tree": f"{repository}/tree/{host.args.commit}",
+        "Cargo.lock sha256": sha256((ROOT / "Cargo.lock").read_bytes()),
+        "Workflow run": run if run else "none (built outside GitHub Actions)",
+        "Corresponding source": f"{CLI_PACKAGE}-{version}-source.tar.gz (its sha256 is in "
+                                f"{CLI_PACKAGE}-{version}-SHA256SUMS)",
+    }
+    try:
+        text = (data or b"").decode("utf-8")
+    except UnicodeDecodeError as err:
+        art.check("SOURCE.md is UTF-8 with LF line ends and a final newline", False, str(err))
+        return
+    art.check("SOURCE.md is UTF-8 with LF line ends and a final newline",
+              data is not None and "\r" not in text and text.endswith("\n"), "" if data is not None else "absent")
+    lines, problems = text.split("\n"), []
+    for key, value in facts.items():
+        found = [line for line in lines if line.startswith(f"- {key}:")]
+        if found != [f"- {key}: {value}"]:
+            problems.append(f"{key}: {found or 'no line'}, want {f'- {key}: {value}'!r}")
+    art.check("SOURCE.md states the repository, tag, commit, tree, Cargo.lock sha256, workflow run and source "
+              "archive", not problems, "; ".join(problems))
+
+
+def parse_third_party(data: bytes) -> tuple:
+    """THIRD-PARTY-LICENSES.txt → (header line, [crate blocks], {sha256: text}, the first format problem or '').
+    A header line, an empty line, then per crate `== <name> <version> ==`, `license:`, `source:`,
+    `checksum:`, `texts: <sha256>…` and an empty line; then each text once: `--- text <sha256> <size>
+    bytes ---`, its exact bytes and a newline, up to the end of the file."""
+    header, crates, texts, pos = None, [], {}, 0
+
+    def line() -> str:
+        nonlocal pos
+        end = data.find(b"\n", pos)
+        if end < 0:
+            raise ValueError(f"no newline after byte {pos}")
+        found, pos = data[pos:end].decode("utf-8"), end + 1
+        return found
+
+    try:
+        header = line()
+        if line():
+            raise ValueError("no empty line after the header")
+        while data.startswith(b"== ", pos):
+            title = re.fullmatch(r"== (\S+) (\S+) ==", line())
+            fields = [re.fullmatch(rf"{key}: ({pattern})", line()) for key, pattern in THIRD_PARTY_FIELDS]
+            if not title or not all(fields) or line():
+                raise ValueError(f"a malformed crate block ending at byte {pos}")
+            crates.append({"name": title.group(1), "version": title.group(2),
+                           **{key: found.group(1) for (key, _), found in zip(THIRD_PARTY_FIELDS, fields)}})
+        while pos < len(data):
+            head = THIRD_PARTY_TEXT.fullmatch(line())
+            if not head:
+                raise ValueError(f"no `--- text <sha256> <size> bytes ---` line ending at byte {pos}")
+            size, digest = int(head.group("size")), head.group("sha256")
+            body, pos = data[pos:pos + size], pos + size
+            if len(body) != size or data[pos:pos + 1] != b"\n":
+                raise ValueError(f"text {digest[:16]}… is cut short")
+            pos += 1
+            if digest in texts:
+                raise ValueError(f"text {digest[:16]}… appears twice")
+            texts[digest] = body
+    except (ValueError, UnicodeDecodeError) as err:
+        return header, crates, texts, str(err)
+    return header, crates, texts, ""
+
+
+def check_cli_licenses(host: Host, art: Artifact, data, info: dict, triple: str) -> None:
+    """THIRD-PARTY-LICENSES.txt: build-info's linked registry crates, sorted, with the same facts and texts that
+    hash to their names; every linked crate's expression satisfiable from deny.toml's allow list."""
+    name = "THIRD-PARTY-LICENSES.txt"
+    if data is None:
+        art.check(f"{name} lists the linked crates and their license texts", False, "absent")
+        return
+    header, crates, texts, problem = parse_third_party(data)
+    art.check(f"{name} reads as a header, crate blocks, then each text once", not problem, problem)
+    want_header = f"Third-party crates in qrscan {host.version} for {triple}, and their license texts"
+    art.check(f"{name} header names qrscan {host.version} for {triple}", header == want_header, f"{header!r}")
+    linked = [obj(dep) for dep in info.get("dependencies")] if isinstance(info.get("dependencies"), list) else []
+    registry = {(dep.get("name"), dep.get("version")): dep for dep in linked if dep.get("source") is not None
+                and isinstance(dep.get("name"), str) and isinstance(dep.get("version"), str)}
+    listed = [(crate["name"], crate["version"]) for crate in crates]
+    order = [f"{a[0]} {a[1]} before {b[0]} {b[1]}" for a, b in zip(listed, listed[1:]) if a >= b]
+    off = [f"not listed: {n} {v}" for n, v in sorted(set(registry) - set(listed), key=str)]
+    off += [f"not a linked registry crate in build-info: {n} {v}" for n, v in sorted(set(listed) - set(registry))]
+    art.check(f"{name} lists exactly build-info's linked registry crates, sorted by name and version, once each",
+              not order and not off, "; ".join(order[:3] + off))
+    facts, used = [], set()
+    for crate in crates:
+        dep, label = registry.get((crate["name"], crate["version"]), {}), f"{crate['name']} {crate['version']}"
+        facts += [f"{label} {field} {crate[field]!r}, build-info {dep.get(field)!r}"
+                  for field in ("license", "source", "checksum") if dep and crate[field] != dep.get(field)]
+        digests = crate["texts"].split()
+        used |= set(digests)
+        facts += [f"{label} names text {digest[:16]}…, which the file does not hold"
+                  for digest in digests if digest not in texts]
+        if len(set(digests)) != len(digests):
+            facts.append(f"{label} names a text twice")
+    art.check(f"{name}: each crate's license, source and checksum as build-info records them, and its texts present",
+              not facts, "; ".join(facts))
+    keys = list(texts)
+    bad = [f"text {key[:16]}… hashes to {sha256(body)[:16]}…" for key, body in texts.items() if sha256(body) != key]
+    bad += [f"text {key[:16]}… is named by no crate" for key in keys if key not in used]
+    bad += ["texts not sorted by sha256"] if keys != sorted(keys) else []
+    art.check(f"{name}: each text once, sorted, named by its sha256 and by some crate", not bad, "; ".join(bad))
+    allowed, refused = deny_allowed(), []
+    for dep in linked:
+        expression = dep.get("license")
+        try:
+            if not isinstance(expression, str) or not spdx_allowed(expression, allowed):
+                refused.append(f"{dep.get('name')} {dep.get('version')}: {expression!r}")
+        except ValueError as err:
+            refused.append(f"{dep.get('name')} {dep.get('version')}: {err}")
+    art.check("every linked crate's license expression is satisfiable from deny.toml's allow list",
+              not refused, "; ".join(refused))
+
+
+def cli_markers(host: Host) -> list:
+    """(marker, why) no text member of a CLI archive may hold: the generic build-host prefixes; this host's
+    HOME, USERPROFILE, RUNNER_TEMP, checkout and --source-tree paths in both slash forms; each --forbid
+    value, named by its position so a private marker never reaches the report."""
+    markers = [(leak, repr(leak)) for leak in CLI_LEAKS]
+    places = [(os.environ.get(key), key) for key in ("HOME", "USERPROFILE", "RUNNER_TEMP")]
+    places.append((str(ROOT), "the checkout path"))
+    if host.args.source_tree:
+        places.append((str(pathlib.Path(host.args.source_tree).resolve()), "the --source-tree path"))
+    for value, why in places:
+        # A short path (`/`, `/root`) would match any text: the generic list covers those hosts.
+        if value and len(pathlib.PurePosixPath(value.replace("\\", "/")).parts) >= 3:
+            markers += [(form, why) for form in sorted({value.replace("\\", "/"), value.replace("/", "\\")})]
+    markers += [(value, f"--forbid value {i}") for i, value in enumerate(host.args.forbid or [], 1)]
+    return markers
+
+
+def check_cli_leaks(host: Host, art: Artifact, inner: dict, binary: str) -> None:
+    """C9: no member name is a stray file, and no text member names a build host or a --forbid marker
+    (ASCII case ignored: Windows and macOS paths are case-insensitive)."""
+    check_stray(art, inner)
+    markers = [(marker.encode("utf-8").lower(), why) for marker, why in cli_markers(host)]
+    hits = []
+    for name, data in sorted(inner.items()):
+        if name != binary:
+            lowered = data.lower()
+            hits += sorted({f"{name}: {why}" for marker, why in markers if marker in lowered})
+    art.check("no text member holds a build-host path or a --forbid marker", not hits, "; ".join(hits))
+
+
+def check_cli_copy(art: Artifact, name: str, data, source: pathlib.Path) -> None:
+    """NAME is SOURCE's bytes; an absent member or an absent source fails with its own reason."""
+    want = source.read_bytes() if source.is_file() else None
+    same = want is not None and data == want
+    art.check(f"{name} is {rel(source)} verbatim", same, "" if same else (
+        f"{rel(source)} is absent from the checkout" if want is None else
+        "absent" if data is None else f"differs from {rel(source)}"))
+
+
+def inspect_cli(host: Host, path: pathlib.Path, notes=()) -> Artifact:
+    """One prebuilt qrscan archive: its name, container, members, headers, copies and generated files."""
+    art = host.add(Artifact(f"CLI archive {path.name}", "cli"))
+    art.notes.extend(notes)
+    describe(art, path, [])
+    named = CLI_ARCHIVE.fullmatch(path.name)
+    version, triple, ext = named.group("version", "triple", "ext") if named else (None, None, None)
+    art.package = {"filename": path.name, "version": version, "triple": triple}
+    art.check(f"name is {CLI_PACKAGE}-<version>-<triple>.tar.gz or .zip", named is not None, path.name)
+    if named is None:
+        return art
+    art.check(f"version {version} = workspace {host.version}", version == host.version, f"{version!r}")
+    if not art.check(f"target is one of {', '.join(CLI_TARGETS)}", triple in CLI_TARGETS, f"{triple!r}"):
+        return art
+    art.check("zip for the Windows target, tar.gz for the others", ext == CLI_TARGETS[triple], f".{ext}")
+    stem, zipped = path.name[:-len(ext) - 1], ext == "zip"
+    binary = "qrscan.exe" if triple.endswith("-windows-msvc") else "qrscan"
+    try:
+        if zipped:
+            entries, files, problems = read_cli_zip(path)
+            names = [entry.orig_filename for entry in entries]
+        else:
+            entries, files, tar, problems, global_headers = read_cli_tar(path)
+            names = [m.name + ("/" if m.isdir() else "") for m in entries]
+    except (OSError, EOFError, ValueError, zlib.error, tarfile.TarError, zipfile.BadZipFile) as err:
+        art.check(f"reads as one .{ext} archive", False, f"{type(err).__name__}: {err}")
+        return art
+    art.listing = sorted(names)
+    if zipped:
+        art.check("one clean zip: stored or deflated entries in one stream, no duplicate, absolute, `..`, "
+                  "backslash or symlink entry, no encryption, data descriptor, extra field or comment",
+                  not problems, "; ".join(problems))
+    else:
+        special = [f"{m.name} ({_TAR_KINDS.get(m.type, f'type {m.type!r}')})" for m in entries
+                   if not m.isfile() and not m.isdir()]
+        check_members(art, special + _tar_anomalies(path, entries, raw=tar))
+        problems += ustar_problems(tar, entries, global_headers)
+        art.check("gzip and tar headers as the one writer makes them: no gzip FNAME or other flag, gzip mtime 0, "
+                  "OS byte 255, one gzip member; POSIX ustar members only, no pax or GNU header",
+                  not problems, "; ".join(problems))
+    outside = [name for name in names if not name.startswith(f"{stem}/")]
+    art.check(f"one top directory, {stem}/", not outside, ", ".join(outside[:5]))
+    check_exact_set(art, names, frozenset({f"{stem}/", *(f"{stem}/{name}" for name in
+                                                         [*CLI_COPIES, *CLI_GENERATED, binary])}),
+                    "release archive's members")
+    raw_names = [name.encode("utf-8", "surrogateescape") for name in names]
+    unsorted = [f"{a} before {b}" for a, b, x, y in zip(names, names[1:], raw_names, raw_names[1:]) if x > y]
+    art.check("members in bytewise order, the directory first", not unsorted, "; ".join(unsorted[:3]))
+    inner = {name[len(stem) + 1:]: data for name, data in files.items() if name.startswith(f"{stem}/")}
+    check_license(art, inner.get("LICENSE"), "LICENSE")
+    for member, source in CLI_COPIES.items():
+        if member != "LICENSE":
+            check_cli_copy(art, member, inner.get(member), ROOT / source)
+    info = check_cli_build_info(host, art, inner.get("build-info.json"), triple, binary, inner.get(binary))
+    source, toolchain = obj(info.get("source")), obj(info.get("toolchain"))
+    owner, modes = cli_headers(entries, zipped, stem, binary, source.get("source_date_epoch"))
+    art.check("zip entries made on Unix (create_system 3), each time = build-info's source_date_epoch" if zipped
+              else "members owned by uid/gid 0 with no user or group name, mtime = build-info's source_date_epoch",
+              not owner, "; ".join(owner[:6]))
+    art.check(f"modes by policy: 0755 for the directory and {binary}, 0644 for the rest", not modes,
+              "; ".join(modes[:6]))
+    notice = inner.get("COPYRIGHT-rust-std.html")
+    art.check("COPYRIGHT-rust-std.html sha256 = build-info toolchain.std_notice_sha256",
+              notice is not None and sha256(notice) == toolchain.get("std_notice_sha256"),
+              "absent" if notice is None else f"{sha256(notice)[:16]}…, build-info "
+                                               f"{str(toolchain.get('std_notice_sha256'))[:16]}…")
+    check_cli_source_md(host, art, inner.get("SOURCE.md"), info)
+    check_cli_licenses(host, art, inner.get("THIRD-PARTY-LICENSES.txt"), info, triple)
+    check_cli_leaks(host, art, inner, binary)
+    rustc = toolchain.get("rustc") if isinstance(toolchain.get("rustc"), list) else []
+    art.package.update(commit=source.get("commit"), cargo_lock_sha256=source.get("cargo_lock_sha256"),
+                       rustc_release=[line for line in rustc if isinstance(line, str) and line.startswith("release:")],
+                       std_notice_sha256=toolchain.get("std_notice_sha256"))
+    return art
+
+
+def inspect_cli_sums(host: Host, path: pathlib.Path, notes=()) -> Artifact:
+    """The SHA256SUMS file: its name, its exact format and --sums-sha256. What it lists is judged once every
+    file given is read (check_cli_sums)."""
+    art = host.add(Artifact(f"CLI checksums {path.name}", "cli-sums"))
+    art.notes.extend(notes)
+    describe(art, path, [])
+    named = CLI_SUMS.fullmatch(path.name)
+    want = f"{CLI_PACKAGE}-{host.version}-SHA256SUMS"
+    art.check(f"name is {want}", path.name == want, path.name)
+    data, problems, entries = path.read_bytes(), [], []
+    if not data.isascii():
+        problems.append("a non-ASCII byte")
+    if b"\r" in data:
+        problems.append("a CR byte (CRLF line ends)")
+    if not data.endswith(b"\n"):
+        problems.append("no final newline")
+    lines = data.decode("ascii", "replace").split("\n")
+    for number, line in enumerate(lines[:-1] if data.endswith(b"\n") else lines, 1):
+        found = CLI_SUMS_LINE.fullmatch(line)
+        if found:
+            entries.append((found.group("name"), found.group("sha256")))
+        else:
+            problems.append(f"line {number} is not `<64 lowercase hex>  <file name>`: {line[:90]!r}")
+    listed = [name for name, _ in entries]
+    problems += [f"{a} before {b}" for a, b in zip(listed, listed[1:]) if a > b]
+    problems += [f"{name} listed twice" for name in sorted({n for n in listed if listed.count(n) > 1})]
+    problems += [] if lines != [""] else ["no line"]
+    art.check("lines `<sha256>  <name>` (sha256sum's text format): ASCII, LF, a final newline, sorted by name, "
+              "each name once", not problems, "; ".join(problems))
+    art.listing = listed
+    art.package = {"filename": path.name, "version": named.group("version") if named else None,
+                   "entries": dict(entries)}
+    if host.args.sums_sha256 is not None:
+        same = art.sha256 == host.args.sums_sha256
+        art.check("its sha256 = --sums-sha256", same, "" if same else
+                  f"{art.sha256[:16]}…, --sums-sha256 {host.args.sums_sha256[:16]}…")
+    return art
+
+
+def check_cli_sums(host: Host) -> None:
+    """S3: each SHA256SUMS lists every other CLI release file given, with its sha256, and nothing else."""
+    given = {a.package.get("filename"): a.sha256 for a in host.artifacts if a.kind in ("cli", "cli-source")}
+    for art in [a for a in host.artifacts if a.kind == "cli-sums"]:
+        listed = art.package.get("entries") or {}
+        problems = [f"no line for {name}" for name in sorted(set(given) - set(listed))]
+        problems += [f"a line for {name}, which was not given" for name in sorted(set(listed) - set(given))]
+        problems += [f"{name}: listed {listed[name][:16]}…, file {given[name][:16]}…"
+                     for name in sorted(set(listed) & set(given)) if listed[name] != given[name]]
+        art.check("one line per CLI archive and source archive given, with its sha256, and nothing else",
+                  not problems, "; ".join(problems))
+
+
+def check_cli_release_set(host: Host) -> None:
+    """R1: the release set is the five archives, the source archive and SHA256SUMS, once each, built from one
+    commit, Cargo.lock, compiler and standard library notice, with nothing else beside them."""
+    files = [a for a in host.artifacts if a.kind in CLI_KINDS]
+    art = host.add(Artifact("CLI release set", "cli-set"))
+    art.listing = sorted(a.package.get("filename") or a.name for a in files)
+    archives, problems = [a for a in files if a.kind == "cli"], []
+    for triple in CLI_TARGETS:
+        count = sum(a.package.get("triple") == triple for a in archives)
+        problems += [] if count == 1 else [f"{count} {triple} archives" if count else f"no {triple} archive"]
+    problems += [f"{a.package.get('filename')} is no release target" for a in archives
+                 if a.package.get("triple") not in CLI_TARGETS]
+    for kind, what in (("cli-source", "source archive"), ("cli-sums", "SHA256SUMS")):
+        count = sum(a.kind == kind for a in files)
+        problems += [] if count == 1 else [f"{count} {what} files" if count else f"no {what}"]
+    versions = sorted({str(a.package.get("version")) for a in files})
+    problems += [] if versions == [host.version] else [f"versions {', '.join(versions)}, want {host.version} only"]
+    for key, what in (("commit", "commits"), ("cargo_lock_sha256", "Cargo.lock sha256 values"),
+                      ("rustc_release", "rustc releases"), ("std_notice_sha256", "std notices")):
+        values = sorted({str(a.package.get(key)) for a in archives})
+        problems += [] if len(values) <= 1 else [f"{len(values)} {what} across the archives: {', '.join(values)}"]
+    problems += [f"{a.name} is not a CLI release asset" for a in host.artifacts if a.kind not in CLI_KINDS
+                 and a is not art]
+    art.check(f"the {len(CLI_TARGETS)} archives, the source archive and SHA256SUMS once each, from one version, "
+              "commit, Cargo.lock, rustc and std notice, and nothing else", not problems, "; ".join(problems))
+
+
+def parse_ls_tree(output: bytes) -> list:
+    """`git ls-tree -r -t -z --full-tree` → [(mode, type, object id, path)]; paths decoded as tarfile does."""
+    entries = []
+    for record in filter(None, output.split(b"\0")):
+        head, _, name = record.partition(b"\t")
+        mode, kind, oid = head.decode("ascii").split(" ")
+        entries.append((mode, kind, oid, name.decode("utf-8", "surrogateescape")))
+    return entries
+
+
+def parse_check_attr(output: bytes) -> dict:
+    """`git check-attr -z` → {path: {attribute: value}}."""
+    fields = output.split(b"\0")
+    found: dict = {}
+    for i in range(0, len(fields) - 2, 3):
+        name, attribute, value = (field.decode("utf-8", "surrogateescape") for field in fields[i:i + 3])
+        found.setdefault(name, {})[attribute] = value
+    return found
+
+
+def source_tree_problems(entries: list, attributes: dict) -> list:
+    """Why a commit's tree cannot map one to one onto a source archive: a symlink or a submodule, or an entry
+    git archive drops (export-ignore) or rewrites (export-subst)."""
+    problems = [f"{name}: {'a symlink' if mode == '120000' else 'a submodule' if kind == 'commit' else f'mode {mode}'}"
+                for mode, kind, _oid, name in entries
+                if mode == "120000" or kind == "commit" or (kind == "blob" and mode not in ("100644", "100755"))]
+    problems += [f"{name}: {attribute} {value}" for name, values in sorted(attributes.items())
+                 for attribute, value in sorted(values.items()) if value not in ("unspecified", "unset")]
+    return problems
+
+
+_GIT_TREES: dict = {}
+
+
+def git_tree(directory: pathlib.Path, commit: str, scratch: pathlib.Path) -> dict:
+    """What git in DIRECTORY says about COMMIT: {head: HEAD^{commit}, entries: ls-tree rows, blobs: {id: bytes},
+    attributes: export-ignore and export-subst of every path, error: why it could not, unavailable: no git}."""
+    key = (str(directory.resolve()), commit)
+    if key in _GIT_TREES:
+        return _GIT_TREES[key]
+    git = which("git")
+    if git is None:
+        return {"unavailable": "git is not installed"}
+
+    def run(*args: str, stdin: bytes = None, env=None):
+        return subprocess.run([git, "-C", str(directory), *args], input=stdin, capture_output=True, env=env)
+
+    head = run("rev-parse", "--verify", "--quiet", "HEAD^{commit}")
+    if head.returncode:
+        return {"error": f"--source-tree has no HEAD commit (git rev-parse exit {head.returncode})"}
+    listing = run("ls-tree", "-r", "-t", "-z", "--full-tree", commit)
+    if listing.returncode:
+        return {"head": head.stdout.decode().strip(),
+                "error": f"git ls-tree {commit[:12]}: {listing.stderr.decode(errors='replace').strip()[:200]}"}
+    result = {"head": head.stdout.decode().strip(), "entries": parse_ls_tree(listing.stdout)}
+    wanted = [oid for _mode, kind, oid, _name in result["entries"] if kind == "blob"]
+    batch = run("cat-file", "--batch", stdin="".join(f"{oid}\n" for oid in wanted).encode())
+    blobs, pos, out = {}, 0, batch.stdout
+    try:
+        for oid in wanted:
+            end = out.index(b"\n", pos)
+            found, kind, size = out[pos:end].decode("ascii").split(" ")
+            if (found, kind) != (oid, "blob"):
+                raise ValueError(out[pos:end].decode("ascii", "replace"))
+            blobs[oid], pos = out[end + 1:end + 1 + int(size)], end + 2 + int(size)
+    except ValueError as err:
+        return result | {"error": f"git cat-file --batch: no blob for {oid}: {err}"}
+    paths = b"".join(name.encode("utf-8", "surrogateescape") + b"\0" for *_rest, name in result["entries"])
+    names = ["export-ignore", "export-subst"]
+    attrs = run("check-attr", "-z", "--stdin", "--source", commit, *names, stdin=paths)
+    if attrs.returncode:  # git < 2.40 has no --source: ask COMMIT's own index, in a scratch file
+        env = dict(os.environ, GIT_INDEX_FILE=str(scratch / "source-index"))
+        loaded = run("read-tree", commit, env=env)
+        attrs = run("check-attr", "-z", "--stdin", "--cached", *names, stdin=paths, env=env) \
+            if loaded.returncode == 0 else loaded
+    if attrs.returncode:
+        return result | {"error": f"git check-attr: {attrs.stderr.decode(errors='replace').strip()[:200]}"}
+    result.update(blobs=blobs, attributes=parse_check_attr(attrs.stdout), error="")
+    _GIT_TREES[key] = result
+    return result
+
+
+def inspect_cli_source(host: Host, path: pathlib.Path, notes=()) -> Artifact:
+    """The source archive: `git archive --prefix=<stem>/` of --commit, gzipped by the one writer. Its members
+    map one to one onto the commit's tree, read from --source-tree. Its content is the public tree, so the
+    leak scan of the archives does not apply."""
+    art = host.add(Artifact(f"CLI source {path.name}", "cli-source"))
+    art.notes.extend(notes)
+    describe(art, path, [])
+    named = CLI_SOURCE.fullmatch(path.name)
+    art.package = {"filename": path.name, "version": named.group("version") if named else None}
+    want = f"{CLI_PACKAGE}-{host.version}-source.tar.gz"
+    art.check(f"name is {want}", path.name == want, path.name)
+    prefix = path.name.removesuffix(".tar.gz") + "/"
+    try:
+        tar, problems = gunzip(path.read_bytes())
+        with tarfile.open(fileobj=io.BytesIO(tar)) as archive:
+            members = archive.getmembers()
+            files = {m.name: archive.extractfile(m).read() for m in members if m.isfile()}
+            global_headers = dict(archive.pax_headers)
+    except (OSError, EOFError, ValueError, zlib.error, tarfile.TarError) as err:
+        art.check("reads as one gzip member holding a tar", False, f"{type(err).__name__}: {err}")
+        return art
+    names = [m.name + ("/" if m.isdir() else "") for m in members]
+    art.listing = sorted(names)
+    art.check("gzip header as the one writer makes it: no FNAME or other flag, mtime 0, OS byte 255, one member",
+              not problems, "; ".join(problems))
+    check_members(art, [f"{m.name} ({_TAR_KINDS.get(m.type, f'type {m.type!r}')})" for m in members
+                        if not m.isfile() and not m.isdir()] + _tar_anomalies(path, members, raw=tar))
+    comment = global_headers.get("comment")
+    art.check("its pax global header is git archive's commit comment, = --commit",
+              set(global_headers) == {"comment"} and comment == host.args.commit,
+              f"pax global header {sorted(global_headers)}, comment {comment!r}")
+    tree = git_tree(pathlib.Path(host.args.source_tree), host.args.commit, host.scratch)
+    if "unavailable" in tree:
+        return art.unavailable(tree["unavailable"])
+    art.check("--source-tree's HEAD^{commit} = --commit", tree.get("head") == host.args.commit,
+              f"HEAD^{{commit}} {tree.get('head')!r}")
+    if not art.check("git reads the commit's tree, blobs and export attributes", not tree["error"], tree["error"]):
+        return art
+    problems = source_tree_problems(tree["entries"], tree["attributes"])
+    art.check("the commit's tree has no symlink, submodule, export-ignore or export-subst entry", not problems,
+              "; ".join(problems[:6]))
+    rows = {prefix + name + ("/" if kind == "tree" else ""): (mode, oid) for mode, kind, oid, name in tree["entries"]}
+    check_exact_set(art, names, frozenset({prefix, *rows}), f"commit's tree under {prefix}")
+    modes = {m.name: m.mode for m in members if m.isfile()}
+    altered = [name for name, data in sorted(files.items())
+               if name in rows and data != tree["blobs"].get(rows[name][1])]
+    art.check("each file's bytes = its git blob", not altered, f"differ: {', '.join(altered[:6])}" if altered else "")
+    flipped = [f"{name} (tree {rows[name][0]}, member {modes[name]:o})" for name in sorted(modes)
+               if name in rows and bool(modes[name] & 0o111) != (rows[name][0] == "100755")]
+    art.check("the exec bit set exactly on the tree's 100755 files", not flipped, "; ".join(flipped[:6]))
+    return art
+
+
 # ---------------------------------------------------------------- archive · all
 
 
@@ -1508,12 +2419,17 @@ def cmd_archive(host: Host) -> None:
     if not host.args.files:
         print("archive: give at least one file", file=sys.stderr)
         sys.exit(2)
+    usage = cli_usage(host.args)
+    if usage:
+        print(f"archive: {usage}", file=sys.stderr)
+        sys.exit(2)
     for name in host.args.files:
         # Unresolved: an archive outside the repo is reported as given, never as
         # the symlink-resolved path (which can name a private home directory).
         path = pathlib.Path(name)
         note = [f"given archive {name}"]
         art = None
+        kind = cli_kind(path.name)
         if not path.is_file():
             host.add(Artifact(f"archive {name}", "archive")).check("file exists", False, name)
         elif path.name.endswith(".crate"):
@@ -1522,12 +2438,17 @@ def cmd_archive(host: Host) -> None:
             art = inspect_wheel(host, path, notes=note)
         elif path.name.endswith(".tgz"):
             art = inspect_npm(host, path, notes=note)
+        elif kind is not None:  # before the sdist: the CLI archives and source are .tar.gz too
+            art = {"cli": inspect_cli, "cli-source": inspect_cli_source, "cli-sums": inspect_cli_sums}[kind](
+                host, path, notes=note)
         elif path.name.endswith(".tar.gz"):
             art = inspect_sdist(host, path, notes=note)
         else:
             host.add(Artifact(f"archive {name}", "archive")).check("known archive kind", False, path.suffix)
         if art is not None:
             host.recorded.append((art.sha256, name))
+    if any(a.kind == "cli-sums" for a in host.artifacts):
+        check_cli_sums(host)
     if host.args.release_set:
         check_release_set(host)
 
@@ -2218,6 +3139,9 @@ def self_test() -> int:
     flutter_count, flutter_failures = flutter_self_test()
     ran += flutter_count
     failures.extend(flutter_failures)
+    cli_count, cli_failures = cli_self_test()
+    ran += cli_count
+    failures.extend(cli_failures)
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
     print(f"self-test: {ran - len(failures)}/{ran} scenarios as expected")
@@ -2309,6 +3233,779 @@ def flutter_self_test():
     return count, failures
 
 
+# CLI release fixtures: what the one writer makes, built here byte by byte so a
+# plant changes exactly one thing.
+CLI_FIXTURE_EPOCH = 1793597346
+CLI_FIXTURE_RUN = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/1234567890"
+CLI_FIXTURE_LICENSES = {"clap": "MIT OR Apache-2.0", "image": "MIT OR Apache-2.0", "rqrr": "MIT OR Apache-2.0",
+                        "rxing": "Apache-2.0", "serde_json": "MIT OR Apache-2.0"}
+_APACHE_TEXT = b"Apache License\nVersion 2.0, January 2004\n"
+_MIT_TEXT = b"MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n"
+GZIP_HEADER = b"\x1f\x8b\x08\x00\0\0\0\0\x02\xff"  # no flag, mtime 0, XFL 2 (level 9), OS 255
+
+
+def _gzip(data: bytes, level: int = 1, header: bytes = GZIP_HEADER) -> bytes:
+    """DATA as one gzip member under HEADER (level 1: the inspector does not judge the level). Not
+    gzip.compress: before Python 3.13 its mtime-0 path writes zlib's OS byte, where gzip.GzipFile writes 255."""
+    deflate = zlib.compressobj(level, zlib.DEFLATED, -15)
+    body = deflate.compress(data) + deflate.flush()
+    return header + body + zlib.crc32(data).to_bytes(4, "little") + (len(data) % 2 ** 32).to_bytes(4, "little")
+
+
+def _tar_blocks(rows: list, fmt: int = tarfile.USTAR_FORMAT) -> bytes:
+    """[(TarInfo, bytes)] as tar header and data blocks, no end-of-archive marker."""
+    return b"".join(info.tobuf(fmt, "utf-8", "surrogateescape") + data + b"\0" * (-len(data) % 512)
+                    for info, data in rows)
+
+
+def _ustar(rows: list, fmt: int = tarfile.USTAR_FORMAT, pax_global: dict = None) -> bytes:
+    """ROWS as one tar stream: a pax global header when given, the members, the end blocks, record padding."""
+    head = tarfile.TarInfo.create_pax_global_header(pax_global) if pax_global else b""
+    stream = head + _tar_blocks(rows, fmt) + b"\0" * 1024
+    return stream + b"\0" * (-len(stream) % tarfile.RECORDSIZE)
+
+
+def _cli_rows(top: str, files: dict, binary: str, epoch: int = CLI_FIXTURE_EPOCH) -> list:
+    """TOP/ then FILES under it as the one writer's tar members: bytewise order, uid/gid 0, no user or group
+    name, mtime EPOCH, 0755 for the directory and BINARY, 0644 for the rest."""
+    rows = []
+    for name in sorted(["", *files], key=lambda n: n.encode()):
+        info = tarfile.TarInfo(f"{top}/{name}" if name else top)
+        info.type = tarfile.REGTYPE if name else tarfile.DIRTYPE
+        info.mode = 0o755 if name in ("", binary) else 0o644
+        info.size = len(files[name]) if name else 0
+        info.mtime, info.uid, info.gid, info.uname, info.gname = epoch, 0, 0, "", ""
+        rows.append((info, files.get(name, b"")))
+    return rows
+
+
+def _cli_zip(top: str, files: dict, binary: str, edit=None, extra=(), comment: bytes = b"") -> bytes:
+    """TOP/ then FILES as the one writer's zip: deflated (the directory stored), date_time from
+    CLI_FIXTURE_EPOCH, create_system 3, modes in external_attr. EDIT(name, ZipInfo) changes an entry before
+    it is written; EXTRA [(name, bytes)] follows the regular entries."""
+    buffer = io.BytesIO()
+    with warnings.catch_warnings(), zipfile.ZipFile(buffer, "w") as archive:
+        warnings.simplefilter("ignore")  # a planted duplicate name
+        for name in sorted(["", *files], key=lambda n: n.encode()):
+            info = zipfile.ZipInfo(f"{top}/{name}", dos_time(CLI_FIXTURE_EPOCH))
+            info.create_system = 3
+            info.external_attr = (0o040755 if not name else 0o100755 if name == binary else 0o100644) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED if name else zipfile.ZIP_STORED
+            if edit is not None:
+                edit(name, info)
+            archive.writestr(info, files.get(name, b""), compresslevel=1)
+        for name, data in extra:
+            info = zipfile.ZipInfo(name, dos_time(CLI_FIXTURE_EPOCH))
+            info.create_system, info.external_attr = 3, 0o100644 << 16
+            archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=1)
+        archive.comment = comment
+    return buffer.getvalue()
+
+
+def _zip_patch(raw: bytes, name: str, flags: int = 0, method: int = None) -> bytes:
+    """RAW with FLAGS or'ed into NAME's general-purpose flags and its compression METHOD replaced, in the local
+    header and the central directory alike (zipfile resets both when it writes)."""
+    data, encoded = bytearray(raw), name.encode()
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        local, pos = archive.getinfo(name).header_offset, archive.start_dir
+    places = [(local + 6, local + 8)]
+    while data[pos:pos + 4] == b"PK\x01\x02":
+        sizes = [int.from_bytes(data[pos + i:pos + i + 2], "little") for i in (28, 30, 32)]
+        if sizes[0] == len(encoded) and data[pos + 46:pos + 46 + sizes[0]] == encoded:
+            places.append((pos + 8, pos + 10))
+        pos += 46 + sum(sizes)
+    for flag_at, method_at in places:
+        data[flag_at] |= flags
+        if method is not None:
+            data[method_at:method_at + 2] = method.to_bytes(2, "little")
+    return bytes(data)
+
+
+def _cli_third_party(version: str, triple: str, deps: list) -> bytes:
+    """THIRD-PARTY-LICENSES.txt over DEPS' registry crates: the Apache text for each, the MIT text too when the
+    expression names MIT, each text once in the appendix."""
+    texts, blocks = {}, []
+    for dep in sorted((d for d in deps if d.get("source") is not None),
+                      key=lambda d: (str(d["name"]), str(d["version"]))):
+        own = [_APACHE_TEXT] + ([_MIT_TEXT] if "MIT" in str(dep["license"]) else [])
+        digests = [sha256(text) for text in own]
+        texts.update(zip(digests, own))
+        blocks.append(f"== {dep['name']} {dep['version']} ==\nlicense: {dep['license']}\nsource: {dep['source']}\n"
+                      f"checksum: {dep['checksum']}\ntexts: {' '.join(digests)}\n\n")
+    head = f"Third-party crates in qrscan {version} for {triple}, and their license texts\n\n"
+    return (head + "".join(blocks)).encode() + b"".join(
+        f"--- text {digest} {len(text)} bytes ---\n".encode() + text + b"\n" for digest, text in sorted(texts.items()))
+
+
+def _cli_source_md(version: str, commit: str, tag, ref: str, run=CLI_FIXTURE_RUN) -> bytes:
+    repository = workspace_repository()
+    return "\n".join([
+        f"# Source of qrscan {version}", "",
+        f"- Repository: {repository}",
+        f"- Tag: {tag}" if tag else f"- Tag: not a release tag ({ref})",
+        f"- Commit: {commit}", f"- Tree: {repository}/tree/{commit}",
+        f"- Cargo.lock sha256: {sha256((ROOT / 'Cargo.lock').read_bytes())}",
+        f"- Workflow run: {run or 'none (built outside GitHub Actions)'}",
+        f"- Corresponding source: {CLI_PACKAGE}-{version}-source.tar.gz (its sha256 is in "
+        f"{CLI_PACKAGE}-{version}-SHA256SUMS)",
+        "", "Built by .github/workflows/cli-archives.yml and scripts/cli-release.py at that commit.",
+        "These files are not code-signed or notarized: see README.md.", ""]).encode()
+
+
+def cli_self_test():
+    """CLI release files: the clean set passes; each planted defect fails with a check naming it."""
+    version, failures, count = workspace_version(), [], 0
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD^{commit}"], cwd=ROOT, text=True).strip()
+    lock, pin, tag = lock_packages(), rust_pin(), f"v{version}"
+
+    def dep(name: str, at: str, expression: str) -> dict:
+        package = lock[(name, at)]
+        return {"name": name, "version": at, "source": package.get("source"), "checksum": package.get("checksum"),
+                "license": expression}
+
+    linked = [dep(name, min(v for n, v in lock if n == name), expression)
+              for name, expression in CLI_FIXTURE_LICENSES.items()]
+    linked += [dep(name, version, SPDX) for name in ("qrcode-ai-scanner", CLI_PACKAGE)]
+    build_only = next((n, v) for n, v in sorted(lock) if lock[(n, v)].get("source") and n not in CLI_FIXTURE_LICENSES)
+    notice = b"<!DOCTYPE html>\n<html><body><p>Rust standard library notice (fixture)</p></body></html>\n"
+
+    def build_info(triple: str, binary: str, program: bytes, std_notice: bytes, release_tag) -> dict:
+        gnu, windows = triple.endswith("-linux-gnu"), triple.endswith("-windows-msvc")
+        return {
+            "schema": CLI_BUILD_INFO, "name": "qrscan", "package": CLI_PACKAGE, "version": version, "target": triple,
+            "source": {"repository": workspace_repository(), "tag": release_tag, "commit": commit,
+                       "ref": f"refs/tags/{release_tag}" if release_tag else "refs/heads/release-candidate",
+                       "source_date_epoch": CLI_FIXTURE_EPOCH, "dirty": False,
+                       "cargo_lock_sha256": sha256((ROOT / "Cargo.lock").read_bytes())},
+            "toolchain": {"rustc": [f"rustc {pin} (17067e9ac 2026-10-01)", "binary: rustc", f"release: {pin}"],
+                          "cargo": f"cargo {pin} (2026-10-01)", "std_notice_sha256": sha256(std_notice)},
+            "linker": {"kind": "zig" if gnu else "msvc" if windows else "apple-ld",
+                       "unwinder": "zig-libunwind" if gnu else None},
+            "profile": cli_profile(),
+            "rustflags": [f"--remap-path-prefix={p}=/{p.strip('<>')}" for p in CLI_PLACEHOLDERS]
+                         + CLI_ROW_FLAGS.get(triple, []),
+            "command": ["cargo", "zigbuild" if gnu else "build", "--release", "--locked", "-p", CLI_PACKAGE, "--bin",
+                        "qrscan", "--target", f"{triple}.2.28" if gnu else triple, "--target-dir", "<target-dir>"],
+            "deployment_target": CLI_DEPLOYMENT_TARGETS.get(triple),
+            "builder": {"runner_os": "Windows" if windows else "Linux" if gnu else "macOS", "runner_arch": "X64",
+                        "image_os": "fixture", "image_version": "20261026.1", "workflow_run": CLI_FIXTURE_RUN},
+            "binary": {"path": binary, "sha256": sha256(program), "size": len(program)},
+            "dependencies": [dict(d) for d in linked],
+            "build_dependencies": [dep(*build_only, "MIT OR Apache-2.0")],
+        }
+
+    def inner(triple: str, edit=None, release_tag=tag, std_notice: bytes = notice, source_md=None) -> dict:
+        """A clean archive's members below its top directory; EDIT(build-info) runs before the files that
+        restate it are written."""
+        binary = "qrscan.exe" if triple.endswith("-windows-msvc") else "qrscan"
+        program = b"\x7fELF qrscan fixture for " + triple.encode()
+        info = build_info(triple, binary, program, std_notice, release_tag)
+        if edit is not None:
+            edit(info)
+        files = {member: (ROOT / source).read_bytes() for member, source in CLI_COPIES.items()}
+        deps = info.get("dependencies")
+        if not isinstance(deps, list) or not all(isinstance(d, dict) and DEPENDENCY_KEYS <= set(d) for d in deps):
+            deps = linked  # a malformed inventory: the license file keeps the clean one
+        return files | {
+            "COPYRIGHT-rust-std.html": std_notice, binary: program,
+            "SOURCE.md": source_md if source_md is not None else _cli_source_md(
+                version, commit, release_tag, info["source"]["ref"]),
+            "THIRD-PARTY-LICENSES.txt": _cli_third_party(version, triple, deps),
+            "build-info.json": json.dumps(info, indent=2).encode() + b"\n"}
+
+    def stem(triple: str) -> str:
+        return f"{CLI_PACKAGE}-{version}-{triple}"
+
+    def archive_bytes(triple: str, files: dict) -> bytes:
+        binary = "qrscan.exe" if triple.endswith("-windows-msvc") else "qrscan"
+        if CLI_TARGETS.get(triple) == "zip":
+            return _cli_zip(stem(triple), files, binary)
+        return _gzip(_ustar(_cli_rows(stem(triple), files, binary)))
+
+    def judge(name: str, paths: list, want: str, *needles: str, options=(), at: str = None) -> Host:
+        nonlocal count
+        count += 1
+        argv = ["archive", *map(str, paths), "--commit", at or commit, *options]
+        host = Host(build_parser().parse_args(argv))
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                cmd_archive(host)
+        finally:
+            shutil.rmtree(host.scratch, ignore_errors=True)
+        statuses = {a.status for a in host.artifacts}
+        got = FAIL if FAIL in statuses else UNAVAILABLE if UNAVAILABLE in statuses else PASS
+        failed = " · ".join(f"{c.name}: {c.detail}" for a in host.artifacts for c in a.checks if not c.ok)
+        missing = [n for n in needles if n not in failed]
+        contradicted = [c.name for a in host.artifacts for c in a.checks if c.ok and c.detail.startswith("differ")]
+        if got != want or missing or contradicted or not host.artifacts:
+            failures.append(f"CLI {name}: {got.upper()} (want {want.upper()})"
+                            + (f", no failing check names {missing}" if missing else "")
+                            + (f", passing checks report a difference: {contradicted}" if contradicted else "")
+                            + (f" — failing: {failed[:600]}" if failed else ""))
+        return host
+
+    with tempfile.TemporaryDirectory(prefix="cli-inspect-selftest-") as tmp:
+        base, saved = pathlib.Path(tmp), CLI_COPIES["README.md"]
+        readme = base / "README.md"  # distribution/cli/README.md may not exist yet: a fixture stands in
+        readme.write_bytes(b"# qrscan\n\nVerify the archive against SHA256SUMS, extract it and run qrscan.\n")
+        CLI_COPIES["README.md"] = str(readme)
+
+        def put(label: str, filename: str, data: bytes) -> pathlib.Path:
+            (base / label).mkdir(parents=True, exist_ok=True)
+            (base / label / filename).write_bytes(data)
+            return base / label / filename
+
+        def sums(label: str, paths: list) -> pathlib.Path:
+            lines = "".join(f"{sha256(p.read_bytes())}  {p.name}\n" for p in sorted(paths, key=lambda p: p.name))
+            return put(label, f"{CLI_PACKAGE}-{version}-SHA256SUMS", lines.encode())
+
+        def slug(text: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60]
+
+        try:
+            archives = {triple: put("set", f"{stem(triple)}.{ext}", archive_bytes(triple, inner(triple)))
+                        for triple, ext in CLI_TARGETS.items()}
+            git_tar = subprocess.run(["git", "-c", "core.autocrlf=false", "-c", "core.eol=lf", "archive",
+                                      "--format=tar", f"--prefix={CLI_PACKAGE}-{version}-source/", commit],
+                                     cwd=ROOT, capture_output=True, check=True).stdout
+            source = put("set", f"{CLI_PACKAGE}-{version}-source.tar.gz", _gzip(git_tar))
+            release = [*archives.values(), source]
+            checksums = sums("set", release)
+            full, tree = [*release, checksums], ("--source-tree", str(ROOT))
+            qualified = sha256(checksums.read_bytes())
+            host = judge("clean release set", full, PASS, options=(
+                "--release-set", "--tag", tag, "--sums-sha256", qualified, *tree))
+            # Not a vacuous pass: every class of check ran on every file of the set.
+            wanted = {"cli": ("name is", "zip for the Windows target", "file set is exactly the release archive's",
+                              "members in bytewise order", "LICENSE is the AGPL text", "LICENSING.md is",
+                              "COPYRIGHT-rust-std.html sha256", "build-info.json: schema", "build-info binary",
+                              "build-info dependencies", "build-info links the anchors", "modes by policy",
+                              "SOURCE.md states", "lists exactly build-info's linked registry crates",
+                              "deny.toml", "no text member holds", "no private or stray files"),
+                      "cli-source": ("pax global header", "file set is exactly the commit's tree",
+                                     "each file's bytes = its git blob", "exec bit", "HEAD^{commit} = --commit"),
+                      "cli-sums": ("sha256sum's text format", "one line per CLI archive", "--sums-sha256"),
+                      "cli-set": ("archives, the source archive and SHA256SUMS once each",)}
+            kinds = sorted(a.kind for a in host.artifacts)
+            if kinds != ["cli"] * 5 + ["cli-set", "cli-source", "cli-sums"]:
+                failures.append(f"CLI clean release set: artifacts {kinds}")
+            for art in host.artifacts:
+                names = " · ".join(c.name for c in art.checks)
+                absent = [needle for needle in wanted.get(art.kind, ()) if needle not in names]
+                if absent:
+                    failures.append(f"CLI clean release set: {art.name} ran no check {absent}")
+            gnu, win, mac = "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"
+            judge("one archive and a SHA256SUMS listing it alone",
+                  [archives[gnu], sums("partial", [archives[gnu]])], PASS)
+            judge("the Windows archive alone", [archives[win]], PASS, options=("--tag", f"refs/tags/{tag}"))
+            judge("a branch build: no tag anywhere", [put("branch", f"{stem(mac)}.tar.gz", archive_bytes(
+                mac, inner(mac, release_tag=None)))], PASS)
+
+            def unattended(info):
+                info["builder"]["workflow_run"] = None
+
+            judge("a build outside GitHub Actions", [put("local", f"{stem(mac)}.tar.gz", archive_bytes(mac, inner(
+                mac, unattended, source_md=_cli_source_md(version, commit, tag, f"refs/tags/{tag}", None))))], PASS)
+            judge("the source archive alone", [source], PASS, options=tree)
+
+            # C1: the name.
+            clean_gnu = archives[gnu].read_bytes()
+            for label, filename, needle in (
+                    ("an archive named at another version", f"{CLI_PACKAGE}-0.10.0-{gnu}.tar.gz", "version 0.10.0"),
+                    ("an archive for a triple outside the five", f"{CLI_PACKAGE}-{version}-x86_64-unknown-linux-musl"
+                                                                 ".tar.gz", "target is one of"),
+                    ("a Linux archive as .zip", f"{stem(gnu)}.zip", "zip for the Windows target"),
+                    ("an archive name without a target", f"{CLI_PACKAGE}-{version}.tar.gz", "name is")):
+                judge(label, [put(slug(label), filename, clean_gnu)], FAIL, needle)
+            judge("the Windows archive as .tar.gz", [put("win-tgz", f"{stem(win)}.tar.gz", _gzip(_ustar(_cli_rows(
+                stem(win), inner(win), "qrscan.exe"))))], FAIL, "zip for the Windows target")
+
+            # C2: one gzip member over one plain ustar stream, as the writer makes it.
+            gnu_files = inner(gnu)
+
+            def rows() -> list:
+                return _cli_rows(stem(gnu), gnu_files, "qrscan")
+
+            def tar_case(label: str, data: bytes, *needles: str) -> None:
+                judge(label, [put(f"tar-{slug(label)}", f"{stem(gnu)}.tar.gz", data)], FAIL, *needles)
+
+            plain = _ustar(rows())
+            for label, header, needle in (
+                    ("a file name", b"\x1f\x8b\x08\x08\0\0\0\0\x02\xffqrscan.tar\0", "FNAME"),
+                    ("a modification time", b"\x1f\x8b\x08\x00" + CLI_FIXTURE_EPOCH.to_bytes(4, "little") + b"\x02\xff",
+                     "gzip mtime 1793597346"),
+                    ("zlib's Unix OS byte", GZIP_HEADER[:9] + b"\x03", "OS byte 3"),
+                    ("a comment", b"\x1f\x8b\x08\x10\0\0\0\0\x02\xffnote\0", "flags 0x10"),
+                    ("a header CRC", b"\x1f\x8b\x08\x02\0\0\0\0\x02\xff" + (zlib.crc32(
+                        b"\x1f\x8b\x08\x02\0\0\0\0\x02\xff") & 0xFFFF).to_bytes(2, "little"), "flags 0x02")):
+                tar_case(f"gzip header with {label}", _gzip(plain, header=header), needle)
+            tar_case("a second gzip member", _gzip(plain) + _gzip(b"more"), "byte(s) after the gzip member")
+            tar_case("a cut gzip stream", _gzip(plain)[:-64], "cut short")
+            tar_case("an uncompressed tar", plain, "not a gzip")
+            for kind, needle in ((tarfile.SYMTYPE, "symlink"), (tarfile.LNKTYPE, "hard link"),
+                                 (tarfile.FIFOTYPE, "FIFO"), (tarfile.CHRTYPE, "character device")):
+                link = tarfile.TarInfo(f"{stem(gnu)}/zz-{needle.replace(' ', '-')}")
+                link.type, link.linkname, link.mtime = kind, "qrscan", CLI_FIXTURE_EPOCH
+                tar_case(f"a {needle} member", _gzip(_ustar(rows() + [(link, b"")])), f"({needle})")
+            tar_case("a pax global header", _gzip(_ustar(rows(), pax_global={"comment": commit})),
+                     "a pax global header (comment)")
+            extended = rows()
+            extended[2][0].pax_headers = {"comment": "x"}
+            tar_case("a pax header before a member", _gzip(_ustar(extended, tarfile.PAX_FORMAT)),
+                     "an extended (pax or GNU) header before it")
+            tar_case("GNU tar headers", _gzip(_ustar(rows(), tarfile.GNU_FORMAT)), "not POSIX ustar")
+            old = rows()
+            old[3][0].type = tarfile.AREGTYPE
+            tar_case("an old-style regular file header (type NUL)", _gzip(_ustar(old)), "header type b'\\x00'")
+            tar_case("bytes after the end-of-archive blocks", _gzip(plain + b"trailing"), "non-NUL byte(s) after")
+            hidden = rows()
+            tar_case("a member after an all-zero block", _gzip(_tar_blocks(hidden[:-1]) + b"\0" * 512 + _tar_blocks(
+                hidden[-1:]) + b"\0" * 1024), "only a lenient parse lists")
+            twice = rows()
+            tar_case("a member twice", _gzip(_ustar(twice + [twice[2]])), "duplicate member name")
+
+            # C2: one clean zip stream.
+            win_files, win_top = inner(win), stem(win)
+            clean_zip = archives[win].read_bytes()
+            readme_entry = f"{win_top}/README.md"
+
+            def zip_case(label: str, data: bytes, *needles: str) -> None:
+                judge(label, [put(f"zip-{slug(label)}", f"{win_top}.zip", data)], FAIL, *needles)
+
+            def entry(name: str, **fields):
+                return lambda member, info: [setattr(info, k, v) for k, v in fields.items()] if member == name else None
+
+            for label, name, needle in (("a duplicate entry", f"{win_top}/LICENSE", "a duplicate entry"),
+                                        ("an absolute entry", "/abs.txt", "an absolute name"),
+                                        ("a drive-letter entry", "C:/abs.txt", "an absolute name"),
+                                        ("a `..` entry", f"{win_top}/../up.txt", "a `..` component"),
+                                        ("a backslash entry", f"{win_top}\\x.txt", "a backslash")):
+                zip_case(label, _cli_zip(win_top, win_files, "qrscan.exe", extra=[(name, b"x")]), needle)
+            zip_case("a symlink entry", _cli_zip(win_top, win_files, "qrscan.exe", entry(
+                "README.md", external_attr=0o120777 << 16)), "a symlink")
+            zip_case("an extra field", _cli_zip(win_top, win_files, "qrscan.exe", entry(
+                "README.md", extra=b"\x99\x99\x04\x00abcd")), "an extra field")
+            zip_case("an entry comment", _cli_zip(win_top, win_files, "qrscan.exe", entry(
+                "README.md", comment=b"note")), "an entry comment")
+            zip_case("an archive comment", _cli_zip(win_top, win_files, "qrscan.exe", comment=b"note"),
+                     "an archive comment")
+            zip_case("an encrypted entry", _zip_patch(clean_zip, readme_entry, flags=0x1), "encrypted")
+            zip_case("an entry with a data descriptor", _zip_patch(clean_zip, readme_entry, flags=0x8),
+                     "a data descriptor")
+            zip_case("a bzip2 entry", _zip_patch(clean_zip, readme_entry, method=12), "compression 12")
+            zip_case("bytes before the first entry", b"JUNK" * 4 + clean_zip, "+16 byte(s) before its local header")
+            zip_case("bytes after the end record", clean_zip + b"trailing",
+                     "data after the end-of-central-directory record")
+            zip_case("no zip at all", b"not a zip\n" * 4, "reads as one .zip archive")
+
+            # C3: one top directory named like the archive, exactly the members, bytewise order.
+            for label, files, needle in (
+                    ("an extra member", gnu_files | {"extra.txt": b"x\n"}, f"unexpected: {stem(gnu)}/extra.txt"),
+                    ("a missing member", {k: v for k, v in gnu_files.items() if k != "LICENSE-APACHE-2.0"},
+                     f"missing: {stem(gnu)}/LICENSE-APACHE-2.0"),
+                    ("a .env member", gnu_files | {".env": b"TOKEN=x\n"}, "no private or stray files: .env")):
+                tar_case(label, _gzip(_ustar(_cli_rows(stem(gnu), files, "qrscan"))), needle)
+            tar_case("no directory entry", _gzip(_ustar(rows()[1:])), f"missing: {stem(gnu)}/")
+            tar_case("another top directory", _gzip(_ustar(_cli_rows("qrscan-0.11.0", gnu_files, "qrscan"))),
+                     f"one top directory, {stem(gnu)}/")
+            swapped = rows()
+            swapped[1], swapped[2] = swapped[2], swapped[1]
+            tar_case("members out of bytewise order", _gzip(_ustar(swapped)),
+                     f"{stem(gnu)}/LICENSE before {stem(gnu)}/COPYRIGHT-rust-std.html")
+
+            # C4: owners, times and modes by policy, never from a filesystem.
+            for label, index, field, value, needle in (
+                    ("a member owned by uid 1001", 2, "uid", 1001, "uid/gid 1001/0"),
+                    ("a member with a user name", 2, "uname", "runner", "uname 'runner'"),
+                    ("a member with a group name", 2, "gname", "docker", "gname 'docker'"),
+                    ("a member with another mtime", 2, "mtime", CLI_FIXTURE_EPOCH + 1, "mtime 1793597347"),
+                    ("qrscan without its exec bits", -1, "mode", 0o644, "qrscan: mode 644, want 755"),
+                    ("a text member with exec bits", 2, "mode", 0o755, "LICENSE: mode 755, want 644"),
+                    ("a directory mode 0700", 0, "mode", 0o700, "mode 700, want 755")):
+                planted = rows()
+                setattr(planted[index][0], field, value)
+                tar_case(label, _gzip(_ustar(planted)), needle)
+            for label, edit, needle in (
+                    ("a zip entry made on another system", entry("LICENSE", create_system=0), "create_system 0"),
+                    ("a zip entry at another time", entry("LICENSE", date_time=(2020, 1, 1, 0, 0, 0)),
+                     "time (2020, 1, 1, 0, 0, 0)"),
+                    ("qrscan.exe without its exec bits", entry("qrscan.exe", external_attr=0o100644 << 16),
+                     "qrscan.exe: mode 100644, want 100755")):
+                zip_case(label, _cli_zip(win_top, win_files, "qrscan.exe", edit), needle)
+
+            def member_case(label: str, files: dict, *needles: str, triple: str = gnu, options=()) -> None:
+                path = put(f"member-{slug(label)}", f"{stem(triple)}.{CLI_TARGETS[triple]}",
+                           archive_bytes(triple, files))
+                judge(label, [path], FAIL, *needles, options=options)
+
+            # C5: the copies are their checkout files, the std notice the one build-info hashed.
+            member_case("LICENSE with CRLF line ends", gnu_files | {"LICENSE": LICENSE.read_bytes().replace(
+                b"\n", b"\r\n")}, "LICENSE is the AGPL text")
+            for member, source_path in CLI_COPIES.items():
+                if member != "LICENSE":
+                    member_case(f"an altered {member}", gnu_files | {member: gnu_files[member] + b"\nedited\n"},
+                                f"{member} is {rel(ROOT / source_path)} verbatim: differs")
+            member_case("a std notice other than build-info's", gnu_files | {"COPYRIGHT-rust-std.html": b"<html/>\n"},
+                        "COPYRIGHT-rust-std.html sha256 = build-info toolchain.std_notice_sha256")
+            CLI_COPIES["README.md"] = str(base / "absent" / "README.md")
+            member_case("the README source absent from the checkout", gnu_files, "absent from the checkout")
+            CLI_COPIES["README.md"] = str(readme)
+
+            # C6: SOURCE.md states each fact once, with the value this run knows.
+            facts = _cli_source_md(version, commit, tag, f"refs/tags/{tag}")
+            for label, text, needle in (
+                    ("another commit", _cli_source_md(version, "0" * 40, tag, f"refs/tags/{tag}"), "Commit:"),
+                    ("no source archive line", re.sub(rb"- Corresponding source:[^\n]*\n", b"", facts),
+                     "Corresponding source: no line"),
+                    ("a second tag line", facts + b"- Tag: v0.0.1\n", "Tag: ['- Tag: v0.11.0', '- Tag: v0.0.1']"),
+                    ("no tag on a tagged build", _cli_source_md(version, commit, None, f"refs/tags/{tag}"), "Tag:"),
+                    ("another workflow run", _cli_source_md(version, commit, tag, f"refs/tags/{tag}",
+                                                            "https://example.invalid/run/1"), "Workflow run:"),
+                    ("CRLF line ends", facts.replace(b"\n", b"\r\n"), "LF line ends"),
+                    ("a non-UTF-8 byte", facts + b"\xff\n", "UTF-8"),
+                    ("a home path", facts + b"Built in /home/alice/src.\n", "SOURCE.md: '/home/'")):
+                member_case(f"SOURCE.md with {label}", gnu_files | {"SOURCE.md": text}, needle)
+
+            # C7: build-info holds exactly its keys, and every fact this run can check.
+            def info_case(label: str, edit, *needles: str, triple: str = gnu) -> None:
+                member_case(f"build-info with {label}", inner(triple, edit), *needles, triple=triple,
+                            options=("--tag", tag))
+
+            def setter(*keys, value=None, drop: bool = False):
+                def edit(info):
+                    node = info
+                    for key in keys[:-1]:
+                        node = node[key]
+                    if drop:
+                        del node[keys[-1]]
+                    else:
+                        node[keys[-1]] = value
+                return edit
+
+            member_case("build-info that is no JSON", gnu_files | {"build-info.json": b"{"},
+                        "build-info.json reads as a JSON object")
+            member_case("build-info that is a JSON list", gnu_files | {"build-info.json": b"[]\n"},
+                        "build-info.json reads as a JSON object: list")
+            for label, edit, needle in (
+                    ("another schema", setter("schema", value="qrscan-build-info/2"), "schema 'qrscan-build-info/2'"),
+                    ("an extra key", setter("signed", value=True), "unexpected key signed"),
+                    ("a missing nested key", setter("builder", "image_version", drop=True),
+                     "missing key builder.image_version"),
+                    ("a linker without its unwinder", setter("linker", "unwinder", drop=True),
+                     "linker is no object with kind and unwinder"),
+                    ("a dependency with an extra key", setter("dependencies", 0, "path", value="/x"),
+                     "dependencies[0] keys"),
+                    ("rustflags as one string", setter("rustflags", value="-Copt-level=3"),
+                     "rustflags is no list of strings"),
+                    ("another binary name", setter("name", value="qrscan2"), "name 'qrscan2'"),
+                    ("another target", setter("target", value="aarch64-unknown-linux-gnu"), "target 'aarch64"),
+                    ("another version", setter("version", value="0.10.0"), "version '0.10.0'"),
+                    ("another commit", setter("source", "commit", value="0" * 40), "build-info source.commit"),
+                    ("a tag other than --tag", setter("source", "tag", value="v0.10.0"), "source.tag 'v0.10.0'"),
+                    ("a tag without its ref", setter("source", "ref", value="refs/heads/main"),
+                     "ref 'refs/heads/main'"),
+                    ("a dirty tree", setter("source", "dirty", value=True), "dirty: True"),
+                    ("another Cargo.lock", setter("source", "cargo_lock_sha256", value="0" * 64), "Cargo.lock sha256"),
+                    ("another repository", setter("source", "repository", value="https://github.com/fork/scanner"),
+                     "repository: 'https://github.com/fork/scanner'"),
+                    ("a string source_date_epoch", setter("source", "source_date_epoch", value="1793597346"),
+                     "source_date_epoch: '1793597346'"),
+                    ("another rustc", setter("toolchain", "rustc", value=["release: 1.98.1"]),
+                     "release lines ['1.98.1']"),
+                    ("another binary sha256", setter("binary", "sha256", value="0" * 64), "build-info binary"),
+                    ("another binary size", setter("binary", "size", value=1), "size 1"),
+                    ("fat LTO", setter("profile", "lto", value="fat"), "build-info profile"),
+                    ("rxing without overflow checks", setter("profile", "overflow_checks", value={}),
+                     "build-info profile"),
+                    ("a host path remap", setter("rustflags", 0, value="--remap-path-prefix=/home/runner/.cargo=/c"),
+                     "build-info rustflags"),
+                    ("no row flag", lambda info: info["rustflags"].pop(), "build-info rustflags"),
+                    ("an extra flag", lambda info: info["rustflags"].append("-Ctarget-cpu=native"),
+                     "build-info rustflags"),
+                    ("no unwinder on a GNU row", setter("linker", "unwinder", value=None), "unwinder None"),
+                    ("a deployment target on Linux", setter("deployment_target", value="10.15"),
+                     "deployment_target = null"),
+                    ("another dependency checksum", setter("dependencies", 0, "checksum", value="0" * 64),
+                     "checksum '" + "0" * 64),
+                    ("a dependency outside Cargo.lock", lambda info: info["dependencies"].append(
+                        dict(info["dependencies"][0], version="0.0.0")), "is not in Cargo.lock"),
+                    ("a dependency twice", lambda info: info["dependencies"].append(dict(info["dependencies"][0])),
+                     "listed twice"),
+                    ("a dependency without a license", setter("dependencies", 0, "license", value=""),
+                     "has no license expression"),
+                    ("a dependency name that is a list", setter("dependencies", 0, "name", value=["clap"]),
+                     "a name or version that is no string"),
+                    ("an anchor missing", lambda info: info.update(dependencies=[
+                        d for d in info["dependencies"] if d["name"] != "rxing"]), "missing: rxing"),
+                    ("a build dependency outside Cargo.lock", setter("build_dependencies", 0, "version", value="0.0.0"),
+                     "build_dependencies: ")):
+                info_case(label, edit, needle)
+            info_case("a macOS deployment target of 12.0", setter("deployment_target", value="12.0"),
+                      'deployment_target = "11.0"', triple=mac)
+
+            # C8: the license file restates build-info's linked registry crates, with texts that hash to their names.
+            third = gnu_files["THIRD-PARTY-LICENSES.txt"]
+            head, _, rest = third.partition(b"\n\n")
+            blocks_part, _, appendix = rest.partition(b"--- text ")
+            blocks = [block + b"\n\n" for block in blocks_part.split(b"\n\n") if block]
+            appendix = b"--- text " + appendix
+            texts = [b"--- text " + text for text in appendix.split(b"--- text ") if text]
+            registry = sorted((d for d in linked if d["source"] is not None), key=lambda d: (d["name"], d["version"]))
+            first, second = (f"{d['name']} {d['version']}" for d in registry[:2])
+
+            def third_case(label: str, data: bytes, *needles: str) -> None:
+                member_case(f"THIRD-PARTY-LICENSES.txt with {label}", gnu_files | {"THIRD-PARTY-LICENSES.txt": data},
+                            *needles)
+
+            mit, apache = sha256(_MIT_TEXT), sha256(_APACHE_TEXT)
+            for label, data, needle in (
+                    ("another target in its header", third.replace(gnu.encode(), mac.encode(), 1),
+                     f"header names qrscan {version} for {gnu}"),
+                    ("a crate missing", _cli_third_party(version, gnu, registry[1:]),
+                     f"not listed: {registry[0]['name']}"),
+                    ("a build-only crate", _cli_third_party(version, gnu, [*registry, dep(*build_only, "MIT")]),
+                     f"not a linked registry crate in build-info: {build_only[0]}"),
+                    ("crates out of order", head + b"\n\n" + b"".join([blocks[1], blocks[0], *blocks[2:]]) + appendix,
+                     f"{second} before {first}"),
+                    ("another license", third.replace(b"license: Apache-2.0\n", b"license: MIT\n", 1),
+                     "license 'MIT', build-info 'Apache-2.0'"),
+                    ("another source", third.replace(b"source: registry+", b"source: git+", 1), "source 'git+"),
+                    ("another checksum", re.sub(rb"checksum: [0-9a-f]{64}", b"checksum: " + b"0" * 64, third, count=1),
+                     "checksum '" + "0" * 64),
+                    ("a text it names but does not hold", head + b"\n\n" + b"".join(blocks) + b"".join(
+                        t for t in texts if mit.encode() not in t), "which the file does not hold"),
+                    ("a text that does not hash to its name", third.replace(b"Permission is hereby granted",
+                                                                             b"Permission is hereby GRANTED"),
+                     f"text {mit[:16]}… hashes to"),
+                    ("a text no crate names", third + f"--- text {sha256(b'x')} 1 bytes ---\nx\n".encode(),
+                     "is named by no crate"),
+                    ("texts out of order", head + b"\n\n" + b"".join(blocks) + b"".join(reversed(texts)),
+                     "texts not sorted by sha256"),
+                    ("a crate block without its checksum", re.sub(rb"checksum: [0-9a-f]{64}\n", b"", third, count=1),
+                     "a malformed crate block"),
+                    ("a text cut short", third[:-40], "is cut short"),
+                    ("no empty line after its header", third.replace(b"\n\n", b"\n", 1),
+                     "no empty line after the header")):
+                third_case(label, data, needle)
+            for label, expression in (("GPL-3.0-only", "GPL-3.0-only"), ("MIT-0", "MIT-0"),
+                                      ("MIT AND GPL-3.0-only", "MIT AND GPL-3.0-only"),
+                                      ("an unbalanced expression", "(MIT OR Apache-2.0")):
+                info_case(f"a dependency licensed {label}", setter("dependencies", 0, "license", value=expression),
+                          "satisfiable from deny.toml's allow list")
+            # The expression evaluator alone: deny.toml's list, every SPDX form cargo-deny reads.
+            allowed = deny_allowed()
+            for expression, want in (("MIT", True), ("MIT/Apache-2.0", True), ("Apache-2.0 WITH LLVM-exception", True),
+                                     ("(MIT OR Apache-2.0) AND Unicode-3.0", True), ("mit or Apache-2.0", True),
+                                     ("GPL-2.0-only WITH Classpath-exception-2.0 OR MIT", True),
+                                     ("MIT AND GPL-3.0-only", False), ("GPL-3.0-only", False),
+                                     ("Apache-2.0 WITH Classpath-exception-2.0", False), ("MIT-0", False),
+                                     ("MIT OR", None), ("(MIT", None), ("MIT Apache-2.0", None), ("WITH MIT", None)):
+                count += 1
+                try:
+                    got = spdx_allowed(expression, allowed)
+                except ValueError:
+                    got = None
+                if got is not want:
+                    failures.append(f"CLI spdx {expression!r}: {got} (want {want})")
+
+            # C9: no text member names a build host, generically or by this host's own paths, nor a --forbid value.
+            marker = "acme-private-marker"
+            for label, plant, needle, env, options in (
+                    ("plans/ in a text member", "see plans/notes.md", "COPYRIGHT-rust-std.html: 'plans/'", {}, ()),
+                    ("a --forbid value", f"built for {marker}", "COPYRIGHT-rust-std.html: --forbid value 2", {},
+                     ("--forbid", "never-present", "--forbid", marker.upper())),
+                    ("the RUNNER_TEMP path", "/srv/ci-temp/run-7/out", "COPYRIGHT-rust-std.html: RUNNER_TEMP",
+                     {"RUNNER_TEMP": "/srv/ci-temp/run-7"}, ()),
+                    ("the checkout path in Windows form", str(ROOT).replace("/", "\\"), "the checkout path", {}, ()),
+                    ("an upper-case Windows user path", "C:\\USERS\\RUNNERADMIN\\x", "'runneradmin'", {}, ()),
+                    ("a macOS runner home", "/Users/runner/work", "'/Users/runner'", {}, ())):
+                saved_env = {key: os.environ.get(key) for key in env}
+                os.environ.update(env)
+                try:
+                    planted = archive_bytes(gnu, inner(gnu, std_notice=notice + plant.encode() + b"\n"))
+                    host = judge(f"leak scan: {label}", [put(f"leak-{slug(label)}", f"{stem(gnu)}.tar.gz", planted)],
+                                 FAIL, needle, options=options)
+                finally:
+                    for key, value in saved_env.items():
+                        os.environ.pop(key) if value is None else os.environ.__setitem__(key, value)
+                said = markdown(host, "leak scan") + json.dumps([dataclasses.asdict(a) for a in host.artifacts])
+                if marker in said.lower():
+                    failures.append(f"CLI leak scan: {label}: the --forbid value reached the report")
+
+            # S1-S3: SHA256SUMS lists exactly the files given beside it, in sha256sum's format.
+            one, two = archives[gnu], archives[mac]
+            lines = {path.name: f"{sha256(path.read_bytes())}  {path.name}\n" for path in (one, two)}
+            good = "".join(lines[name] for name in sorted(lines))
+            for label, given, text, needle, options in (
+                    ("CRLF line ends", [one, two], good.replace("\n", "\r\n"), "a CR byte", ()),
+                    ("lines out of order", [one, two], "".join(lines[n] for n in sorted(lines, reverse=True)),
+                     f"{one.name} before {two.name}", ()),
+                    ("a wrong sha256", [one], f"{'0' * 64}  {one.name}\n", f"{one.name}: listed {'0' * 16}…", ()),
+                    ("a line missing", [one, two], lines[one.name], f"no line for {two.name}", ()),
+                    ("a line for a file not given", [one], good, f"a line for {two.name}, which was not given", ()),
+                    ("a line for itself", [one], lines[one.name] + f"{'1' * 64}  {CLI_PACKAGE}-{version}-SHA256SUMS\n",
+                     f"a line for {CLI_PACKAGE}-{version}-SHA256SUMS, which was not given", ()),
+                    ("an upper-case sha256", [one], lines[one.name].upper().replace(one.name.upper(), one.name),
+                     "line 1 is not", ()),
+                    ("a binary-mode marker", [one], lines[one.name].replace("  ", " *"), "line 1 is not", ()),
+                    ("a path in a name", [one], lines[one.name].replace("  ", "  release/"), "line 1 is not", ()),
+                    ("no final newline", [one], lines[one.name].rstrip("\n"), "no final newline", ()),
+                    ("a line twice", [one], lines[one.name] * 2, f"{one.name} listed twice", ()),
+                    ("a non-ASCII byte", [one], lines[one.name] + "é\n", "a non-ASCII byte", ()),
+                    ("no line at all", [], "", "no line", ()),
+                    ("a sha256 other than --sums-sha256", [one, two], good, "its sha256 = --sums-sha256",
+                     ("--sums-sha256", "f" * 64))):
+                listing = put(f"sums-{slug(label)}", f"{CLI_PACKAGE}-{version}-SHA256SUMS", text.encode())
+                judge(f"SHA256SUMS with {label}", [*given, listing], FAIL, needle, options=options)
+            judge("SHA256SUMS named for another version", [one, put("sums-version", f"{CLI_PACKAGE}-0.10.0-SHA256SUMS",
+                                                                  lines[one.name].encode())], FAIL,
+                  f"name is {CLI_PACKAGE}-{version}-SHA256SUMS")
+
+            # C10: the source archive is the commit's tree, file for file, under one prefix.
+            prefix = f"{CLI_PACKAGE}-{version}-source/"
+
+            def retar(edit=None, comment=commit, header: bytes = GZIP_HEADER) -> bytes:
+                with tarfile.open(fileobj=io.BytesIO(git_tar)) as src:
+                    members = [(m, src.extractfile(m).read() if m.isfile() else b"") for m in src.getmembers()]
+                if edit is not None:
+                    members = edit(members)
+                return _gzip(_ustar(members, tarfile.PAX_FORMAT, {"comment": comment} if comment else None), 0, header)
+
+            def changed(name: str, data: bytes = None, **fields):
+                def edit(members):
+                    for info, _ in members:
+                        if info.name == prefix + name:
+                            for key, value in fields.items():
+                                setattr(info, key, value)
+                    return [(info, data if data is not None and info.name == prefix + name else body)
+                            for info, body in members]
+                return edit
+
+            def extra_member(kind=tarfile.REGTYPE):
+                def edit(members):
+                    info = tarfile.TarInfo(prefix + "extra.txt")
+                    info.type, info.size, info.linkname = kind, 2 if kind == tarfile.REGTYPE else 0, "README.md"
+                    return members + [(info, b"x\n" if kind == tarfile.REGTYPE else b"")]
+                return edit
+
+            with tarfile.open(fileobj=io.BytesIO(git_tar)) as src:
+                executable = next(m.name for m in src.getmembers() if m.isfile() and m.mode & 0o111)
+            altered = (ROOT / "LICENSING.md").read_bytes() + b"\nedited\n"
+            for label, data, needle, at, src_tree in (
+                    ("an extra file", retar(extra_member()), f"unexpected: {prefix}extra.txt", None, None),
+                    ("a symlink", retar(extra_member(tarfile.SYMTYPE)), "extra.txt (symlink)", None, None),
+                    ("a missing file", retar(lambda m: [r for r in m if r[0].name != prefix + "README.md"]),
+                     f"missing: {prefix}README.md", None, None),
+                    ("an altered file", retar(changed("LICENSING.md", size=len(altered), data=altered)),
+                     f"differ: {prefix}LICENSING.md", None, None),
+                    ("an exec bit added", retar(changed("README.md", mode=0o775)),
+                     f"{prefix}README.md (tree 100644, member 775)", None, None),
+                    ("an exec bit removed", retar(changed(executable.removeprefix(prefix), mode=0o664)),
+                     f"{executable} (tree 100755, member 664)", None, None),
+                    ("another commit's comment", retar(comment="0" * 40), "comment '" + "0" * 40, None, None),
+                    ("no pax global header", retar(comment=None), "pax global header [], comment None", None, None),
+                    ("another prefix", retar(lambda m: [(setattr(i, "name", i.name.replace(
+                        prefix, "scanner/", 1)) or i, d) for i, d in m]), "file set is exactly the commit's tree",
+                     None, None),
+                    ("a gzip file name", retar(header=GZIP_HEADER[:3] + b"\x08" + GZIP_HEADER[4:] + b"src.tar\0"),
+                     "gzip FNAME set", None, None),
+                    ("a --commit that is not --source-tree's HEAD", source.read_bytes(),
+                     "--source-tree's HEAD^{commit} = --commit: HEAD^{commit} '", "f" * 40, None),
+                    ("a --source-tree that is no git checkout", source.read_bytes(), "has no HEAD commit", None,
+                     str(base))):
+                path = put(f"source-{slug(label)}", source.name, data)
+                judge(f"source archive with {label}", [path], FAIL, needle, at=at,
+                      options=("--source-tree", src_tree or str(ROOT)))
+                path.unlink()
+            judge("source archive named for another version", [put("source-version", f"{CLI_PACKAGE}-0.10.0-source"
+                                                                  ".tar.gz", source.read_bytes())], FAIL,
+                  f"name is {CLI_PACKAGE}-{version}-source.tar.gz", options=tree)
+            # What git says about a tree this checkout does not have: symlinks, submodules, export attributes.
+            oid = "1" * 40
+            listing = "".join(f"{row}\x00" for row in (
+                f"100644 blob {oid}\tREADME.md", f"100755 blob {oid}\tscripts/run.sh", f"040000 tree {oid}\tdocs",
+                f"120000 blob {oid}\tlink", f"160000 commit {oid}\tvendor/sub")).encode()
+            attributes = (b"README.md\0export-ignore\0unspecified\0README.md\0export-subst\0set\0"
+                          b"docs\0export-ignore\0set\0scripts/run.sh\0export-subst\0unset\0")
+            for label, got, want in (
+                    ("ls-tree rows", parse_ls_tree(listing)[1], ("100755", "blob", oid, "scripts/run.sh")),
+                    ("check-attr rows", parse_check_attr(attributes)["README.md"],
+                     {"export-ignore": "unspecified", "export-subst": "set"}),
+                    ("a tree git archive cannot map one to one", source_tree_problems(
+                        parse_ls_tree(listing), parse_check_attr(attributes)),
+                     ["link: a symlink", "vendor/sub: a submodule", "README.md: export-subst set",
+                      "docs: export-ignore set"]),
+                    ("a clean tree", source_tree_problems(parse_ls_tree(listing)[:3], {}), [])):
+                count += 1
+                if got != want:
+                    failures.append(f"CLI {label}: {got!r} (want {want!r})")
+
+            # R1: the release set is complete, from one build, and holds nothing else.
+            def release_set(label: str, files: list, *needles: str) -> None:
+                judge(f"release set: {label}", [*files, sums(f"set-{slug(label)}", [
+                    f for f in files if not f.name.endswith(".crate")])], FAIL, *needles,
+                      options=("--release-set", *tree))
+
+            others = {triple: put(f"other-notice-{triple}", f"{stem(triple)}.{ext}", archive_bytes(
+                triple, inner(triple, std_notice=notice + b"<!-- another toolchain -->\n")))
+                for triple, ext in CLI_TARGETS.items() if triple == mac}
+            release_set("four archives", [a for t, a in archives.items() if t != mac] + [source],
+                        f"no {mac} archive")
+            release_set("a target twice", [*release, put("twice", archives[gnu].name, archives[gnu].read_bytes())],
+                        f"2 {gnu} archives")
+            release_set("two versions", [*release, put("old", f"{CLI_PACKAGE}-0.10.0-{gnu}.tar.gz", clean_gnu)],
+                        f"versions 0.10.0, {version}")
+            release_set("differing std notices", [*(a for t, a in archives.items() if t != mac), others[mac], source],
+                        "2 std notices across the archives")
+            release_set("no source archive", list(archives.values()), "no source archive")
+            judge("release set: no SHA256SUMS", release, FAIL, "no SHA256SUMS", options=("--release-set", *tree))
+            crate = _tar(put("crate", "placeholder", b"").with_name(f"qrcode-ai-scanner-{version}.crate"),
+                         f"qrcode-ai-scanner-{version}", _clean_crate(version))
+            release_set("a crate beside the CLI files", [*release, crate], "is not a CLI release asset")
+            wheel = _zip(put("wheel", "placeholder", b"").with_name(
+                f"qrcode_ai_scanner-{version}-cp38-abi3-manylinux_2_17_x86_64.whl"), _clean_wheel(version))
+            judge("release set: a wheel beside the CLI files", [*full, wheel], FAIL,
+                  f"wheel {wheel.name} is not a CLI release asset", options=("--release-set", *tree))
+
+            # Usage: CLI files need a full --commit, the source archive a --source-tree; CLI options need CLI files.
+            for label, argv in (
+                    ("a CLI archive without --commit", ["archive", str(one)]),
+                    ("a short commit", ["archive", str(one), "--commit", commit[:12]]),
+                    ("an upper-case commit", ["archive", str(one), "--commit", commit.upper()]),
+                    ("the source archive without --source-tree", ["archive", str(source), "--commit", commit]),
+                    ("--sums-sha256 without SHA256SUMS", ["archive", str(one), "--commit", commit,
+                                                          "--sums-sha256", "0" * 64]),
+                    ("--sums-sha256 that is not a sha256", ["archive", str(one), str(checksums), "--commit", commit,
+                                                            "--sums-sha256", "xyz"]),
+                    ("--commit with no CLI file", ["archive", str(crate), "--commit", commit]),
+                    ("an empty --forbid", ["archive", str(one), "--commit", commit, "--forbid", ""]),
+                    ("a blank --forbid", ["archive", str(one), "--commit", commit, "--forbid", "  "]),
+                    ("--commit with versions", ["versions", "--commit", commit]),
+                    ("--forbid with selftest", ["selftest", "--forbid", "x"])):
+                count += 1
+                code = _run_main(argv)
+                if code != 2:
+                    failures.append(f"CLI usage, {label}: exit {code} (want 2)")
+
+            # --record: once nothing failed, one sha256sum line per file given, SHA256SUMS included.
+            for label, files, options, want in (
+                    ("the clean release set", full, ("--release-set", "--tag", tag, "--sums-sha256", qualified), 0),
+                    ("a SHA256SUMS other than --sums-sha256", full, ("--release-set", "--sums-sha256", "e" * 64), 1)):
+                count += 1
+                record = base / "records" / slug(label) / "cli-inspected.sha256"
+                record.parent.mkdir(parents=True, exist_ok=True)
+                record.write_text(f"{'0' * 64}  stale\n")
+                code = _run_main(["archive", *map(str, files), "--commit", commit, *tree, *options, "--strict",
+                                  "--quiet", "--record", str(record)])
+                want_text = "".join(f"{sha256(p.read_bytes())}  {p}\n" for p in files) if want == 0 else None
+                got = record.read_text() if record.exists() else None
+                if code != want or got != want_text:
+                    failures.append(f"CLI --record after {label}: exit {code} (want {want}), record {got!r:.90}")
+        finally:
+            CLI_COPIES["README.md"] = saved
+    return count, failures
+
+
 # ---------------------------------------------------------------- report
 
 
@@ -2345,7 +4042,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("target", choices=["all", "crates", "node", "wasm", "python", "flutter",
                                            "archive", "pypi-live", "licenses", "profiles", "versions", "selftest"])
-    parser.add_argument("files", nargs="*", help="archive: files to inspect · pypi-live: wheels and sdist to compare")
+    parser.add_argument("files", nargs="*", help="archive: files to inspect (packages, or CLI release files) · "
+                                                 "pypi-live: wheels and sdist to compare")
     parser.add_argument("--out", help="write package-inspect.{json,md} + logs/ here")
     parser.add_argument("--strict", action="store_true", help="UNAVAILABLE fails too")
     parser.add_argument("--quiet", action="store_true", help="stdout: the verdict table and failed checks only")
@@ -2358,14 +4056,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--package-root", help="flutter: inspect this staged package root, not the in-tree binding")
     parser.add_argument("--sync", action="store_true", help="licenses: rewrite stale copies")
     parser.add_argument("--nightly", help="profiles: the nightly toolchain for --unit-graph")
-    parser.add_argument("--tag", help="versions: the release tag (vX.Y.Z or refs/tags/vX.Y.Z)")
+    parser.add_argument("--tag", help="versions: the release tag (vX.Y.Z or refs/tags/vX.Y.Z) · archive: the tag the "
+                                      "CLI release files were built from")
     parser.add_argument("--record", help="archive · flutter: once nothing failed, write `<sha256>  <file>` per inspected file "
                                          "(sha256sum's format) to this file; removed when anything failed")
     parser.add_argument("--release-set", action="store_true",
                         help="node · archive: the set about to publish, complete and nothing else — npm: the main "
                              "package pins every napi target at this version and every pin has its platform "
-                             "package; Python: one wheel per row of python.yml's matrix and one sdist. flutter: the "
+                             "package; Python: one wheel per row of python.yml's matrix and one sdist; CLI: the "
+                             "five archives, the source archive and SHA256SUMS. flutter: the "
                              "complete portable candidate and real pub validator (required in every Flutter inspection)")
+    parser.add_argument("--commit", help="archive: the full commit id the CLI release files were built from "
+                                         "(required with them)")
+    parser.add_argument("--sums-sha256", help="archive: the sha256 the CLI SHA256SUMS file must have")
+    parser.add_argument("--source-tree", help="archive: a git checkout holding --commit (required with the CLI "
+                                              "source archive)")
+    parser.add_argument("--forbid", action="append", metavar="S",
+                        help="archive: a string no CLI text member may hold (repeatable; never echoed)")
     return parser
 
 
@@ -2374,6 +4081,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.record and args.target not in ("archive", "flutter"):
         parser.error("--record goes with archive or flutter")
+    cli_options = [flag for flag, value in (("--commit", args.commit), ("--sums-sha256", args.sums_sha256),
+                                            ("--source-tree", args.source_tree), ("--forbid", args.forbid))
+                   if value is not None]
+    if cli_options and args.target != "archive":
+        parser.error(f"{', '.join(cli_options)}: archive only (CLI release files)")
     if args.target == "selftest":
         return self_test()
 
