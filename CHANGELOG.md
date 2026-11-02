@@ -140,6 +140,11 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.
   The floor itself is unchanged.
+- The packed Python consumer runs on interpreters back to the advertised
+  floor (`requires-python >= 3.8`, abi3-py38): its probe no longer needs
+  3.9's `Path.is_relative_to`, and its venv links the interpreter like
+  `python -m venv`, since a copied standalone 3.8–3.10 interpreter cannot
+  find its `libpython`. Its pytest suite keeps its 3.11 floor.
 - Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.

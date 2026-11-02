@@ -26,18 +26,23 @@ def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def inside(path, root):
+    """Path.is_relative_to, which the probe's floor interpreter (3.8) lacks."""
+    return path == root or root in path.parents
+
+
 def probe(args):
     import qrcode_ai_scanner as qr
 
     prefix = Path(sys.prefix).resolve()
     imported = Path(qr.__file__).resolve()
     assert sys.prefix != sys.base_prefix, "the consumer must run in a fresh venv"
-    assert imported.is_relative_to(prefix), (imported, prefix)
+    assert inside(imported, prefix), (imported, prefix)
     extensions = [Path(module.__file__).resolve() for name, module in sys.modules.items()
                   if name.startswith("qrcode_ai_scanner.") and getattr(module, "__file__", "").endswith(tuple(EXTENSION_SUFFIXES))]
     assert len(extensions) == 1, f"expected one loaded native extension, found {extensions}"
     extension = extensions[0]
-    assert extension.is_relative_to(prefix), (extension, prefix)
+    assert inside(extension, prefix), (extension, prefix)
     assert qr.__version__ == importlib.metadata.version("qrcode-ai-scanner") == args.version
     data = Path(args.fixture).read_bytes()
     text = "https://qrcode-ai.com/c/v5q"
@@ -129,7 +134,9 @@ def main():
     assert len(wheels) == 1, f"expected one {args.wheel_tag} wheel, found {wheels}"
     consumer = Path(tempfile.mkdtemp(prefix="qrscan-packed-python-"))
     venv_dir = consumer / "venv"
-    venv.EnvBuilder(with_pip=True).create(venv_dir)
+    # Symlinked like `python -m venv` on POSIX: a copied interpreter that loads
+    # @executable_path/../lib/libpython (the 3.8-3.10 standalone builds) aborts.
+    venv.EnvBuilder(with_pip=True, symlinks=os.name != "nt").create(venv_dir)
     python = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     fixture = consumer / "fixture.png"
     shutil.copyfile(Path(args.fixture).resolve(), fixture)
