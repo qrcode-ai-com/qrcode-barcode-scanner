@@ -6,8 +6,10 @@ The source repository is `qrcode-ai-com/qrcode-barcode-scanner`, transferred
 from `supernovae-st/qrcode-barcode-scanner` (earlier `supernovae-st/qrcode-ai-scanner`)
 on 1 November 2026; the old addresses redirect. Release one
 multiformat engine and its runtime bindings; no QR/barcode extraction is required.
-Existing package names, tags, registry artifacts and OCI image metadata retain
-their identities. See [SOURCE-AND-EXTRACTION.md](SOURCE-AND-EXTRACTION.md).
+Published versions keep their package names, tags, registry artifacts and OCI
+image metadata; from 0.11.0 the packages are published under the
+`qrcode-barcode-scanner` family names, never under a former name. See
+[SOURCE-AND-EXTRACTION.md](SOURCE-AND-EXTRACTION.md).
 
 The repository rename does not publish packages or change publisher grants.
 Before a future release, verify trusted-publisher/OIDC settings and source links
@@ -15,12 +17,24 @@ against the actual repository identity. Follow the artifact-specific gates below
 The transfer changed the GitHub OIDC identity every trusted publisher matches
 on: tokens now name owner `qrcode-ai-com` and repository
 `qrcode-barcode-scanner`. Package metadata already names that repository (npm
-provenance requires `repository.url` to match the building repository). The
-publishers on crates.io, npm and PyPI recorded below as of 0.10.1 name the
-pre-transfer `supernovae-st/qrcode-ai-scanner`; their owner re-binds each one to
-`qrcode-ai-com/qrcode-barcode-scanner` (same workflow file and environment)
-before the first upload from the new repository, and pub.dev at its first
-automated publish. Until then a publishing job stops at authentication.
+provenance requires `repository.url` to match the building repository).
+
+From 0.11.0 the packages carry new names, and each new name needs a trusted
+publisher of its own: crates.io and npm can bind one only after the package's
+first version exists, while PyPI accepts a pending publisher before it. The
+owner uploads each first version from the tag run's inspected artifacts (see
+[First publication of a new name](#first-publication-of-a-new-name)), then
+configures that name's publisher: owner `qrcode-ai-com`, repository
+`qrcode-barcode-scanner`, the existing workflow file and environment. The
+publishers on crates.io, npm and PyPI recorded below as of 0.10.1 belong to the
+former names and name the pre-transfer `supernovae-st/qrcode-ai-scanner`; they
+are never re-bound to this repository, because a re-bound publisher would open
+a CI path that uploads under a former name. Each new publisher is recorded in
+three states: configured (read back in the registry's settings), exchanged (an
+OIDC token exchange succeeded) and exercised (an upload through it succeeded).
+Only an exercised publisher proves the binding. Until a name's publisher is
+configured, a publishing job that would upload under it stops at
+authentication with nothing uploaded; pub.dev follows owner step 6.
 
 The proven runbook — three releases shipped with it on 2026-07-08 alone
 (0.6.0 · 0.7.0 · 0.7.1). Every step exists because skipping it bit us once;
@@ -42,18 +56,23 @@ Bump the workspace `Cargo.toml` version, then:
 cargo run -p xtask -- sync-version    # mirrors every publish surface + doc pins
 ```
 
-It rewrites the 8 hand-spelled surfaces (`bindings/flutter/rust/Cargo.toml`
+It rewrites the hand-spelled version surfaces (`bindings/flutter/rust/Cargo.toml`
 · py · uniffi · the cli core pin · `pubspec.yaml` · `build.gradle.kts` ·
-`package.json`) **and** the version-pinned doc coordinates (JitPack lines
-in `bindings/kotlin/README.md` + root `README.md`), then prints the
-five-lockfile regeneration loop (workspace, py, uniffi, flutter/rust,
-fuzz). `--check` verifies without writing (exit 1 on drift) — the local
-twin of the mobile.yml version gate, which stays the CI enforcement.
+`package.json`), the Flutter example lockfile's entry for the plugin, **and**
+the version-pinned doc coordinate (the JitPack coordinate line in
+`bindings/kotlin/README.md`), then prints the five-lockfile regeneration loop
+(workspace, py, uniffi, flutter/rust, fuzz). `--check` verifies without
+writing (exit 1 on drift) — the local twin of the mobile.yml version gate,
+which stays the CI enforcement. A required surface whose file spells no line
+to sync fails both modes, and nothing is written.
 
-**Version-pinned docs ride the same commit**: the JitPack coordinate in
-`bindings/kotlin/README.md` AND the root `README.md` mobile paragraph
+**Version-pinned docs ride the same commit**: the JitPack coordinate line in
+`bindings/kotlin/README.md` is the one left. Such a coordinate once lagged
 (left at v0.6.0 through two releases, 2026-07-08 — greppable:
 `grep -rn "qrcode-ai-scanner:v0" README.md bindings/`).
+The coordinate now spells the new artifact name, so the live check covers both
+spellings and must print only that line, at the new version:
+`grep -rnE 'qrcode-ai-scanner:v0|qrcode-barcode-scanner:v0' README.md bindings/`.
 
 **So do the goldens.** `spec_golden` pins every `spec/examples/*.json` to
 the build's `versions` (the crate version included): rebuild the CLI after
@@ -122,17 +141,17 @@ cargo +1.99.1 fmt --all --check
 RUSTFLAGS="-D warnings" cargo +1.99.1 clippy --workspace --all-targets --all-features --locked
 cargo +1.99.1 nextest run --workspace --locked && cargo +1.99.1 test --doc --workspace --locked
 # the core with one engine, as a dependency without default features builds it
-RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-ai-scanner --locked --no-default-features \
+RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-barcode-scanner --locked --no-default-features \
   --features engine-rqrr,serde --lib
-RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-ai-scanner --locked --no-default-features \
+RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-barcode-scanner --locked --no-default-features \
   --features engine-rxing,serde --lib
-cargo +1.99.1 nextest run -p qrcode-ai-scanner --locked --no-default-features \
+cargo +1.99.1 nextest run -p qrcode-barcode-scanner --locked --no-default-features \
   --features engine-rqrr,serde --lib --test capabilities \
   -E 'binary(capabilities) | test(/^capabilities::/)'
-cargo +1.99.1 nextest run -p qrcode-ai-scanner --locked --no-default-features \
+cargo +1.99.1 nextest run -p qrcode-barcode-scanner --locked --no-default-features \
   --features engine-rxing,serde --test capabilities
 python3 scripts/check-type-parity.py
-cargo +1.88 check -p qrcode-ai-scanner --all-features --locked   # MSRV
+cargo +1.88 check -p qrcode-barcode-scanner --all-features --locked   # MSRV
 python3 scripts/check-publish-guards.py --self-test   # both workflow policies' own scenarios
 python3 scripts/check-publish-guards.py               # the publishing-job policy (§ Publishing)
 python3 scripts/check-publish-guards.py --toolchains  # one Rust toolchain (§ Toolchain)
@@ -261,7 +280,7 @@ before the tag push. Its pin commit is the commit the tag names, so it comes
 before the gates of § 4.
 
 The CLI assets carry the corresponding source,
-`qrcode-ai-scanner-cli-X.Y.Z-source.tar.gz`, a `git archive` of the tagged
+`qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`, a `git archive` of the tagged
 commit (`SOURCE_ASSET` in `scripts/cli-release.py`). A published release takes
 no later asset, so that choice, and the `LICENSING.md` wording that describes
 it, are settled before the tag, never after.
@@ -316,8 +335,8 @@ nothing and names the state; the owner's step depends on it:
   create it again as § 5 says), then re-run.
 - **The draft holds CLI assets that are not this run's set** (a half-done
   upload, other bytes from another run, an unexpected
-  `qrcode-ai-scanner-cli-*` name, or SHA256SUMS ahead of a missing asset):
-  delete the draft's `qrcode-ai-scanner-cli-*` assets (`gh release
+  `qrcode-barcode-scanner-cli-*` name, or SHA256SUMS ahead of a missing asset):
+  delete the draft's `qrcode-barcode-scanner-cli-*` assets (`gh release
   delete-asset vX.Y.Z <name>`: a draft stays modifiable, and no workflow
   deletes), then dispatch mode `build` on the tag (`gh workflow run
   cli-archives.yml --ref vX.Y.Z -f mode=build`). That run builds, judges and
@@ -332,7 +351,7 @@ nothing and names the state; the owner's step depends on it:
 
 | Leg | Expectation |
 |---|---|
-| crates-publish · npm-publish · python | green; registries live in ~10-15 min — once the one-time setup is done (§ Publishing). Before it, crates-publish and npm-publish stop at authentication; with only some npm trusted publishers configured, the configured platform packages go up and the main package does not, until a re-run after the rest are configured |
+| crates-publish · npm-publish · python | green; registries live in ~10-15 min — once the one-time setup is done (§ Publishing). Before it, crates-publish and npm-publish stop at authentication; with only some npm trusted publishers configured, the configured platform packages go up and the main package does not, until a re-run after the rest are configured. On the first version under a new name (0.11.0), crates-publish and npm-publish upload nothing: the owner uploads that run's inspected artifacts (§ Publishing, First publication of a new name), and the jobs, approved or re-run, compare the live versions; python publishes through the pending publisher of owner step 5 |
 | cli-archives › build to qualified | green, judging the tag's own bytes (§ CLI archives) |
 | cli-archives › attach | green once the owner's draft exists: the missing CLI assets uploaded, SHA256SUMS last, then read back; its summary gives the SHA256SUMS sha256 and this run's id, the `qualified_run` of the public check (§ 7). Red, with nothing uploaded, in the states above |
 | mobile › test + android | green (JitPack chain proven since v0.6.0) |
@@ -377,11 +396,14 @@ nothing and names the state; the owner's step depends on it:
   record.
 - **Immutable releases stay off** (owner step 8): run the public check
   without `expect_immutable`, and claim no release attestation.
-- Verify registries: `npm view @supernovae-st/qrcode-ai-scanner-wasm
-  version` (this is the builder's bump signal) + crates.io + PyPI.
+- Verify registries: `npm view @qrcode-ai-com/qrcode-barcode-scanner-wasm
+  version` from 0.11.0 on (`npm view @supernovae-st/qrcode-ai-scanner-wasm
+  version` for 0.10.x; this is the builder's bump signal) + crates.io
+  (`qrcode-barcode-scanner`) + PyPI (`qrcode-barcode-scanner`).
 - Downstream: the landing/app pins a caret 0.x range — **the caret freezes
   the minor** (`^0.7.0` never takes 0.8.0); minor bumps need a manual edit
-  in the consumer.
+  in the consumer. A consumer of a former name never reaches 0.11.0 through
+  any range: it switches to the new package name by hand.
 
 ## Publishing — tag-only, trusted, one environment per registry
 
@@ -425,8 +447,8 @@ repository tokens — hence step 0, at merge.
 | Workflow › job | Environment | Credential | What it uploads |
 |---|---|---|---|
 | crates-publish › publish | `crates-io` | crates.io trusted publishing: `rust-lang/crates-io-auth-action` trades the OIDC token for a 30-minute crates.io token | both crates, packed (`cargo package --locked --no-verify`) and inspected in the job before the token is minted; each upload compared with its inspected archive, byte for byte |
-| npm-publish › publish-native · publish-wasm | `npm` | npm trusted publishing (npm CLI ≥ 11.5.1 on Node 24), provenance attested automatically | the very tarballs pack-native and build-wasm packed and inspected, read back again in the job and uploaded unchanged with `npm publish <tarball> --ignore-scripts`; each `npm publish` first checks that its operand is an absolute path to a regular `.tgz` file whose path and sha256 the in-job re-inspection recorded, and stops the job otherwise; after every upload, and for a version already live, the registry's `dist.integrity` must be that tarball's sha512 |
-| python › release | `release` | PyPI trusted publishing (already live: 0.9.0 carries PEP 740 attestations) | `dist/`, read back in the job: exactly one wheel per row of the wheels matrix and the sdist; before the upload, every file PyPI already serves at the version must be the one read back (sha256), and PyPI may serve no other file there, so `skip-existing` (which goes by file name) skips only proven copies |
+| npm-publish › publish-native · publish-wasm | `npm` | npm trusted publishing (npm CLI ≥ 11.5.1 on Node 24), provenance attested automatically; a version the owner uploads by hand (the first under a new name) carries no npm provenance | the very tarballs pack-native and build-wasm packed and inspected, read back again in the job and uploaded unchanged with `npm publish <tarball> --ignore-scripts`; each `npm publish` first checks that its operand is an absolute path to a regular `.tgz` file whose path and sha256 the in-job re-inspection recorded, and stops the job otherwise; after every upload, and for a version already live, the registry's `dist.integrity` must be that tarball's sha512 |
+| python › release | `release` | PyPI trusted publishing: a pending publisher on the new project `qrcode-barcode-scanner` (owner step 5); the 0.9.0 files of the former project `qrcode-ai-scanner` carry PEP 740 attestations | `dist/`, read back in the job: exactly one wheel per row of the wheels matrix and the sdist; before the upload, every file PyPI already serves at the version must be the one read back (sha256), and PyPI may serve no other file there, so `skip-existing` (which goes by file name) skips only proven copies |
 | flutter › publish | `pub` | pub.dev automated publishing; a pushed tag only (pub.dev accepts no other trigger) | the portable archive created once by the unprivileged stage job and consumed by host/native checks; extracted outside the checkout, re-inspected with `package-inspect.py flutter --package-root … --strict --release-set --record …`, with file hashes checked immediately before publishing (dormant pending owner step 6) |
 | mobile › ios-release | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write` | the CI-built xcframework zip and its `checksum.txt`, only into the owner's draft (the one release of the tag, targeting the tagged commit), only where no zip is, and only when its sha256 is the one Package.swift pins, compared before any upload; an attached zip is verified against that pin, never replaced; it never creates, edits or publishes a release |
 | cli-archives › attach | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write`, held by four fixed `gh` steps only | the CLI assets assemble wrote once (`cli-release-set`), re-inspected in the job against the SHA256SUMS sha256 every consumer judged, only into the owner's draft targeting the tagged commit: the missing ones, archives, then source, then SHA256SUMS, each file found in the re-inspection record before its upload, then read back; a draft holding other CLI bytes, or a published release lacking any, is refused with nothing uploaded |
@@ -435,7 +457,9 @@ No registry token is read by any workflow. A token (or a person) is still
 required only where a registry has no OIDC path: the first version of a NEW
 crate on crates.io, the first version of a NEW npm package (a new napi
 target, say — or `npm stage publish`), and pub.dev's first upload, which
-must be a user's.
+must be a user's. 0.11.0 is the first version under every package's new
+name: [First publication of a new name](#first-publication-of-a-new-name),
+after the owner steps, says how those first versions go up.
 
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
@@ -629,21 +653,33 @@ performs them):
    registered: a referenced environment that does not exist is created on
    first use WITHOUT protection rules, and a publisher bound to an
    unprotected environment accepts a run from any branch. The old `pub.dev`
-   environment is no longer referenced and can go.
-2. crates.io, for `qrcode-ai-scanner` and for `qrcode-ai-scanner-cli`:
+   environment is no longer referenced and has no protection: it is not to be
+   used, so delete it.
+2. crates.io, for the new crates `qrcode-barcode-scanner` and
+   `qrcode-barcode-scanner-cli`, each once its first version is uploaded
+   ([First publication of a new name](#first-publication-of-a-new-name)):
    Settings › Trusted Publishing › add GitHub: owner `qrcode-ai-com`,
-   repository `qrcode-barcode-scanner` (the 0.10.x binding named
-   `supernovae-st` / `qrcode-ai-scanner`), workflow `crates-publish.yml`,
-   environment `crates-io`; then restrict both crates to trusted publishing.
-3. npmjs.com, for each of the eight packages —
-   `@supernovae-st/qrcode-ai-scanner`, `-darwin-arm64`, `-darwin-x64`,
+   repository `qrcode-barcode-scanner`, workflow `crates-publish.yml`,
+   environment `crates-io`; then restrict the crate to trusted publishing,
+   revoke the API token that made the first upload, and read all three back
+   in the crate's settings. The 0.10.x crates `qrcode-ai-scanner` and
+   `qrcode-ai-scanner-cli` keep the binding recorded for them (`supernovae-st`
+   / `qrcode-ai-scanner`) and are never re-bound.
+3. npmjs.com, for each of the eight new packages —
+   `@qrcode-ai-com/qrcode-barcode-scanner`, `-darwin-arm64`, `-darwin-x64`,
    `-linux-x64-gnu`, `-linux-arm64-gnu`, `-linux-x64-musl`,
-   `-win32-x64-msvc` and `-wasm`: Settings › Trusted Publisher › GitHub
-   Actions: organization or user `qrcode-ai-com`, repository
-   `qrcode-barcode-scanner` (0.10.x: `supernovae-st` / `qrcode-ai-scanner`),
-   workflow `npm-publish.yml`, environment `npm`; then
+   `-win32-x64-msvc` and `-wasm` — once its first version exists
+   ([First publication of a new name](#first-publication-of-a-new-name)):
    Settings › Publishing access › *Require two-factor authentication and
-   disallow tokens*.
+   disallow tokens* (it does not block trusted publishing); then Settings ›
+   Trusted Publisher › GitHub Actions: organization or user `qrcode-ai-com`,
+   repository `qrcode-barcode-scanner`, workflow `npm-publish.yml`,
+   environment `npm`, with `npm publish` allowed and not only staged
+   publishing. Create each publisher at most two days before the tag run that
+   first publishes through it: npm drops a new configuration that has not
+   completed a publish within two days. The packages released up to 0.10.1
+   under `@supernovae-st` keep the binding recorded for them (0.10.x:
+   `supernovae-st` / `qrcode-ai-scanner`) and are never re-bound.
 4. **Recommended: required reviewers** on `crates-io`, `npm` and `release`
    (Settings › Environments › each one › Required reviewers: up to six people
    or teams, one approval lets the job run; with *Prevent self-review* where
@@ -652,11 +688,20 @@ performs them):
    which no token revocation stops (step 0), and the two release lanes
    (mobile › ios-release, cli-archives › attach), whose uploads into the draft
    then wait for that approval too.
-5. PyPI: re-bind the existing trusted publisher (0.9.0: owner
-   `supernovae-st`, repository `qrcode-ai-scanner`) to owner `qrcode-ai-com`,
-   repository `qrcode-barcode-scanner`, workflow `python.yml`, environment
-   `release`.
-6. pub.dev, once a user has made the first upload. Before its trusted
+5. PyPI: add a pending trusted publisher for the new project
+   `qrcode-barcode-scanner` in the account's Publishing settings: owner
+   `qrcode-ai-com`, repository `qrcode-barcode-scanner`, workflow
+   `python.yml`, environment `release`. The project is created by the first
+   upload through it, and a pending publisher reserves nothing: check that the
+   name is still free just before the tag. The publisher of the former
+   project `qrcode-ai-scanner` (0.9.0: owner `supernovae-st`, repository
+   `qrcode-ai-scanner`) stays as recorded and is never re-bound.
+6. pub.dev, only if the Flutter package ships in the release. Its first upload
+   is a user's, made only from the `flutter-stage` artifact of a `flutter.yml`
+   run on the tag whose `test`, `build-android` and `build-ios` jobs passed,
+   re-inspected first with `scripts/package-inspect.py flutter --package-root …
+   --strict --release-set`. The package then moves to the verified publisher
+   `qrcode-ai.com`; that transfer cannot be undone. Before its trusted
    publisher is configured, in one change: pin the Flutter and Dart SDKs of
    flutter › publish to exact versions, take the lockfile decision for its
    `flutter pub get` (a tracked pubspec.lock with `--enforce-lockfile`, or a
@@ -665,8 +710,8 @@ performs them):
    nothing to waive). Then Admin › Automated publishing › enable GitHub
    Actions: repository `qrcode-ai-com/qrcode-barcode-scanner`, tag pattern
    `v{{version}}`, require environment `pub`.
-   Use `scripts/stage-flutter-package.py` from the exact committed candidate
-   for the manual upload too; never publish `bindings/flutter` directly.
+   The `flutter-stage` artifact is the archive `scripts/stage-flutter-package.py`
+   builds from the tagged commit; never publish `bindings/flutter` directly.
    The stage vendors that candidate's normalized Cargo archive, verifies its
    source/version/LICENSE identity, preserves the binding lockfile, and adds
    the bundled-core digest to the staged manifest to invalidate cargokit's
@@ -689,11 +734,75 @@ performs them):
    release verify` and `gh release verify-asset` on every CLI asset, and
    `gh release view vX.Y.Z --json isImmutable` reports the state.
 
+### First publication of a new name
+
+0.11.0 is the first version under every package's new name, and crates.io and
+npm bind a trusted publisher only to a package that exists. The first version
+under a new crates.io or npm name is therefore uploaded by the owner, from the
+bytes the tag run built and inspected, never from a new build:
+
+- **Which run.** Only the artifacts of the `vX.Y.Z` tag run in which every job
+  the publishing job needs passed. For npm, publish-native needs pack-native,
+  operand-proof, consume-native and consume-native-musl, and publish-wasm needs
+  build-wasm, operand-proof, consume-wasm and consume-wasm-browser: a tarball
+  from a run with a red or skipped consumer job is never uploaded. The upload
+  happens within 30 days of that run and before its artifacts expire;
+  otherwise a new tag run is made.
+- **Order.** crates.io: the core crate, then the CLI, whose packaged lockfile
+  pins the core by checksum. npm: the six platform packages, then the main
+  package, then the `-wasm` package. PyPI needs no manual upload: python ›
+  release publishes through the pending publisher of owner step 5. pub.dev
+  only if the Flutter package ships (owner step 6).
+- **crates.io.** Download the run's `rust-packed-consumer-<os>` artifacts:
+  each holds the two `.crate` files the consumers judged. In a clean clone of
+  the tag, with the CI compiler and an isolated `CARGO_HOME` and
+  `CARGO_TARGET_DIR`, package both crates again:
+
+  ```bash
+  cargo package --locked -p qrcode-barcode-scanner -p qrcode-barcode-scanner-cli --no-verify
+  ```
+
+  Each sha256 must equal the artifacts' own. Only then publish the core from
+  that clone with `cargo publish -p qrcode-barcode-scanner --locked --no-verify`
+  and an API token scoped to publishing new crates, set in that command's
+  environment only, and read the version's index entry back: its `cksum` must
+  be that sha256. Then do the same for the CLI.
+- **npm.** Download the run's `npm-native-tarballs` and `npm-wasm-tarball`
+  artifacts, check them against the artifact digests the run lists and record
+  each tarball's sha256. From a clean clone of the tag, re-inspect them with
+  the publishing jobs' own commands: `scripts/package-inspect.py archive`
+  with `--release-set --strict` and `scripts/native-floor.py --policy node
+  --complete` on the native set, `scripts/package-inspect.py archive` with
+  `--strict` on the Wasm tarball. Upload each file unchanged, with the owner's
+  two-factor code:
+
+  ```bash
+  npm publish <absolute path>.tgz --access public --ignore-scripts
+  ```
+
+  Then read `npm view <name>@X.Y.Z dist.integrity` back: it must be the
+  tarball's sha512. A version uploaded this way carries no npm provenance.
+- **Then the publishers.** Owner step 2 configures each new crate's publisher
+  and hardens the crate; owner step 3 hardens each new npm package and
+  configures its publisher within the two days before the tag run that first
+  publishes through it. With required reviewers on the environment (owner
+  step 4), the tag run's publishing jobs wait for the approval; without them
+  they stopped at authentication with nothing uploaded, and their failed jobs
+  are re-run. Either way they find each version live and compare it with the
+  archive they inspected: crates-publish after an OIDC token exchange, which
+  shows the crate's publisher configured and exchanged, npm-publish by
+  `dist.integrity` alone, with no token exchange. A publisher is exercised,
+  and its binding proven, only by a later version uploaded through it.
+
+Record, for each artifact, its name, version, sha256, source run and artifact
+digest, the comparison result, the upload time, the read-back and the
+publisher's state.
+
 ## CLI archives — prebuilt qrscan in the owner's draft release
 
 `.github/workflows/cli-archives.yml` attaches prebuilt `qrscan` archives to
 the engine's `vX.Y.Z` GitHub release. For version X.Y.Z it makes seven
-assets, all named `qrcode-ai-scanner-cli-X.Y.Z-…`:
+assets, all named `qrcode-barcode-scanner-cli-X.Y.Z-…`:
 
 - one archive per target: `x86_64-unknown-linux-gnu` and
   `aarch64-unknown-linux-gnu` (glibc 2.28 or later), `x86_64-apple-darwin`
