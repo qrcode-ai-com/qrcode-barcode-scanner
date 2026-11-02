@@ -8,10 +8,13 @@ import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import dc from 'node:diagnostics_channel';
 import dns from 'node:dns';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
-import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   startDnsFixture,
   startFixture,
@@ -20,8 +23,14 @@ import {
 } from './destination-fixtures.mjs';
 
 const nodeProcess = globalThis.process;
-const CORE_MODULE = nodeProcess.env.QRSCAN_DESTINATION_MODULE ?? './destination.js';
-const NODE_MODULE = nodeProcess.env.QRSCAN_DESTINATION_NODE_MODULE ?? './destination-node.js';
+// QRSCAN_DESTINATION_PACKAGE: the folder holding destination.js and destination-node.js, such as
+// an installed package (default: this file's folder). The two module variables, when set, win.
+const PACKAGE_DIR = nodeProcess.env.QRSCAN_DESTINATION_PACKAGE;
+const packaged = file => (PACKAGE_DIR === undefined ? `./${file}`
+  : pathToFileURL(resolve(PACKAGE_DIR, file)).href);
+const CORE_MODULE = nodeProcess.env.QRSCAN_DESTINATION_MODULE ?? packaged('destination.js');
+const NODE_MODULE = nodeProcess.env.QRSCAN_DESTINATION_NODE_MODULE
+  ?? packaged('destination-node.js');
 const CHILD = nodeProcess.env.QRSCAN_DESTINATION_CHILD;
 const SELF = fileURLToPath(import.meta.url);
 
@@ -173,23 +182,39 @@ async function childJson(name, options) {
   return JSON.parse(stdout);
 }
 
-// A throwaway self-signed P-256 pair, or null when openssl is missing outside CI.
+// A throwaway self-signed P-256 pair, or null when openssl is missing outside CI. openssl writes
+// the key and the certificate to files in a temporary folder, read back here: a Windows build
+// has no /dev/stdout and ends its PEM lines with CRLF. The first call prints the openssl build.
+let opensslBuild = null;
 function selfSigned(subject, altNames) {
-  let pem;
+  const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] };
+  const dir = mkdtempSync(join(tmpdir(), 'qrscan-tls-'));
+  const keyFile = join(dir, 'key.pem');
+  const certFile = join(dir, 'cert.pem');
   try {
-    pem = execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt',
-      'ec_paramgen_curve:prime256v1', '-nodes', '-keyout', '/dev/stdout', '-out', '/dev/stdout',
-      '-days', '1', '-subj', subject, '-addext', `subjectAltName=${altNames}`],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (error) {
-    if (error.code !== 'ENOENT' || nodeProcess.env.CI === 'true') throw error;
-    return null;
+    try {
+      if (opensslBuild === null) {
+        opensslBuild = execFileSync('openssl', ['version', '-v', '-d'], options).trim()
+          .split(/\r?\n/).join('; ');
+        console.log(`openssl: ${opensslBuild}`);
+      }
+      execFileSync('openssl', ['req', '-x509', '-newkey', 'ec', '-pkeyopt',
+        'ec_paramgen_curve:prime256v1', '-nodes', '-keyout', keyFile, '-out', certFile,
+        '-days', '1', '-subj', subject, '-addext', `subjectAltName=${altNames}`], options);
+    } catch (error) {
+      if (error.code !== 'ENOENT' || nodeProcess.env.CI === 'true') throw error;
+      return null;
+    }
+    const pem = file => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+    return {
+      key: /-----BEGIN (?:EC )?PRIVATE KEY-----[\s\S]+?-----END (?:EC )?PRIVATE KEY-----\n/
+        .exec(pem(keyFile))[0],
+      cert: /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----\n/
+        .exec(pem(certFile))[0],
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  return {
-    key: /-----BEGIN (?:EC )?PRIVATE KEY-----[\s\S]+?-----END (?:EC )?PRIVATE KEY-----\n/
-      .exec(pem)[0],
-    cert: /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----\n/.exec(pem)[0],
-  };
 }
 
 const appendedNodeOptions = flag =>

@@ -75,11 +75,13 @@ import email.parser
 import functools
 import gzip
 import hashlib
+import html.parser
 import importlib.util
 import io
 import json
 import os
 import pathlib
+import posixpath
 import re
 import shlex
 import shutil
@@ -134,6 +136,11 @@ NODE_FILES = frozenset({
     "LICENSE", "README.md", "package.json",
     "index.js", "index.d.ts", "native.js", "native.d.ts", "report-types.d.ts",
 })
+# The image example ships inside the wasm package, so the installed folder runs it under any
+# static server. scripts/patch-wasm-pkg.mjs lists each file (never the folder) and copies it
+# verbatim; nothing else may sit under examples/.
+WASM_EXAMPLE_FILES = ("examples/README.md", "examples/headless.html", "examples/headless.js",
+                      "examples/scanner.worker.js")
 WASM_FILES = frozenset({
     "LICENSE", "README.md", "package.json",
     "LICENSE-APACHE-2.0", "THIRD-PARTY.md",
@@ -142,6 +149,7 @@ WASM_FILES = frozenset({
     "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
     "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts",
     "auto.js", "auto.d.ts", "build-info.json",
+    *WASM_EXAMPLE_FILES,
 })
 # 0.10.x exported its no-SIMD module under compatible/; from 0.11 these export
 # keys name the one portable module's own files, never a second file.
@@ -661,6 +669,9 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
                        "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts"):
             check_equal_file(art, source, files.get(source), WASM_DIR / source)
         check_destination_modules(art, files)
+        for source in WASM_EXAMPLE_FILES:
+            check_equal_file(art, source, files.get(source), WASM_DIR / source)
+        check_example(art, files)
         dts = files.get("qrcode-ai-scanner.d.ts", b"").decode()
         retyped = all(
             re.search(rf"export function {fn}\([^)]*\): ScanReport;", dts) for fn in ("scan_image", "scan_frame")
@@ -1433,6 +1444,150 @@ def check_destination_modules(art: Artifact, files: dict) -> None:
                     else list(read_module(judge, data.decode("utf-8", errors="replace"))))
         shown = problems[:12] + ([f"… {len(problems) - 12} more"] if len(problems) > 12 else [])
         art.check(check, not problems, "; ".join(shown))
+
+
+# The example's page and scripts run with no bundler in front of them: a bare specifier never
+# resolves there, and an absolute URL leaves the package folder. So each load read here names a
+# file the package ships, by a relative path (or is a data: URL): an import, a
+# `new URL('…', import.meta.url)`, the literal first argument of a call that loads it (fetch,
+# importScripts, sendBeacon, Worker, SharedWorker, WebSocket, EventSource), and the page's src
+# attributes and link hrefs. A first argument held in a variable is read where its value is
+# made, if in one of these forms. The scripts keep to the destination core's browser floor.
+# Known forms only, like the floor. The page's Content-Security-Policy refuses every other
+# request the page makes; it does not govern the module worker, which takes its policy from its
+# own response, so a request the worker makes in another form is seen only by a run in a
+# browser, on the paths that run drives.
+WASM_EXAMPLE_SCRIPTS = ("examples/headless.js", "examples/scanner.worker.js")
+IMPORT_META_URL = (("name", "import"), ("punct", "."), ("name", "meta"), ("punct", "."), ("name", "url"))
+EXAMPLE_LOAD_CALLS = frozenset({"fetch", "importScripts", "sendBeacon", "Worker", "SharedWorker", "WebSocket",
+                                "EventSource"})
+# A decoded value is shown as text and never opened: the scripts parse no markup, make no link
+# and navigate nowhere. Refused wherever they appear, an object key or a quoted member included;
+# open, write and writeln only when called; setAttribute and setAttributeNS when the attribute
+# they set takes a URL or a script, or is computed.
+EXAMPLE_REFUSED_NAMES = frozenset({"innerHTML", "outerHTML", "insertAdjacentHTML", "createContextualFragment",
+                                   "DOMParser", "srcdoc", "href", "location", "navigation"})
+EXAMPLE_REFUSED_CALLS = frozenset({"open", "write", "writeln"})
+EXAMPLE_URL_ATTRIBUTES = frozenset({"href", "src", "srcset", "srcdoc", "action", "formaction", "ping", "poster",
+                                    "data", "background", "codebase", "cite"})
+
+
+def judge_example_dom(tokens: list) -> list:
+    """Each markup sink, link or navigation the example scripts would reach, in the forms above."""
+    problems = []
+    for k, (kind, value, line) in enumerate(tokens):
+        prev, after = _at(tokens, k - 1), _at(tokens, k + 1)
+        quoted = _quoted(tokens[k]) if _is(prev, "[") and _is(after, "]") and _member_bracket(tokens, k - 1) else None
+        name, paren = (value, k + 1) if kind == "name" else (quoted, k + 2)
+        called = _is(_at(tokens, paren), "(")
+        if name in EXAMPLE_REFUSED_NAMES:
+            problems.append(f"line {line}: {name}")
+        elif name in EXAMPLE_REFUSED_CALLS and called:
+            problems.append(f"line {line}: {name}()")
+        elif name in ("setAttribute", "setAttributeNS") and called:
+            arguments = _call_arguments(tokens, paren)
+            position = 1 if name == "setAttributeNS" else 0
+            attribute = arguments[position] if len(arguments) > position else []
+            text = _quoted(attribute[0]) if len(attribute) == 1 else None
+            local = None if text is None else text.lower().rsplit(":", 1)[-1]
+            if local is None:
+                problems.append(f"line {line}: {name}() of a computed attribute")
+            elif local in EXAMPLE_URL_ATTRIBUTES or local.startswith("on"):
+                problems.append(f"line {line}: {name}({text!r})")
+    return problems
+
+
+class _PageLoads(html.parser.HTMLParser):
+    """(line, value) of each src attribute and link href in a page: what it loads, not where
+    an anchor would take a reader."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.found = []
+
+    def handle_starttag(self, tag, attrs):
+        line = self.getpos()[0]
+        self.found += [(line, value or "") for key, value in attrs if key == "src" or (tag == "link" and key == "href")]
+
+    handle_startendtag = handle_starttag
+
+
+def example_loads(name: str, source: str) -> list:
+    """(line, reference) for each load of the example file NAME in the forms read here; the
+    reference is None where the form names no literal path (a computed import or URL)."""
+    if name.endswith(".html"):
+        page = _PageLoads()
+        page.feed(source)
+        page.close()
+        return page.found
+    tokens = js_tokens(source)
+    found = [(line, module) for _form, module, line in js_imports(tokens)]
+    for k, (kind, value, line) in enumerate(tokens):
+        before = _at(tokens, k - 1)
+        if kind != "name" or not _is(_at(tokens, k + 1), "("):
+            continue
+        if value in EXAMPLE_LOAD_CALLS:
+            # A literal first argument is the path; one that starts with a literal and goes on
+            # (a concatenation, a template with substitutions) is computed from it.
+            first = (_call_arguments(tokens, k + 1) or [[]])[0]
+            if len(first) == 1 and _quoted(first[0]) is not None:
+                found.append((line, _quoted(first[0])))
+            elif first and first[0][0] in ("str", "template"):
+                found.append((line, None))
+            continue
+        if value != "URL" or before is None or before[:2] != ("name", "new"):
+            continue
+        arguments = _call_arguments(tokens, k + 1)
+        if len(arguments) == 2 and tuple(token[:2] for token in arguments[1]) == IMPORT_META_URL:
+            found.append((line, _quoted(arguments[0][0]) if len(arguments[0]) == 1 else None))
+    return found
+
+
+def example_load_problems(name: str, source: str, shipped) -> list:
+    """Each load of the example file NAME that is not a relative path to a file in SHIPPED."""
+    try:
+        loads = example_loads(name, source)
+    except ValueError as error:
+        return [f"{name}: not readable as JavaScript: {error}"]
+    problems = []
+    for line, reference in loads:
+        where = f"{name} line {line}"
+        if reference is None:
+            problems.append(f"{where}: a load that names no literal path")
+        elif reference.startswith("data:"):
+            continue
+        elif not reference.startswith(("./", "../")):
+            problems.append(f"{where}: {reference!r} is not a relative path")
+        else:
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(name), re.split(r"[?#]", reference)[0]))
+            if target.startswith("..") or target not in shipped:
+                problems.append(f"{where}: {reference!r} names no file the package ships")
+    return problems
+
+
+def check_example(art: Artifact, files: dict) -> None:
+    """The image example, read statically as it ships. A file the reader cannot read fails."""
+    for name in WASM_EXAMPLE_SCRIPTS:
+        data = files.get(name)
+        problems = ([f"no {name} in the archive"] if data is None
+                    else list(read_module(judge_browser_floor, data.decode("utf-8", errors="replace"))))
+        shown = problems[:12] + ([f"… {len(problems) - 12} more"] if len(problems) > 12 else [])
+        art.check(f"{name} stays inside the browser floor (none of the refused post-ES2020 syntax or newer "
+                  "browser APIs)", not problems, "; ".join(shown))
+        problems = ([f"no {name} in the archive"] if data is None
+                    else list(read_module(judge_example_dom, data.decode("utf-8", errors="replace"))))
+        art.check(f"{name} parses no markup, makes no link and navigates nowhere (no innerHTML, href, location, "
+                  "open(), setAttribute() of a URL or script attribute, or similar)", not problems, "; ".join(problems[:12]))
+    problems = []
+    for name in ("examples/headless.html", *WASM_EXAMPLE_SCRIPTS):
+        data = files.get(name)
+        problems += ([f"no {name} in the archive"] if data is None
+                     else example_load_problems(name, data.decode("utf-8", errors="replace"), files))
+    shown = problems[:12] + ([f"… {len(problems) - 12} more"] if len(problems) > 12 else [])
+    art.check("the example loads only files the package ships, each by a relative path (imports, "
+              "new URL(…, import.meta.url), the literal first argument of fetch, importScripts, sendBeacon, Worker, "
+              "SharedWorker, WebSocket and EventSource, the page's src attributes and link hrefs)", not problems,
+              "; ".join(shown))
 
 
 def metadata(data: bytes):
@@ -3108,7 +3263,8 @@ def _npm_wasm(version: str) -> dict:
             "report-types.d.ts": CANON_TYPES.read_bytes(),
             **{f"{name}.{ext}": (WASM_DIR / f"{name}.{ext}").read_bytes()
                for name in ("auto", "camera", "camera-overlay", "destination", "destination-node")
-               for ext in ("js", "d.ts")}}
+               for ext in ("js", "d.ts")},
+            **{name: (WASM_DIR / name).read_bytes() for name in WASM_EXAMPLE_FILES}}
 
 
 def _with_scripts(files: dict, **scripts: str) -> dict:
@@ -3264,6 +3420,96 @@ def self_test() -> int:
             altered[name] += b"\n// altered\n"
             judge(f"wasm package with an altered {name}", [npm(f"wasm-altered-{name}", altered)], FAIL,
                   f"{name} is crates/qrcode-ai-scanner-wasm/{name} verbatim")
+        # The image example: every file ships, each the crate's, and nothing else sits under examples/.
+        for name in WASM_EXAMPLE_FILES:
+            label = re.sub(r"[^a-z0-9]+", "-", name)
+            incomplete = {key: value for key, value in _npm_wasm(version).items() if key != name}
+            judge(f"wasm package missing {name}", [npm(f"wasm-missing-{label}", incomplete)], FAIL, f"missing: {name}")
+            altered = _npm_wasm(version)
+            altered[name] += b"\n"
+            judge(f"wasm package with an altered {name}", [npm(f"wasm-altered-{label}", altered)], FAIL,
+                  f"{name} is crates/qrcode-ai-scanner-wasm/{name} verbatim")
+        for planted in ("examples/notes.md", "examples/headless.test.mjs", "examples/fixtures/sample.png"):
+            judge(f"wasm package + {planted}",
+                  [npm(f"wasm-plant-{re.sub(r'[^a-z0-9]+', '-', planted)}", _npm_wasm(version) | {planted: b"x"})],
+                  FAIL, f"unexpected: {planted}")
+        # Each static reading of the example refuses its own form (the copy check refuses them too).
+        floor, loads = "examples/headless.js stays inside the browser floor", "the example loads only files"
+        dom = "examples/headless.js parses no markup"
+        shown = "item.appendChild(element('pre', 'value', text));"
+        for label, name, old, new, needles in (
+                ("a logical assignment", "examples/headless.js", "const BUDGET_MS = 0;",
+                 "let BUDGET_MS;\nBUDGET_MS ??= 0;", (floor, "logical assignment ??=")),
+                ("a bare specifier", "examples/scanner.worker.js", "from '../auto.js'",
+                 "from '@supernovae-st/qrcode-ai-scanner-wasm/auto'", (loads, "is not a relative path")),
+                ("a CDN import", "examples/scanner.worker.js", "from '../auto.js'",
+                 "from 'https://cdn.example.com/auto.js'", (loads, "is not a relative path")),
+                ("an import outside the package", "examples/scanner.worker.js", "from '../auto.js'",
+                 "from '../../auto.js'", (loads, "names no file the package ships")),
+                ("a computed import", "examples/scanner.worker.js", "let load = null;",
+                 "let load = null;\nconst later = (name) => import(name);", (loads, "names no literal path")),
+                ("a URL to a file the package lacks", "examples/headless.js", "'../build-info.json'",
+                 "'../build-info.min.json'", (loads, "names no file the package ships")),
+                ("a computed worker URL", "examples/headless.js", "new URL('./scanner.worker.js', import.meta.url)",
+                 "new URL(`./${'scanner'}.worker.js`, import.meta.url)", (loads, "names no literal path")),
+                ("a CDN script in the page", "examples/headless.html", '<script type="module" src="./headless.js">',
+                 '<script src="https://cdn.example.com/scanner.js"></script>\n<script type="module" src="./headless.js">',
+                 (loads, "is not a relative path")),
+                ("a stylesheet from elsewhere", "examples/headless.html", '<link rel="icon" href="data:,">',
+                 '<link rel="icon" href="data:,">\n<link rel="stylesheet" href="//fonts.example.com/a.css">',
+                 (loads, "is not a relative path")),
+                ("a value written as markup", "examples/headless.js", shown,
+                 "const value = element('pre', 'value');\n  value.innerHTML = text;\n  item.appendChild(value);",
+                 (dom, ": innerHTML")),
+                ("a value made a link", "examples/headless.js", shown,
+                 "const link = element('a', 'value', text);\n  link['href'] = text;\n  item.appendChild(link);",
+                 (dom, ": href")),
+                ("a value opened", "examples/headless.js", shown,
+                 f"{shown}\n  if (/^https?:/.test(text)) window.open(text, '_blank');", (dom, ": open()")),
+                ("a reload after an error", "examples/headless.js", "function showError(reply, name) {",
+                 "function showError(reply, name) {\n  if (reply.phase === 'scan') location.reload();",
+                 (dom, ": location")),
+                ("a fetch from elsewhere", "examples/headless.js", "await fetch(url)",
+                 "await fetch('https://cdn.example.com/package.json')", (loads, "is not a relative path")),
+                ("a fetch URL built from a literal", "examples/headless.js", "await fetch(url)",
+                 "await fetch('https://cdn.example.com/' + url.pathname)", (loads, "names no literal path")),
+                ("a worker from elsewhere", "examples/headless.js", "new Worker(WORKER_URL, { type: 'module' })",
+                 "new Worker('https://cdn.example.com/scanner.worker.js', { type: 'module' })",
+                 (loads, "is not a relative path")),
+                ("a shared worker outside the package", "examples/scanner.worker.js", "let load = null;",
+                 "let load = null;\nconst shared = new SharedWorker('../../shared.worker.js');",
+                 (loads, "names no file the package ships")),
+                ("a script imported from elsewhere", "examples/scanner.worker.js", "let load = null;",
+                 "let load = null;\nimportScripts('https://cdn.example.com/polyfill.js');",
+                 (loads, "is not a relative path")),
+                ("a socket", "examples/scanner.worker.js", "let load = null;",
+                 "let load = null;\nconst socket = new WebSocket('wss://telemetry.example.com/');",
+                 (loads, "is not a relative path")),
+                ("an event stream", "examples/headless.js", "const BUDGET_MS = 0;",
+                 "const BUDGET_MS = 0;\nconst events = new EventSource(`https://events.example.com/${BUDGET_MS}`);",
+                 (loads, "names no literal path")),
+                ("a beacon", "examples/headless.js", shown,
+                 f"{shown}\n  navigator.sendBeacon('https://telemetry.example.com/', text);",
+                 (loads, "is not a relative path")),
+                ("a link made with Object.assign", "examples/headless.js", shown,
+                 "item.appendChild(Object.assign(element('a', 'value', text), { href: text }));", (dom, ": href")),
+                ("a link made with setAttribute", "examples/headless.js", shown,
+                 "const link = element('a', 'value', text);\n  link.setAttribute('href', text);\n  item.appendChild(link);",
+                 (dom, "setAttribute('href')")),
+                ("an image source set with setAttribute", "examples/headless.js", shown,
+                 "const image = element('img', 'value');\n  image.setAttribute('src', text);\n  item.appendChild(image);",
+                 (dom, "setAttribute('src')")),
+                ("a computed attribute set", "examples/headless.js", shown,
+                 "const link = element('a', 'value', text);\n  link.setAttribute(text.slice(0, 4), text);\n"
+                 "  item.appendChild(link);", (dom, "of a computed attribute"))):
+            planted = _npm_wasm(version)
+            source = planted[name].decode()
+            if old not in source:
+                failures.append(f"example plant {label}: {old!r} not found in {name}")
+                continue
+            planted[name] = source.replace(old, new, 1).encode()
+            judge(f"wasm package whose example has {label}",
+                  [npm(f"wasm-example-{re.sub(r'[^a-z0-9]+', '-', label)}", planted)], FAIL, *needles)
         # The Node resolver is exported under `node` alone, types first, and through no other key.
         node_only = {"types": "./destination-node.d.ts", "node": "./destination-node.js"}
         for label, key, value in (

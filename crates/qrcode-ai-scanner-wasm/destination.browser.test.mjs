@@ -11,7 +11,9 @@
 //   QRSCAN_BROWSER_CHANNEL      optional Chromium channel
 //   QRSCAN_TEST_FIREFOX=1       B14: B2..B8, B15 and B16 again in Firefox
 //   QRSCAN_NO_SIMD_BROWSER      B17: executable of the SIMD-disabled Chromium 978106
-//   CI=true                     a case whose prerequisites are missing fails instead of skipping
+//   CI=true                     a required case whose prerequisites are missing fails instead of
+//                               skipping; B11 (no [::1] on the host), B14 and B17 (opt-in
+//                               runtimes) are not required and stay recorded as not run
 // Usage: node destination.browser.test.mjs [report.json]
 //
 // No request may leave loopback. Chromium runs behind a recording proxy that refuses every

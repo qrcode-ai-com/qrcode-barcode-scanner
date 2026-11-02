@@ -79,11 +79,9 @@ node camera-overlay.unit.test.mjs
 # request leaves this machine.
 node destination.test.mjs
 node destination-node.test.mjs
-# camera-overlay.test.mjs (the rendered overlay) needs a real browser:
-# scripts/packed-wasm-browser.mjs runs it against the packed archive.
-# destination.browser.test.mjs needs one too, and no script or CI job runs it
-# yet: run it by hand (its header lists the Playwright, Vite and package
-# variables it reads).
+# camera-overlay.test.mjs (the rendered overlay) and destination.browser.test.mjs
+# need a real browser: scripts/packed-wasm-browser.mjs runs both against the
+# packed archive (the wasm-browser CI job).
 
 raw=$(wc -c <pkg/qrcode-ai-scanner_bg.wasm)
 gz=$(gzip -9 -c pkg/qrcode-ai-scanner_bg.wasm | wc -c)

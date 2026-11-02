@@ -6,10 +6,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { getEventListeners } from 'node:events';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const nodeProcess = globalThis.process;
-const MODULE = nodeProcess.env.QRSCAN_DESTINATION_MODULE ?? './destination.js';
+// QRSCAN_DESTINATION_PACKAGE: the folder holding destination.js, such as an installed package
+// (default: this file's folder). QRSCAN_DESTINATION_MODULE, when set, names the module itself.
+const PACKAGE_DIR = nodeProcess.env.QRSCAN_DESTINATION_PACKAGE;
+const MODULE = nodeProcess.env.QRSCAN_DESTINATION_MODULE ?? (PACKAGE_DIR === undefined
+  ? './destination.js' : pathToFileURL(resolve(PACKAGE_DIR, 'destination.js')).href);
 const CHILD = nodeProcess.env.QRSCAN_DESTINATION_CHILD;
 const SELF = fileURLToPath(import.meta.url);
 
