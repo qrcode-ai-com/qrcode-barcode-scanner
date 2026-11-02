@@ -23,10 +23,13 @@ export interface ScanOptions {
   /** Default: "full". */
   profile?: ScanProfile;
   /**
-   * Cancels a QUEUED task. A RUNNING scan is not interrupted: once its image
-   * is decoded, its profile/budgetMs budget stops planned work at attempt
-   * granularity, and the bounded work spec/02-profiles.md § Budget semantics
-   * lists may finish past it.
+   * Rejects the scan with an `AbortError` DOMException when already aborted
+   * at the call, or when aborted while the task is QUEUED. A RUNNING scan is
+   * not interrupted: it settles as if not aborted, with its report or its own
+   * `[QRS-xxx]` fault. Once its image is decoded, its profile/budgetMs budget
+   * stops planned work at attempt granularity, and the bounded work
+   * spec/02-profiles.md § Budget semantics lists may finish past it. One
+   * signal may be shared by several scans.
    */
   signal?: AbortSignal;
   /**

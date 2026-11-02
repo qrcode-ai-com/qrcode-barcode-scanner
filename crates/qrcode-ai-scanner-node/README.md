@@ -20,8 +20,11 @@ if (report.detections.length) {
 }
 ```
 
-- `scan(image, { profile, signal, budgetMs })` — async, `full | fast | frame`,
-  AbortSignal cancels queued scans. `budgetMs` unset keeps the profile default
+- `scan(image, { profile, signal, budgetMs })` — async, `full | fast | frame`.
+  An AbortSignal aborted before the call or while the scan is queued rejects
+  it with an `AbortError` DOMException; a running scan settles as if not
+  aborted (its report, or its own `[QRS-xxx]` fault), and one signal may
+  serve several scans. `budgetMs` unset keeps the profile default
   (full 4000 · fast 800 · frame 80 ms); `0` is unbounded, the reproducible mode.
   The clock starts once the image is decoded (`maxDimension` / `maxPixels`
   bound the decode). A report the budget cut says so:
@@ -29,8 +32,8 @@ if (report.detections.length) {
 - `scanSync(image, { profile })` — blocking, scripts only.
 - `capabilities()` — the readers compiled into the addon: `versions`, decode
   `engines` and the `symbologies` they can return (not that an image decodes).
-- "No QR found" **resolves** with empty `detections`; rejections carry
-  `[QRS-xxx]` codes (invalid input only).
+- "No QR found" **resolves** with empty `detections`; rejections other than
+  an abort carry `[QRS-xxx]` codes (invalid input only).
 - Encoded images (PNG/JPEG/WebP/GIF) only: raw camera frames and the
   camera/overlay modules belong to the wasm package below.
 - Each platform's addon is an optional dependency. When the host's addon is

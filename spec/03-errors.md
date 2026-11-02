@@ -22,7 +22,7 @@ code; the cross-surface match contract is the regex `QRS-\d{3}`
 |---|---|---|
 | Rust | `Err(ScanError)` — `.code()` returns `"QRS-xxx"`, `thiserror` + `miette` diagnostics | `match err.code() { "QRS-003" => … }` |
 | CLI stderr | `✖ <message> [QRS-xxx]` + exit code 2 (the glyph and its color are presentation) | match the code, not the prose |
-| Node | rejected Promise (`scanSync`: thrown `Error`), `Error.message` ends with `[QRS-xxx]`; an aborted signal rejects a queued scan with an `AbortError` DOMException | `e.message.match(/QRS-\d{3}/)` |
+| Node | rejected Promise (`scanSync`: thrown `Error`), `Error.message` ends with `[QRS-xxx]`; a signal already aborted at the call, or aborted while the scan is queued, rejects with an `AbortError` DOMException, which has no code | `e.message.match(/QRS-\d{3}/)`; an abort by `e.name === "AbortError"` |
 | WASM | thrown `JsError`, message ends with `[QRS-xxx]` | same match |
 | Python | raised `ValueError`, message ends with `[QRS-xxx]` | `re.search(r"QRS-\d{3}", str(e))` |
 | Kotlin / Swift | thrown `ScanBindingException.ScanFailed` (Kotlin) · `ScanBindingError.ScanFailed` (Swift), its message carries `[QRS-xxx]` | same match |
@@ -37,8 +37,12 @@ integer type cannot hold. That is Node's and WASM's thrown error, Python's
 Match it by its type or case, never by a code it does not have.
 
 `QRS-005` comes only from Rust's `scan_cancellable`. Node's `AbortSignal`
-rejects a queued scan with an `AbortError` and never interrupts a running
-one; the other bindings expose no cancellation.
+rejects a scan that has not started (the signal was already aborted at the
+call, or aborted while the task was queued) with an `AbortError`
+DOMException. It never interrupts a running scan, which settles as if not
+aborted: its report, or its own `[QRS-xxx]` fault. One signal may be shared
+by several scans: aborting it rejects each of them still queued. The other
+bindings expose no cancellation.
 
 ## CLI exit codes (the headline contract)
 

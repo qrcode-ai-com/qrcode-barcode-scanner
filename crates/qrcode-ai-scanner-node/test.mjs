@@ -6,6 +6,7 @@
 // Schema, which every contract change updates (the AGENTS.md cascade).
 import { capabilities, scan, scanSync, version } from "./index.js";
 import { execFileSync } from "node:child_process";
+import { getEventListeners } from "node:events";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -80,10 +81,74 @@ assert.deepEqual(frame.detections.map((d) => d.content.text), [V5Q]);
 // invalid input rejects with the QRS tag
 await assert.rejects(() => scan(Buffer.from("garbage")), /QRS-001/);
 
-// abort BEFORE start rejects
+// abort BEFORE start rejects with an AbortError DOMException
 const controller = new AbortController();
 controller.abort();
-await assert.rejects(() => scan(clean, { signal: controller.signal }), /Abort/i);
+await assert.rejects(() => scan(clean, { signal: controller.signal }),
+  (error) => error instanceof DOMException && error.name === "AbortError");
+// a signal that is not an AbortSignal rejects rather than being ignored;
+// null leaves the scan without one
+for (const signal of [{}, { aborted: false }, "abort", 1]) {
+  await assert.rejects(() => scan(clean, { signal }),
+    (error) => error instanceof TypeError && error.message === "options.signal must be an AbortSignal",
+    JSON.stringify(signal));
+}
+assert.deepEqual((await scan(clean, { profile: "fast", budgetMs: 0, signal: null }))
+  .detections.map((d) => d.content.text), [V5Q]);
+// a scan leaves the caller's own onabort handler in place (napi replaced it)
+{
+  const own = new AbortController();
+  let called = 0;
+  own.signal.onabort = () => { called++; };
+  await scan(clean, { profile: "fast", budgetMs: 0, signal: own.signal });
+  own.abort();
+  assert.equal(called, 1, "the caller's onabort still runs after a scan");
+}
+
+// abort while QUEUED, on one pool thread (UV_THREADPOOL_SIZE is read once, at
+// the pool's first use, so a child process): aborted right after the call, a
+// scan waiting behind a blocker rejects with the same DOMException. One signal
+// may serve several scans: reused after a completed scan, it still cancels the
+// scans queued later (napi alone stops at the completed task).
+const queuedAbort = `
+  const { scan } = require(${JSON.stringify(fileURLToPath(here("./index.js")))});
+  const [held, queued, clean] = process.argv.slice(1).map((file) => require("node:fs").readFileSync(file));
+  const options = { profile: "full", budgetMs: 0 };
+  const settle = (promise) => promise.then(
+    (report) => ({ resolved: true, texts: report.detections.map((d) => d.content.text).sort() }),
+    (error) => ({ resolved: false, domException: error instanceof DOMException, name: error.name }));
+  (async () => {
+    const controller = new AbortController();
+    const blocker = settle(scan(held, options));
+    const aborted = settle(scan(queued, { ...options, signal: controller.signal }));
+    controller.abort();
+    const single = { blocker: await blocker, aborted: await aborted };
+    const shared = new AbortController();
+    const first = await settle(scan(clean, { profile: "fast", budgetMs: 0, signal: shared.signal }));
+    const holder = settle(scan(held, options));
+    const later = [queued, queued].map((image) => settle(scan(image, { ...options, signal: shared.signal })));
+    shared.abort();
+    const reused = { first, blocker: await holder, later: await Promise.all(later) };
+    console.log(JSON.stringify({ pool: process.env.UV_THREADPOOL_SIZE, single, reused }));
+  })();`;
+const cancelled = JSON.parse(execFileSync(process.execPath, ["-e", queuedAbort,
+  ...["symbology/mixed-code128-qr.png", "artistic/blob-style-monkey-logo.webp", "clean/gen_v5_q.png"]
+    .map((rel) => fileURLToPath(here(`../../fixtures/${rel}`)))],
+{ env: { ...process.env, UV_THREADPOOL_SIZE: "1" }, encoding: "utf8" }));
+const abortError = { resolved: false, domException: true, name: "AbortError" };
+const heldScan = { resolved: true, texts: ["STOCK-4827", "https://qrc-ai.com/76xMa"] };
+assert.deepEqual(cancelled, {
+  pool: "1",
+  single: { blocker: heldScan, aborted: abortError },
+  reused: { first: { resolved: true, texts: [V5Q] }, blocker: heldScan, later: [abortError, abortError] },
+}, "a queued abort rejects like a pre-aborted signal, through a reused signal too");
+// one listener per shared signal, however many scans it serves (one per scan
+// trips Node's 10-listener warning), and none once they settle
+const batchSignal = new AbortController().signal;
+const batch = Array.from({ length: 12 }, () => scan(clean, { profile: "fast", budgetMs: 0, signal: batchSignal }));
+assert.equal(getEventListeners(batchSignal, "abort").length, 1, "one listener for twelve pending scans");
+for (const done of await Promise.all(batch)) assert.deepEqual(done.detections.map((d) => d.content.text), [V5Q]);
+assert.equal(getEventListeners(batchSignal, "abort").length, 0, "no listener left once the scans settle");
 
 // budgetMs rides its wire position: a 1 ms budget stops the Full ladder after
 // fewer attempts than the unbounded run of the same never-decoding image. The

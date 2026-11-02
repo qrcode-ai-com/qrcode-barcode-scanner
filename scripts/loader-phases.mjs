@@ -2,9 +2,12 @@
 // apart from scan rejections ([QRS-xxx]) and from valid empty reports.
 // packed-node-consumer.mjs runs them on every consumer row:
 // - native: the load phase (a main package without its platform package throws
-//   at require, and no WASI binding stands in) and the two cancellation phases
-//   (spec/02-profiles.md § Cancellation: an AbortSignal rejects a QUEUED task;
-//   a RUNNING scan is not interrupted and resolves with its report);
+//   at require, and no WASI binding stands in) and the cancellation phases: an
+//   AbortSignal rejects a QUEUED task and does not interrupt a RUNNING one
+//   (spec/02-profiles.md § Cancellation), so the decodable fixture aborted
+//   while it runs still resolves with its report; the rejection is an
+//   AbortError DOMException, also when one signal serves several scans
+//   (spec/03-errors.md: the Node row and the QRS-005 paragraph);
 // - wasm: every ScannerInitError code a Node realm reaches through the installed
 //   ./auto loader. loader_import_failed and wasm_compile_failed need a browser
 //   (a failed chunk import, a CSP without wasm-unsafe-eval): a Node realm does
@@ -56,7 +59,10 @@ export function nativeLoadPhase({ npmCli, mainTarball, name, platformName }) {
 }
 
 /** Queued versus running cancellation, on one pool thread (UV_THREADPOOL_SIZE
- * is read once, at the pool's first use, so the case needs its own process). */
+ * is read once, at the pool's first use, so the case needs its own process),
+ * then, in a second process, one signal reused after a completed scan: napi
+ * alone stops an abort at the completed task, so the wrapper must still
+ * cancel the scans queued later. */
 export function nativeCancellation({ consumer, name }) {
   const [held, aborted] = SLOW.map(({ file }, index) => {
     const path = join(consumer, `slow-${index}${file.slice(file.lastIndexOf("."))}`);
@@ -76,7 +82,8 @@ export function nativeCancellation({ consumer, name }) {
       const queuedController = new AbortController();
       const queued = qr.scan(aborted, { ...options, signal: queuedController.signal })
         .then(() => ({ resolved: true, at: performance.now() - t0 }),
-          (error) => ({ resolved: false, name: error.name, at: performance.now() - t0 }));
+          (error) => ({ resolved: false, name: error.name, domException: error instanceof DOMException,
+            at: performance.now() - t0 }));
       setTimeout(() => queuedController.abort(), 20);
       const outcome = await queued;
       const reports = await Promise.all(blockers);
@@ -95,6 +102,8 @@ export function nativeCancellation({ consumer, name }) {
   assert.equal(observed.pool, "1");
   assert.equal(observed.queued.resolved, false, `a queued task aborts: ${JSON.stringify(observed)}`);
   assert.equal(observed.queued.name, "AbortError");
+  assert.equal(observed.queued.domException, true,
+    `a queued abort rejects with the DOMException a pre-aborted signal gets: ${JSON.stringify(observed)}`);
   assert.ok(observed.queued.at < observed.blocked.ms,
     `the abort landed while the task was queued behind the blockers: ${JSON.stringify(observed)}`);
   for (const texts of observed.blocked.texts) assert.deepEqual(texts, [...SLOW[0].texts].sort());
@@ -102,9 +111,44 @@ export function nativeCancellation({ consumer, name }) {
   assert.ok(observed.running.abortedAt !== null && observed.running.abortedAt < observed.running.ms,
     `the abort landed while the scan ran: ${JSON.stringify(observed)}`);
   assert.deepEqual(observed.running.texts, [...SLOW[1].texts].sort());
+  // one signal: a scan with it completes, then two scans with it queue behind
+  // three blockers and are aborted while they wait
+  const reused = run(["-e", `
+    const qr = require(${JSON.stringify(name)});
+    const { readFileSync } = require("node:fs");
+    const held = readFileSync(${JSON.stringify(held)}), aborted = readFileSync(${JSON.stringify(aborted)});
+    const options = { profile: "full", budgetMs: 0 };
+    const texts = (report) => report.detections.map((d) => d.content.text).sort();
+    (async () => {
+      const shared = new AbortController();
+      const first = texts(await qr.scan(held, { ...options, signal: shared.signal }));
+      const t0 = performance.now();
+      const blockers = [held, held, held].map((image) => qr.scan(image, options));
+      const queued = [aborted, aborted].map((image) => qr.scan(image, { ...options, signal: shared.signal })
+        .then(() => ({ resolved: true, at: performance.now() - t0 }),
+          (error) => ({ resolved: false, name: error.name, domException: error instanceof DOMException,
+            at: performance.now() - t0 })));
+      setTimeout(() => shared.abort(), 20);
+      const outcomes = await Promise.all(queued);
+      const reports = await Promise.all(blockers);
+      console.log(JSON.stringify({ pool: process.env.UV_THREADPOOL_SIZE, first, queued: outcomes,
+        blocked: { ms: performance.now() - t0, texts: reports.map(texts) } }));
+    })();`], { cwd: consumer, env: { ...process.env, UV_THREADPOOL_SIZE: "1" } });
+  assert.equal(reused.pool, "1");
+  assert.deepEqual(reused.first, [...SLOW[0].texts].sort(), "the first scan with the shared signal completes");
+  for (const outcome of reused.queued) {
+    assert.deepEqual({ resolved: outcome.resolved, name: outcome.name, domException: outcome.domException },
+      { resolved: false, name: "AbortError", domException: true },
+      `a reused signal still cancels a queued scan: ${JSON.stringify(reused)}`);
+    assert.ok(outcome.at < reused.blocked.ms, `the abort landed while the task was queued: ${JSON.stringify(reused)}`);
+  }
+  for (const texts of reused.blocked.texts) assert.deepEqual(texts, [...SLOW[0].texts].sort());
   return { pool_threads: 1, queued: { outcome: observed.queued.name, at_ms: +observed.queued.at.toFixed(1),
-    queue_released_ms: +observed.blocked.ms.toFixed(1) },
-  running: { outcome: "resolved", aborted_at_ms: +observed.running.abortedAt.toFixed(1), resolved_ms: +observed.running.ms.toFixed(1) } };
+    queue_released_ms: +observed.blocked.ms.toFixed(1), dom_exception: observed.queued.domException },
+  running: { outcome: "resolved", aborted_at_ms: +observed.running.abortedAt.toFixed(1), resolved_ms: +observed.running.ms.toFixed(1) },
+  reused_signal: { first: "resolved", queued: reused.queued.map((outcome) => outcome.name),
+    dom_exception: reused.queued.every((outcome) => outcome.domException),
+    at_ms: reused.queued.map((outcome) => +outcome.at.toFixed(1)), queue_released_ms: +reused.blocked.ms.toFixed(1) } };
 }
 
 // A module that validates and compiles but cannot instantiate: it imports
