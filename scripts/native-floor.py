@@ -951,7 +951,7 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
         sums = root / "qrcode-barcode-scanner-cli-1.2.3-SHA256SUMS"
         sums.write_bytes(b"".join(b"0" * 64 + b"  " + Path(path).name.encode() + b"\n"
                                   for path in (*every.values(), str(source))))
-        npm = root / "qrcode-ai-scanner-linux-x64-gnu-1.2.3.tgz"
+        npm = root / "qrcode-ai-com-qrcode-barcode-scanner-linux-x64-gnu-1.2.3.tgz"
         npm.write_bytes(b"\x1f\x8b")
         raw = root / "build" / "qrscan"
         raw.parent.mkdir()
@@ -1132,9 +1132,9 @@ def cli_command_line(failures, clean, gnu_elf, console_pe, arm_elf, glibc):
 
 
 def self_test():
-    gnu, musl = "qrcode-ai-scanner.linux-x64-gnu.node", "qrcode-ai-scanner.linux-x64-musl.node"
-    arm, mac = "qrcode-ai-scanner.linux-arm64-gnu.node", "qrcode-ai-scanner.darwin-arm64.node"
-    intel, win = "qrcode-ai-scanner.darwin-x64.node", "qrcode-ai-scanner.win32-x64-msvc.node"
+    gnu, musl = "qrcode-barcode-scanner.linux-x64-gnu.node", "qrcode-barcode-scanner.linux-x64-musl.node"
+    arm, mac = "qrcode-barcode-scanner.linux-arm64-gnu.node", "qrcode-barcode-scanner.darwin-arm64.node"
+    intel, win = "qrcode-barcode-scanner.darwin-x64.node", "qrcode-barcode-scanner.win32-x64-msvc.node"
     clean = [
         (gnu, make_elf()),
         (arm, make_elf(machine=183, needed=("libc.so.6", "ld-linux-aarch64.so.1"), versions=("GLIBC_2.28",))),
@@ -1167,7 +1167,7 @@ def self_test():
         ("an application DLL", win, make_pe(imports=("KERNEL32.dll", "libscan.dll"))),
         ("an arm64 PE under the x64 name", win, make_pe(machine=0xAA64)),
         ("an ELF under the Windows name", win, make_elf()),
-        ("an unknown target", "qrcode-ai-scanner.freebsd-x64.node", make_elf()),
+        ("an unknown target", "qrcode-barcode-scanner.freebsd-x64.node", make_elf()),
     ]
     failures = []
     for label, data in clean:
@@ -1193,17 +1193,18 @@ def self_test():
                     info.size = len(data)
                     archive.addfile(info, io.BytesIO(data))
             return str(path)
-        addons = [tarball(f"qrcode-ai-scanner-{label.split('.')[1]}-1.2.3.tgz", [(label, data)])
+        addons = [tarball(f"qrcode-ai-com-qrcode-barcode-scanner-{label.split('.')[1]}-1.2.3.tgz", [(label, data)])
                   for label, data in clean]
-        main_package = tarball("qrcode-ai-scanner-1.2.3.tgz", [("package.json", b"{}"), ("index.js", b"")])
-        twin = tarball("qrcode-ai-scanner-linux-x64-gnu-1.2.4.tgz", [clean[0]])
+        main_package = tarball("qrcode-ai-com-qrcode-barcode-scanner-1.2.3.tgz",
+                               [("package.json", b"{}"), ("index.js", b"")])
+        twin = tarball("qrcode-ai-com-qrcode-barcode-scanner-linux-x64-gnu-1.2.4.tgz", [clean[0]])
         # The win32 package under its own name, its addon importing the Visual C++ runtime (as 0.10.0's did)
-        vc_runtime = tarball("planted/qrcode-ai-scanner-win32-x64-msvc-1.2.3.tgz",
+        vc_runtime = tarball("planted/qrcode-ai-com-qrcode-barcode-scanner-win32-x64-msvc-1.2.3.tgz",
                              [(win, make_pe(imports=("KERNEL32.dll", "VCRUNTIME140.dll")))])
         runs = [
             ("the release set", ["--complete", *addons, main_package], []),
             ("a planted addon", ["--complete", *addons[:-1], vc_runtime, main_package],
-             [f"qrcode-ai-scanner-win32-x64-msvc-1.2.3.tgz!package/{win}: imports VCRUNTIME140.dll,"
+             [f"qrcode-ai-com-qrcode-barcode-scanner-win32-x64-msvc-1.2.3.tgz!package/{win}: imports VCRUNTIME140.dll,"
               " which node.exe does not carry"]),
             ("five of six", ["--complete", *addons[1:], main_package], ["linux-x64-gnu: 0 addons, expected 1"]),
             ("a target twice", ["--complete", *addons, twin, main_package], ["linux-x64-gnu: 2 addons, expected 1"]),
