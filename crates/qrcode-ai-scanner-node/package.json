@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/qrcode-ai-scanner",
+  "name": "@qrcode-ai-com/qrcode-barcode-scanner",
   "version": "0.11.0",
   "description": "QR decoding + scannability scoring for artistic and AI-generated QR codes \u2014 async native bindings (Rust)",
   "main": "index.js",
@@ -28,7 +28,7 @@
     "report-types.d.ts"
   ],
   "napi": {
-    "binaryName": "qrcode-ai-scanner",
+    "binaryName": "qrcode-barcode-scanner",
     "targets": [
       "x86_64-apple-darwin",
       "aarch64-apple-darwin",

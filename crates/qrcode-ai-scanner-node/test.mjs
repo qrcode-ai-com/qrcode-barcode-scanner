@@ -240,18 +240,60 @@ assert.throws(() => scanSync(clean, { alphaPalette: ["auto"] }), /unknown palett
 assert.throws(() => scanSync(clean, { alphaPalette: Array.from({ length: 33 }, () => "#ffffff") }),
   /alpha palette too large/, "the anti-DoS cap rejects loudly, never truncates silently");
 
+// The loader's names. It looks up this package's own addon files and platform
+// packages, nothing else: no former package name, no WebAssembly fallback. A
+// smoke run loads one branch only, so the branch of every committed target is
+// read from the text: its addon file, its platform package and that package's
+// manifest, each looked up exactly once.
+const loader = readFileSync(here("./native.js"), "utf8");
+assert.doesNotMatch(loader, /@supernovae-st\/|qrcode[-_]ai[-_]scanner/, "the loader names no former package");
+assert.doesNotMatch(loader, /wasi|wasm/i, "the loader has no WebAssembly fallback");
+// napi's platform suffix of each target in napi.targets: it names the addon
+// file and the platform package of that target.
+const NAPI_SUFFIX = {
+  "x86_64-apple-darwin": "darwin-x64",
+  "aarch64-apple-darwin": "darwin-arm64",
+  "x86_64-unknown-linux-gnu": "linux-x64-gnu",
+  "aarch64-unknown-linux-gnu": "linux-arm64-gnu",
+  "x86_64-unknown-linux-musl": "linux-x64-musl",
+  "x86_64-pc-windows-msvc": "win32-x64-msvc",
+};
+// What the loader requires besides a binding: fs, its own manifest, ldd.
+const helpers = ["node:fs", "./package.json", "child_process"];
+const lookups = [...loader.matchAll(/require\('([^']+)'\)/g)].map(([, specifier]) => specifier)
+  .filter((specifier) => !helpers.includes(specifier));
+const foreign = lookups.filter((specifier) =>
+  !specifier.startsWith(`./${pkg.napi.binaryName}.`) && !specifier.startsWith(`${pkg.name}-`));
+assert.deepEqual(foreign, [],
+  "every lookup is an addon file named after napi.binaryName or a platform package of this one");
+for (const target of pkg.napi.targets) {
+  const suffix = NAPI_SUFFIX[target];
+  assert.ok(suffix, `the napi suffix of the committed target ${target}`);
+  for (const specifier of [`./${pkg.napi.binaryName}.${suffix}.node`, `${pkg.name}-${suffix}`,
+    `${pkg.name}-${suffix}/package.json`]) {
+    assert.equal(lookups.filter((found) => found === specifier).length, 1,
+      `the loader looks up ${specifier} exactly once`);
+  }
+}
+
 // The loader's version check. NAPI_RS_ENFORCE_VERSION_CHECK only guards an
 // INSTALLED platform package, never the local .node the scans above loaded,
 // so rebuild the layout npm creates in a scratch node_modules (this package's
 // `files` + package.json, and a platform package around the built binary)
 // and load it in a child process. 0.9.0 shipped comparing against '0.8.1'
 // and refused its own binaries with the check on.
-assert.doesNotMatch(readFileSync(here("./native.js"), "utf8"), /!== '\d+\.\d+\.\d+'|expected \d+\.\d+\.\d+ but got/,
+assert.doesNotMatch(loader, /!== '\d+\.\d+\.\d+'|expected \d+\.\d+\.\d+ but got/,
   "the loader compares against package.json, never a literal version");
-const binaries = readdirSync(here(".")).filter((f) => /^qrcode-ai-scanner\.[\w-]+\.node$/.test(f));
+// Every addon next to native.js counts, whatever its name: one left by an
+// earlier build under another name would sit unnoticed beside the one the
+// scans above loaded.
+const binaries = readdirSync(here(".")).filter((f) => f.endsWith(".node"));
 assert.equal(binaries.length, 1, `exactly one built binary next to native.js: ${binaries}`);
 const [binary] = binaries;
-const platform = `${pkg.name}-${binary.slice("qrcode-ai-scanner.".length, -".node".length)}`;
+const stem = `${pkg.napi.binaryName}.`;
+assert.ok(binary.startsWith(stem) && /^[\w-]+\.node$/.test(binary.slice(stem.length)),
+  `the built binary is named ${stem}<suffix>.node: ${binary}`);
+const platform = `${pkg.name}-${binary.slice(stem.length, -".node".length)}`;
 const scratch = mkdtempSync(join(tmpdir(), "qrscan-loader-"));
 try {
   const mainDir = join(scratch, "node_modules", ...pkg.name.split("/"));
@@ -308,4 +350,5 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`node binding OK — native ${version()} · loader version check exercised via ${platform}`);
+console.log(`node binding OK — native ${version()} · loader branches named for ${pkg.napi.targets.length} targets` +
+  ` · loader version check exercised via ${platform}`);

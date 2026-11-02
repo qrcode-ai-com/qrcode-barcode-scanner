@@ -1,11 +1,11 @@
-# @supernovae-st/qrcode-ai-scanner
+# @qrcode-ai-com/qrcode-barcode-scanner
 
 Async native QR decoding + scannability scoring for **artistic / AI-generated
 QR codes** — Rust under the hood, libuv pool execution (the event loop never
 blocks, even on a 4s artistic scan).
 
 ```js
-import { scan } from "@supernovae-st/qrcode-ai-scanner";
+import { scan } from "@qrcode-ai-com/qrcode-barcode-scanner";
 
 const report = await scan(imageBuffer); // profile: full (quality gate)
 if (report.detections.length) {
@@ -42,10 +42,12 @@ if (report.detections.length) {
   package it looked for or the unsupported platform: a load failure, with
   no WASI fallback, distinct from `[QRS-xxx]` rejections.
 - Full TypeScript contract in `index.d.ts` — the same versioned shape as the
-  [core crate](https://crates.io/crates/qrcode-ai-scanner), CLI, and wasm package.
+  [core crate](https://crates.io/crates/qrcode-barcode-scanner), CLI, and wasm package.
 
 Browser? Use
-[`@supernovae-st/qrcode-ai-scanner-wasm`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner-wasm).
+[`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm).
+
+Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.
 
 License: AGPL-3.0-or-later · © SuperNovae Studio · part of
 [qrcode-ai.com](https://qrcode-ai.com).
