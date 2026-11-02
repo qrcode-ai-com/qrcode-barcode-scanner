@@ -53,3 +53,17 @@ threads-required = "num-cpus"
 filter = 'test(/^engine::databar_expanded::tests::(rows_are_stored_by_row_number_after_their_equals|repeated_or_partial_rows_are_not_stored_and_containing_rows_replace_them|an_internal_finder_too_close_to_the_previous_one_is_passed_over|no_pair_follows_a_pair_without_a_right_character|a_search_from_the_row_end_or_beyond_finds_nothing|an_odd_finder_takes_its_first_element_from_the_space_before_the_window|an_even_finder_is_matched_mirrored_with_its_first_element_after_the_window)$/)'
 priority = 99
 threads-required = "num-cpus"
+
+# The same for the DataBar Expanded bit stream: a broken countdown in the
+# bit-array builder keeps a character's loop on bit 11. A symbol read spins
+# there whenever that bit is clear, as it is in every first data character
+# without a composite link, unless the optimizer happens to fold the spin
+# into an overflow panic. This direct check sets bit 11 in all three of its
+# characters, so the same break indexes past its array's single storage
+# word within 65 iterations and panics at any optimization level. It runs
+# after the checks above, alone, before any test that decodes a symbol. No
+# test is excluded.
+[[profile.default.overrides]]
+filter = 'test(/^engine::databar_expanded::tests::each_character_contributes_twelve_bits_from_bit_eleven$/)'
+priority = 98
+threads-required = "num-cpus"

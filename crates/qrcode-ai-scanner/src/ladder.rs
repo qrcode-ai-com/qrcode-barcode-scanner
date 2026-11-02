@@ -4218,4 +4218,156 @@ mod ladder_mutant_kills {
         assert_eq!(walk(17), (16, Some(true)));
         assert_eq!(walk(129), (16, Some(true)));
     }
+
+    /// The axis-aligned box from `(from, from)` to `(to, to)`, its corners
+    /// in order from the first.
+    fn axis_box(from: f32, to: f32) -> [Point; 4] {
+        [
+            Point { x: from, y: from },
+            Point { x: to, y: from },
+            Point { x: to, y: to },
+            Point { x: from, y: to },
+        ]
+    }
+
+    /// A grid of `version` rqrr bounded at `bounds` on its unit pixel, not
+    /// re-derived by the engine pass.
+    fn grid_candidate(version: u8, bounds: [Point; 4]) -> RescueCandidate {
+        RescueCandidate {
+            stream: engine::MaskedStream {
+                bits: Vec::new(),
+                bit_len: 0,
+            },
+            corners: bounds,
+            pixel: occurrence::UNIT_PIXEL,
+            version,
+            ec: EcLevel::M,
+            mask: 0,
+            inverted: false,
+            transposed: false,
+            rederived: None,
+        }
+    }
+
+    /// A quadrilateral footprint rqrr's grid measured.
+    fn rqrr_quad(corners: [Point; 4]) -> Footprint {
+        Footprint {
+            kind: Kind::Quad,
+            points: corners.to_vec(),
+            detector: Some(EngineKind::Rqrr),
+        }
+    }
+
+    // ---- candidate_observation ----
+
+    #[test]
+    fn a_candidate_observes_the_outer_corners_of_its_version_s_grid() {
+        // rqrr's bounds frame one module past an N-module symbol, N = 4 ·
+        // version + 17; the observation keeps the symbol's own N modules.
+        // Upright at four pixels a module from (40, 40), version 1 (21
+        // modules, bounds to 128) ends at 124, version 7 (45, to 224) at 220
+        let rank = Rank {
+            attempt: 3,
+            source: source::CANDIDATE,
+            index: 1,
+        };
+        for (version, bounds_end, symbol_end) in [(1, 128.0, 124.0), (7, 224.0, 220.0)] {
+            let candidate = grid_candidate(version, axis_box(40.0, bounds_end));
+            let observation = candidate_observation(&candidate, rank, (400, 400), 300)
+                .expect("a grid inside the image is observed");
+            assert_eq!(
+                observation,
+                Observation {
+                    footprint: rqrr_quad(axis_box(40.0, symbol_end)),
+                    rank,
+                    side: 300,
+                },
+                "version {version}"
+            );
+        }
+    }
+
+    // ---- Run::collect_attempt (candidate geometry) ----
+
+    #[test]
+    fn a_re_derived_grid_is_observed_off_rqrr_s_anchor_in_original_pixels() {
+        // rqrr anchors a half-turned grid one pixel of its plane short of
+        // the symbol's corner along each axis, and the observation moves the
+        // bounds back by that pixel in original space. An attempt at half
+        // the original size bounds the grid from (61, 61) back to (17, 17):
+        // (122, 122) to (34, 34) in the original, moved back by two original
+        // pixels to (124, 124) and (36, 36), of which the version 1 symbol
+        // keeps 21 of 22 modules: (124, 124) to (40, 40)
+        let half_turned = [
+            Point { x: 61.0, y: 61.0 },
+            Point { x: 17.0, y: 61.0 },
+            Point { x: 17.0, y: 17.0 },
+            Point { x: 61.0, y: 17.0 },
+        ];
+        let mut candidate = grid_candidate(1, half_turned);
+        candidate.rederived = Some(Rederived::Parsed {
+            parsed: crate::rescue::bitstream::Parsed {
+                bytes: b"abc".to_vec(),
+                eci: Vec::new(),
+                fnc1: Fnc1::None,
+                structured_append: false,
+                segments: Vec::new(),
+                byte_segments: std::iter::once(0..3).collect(),
+            },
+            margin: 13,
+        });
+        let outcome = engine::EngineOutcome {
+            detections: vec![RawDetection::qr(
+                b"abc",
+                EciEvidence::NoEci,
+                Fnc1::None,
+                EngineKind::Rxing,
+            )],
+            rescue: vec![candidate],
+            ..engine::EngineOutcome::default()
+        };
+        let cancel = CancelToken::new();
+        let mut run = fresh_run(&cancel, (200, 200));
+        let plane = LumaImage::new(vec![255; 100 * 100], 100, 100);
+        run.collect_attempt(&plane, outcome, false);
+        let found = run.store.reconcile();
+        let [detection] = &found[..] else {
+            panic!("one detection: {found:?}");
+        };
+        let observed: Vec<(&Footprint, u32)> = detection
+            .observations
+            .iter()
+            .map(|observation| (&observation.footprint, observation.side))
+            .collect();
+        let symbol = [
+            Point { x: 124.0, y: 124.0 },
+            Point { x: 40.0, y: 124.0 },
+            Point { x: 40.0, y: 40.0 },
+            Point { x: 124.0, y: 40.0 },
+        ];
+        assert_eq!(observed, [(&rqrr_quad(symbol), 100)]);
+    }
+
+    // ---- Run::collect_rescue (one symbol) ----
+
+    #[test]
+    fn a_grid_centred_in_a_collected_grid_of_its_identity_is_that_symbol() {
+        // whichever of a large grid and a small one inside it comes first,
+        // only the centre of the small one lies in the other's box: they are
+        // one symbol, and the first is kept; a grid beside them is another
+        let (large, small, beside) = (
+            axis_box(0.0, 100.0),
+            axis_box(0.0, 20.0),
+            axis_box(150.0, 170.0),
+        );
+        let cancel = CancelToken::new();
+        for (first, second) in [(large, small), (small, large)] {
+            let mut run = fresh_run(&cancel, (200, 200));
+            let both = vec![grid_candidate(2, first), grid_candidate(2, second)];
+            run.collect_rescue(both, (200, 200), false);
+            run.collect_rescue(vec![grid_candidate(2, beside)], (200, 200), false);
+            let kept: Vec<[Point; 4]> = run.rescue_candidates.iter().map(|c| c.corners).collect();
+            assert_eq!(kept, [first, beside]);
+        }
+    }
 }

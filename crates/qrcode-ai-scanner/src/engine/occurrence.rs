@@ -2171,4 +2171,199 @@ mod tests {
         assert_eq!(map(1e37, 0.0), None);
         assert_eq!(map(0.0, 1e37), None);
     }
+
+    #[test]
+    fn the_bridge_samples_inside_its_stretch_up_to_the_image_edges() {
+        // a symbol across the whole width of a 100 px image, read on two
+        // rows from its first column to its right edge: the bridge samples
+        // the centre of each of 100 equal parts of the shared stretch,
+        // columns 0 to 99, never past either end, so every line it reads is
+        // inside the image — one tall symbol is one, and ten white rows
+        // across it leave two copies
+        for (white, want) in [(0..0_u32, Verdict::Same), (15..25, Verdict::Different)] {
+            let mut data = vec![255u8; 100 * 40];
+            for y in (0..40_u32).filter(|y| !white.contains(y)) {
+                for x in (0..100_u32).filter(|x| (x / 5) % 2 == 1) {
+                    data[(y * 100 + x) as usize] = 0;
+                }
+            }
+            let luma = LumaImage::new(data, 100, 40);
+            let got = same_linear(
+                &luma,
+                [p(0.0, 5.5), p(100.0, 5.5)],
+                [p(0.0, 34.5), p(100.0, 34.5)],
+            );
+            assert_eq!(got, want, "white rows {white:?}");
+        }
+    }
+
+    #[test]
+    fn a_line_covering_part_of_the_other_is_compared_over_the_stretch_they_share() {
+        // the first line crosses a blank margin from the left edge of a 200 px
+        // image, the second covers only the symbol on the right half: the
+        // bridge compares the stretch the second projects onto, columns 100
+        // to 199, so it reads the symbol's bars (one tall symbol is one, ten
+        // white rows across it leave two copies), not the margin from the
+        // first line's origin, whose blank pixels prove nothing
+        let first = [p(0.0, 5.5), p(200.0, 5.5)];
+        let second = [p(100.0, 34.5), p(200.0, 34.5)];
+        let lines = Lines::of(first, second);
+        assert_eq!(
+            (lines.start, lines.overlap, lines.offset),
+            (100.0, 100.0, 29.0)
+        );
+        assert_eq!(lines.decided(), None);
+        for (white, want) in [(0..0_u32, Verdict::Same), (15..25, Verdict::Different)] {
+            let mut data = vec![255u8; 200 * 40];
+            for y in (0..40_u32).filter(|y| !white.contains(y)) {
+                for x in (100..200_u32).filter(|x| (x / 5) % 2 == 1) {
+                    data[(y * 200 + x) as usize] = 0;
+                }
+            }
+            let luma = LumaImage::new(data, 200, 40);
+            let got = same_linear(&luma, first, second);
+            assert_eq!(got, want, "white rows {white:?}");
+        }
+    }
+
+    #[test]
+    fn rescaling_scales_each_axis_by_its_own_factor_and_never_from_a_plane_without_area() {
+        // read on a 100 × 50 plane, mapped onto 200 × 200: × 2 along x and
+        // × 4 along y, the kind and the reader unchanged
+        let measured = partial(vec![p(10.0, 20.0), p(30.0, 5.0)], EngineKind::Rxing);
+        assert_eq!(
+            measured.clone().rescaled((100, 50), (200, 200)),
+            partial(vec![p(20.0, 80.0), p(60.0, 20.0)], EngineKind::Rxing)
+        );
+        // the same plane, or one without width or height (no factor to scale
+        // by): the points as measured
+        for from in [(200, 200), (0, 50), (100, 0), (0, 0)] {
+            let mapped = measured.clone().rescaled(from, (200, 200));
+            assert_eq!(mapped, measured, "from {from:?}");
+        }
+    }
+
+    #[test]
+    fn a_partial_footprint_keeps_the_first_eight_distinct_points_in_reading_order() {
+        let points: Vec<Point> = (0..10).map(|i| p(10.0 * i as f32, 5.0)).collect();
+        // a point read twice counts once, wherever the repeat falls
+        let mut read = vec![points[0], points[1], points[0], points[1]];
+        read.extend_from_slice(&points[2..]);
+        let kept = partial(read, EngineKind::Rqrr);
+        assert_eq!(
+            (kept.kind, kept.detector),
+            (Kind::Partial, Some(EngineKind::Rqrr))
+        );
+        // the report schema caps a partial footprint at eight points
+        assert_eq!(kept.points, points[..8]);
+        // points sharing one coordinate are distinct points
+        let cross = vec![p(10.0, 5.0), p(10.0, 6.0), p(11.0, 5.0)];
+        assert_eq!(partial(cross.clone(), EngineKind::Rqrr).points, cross);
+        // no point: nothing measured
+        assert_eq!(
+            partial(Vec::new(), EngineKind::Rqrr),
+            Footprint::unavailable()
+        );
+    }
+
+    #[test]
+    fn a_quad_is_strictly_convex_and_spans_at_least_four_square_pixels() {
+        // a 2 px square spans exactly the minimum, drawn either way round
+        let square = [p(0.0, 0.0), p(2.0, 0.0), p(2.0, 2.0), p(0.0, 2.0)];
+        let back = [square[0], square[3], square[2], square[1]];
+        assert_eq!(clockwise_quad(&square), Some(square));
+        assert_eq!(clockwise_quad(&back), Some(square));
+        // a little narrower, it spans less: no quad
+        let narrow = [p(0.0, 0.0), p(1.9, 0.0), p(1.9, 2.0), p(0.0, 2.0)];
+        assert_eq!(clockwise_quad(&narrow), None);
+        // a corner on the line through its neighbours makes a triangle, not a
+        // strictly convex quad, whichever way round it is drawn
+        let flat = [p(0.0, 0.0), p(5.0, 0.0), p(10.0, 0.0), p(5.0, 10.0)];
+        let flat_back = [flat[0], flat[3], flat[2], flat[1]];
+        assert_eq!(clockwise_quad(&flat), None);
+        assert_eq!(clockwise_quad(&flat_back), None);
+        // three corners are no quad
+        assert_eq!(clockwise_quad(&square[..3]), None);
+    }
+
+    #[test]
+    fn a_footprint_measured_again_keeps_its_earliest_read_then_its_finest_plane() {
+        let square = quad([(0.0, 10.0), (40.0, 10.0), (40.0, 50.0), (0.0, 50.0)]);
+        let at = |attempt: u32, side: u32| observed_on(square.clone(), rank(attempt, 0), side);
+        let beside = observed_on(
+            quad([(60.0, 60.0), (90.0, 60.0), (90.0, 90.0), (60.0, 90.0)]),
+            rank(3, 0),
+            400,
+        );
+        let merged = |mut own: Vec<Observation>, again: Observation| {
+            assert!(!merge(&mut own, vec![again]), "within capacity");
+            own
+        };
+        // an earlier read of a kept footprint takes its place, a later one
+        // does not
+        assert_eq!(merged(vec![at(5, 400)], at(1, 400)), vec![at(1, 400)]);
+        assert_eq!(merged(vec![at(1, 400)], at(5, 400)), vec![at(1, 400)]);
+        // as early, the finer plane's measurement
+        assert_eq!(merged(vec![at(1, 400)], at(1, 800)), vec![at(1, 800)]);
+        assert_eq!(merged(vec![at(1, 800)], at(1, 400)), vec![at(1, 800)]);
+        // the read decides before the plane: an earlier read takes the place
+        // of a later one measured on a finer or a coarser plane, and a later
+        // read never takes the place of an earlier one
+        assert_eq!(merged(vec![at(1, 400)], at(5, 800)), vec![at(1, 400)]);
+        assert_eq!(merged(vec![at(5, 800)], at(1, 400)), vec![at(1, 400)]);
+        assert_eq!(merged(vec![at(5, 400)], at(1, 800)), vec![at(1, 800)]);
+        assert_eq!(merged(vec![at(1, 800)], at(5, 400)), vec![at(1, 800)]);
+        // only the kept measurement of that same footprint is replaced
+        assert_eq!(
+            merged(vec![beside.clone(), at(5, 400)], at(1, 400)),
+            vec![at(1, 400), beside]
+        );
+        // as early and as fine, the kept measurement stays as it was: its
+        // corners on the image edge at +0 are not rewritten as the -0 of an
+        // equal re-measure
+        let edge = quad([(-0.0, 10.0), (40.0, 10.0), (40.0, 50.0), (-0.0, 50.0)]);
+        assert_eq!(edge, square, "+0 and -0 are one coordinate");
+        let kept = merged(vec![at(1, 400)], observed_on(edge, rank(1, 0), 400));
+        let x = |i: usize| kept[0].footprint.points[i].x.to_bits();
+        assert_eq!((x(0), x(3)), (0.0_f32.to_bits(), 0.0_f32.to_bits()));
+    }
+
+    #[test]
+    fn a_detection_groups_its_earliest_256_located_footprints_and_flags_any_past_them() {
+        let luma = blank(400, 400);
+        let square = quad([(50.0, 50.0), (150.0, 50.0), (150.0, 150.0), (50.0, 150.0)])
+            .validated((400, 400));
+        let other = quad([
+            (250.0, 250.0),
+            (350.0, 250.0),
+            (350.0, 350.0),
+            (250.0, 350.0),
+        ])
+        .validated((400, 400));
+        let reads = MAX_GROUPED as u32;
+        // 256 located reads of one symbol, and a read that located nothing
+        // (it takes no place among them): one occurrence, none left out
+        let mut observations: Vec<Observation> = (0..reads)
+            .map(|i| observed(square.clone(), rank(i, 0)))
+            .collect();
+        observations.push(observed(Footprint::unavailable(), rank(0, 1)));
+        let (grouped, saturated) = group(Symbology::QrCode, observations.clone(), &luma);
+        assert_eq!((grouped.len(), saturated), (1, false));
+        assert_eq!(grouped[0].footprint, square);
+        // another symbol read after them is left out, and the grouping flagged
+        let mut late = observations.clone();
+        late.push(observed(other.clone(), rank(reads, 0)));
+        let (grouped, saturated) = group(Symbology::QrCode, late, &luma);
+        assert_eq!((grouped.len(), saturated), (1, true));
+        assert_eq!(grouped[0].footprint, square);
+        // read early, wherever it arrives, it is among the earliest 256
+        let mut early = observations;
+        early.push(observed(other.clone(), rank(0, 2)));
+        let (grouped, saturated) = group(Symbology::QrCode, early, &luma);
+        assert_eq!((grouped.len(), saturated), (2, true));
+        assert_eq!(
+            (&grouped[1].footprint, grouped[1].rank),
+            (&other, rank(0, 2))
+        );
+    }
 }

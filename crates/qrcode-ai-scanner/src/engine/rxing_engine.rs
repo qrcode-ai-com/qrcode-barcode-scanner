@@ -201,9 +201,9 @@ fn decode_all(
 
 fn decode_expanded(luma: &LumaImage) -> rxing::common::Result<Vec<rxing::RXingResult>> {
     let mut image = bitmap(luma)?;
+    // The patched reader reads only TryHarder; the ladder retries inverted images.
     let hints = rxing::DecodeHints {
         TryHarder: Some(true),
-        AlsoInverted: Some(true),
         ..Default::default()
     };
     let mut reader = super::databar_expanded::RSSExpandedReader::default();
@@ -1739,5 +1739,149 @@ mod tests {
         assert_eq!(lineage(&centres), (Some(completed), None));
         let aligned = [bottom_left, top_left, top_right, (37.5, 37.5)];
         assert_eq!(lineage(&aligned), (Some(aligned.map(corner)), None));
+    }
+
+    /// The committed `DataBar` Expanded symbol, downscaled to `side` pixels
+    /// along its longer side.
+    fn databar_expanded(side: u32) -> LumaImage {
+        let symbol = fixture("symbology/databar-expanded-bwipp-regression.png");
+        crate::transform::downscale_to(&symbol, side)
+    }
+
+    /// What a pass read: each result's format and text, in order.
+    fn reads(results: &[rxing::RXingResult]) -> Vec<(rxing::BarcodeFormat, &str)> {
+        results
+            .iter()
+            .map(|result| (*result.getBarcodeFormat(), result.getText()))
+            .collect()
+    }
+
+    /// No read at all.
+    const NOTHING: [(rxing::BarcodeFormat, &str); 0] = [];
+
+    const EXPANDED_TEXT: &str = "(01)09506000134352(10)DEMO";
+
+    /// What the upstream reader stack alone reads under the hints `decode`
+    /// builds for a pass restricted to `only` (`None`: every format).
+    fn upstream(luma: &LumaImage, only: Option<rxing::BarcodeFormat>) -> Vec<rxing::RXingResult> {
+        let mut hints = rxing::DecodeHints {
+            AlsoInverted: Some(true),
+            PossibleFormats: only.map(|format| std::collections::HashSet::from([format])),
+            ..Default::default()
+        };
+        super::decode_all(luma, &mut hints).unwrap_or_default()
+    }
+
+    /// `left` and `right` side by side on a white plane, top-aligned.
+    fn beside(left: &LumaImage, right: &LumaImage) -> LumaImage {
+        let width = left.width() + right.width();
+        let height = left.height().max(right.height());
+        let mut plane = vec![255u8; (width * height) as usize];
+        for (image, offset) in [(left, 0), (right, left.width())] {
+            let side = image.width() as usize;
+            for y in 0..image.height() {
+                let row = &image.data()[y as usize * side..][..side];
+                let start = (y * width + offset) as usize;
+                plane[start..start + side].copy_from_slice(row);
+            }
+        }
+        LumaImage::new(plane, width, height)
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_only_runs_when_no_expanded_symbol_was_read() {
+        // At a quarter of the committed size both readers read the symbol:
+        // the decode publishes one read, so the patched pass, which would
+        // have added a second, did not run. At half the size the upstream
+        // reader stops at an internal false finder and the patched pass reads
+        // the symbol: one read again.
+        use rxing::BarcodeFormat::RSS_EXPANDED;
+        let quarter = databar_expanded(223);
+        assert_eq!(
+            reads(&upstream(&quarter, Some(RSS_EXPANDED))),
+            [(RSS_EXPANDED, EXPANDED_TEXT)]
+        );
+        assert_eq!(
+            reads(&super::decode_expanded(&quarter).unwrap()),
+            [(RSS_EXPANDED, EXPANDED_TEXT)],
+            "the patched pass reads the quarter-size symbol as well"
+        );
+        let half = databar_expanded(446);
+        assert_eq!(
+            reads(&upstream(&half, Some(RSS_EXPANDED))),
+            NOTHING,
+            "the upstream reader misses the half-size symbol"
+        );
+        for plane in [&quarter, &half] {
+            let found = decode(plane, FormatFilter::Only(Symbology::DataBarExpanded));
+            let [read] = &found[..] else {
+                panic!("one read of the {}-pixel symbol: {found:?}", plane.width());
+            };
+            assert_eq!(
+                (read.symbology, read.raw.as_slice()),
+                (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes())
+            );
+        }
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_reads_a_vertical_symbol() {
+        // TryHarder gives the patched reader its quarter-turn pass: the
+        // half-size symbol turned a quarter clockwise, which the upstream
+        // reader misses in both orientations, is read with its element
+        // string — the walk holds it for confirmation like any such read
+        use rxing::BarcodeFormat::RSS_EXPANDED;
+        let upright = databar_expanded(446);
+        let (width, height) = (upright.width(), upright.height());
+        let mut turned = vec![0u8; upright.data().len()];
+        for y in 0..height {
+            for x in 0..width {
+                // (x, y) moves to (height - 1 - y, x) in a height-wide image
+                turned[(x * height + (height - 1 - y)) as usize] =
+                    upright.data()[(y * width + x) as usize];
+            }
+        }
+        let vertical = LumaImage::new(turned, height, width);
+        assert_eq!(
+            reads(&upstream(&vertical, Some(RSS_EXPANDED))),
+            NOTHING,
+            "the upstream reader misses the vertical symbol"
+        );
+        let found = decode(&vertical, FormatFilter::Only(Symbology::DataBarExpanded));
+        let [read] = &found[..] else {
+            panic!("one read of the vertical symbol: {found:?}");
+        };
+        assert_eq!(
+            (read.symbology, read.raw.as_slice(), read.needs_confirmation),
+            (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes(), true)
+        );
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_runs_beside_a_read_of_another_symbol() {
+        // An unrestricted pass over the half-size symbol with a QR code to
+        // its right: the upstream readers read the QR code and miss the
+        // expanded symbol in the region left of it, so the patched pass still
+        // runs and the decode publishes both symbols. A read of another
+        // symbol never stands for the expanded symbol the upstream reader
+        // missed.
+        let qr = render(b"a second read", qrcode::EcLevel::M);
+        let plane = beside(&databar_expanded(446), &qr);
+        assert_eq!(
+            reads(&upstream(&plane, None)),
+            [(rxing::BarcodeFormat::QR_CODE, "a second read")]
+        );
+        let found = decode(&plane, FormatFilter::All);
+        let published: Vec<_> = found
+            .iter()
+            .map(|read| (read.symbology, read.raw.as_slice()))
+            .collect();
+        assert_eq!(
+            published,
+            [
+                (Symbology::QrCode, b"a second read".as_slice()),
+                (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes()),
+            ]
+        );
     }
 }

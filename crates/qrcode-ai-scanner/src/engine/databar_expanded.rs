@@ -2051,7 +2051,10 @@ mod tests {
 
     /// Every character contributes its twelve bits, most significant first,
     /// bit 11 included: the first data character (4095), then a later
-    /// pair's left (2048) and right (3071).
+    /// pair's left (2048) and right (3071). All three set bit 11 on purpose:
+    /// a loop stuck on that bit then indexes past the one storage word of
+    /// this 36-bit array at once instead of spinning, which is why the
+    /// nextest configuration runs this check before any symbol read.
     #[test]
     fn each_character_contributes_twelve_bits_from_bit_eleven() {
         let pairs = [

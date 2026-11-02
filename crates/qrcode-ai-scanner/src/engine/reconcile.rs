@@ -2619,4 +2619,27 @@ mod tests {
             (128, true)
         );
     }
+
+    #[test]
+    fn the_published_contents_saturate_only_past_their_capacity() {
+        // as many distinct contents as are published: every one of them,
+        // nothing left out; one more: the latest is left out, and said so
+        let contents = |count: u32| -> Vec<Read> {
+            (0..count)
+                .map(|n| read(n, format!("symbol-{n}").as_bytes(), NoEci, X, NOWHERE))
+                .collect()
+        };
+        let published = |found: &[Reconciled]| -> Vec<String> {
+            found
+                .iter()
+                .map(|detection| String::from_utf8(detection.key.raw.clone()).unwrap())
+                .collect()
+        };
+        let capacity = u32::try_from(MAX_DETECTIONS).unwrap();
+        let first: Vec<String> = (0..capacity).map(|n| format!("symbol-{n}")).collect();
+        let (found, saturated) = reconcile_counted(contents(capacity));
+        assert_eq!((published(&found), saturated), (first.clone(), false));
+        let (found, saturated) = reconcile_counted(contents(capacity + 1));
+        assert_eq!((published(&found), saturated), (first, true));
+    }
 }
