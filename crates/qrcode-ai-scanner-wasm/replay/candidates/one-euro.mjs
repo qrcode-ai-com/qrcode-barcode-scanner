@@ -1,5 +1,7 @@
-// One-euro smoothing (6.6) as a replay post-filter over each track's measured sequence.
-// It stays runnable here when the experimental option leaves camera.js.
+// One-euro smoothing as a replay post-filter over each track's measured sequence. camera.js
+// does not offer it: run.mjs applies it to a smoothing 'none' replay. Per measurement Te s
+// after the last one, the centroid speed (source px/s) is low-passed at derivativeCutoffHz and
+// the points are blended with the factor of a low-pass at minCutoffHz + beta x that speed.
 
 export const name = 'one-euro';
 export const DEFAULT_PARAMS = Object.freeze({ minCutoffHz: 1, beta: 0.01, derivativeCutoffHz: 1 });

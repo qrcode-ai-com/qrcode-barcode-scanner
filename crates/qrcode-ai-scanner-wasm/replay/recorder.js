@@ -1,4 +1,4 @@
-// Development-only capture recorder (10.2): records each tracker input as a JSONL v1 frame
+// Development-only capture recorder: records each tracker input as a JSONL v1 frame
 // line before the tracker sees it. raw and text become SHA-256 digests salted once per session;
 // no pixels, payloads or ground truth are stored. Nothing runs at import. Never shipped.
 

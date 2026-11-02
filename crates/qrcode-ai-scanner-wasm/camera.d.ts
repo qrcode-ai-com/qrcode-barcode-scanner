@@ -98,16 +98,12 @@ export interface TrackerUpdateOptions {
 
 // ------------------------------------------------------------------------ tracker
 
+/** Any other value or kind throws a RangeError at tracker creation. */
 export type Smoothing =
   /** Fixed blend factor in (0, 1]; the default is 0.35. */
   | number
   | { kind: 'fixed'; alpha: number }
-  | { kind: 'none' }
-  /**
-   * Experimental. Becomes a default only through the replay adoption rule (section 10)
-   * and is removed from this module before the 0.11 freeze if it does not qualify.
-   */
-  | { kind: 'one-euro'; minCutoffHz: number; beta: number; derivativeCutoffHz?: number };
+  | { kind: 'none' };
 
 export interface DetectionTrackerOptions {
   /** Default 0.35. */
@@ -450,13 +446,27 @@ export interface CameraScannerOptions {
   /**
    * When given, the controller calls tracker.update(report, frame, { now: completedAt })
    * before onResult, and tracker.reset({ epoch }) whenever an epoch ends. A throw from that
-   * reset stops no step of the end; it reaches onError as callback_failed (without onError,
-   * it is rethrown from a microtask).
+   * reset stops no step of the end; it is reported as callback_failed (see onError).
    */
   tracker?: DetectionTracker;
-  /** Required unless tracker is given. snapshot is the tracker's, or null without one. */
+  /**
+   * Required unless tracker is given. snapshot is the tracker's, or null without one. A throw
+   * from onResult or tracker.update fails the session with callback_failed.
+   */
   onResult?(report: ScanReport, frame: CameraFrame, snapshot: TrackerSnapshot | null): void;
+  /**
+   * Receives the error of each failed session, and a callback_failed for each throw from
+   * onState or from the tracker's reset. The callback_failed of an onState throw arrives
+   * inside the transition that threw, so start(), stop() and setConstraints() called from
+   * onError then act as they would from onState. Without onError, such a callback_failed is
+   * rethrown from a microtask, as is a throw from onError while it receives one.
+   */
   onError?(error: CameraScannerError): void;
+  /**
+   * Called after each transition. A throw from it changes no transition, camera request or
+   * timer, and start() and setConstraints() still return their promise: it is reported as
+   * callback_failed with the throw as cause (see onError).
+   */
   onState?(change: CameraStateChange): void;
   /**
    * Replaces a hung or failed decoder, for example by terminating and recreating the
@@ -501,14 +511,16 @@ export interface CameraScanner {
   /** True while no new frame has arrived for stallMs (running, unmuted). A mute clears it. */
   readonly stalled: boolean;
   /**
-   * Concurrent calls share one start, including a call from onState or from the tracker's
-   * onChange during the start. Rejects with the CameraScannerError that onError receives when
-   * the session fails before the start settles.
+   * Concurrent calls share one start, including a call from onState, from onError or from the
+   * tracker's onChange during the start. Rejects with the CameraScannerError that onError
+   * receives when the session fails before the start settles.
    */
   start(): Promise<void>;
   /**
    * Ends the epoch and releases the camera; late permission answers and results are discarded.
-   * Final when called from a callback during a start or switch: that start opens nothing.
+   * Final when called from a callback (onState, onError, the tracker's onChange) during a
+   * transition: the interrupted step captures, recovers and attaches no stream after it, and
+   * a start or switch in progress opens nothing.
    */
   stop(): void;
   /**

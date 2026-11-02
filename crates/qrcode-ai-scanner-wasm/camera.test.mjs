@@ -3,7 +3,7 @@ const { createDetectionTracker, createCameraScanner, CameraScannerError, project
   projectVideoGeometry, contentKey } =
   await import(process.env.QRSCAN_CAMERA_MODULE ?? './camera.js');
 
-// Fixtures of DESIGN section 9: 1000 x 1000 frames, epoch 1 and complete traces unless noted.
+// Tracker fixtures: 1000 x 1000 frames, epoch 1 and complete traces unless noted.
 const COMPLETE = { budget_exhausted: false,
   saturation: { reads: false, detections: false, occurrences: false } };
 const report = (...detections) => ({ detections, trace: COMPLETE });
@@ -25,7 +25,7 @@ const near = (actual, expected, tolerance = 5e-7) => assert.ok(
 const entered = (trackId, at, cause = 'new') => ({ type: 'entered', trackId, at, cause });
 const ambiguous = (trackId, at, successors) =>
   ({ type: 'expired', trackId, at, reason: 'ambiguous', successors });
-// The retained repro helper (tracking-repro/repro.mjs): a pipeline-4 detection with corners only.
+// A pipeline-4 detection: content and corners only (corners is never read as a position).
 const make = (x, y, size = 10) => ({ symbology: 'qr_code',
   content: { raw: 'U0FNRQ==', text: 'SAME' },
   corners: [{ x, y }, { x: x + size, y }, { x: x + size, y: y + size }, { x, y: y + size }] });
@@ -166,7 +166,7 @@ for (const [golden, width, height, detection, kind, first, precise] of [
   const a = code('QQ==', [quad(sq(100, 400)), quad(sq(600, 400))]);
   const reversed = { ...a, occurrences: [...a.occurrences].reverse() };
   const b = code('Qg==', [quad(sq(350, 100))]);
-  // Detections become their content key and ECI list; wire addresses are removed (4.11).
+  // Detections become their content key and ECI list; wire addresses are removed.
   const canonical = snapshot => JSON.parse(JSON.stringify(snapshot, (key, value) =>
     key === 'detection' ? [contentKey(value), value.content.eci ?? null]
       : ['observation', 'detectionIndex', 'occurrenceIndex'].includes(key) ? undefined : value));
@@ -236,7 +236,8 @@ for (const g of [0.3, 0.5, 0.7, 1.0]) {
   for (let k = 11; k < 50; k++) {
     const snap = feed(tracker, labels(0, 0, true), frame(k));
     // No identity change after the hide. For g >= 0.5 the hidden label (seen last at 900) is
-    // lost at its second complete miss and expires by frame at E = 900 + 2000 (derived, 5.1).
+    // lost at its second complete miss and expires by frame at E = 900 + 2000 (lastSeenAt +
+    // reacquireMs).
     const lost = { type: 'lost', trackId: 'track-2', at: 1100, reason: 'missed' };
     const hiddenLabel = k === 11 ? [lost]
       : k === 29 ? [{ type: 'expired', trackId: 'track-2', at: 2900, reason: 'timeout' }] : [];
@@ -309,8 +310,8 @@ const copy = (eci, x = 100, y = 400) => code('RUNJ', [quad(sq(x, y))], { eci });
   entered('track-3', 100)]);
   assert.deepEqual(snap.tracks.map(t => [t.id, t.slot, t.basis]),
     [['track-2', 1, 'spatial'], ['track-3', 2, 'spatial']]);
-  // Derived from 4.6 and 5.7 (no design case). One copy compatible with two content tracks
-  // supersedes both; localized comes after expirations and before entered.
+  // One copy compatible with two content tracks supersedes both; localized comes after
+  // expirations and before entered.
   const superseded = (trackId, at, successors) =>
     ({ type: 'expired', trackId, at, reason: 'superseded', successors });
   const shared = createDetectionTracker();
@@ -395,7 +396,7 @@ const firstStays = (snap, at) => assert.deepEqual(
     800: [change('lost', 'track-2', 800, 'missed')],
     2600: [timeout('track-2', 2600)],
   });
-  // The 'reacquired' restart (6.4 row 3) publishes the measurement.
+  // The 'reacquired' restart publishes the measurement.
   assert.deepEqual([reacquired.restart, reacquired.smoothed], ['reacquired', false]);
   assert.deepEqual(reacquired.points, reacquired.measured);
   near(reacquired.points[0].x, 0.22, 0);
@@ -435,7 +436,7 @@ for (const [bx, split] of [[220, true], [250, false]]) {
   }
 }
 
-// 4.13 stacked equal labels (closed forms without a T id). Code 128 at 516 ms: one label hidden
+// Stacked equal labels (closed forms without a T id). Code 128 at 516 ms: one label hidden
 // costs 7.904g² (0.711, 1.976, 3.873, 7.904), and with both visible only the co-observed rule
 // stops the exchange at g <= 0.5. EAN-13 at 10 Hz: 6.015g² (2.947 at 0.7, 6.015 at 1.0).
 near(0.49 / (0.25 * 0.666 * 0.666 + 0.25 * 0.25 / 4), 3.8731, 5e-5);
@@ -545,9 +546,8 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
     [['track-1', 'tracked', 100, 0], ['track-2', 'held', 0, 0]]);
 }
 
-// T10b, dropped order (derived from 4.11 and T5's comparison, no design case; review finding
-// ID-F1): dropped is sorted by key, ECI list, reason and then address, so two wire orders of the
-// same occurrences give the same canonical snapshot.
+// T10b, dropped order (compared as in T5): dropped is sorted by key, ECI list, reason and
+// then address, so two wire orders of the same occurrences give the same canonical snapshot.
 {
   const outside = quad(sq(5000, 5000));
   const blob = { geometry: { kind: 'blob', points: [], reader: null } };
@@ -600,8 +600,8 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
     [['track-1', 'held', { x: 0.1, y: 0.4 }, 100], ['track-2', 'held', { x: 0.6, y: 0.4 }, 100]]);
   assert.deepEqual(snap.unassigned,
     [{ sequence: null, detectionIndex: 0, occurrenceIndex: null, key, reason: 'unresolved' }]);
-  // Derived from 5.2 (no design case): a legacy detection of the key, here with an incompatible
-  // ECI list, proves no absence even though nothing absorbs it.
+  // A legacy detection of the key, here with an incompatible ECI list, proves no absence
+  // even though nothing absorbs it.
   const other = createDetectionTracker();
   feed(other, report(copy(E26)), frameAt(0));
   const legacy = feed(other, report(code('RUNJ', undefined, { eci: E3 })), frameAt(100));
@@ -626,9 +626,9 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
     ['track-2', 'tracked', 100, E3, 0]]);
 }
 
-// T17b, absorbed [] read and a content track (derived from 5.2, last bullet, no design case;
-// review finding ID-F4): a [] read is compatible with the E3 content track too, so while a
-// spatial E26 track absorbs it, the content track is unobserved, not missed.
+// T17b, absorbed [] read and a content track: a [] read is compatible with the E3 content
+// track too, so while a spatial E26 track absorbs it, the content track is unobserved, not
+// missed.
 {
   const signalled = () => code('RUNJ', [UNAVAILABLE], { eci: [] });
   const key = contentKey(copy(E26));
@@ -656,10 +656,9 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
       [['track-1', 'tracked', 0], ['track-2', 'held', 0]]]);
 }
 
-// T12, adoption condition 3 (derived from 4.6, read as in 4.9 against the observation's list,
-// and 4.7, no design case; review finding ID-F5): a [] copy is compatible with both the E26
-// spatial track and the E3 content track, so the content track cannot adopt it; it is
-// superseded, and the solve gives the copy to whichever spatial track gates it, or a new one.
+// T12, adoption beside a spatial track: a [] copy is compatible with both the E26 spatial
+// track and the E3 content track, so the content track cannot adopt it; it is superseded,
+// and the solve gives the copy to whichever spatial track gates it, or a new one.
 {
   const superseded = (trackId, at, successors) =>
     ({ type: 'expired', trackId, at, reason: 'superseded', successors });
@@ -723,9 +722,9 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
   assert.deepEqual(snap.saturated,
     { detections: false, occurrences: false, observations: false, tracks: true });
   assert.equal(snap.events.length, 64);
-  // Derived from 4.10 and 5.7 (no design case): track-1 and track-12 miss (both held, last seen
-  // at 0) and one extra copy remains, so the lower serial is evicted and its slot reused at once;
-  // no later event names the evicted track.
+  // track-1 and track-12 miss (both held, last seen at 0) and one extra copy remains, so
+  // the lower serial is evicted and its slot reused at once; no later event names the
+  // evicted track.
   const without = (row, drop) => ({ ...row, occurrences: row.occurrences.filter((_, i) =>
     !drop.includes(i)) });
   const next = feed(tracker, report(without(rows[0], [0]), without(rows[1], [1]),
@@ -736,10 +735,9 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
     [64, 'track-65', 0, []]);
 }
 
-// T15, eviction after an unresolved read (derived from 4.9, 4.10 and 5.7, no design case;
-// review finding ID-F2): a capacity eviction is a retirement of the frame, so no unresolved
-// event names the evicted track; an event left with no track is dropped, and the read stays
-// unassigned as 'unresolved'.
+// T15, eviction after an unresolved read: a capacity eviction is a retirement of the
+// frame, so no unresolved event names the evicted track; an event left with no track is
+// dropped, and the read stays unassigned as 'unresolved'.
 {
   // One key at its cap of 16: 14 copies seen, one new far copy and one unavailable read.
   const tracker = createDetectionTracker();
@@ -787,7 +785,7 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
 
 // T16a: eight pairs of one content (side 50, rows 2.4 sizes apart) cross every 500 ms with
 // separations 2, 1, 0, 1, 2 sizes, each pair one frame later than the one above. A model of the
-// 4.10 rule (cap 64; a 65th entry releases the entry that ends first, then the lowest slot)
+// creation rule (cap 64; a 65th entry releases the entry that ends first, then the lowest slot)
 // predicts the slot of every new track.
 {
   const tracker = createDetectionTracker();
@@ -837,7 +835,7 @@ const unresolved = (key, at, trackIds) => ({ type: 'unresolved', key, at, trackI
   assert.ok(maxSlot < 128, `slot ${maxSlot}`);
 }
 
-// Timing (DESIGN section 9 B)
+// Timing
 const EXHAUSTED = { ...COMPLETE, budget_exhausted: true };
 const bars = () => code('QkFSUw==', [segment({ x: 100, y: 500 }, { x: 400, y: 500 })],
   { symbology: 'code128' });
@@ -940,8 +938,8 @@ const deliver = (tracker, clock, input, frame, deliverAt = frame.observedAt) => 
     [6, 3500, [timeout('track-1', 2300)], null]);
   assert.deepEqual(end.results.map(r => [r.id, r.present, r.trackIds]), [['result-1', false, []]]);
   assert.deepEqual([clock.delays, clock.timers], [[1200, 1200, 1200, 1200, 2000], []]);
-  // Derived from section 2 (no design case): an advance() that applies no transition calls no
-  // onChange, and every update() does, a rejected one included.
+  // An advance() that applies no transition calls no onChange, and every update() does,
+  // a rejected one included.
   tracker.advance(3600);
   assert.equal(changes.length, 6);
   tracker.update(qr(), frameAt(300));
@@ -1033,18 +1031,18 @@ const deliver = (tracker, clock, input, frame, deliverAt = frame.observedAt) => 
     { width: 100, height: 100, observedAt: Date.now() }), RangeError);
   const late = createDetectionTracker({ clock: fakeClock(100000) });
   assert.throws(() => late.update([], { width: 100, height: 100, observedAt: 39000 }), RangeError);
-  // Derived from the bounds of 5.3 (no design case): both limits themselves are accepted, and
-  // evidence 60 s old is content_only.
+  // observedAt may be up to 1 s ahead of now and 60 s behind: both limits themselves are
+  // accepted, and evidence 60 s old is content_only.
   assert.equal(late.update([], { width: 100, height: 100, observedAt: 40000 }).status,
     'content_only');
   assert.equal(late.update([], { width: 100, height: 100, observedAt: 101000 }).status, 'updated');
   assert.throws(() => late.update([], { width: 100, height: 100, observedAt: 101001 }), RangeError);
 }
 
-// T20c, fractional times (derived from 5.5 and 5.8, no design case; review finding TG-F1): each
-// deadline is tested in the same sum that defines it. With observedAt 999.99, (999.99 + 1200) -
-// 999.99 < 1200, so a subtraction test would keep the result present at its own deadline and
-// re-arm the timer at 0 ms forever on a clock that does not move.
+// T20c, fractional times: each deadline is tested in the same sum that defines it. With
+// observedAt 999.99, (999.99 + 1200) - 999.99 < 1200, so a subtraction test would keep the
+// result present at its own deadline and re-arm the timer at 0 ms forever on a clock that
+// does not move.
 {
   const a = 999.99, clock = fakeClock(a), changes = [];
   const tracker = createDetectionTracker({ clock, onChange: snap => changes.push(snap) });
@@ -1072,7 +1070,7 @@ const deliver = (tracker, clock, input, frame, deliverAt = frame.observedAt) => 
   const first = plain.advance(plain.nextDeadline());
   assert.deepEqual([first.now, first.events, first.results[0].present, plain.nextDeadline()],
     [a + 1200, [change('lost', 'track-1', a + 1200, 'stale')], false, a + 2000 + 1200]);
-  // A frame delivered exactly at observedAt + staleMs is content_only (5.4 step 7).
+  // A frame delivered exactly at observedAt + staleMs is content_only.
   const late = createDetectionTracker({ clock: fakeClock(a) });
   const boundary = feed(late, qr(), frameAt(a), { now: a + 1200 });
   assert.deepEqual([boundary.status, boundary.events, boundary.tracks.map(t => [t.basis, t.state]),
@@ -1168,9 +1166,9 @@ const frameWith = (observedAt, more) => ({ ...frameAt(observedAt), ...more });
   assert.deepEqual([next.epoch, next.tracks.map(t => [t.id, t.slot])], [2, [['track-2', 0]]]);
 }
 
-// T22, malformed detections (derived from 3.2 and 5.4 step 1, no design case; review finding
-// ID-F3): a detection that the tracker reads must be an object with a content object; anything
-// else throws a TypeError before any state change, so the expiry still reaches a snapshot.
+// T22, malformed detections: a detection that the tracker reads must be an object with a
+// content object; anything else throws a TypeError before any state change, so the expiry
+// still reaches a snapshot.
 {
   const tracker = createDetectionTracker(), control = createDetectionTracker();
   for (const t of [tracker, control]) feed(t, qr(), frameAt(0));
@@ -1211,8 +1209,8 @@ const frameWith = (observedAt, more) => ({ ...frameAt(observedAt), ...more });
   const fresh = deliver(watched, clock, qr(), frameAt(1600), 1700);
   assert.deepEqual([fresh.status, fresh.events], ['updated', [entered('track-2', 1600)]]);
   assert.throws(() => watched.reset({ epoch: 0 }), RangeError);
-  // Derived from 5.4 (no design case): reset({ epoch }) starts a session whose sequences start
-  // again, so a later controller's frames are accepted.
+  // reset({ epoch }) starts a session whose sequences start again, so a later
+  // controller's frames are accepted.
   deliver(watched, clock, qr(), frameWith(1800, { sequence: 40 }));
   clock.run(1900);
   assert.deepEqual(watched.reset({ epoch: 3 }).events,
@@ -1310,7 +1308,7 @@ const rows = snap => snap.tracks.map(t => [t.id, t.state, t.misses]);
   assert.deepEqual(tracker.snapshot(1600).results.map(r => [r.id, r.trackIds]), all);
   clock.run(3200);
   const pruned = tracker.advance();
-  // track-16 and track-17 also go stale (5.1): seen at 1500 and 1600.
+  // track-16 and track-17 also go stale: seen at 1500 and 1600.
   assert.deepEqual(pruned.events, [timeout('track-1', 2000),
     change('lost', 'track-16', 2700, 'stale'), change('lost', 'track-17', 2800, 'stale')]);
   assert.deepEqual(ids(pruned.results), all.slice(1).map(([id]) => id));
@@ -1324,8 +1322,7 @@ const rows = snap => snap.tracks.map(t => [t.id, t.state, t.misses]);
   assert.deepEqual([next.events, ids(next.tracks), ids(next.results)],
     [[entered('track-18', 3300)], ['track-18'], ['result-18']]);
 }
-// Derived from 5.8 (no design case): of the results without a live track, the oldest goes
-// first, and the lowest serial on ties.
+// Of the results without a live track, the oldest goes first, and the lowest serial on ties.
 for (const first of [1, 2]) {
   const tracker = createDetectionTracker({ maxResults: 16 });
   const at = (k, x = 100) => code(`K${k}`, [quad(sq(x, 100))]);
@@ -1340,7 +1337,7 @@ for (const first of [1, 2]) {
   assert.deepEqual([ids(pruned.results), pruned.results[0].trackIds],
     [Array.from({ length: 16 }, (_, k) => `result-${k + 2}`), []], `first ${first}`);
 }
-// Derived from 5.3 (no design case): the default maxResults is 32.
+// The default maxResults is 32.
 {
   const tracker = createDetectionTracker();
   for (let k = 0; k <= 32; k++) feed(tracker, report(code(`K${k}`, [quad(sq(100, 100))])),
@@ -1349,8 +1346,8 @@ for (const first of [1, 2]) {
   assert.deepEqual([pruned.tracks, ids(pruned.results)],
     [[], Array.from({ length: 32 }, (_, k) => `result-${k + 2}`)]);
 }
-// Derived from 5.8 and section 2 (no design case): forget() reaches onChange with status
-// 'forget', and the next match of a forgotten result's track opens a new result.
+// forget() reaches onChange with status 'forget', and the next match of a forgotten
+// result's track opens a new result.
 {
   const clock = fakeClock(), changes = [];
   const tracker = createDetectionTracker({ clock, onChange: snap => changes.push(snap) });
@@ -1366,8 +1363,8 @@ for (const first of [1, 2]) {
   assert.deepEqual(again.results.map(r => [r.id, r.trackIds]), [['result-2', ['track-1']]]);
   tracker.destroy();
 }
-// Derived from 5.8 (no design case): retainMs removes a result without a live track once that
-// old, through advance() and never through snapshot().
+// retainMs removes a result without a live track once that old, through advance() and
+// never through snapshot().
 {
   const tracker = createDetectionTracker({ retainMs: 5000 });
   feed(tracker, qr(), frameAt(0));
@@ -1380,9 +1377,9 @@ for (const first of [1, 2]) {
   const removed = tracker.advance(5000);
   assert.deepEqual([removed.events, removed.results, removed.nextDeadline], [[], [], null]);
 }
-// T26, reset() above the bound (derived from 5.8 and section 2, no design case; review finding
-// TG-F2): reset() leaves every result without a live track, so it applies maxResults itself,
-// and an advance() at the same time has nothing left to apply and calls no onChange.
+// T26, reset() above the bound: reset() leaves every result without a live track, so it
+// applies maxResults itself, and an advance() at the same time has nothing left to apply
+// and calls no onChange.
 {
   const clock = fakeClock(), changes = [];
   const tracker = createDetectionTracker({ clock, maxResults: 16,
@@ -1400,9 +1397,9 @@ for (const first of [1, 2]) {
     [[], ids(reset.results), seen]);
   tracker.destroy();
 }
-// T26, a frame that reads the oldest content again (derived from 5.3, 5.4 step 4 and 5.8, no
-// design case; review finding TG-F3): step 4 applies retention only and the maxResults bound
-// waits for step 9, so the frame's own read keeps result-1 instead of reopening its card.
+// T26, a frame that reads the oldest content again: the expiry pass before the frame
+// applies retention only, and the maxResults bound waits until the frame's reads are
+// resolved, so the frame's own read keeps result-1 instead of reopening its card.
 {
   const content = k => report(code(`K${k}`, [quad(sq(100, 100))]));
   const scene = () => {
@@ -1416,7 +1413,7 @@ for (const first of [1, 2]) {
   assert.deepEqual(again.results.map(r => [r.id, r.firstObservedAt, r.trackIds]).slice(0, 2),
     [['result-1', 0, ['track-18']], ['result-2', 100, ['track-2']]]);
   assert.equal(again.results.length, 17);
-  // Control: a frame that reads another content still evicts result-1 at step 9.
+  // Control: a frame that reads another content still evicts result-1, once its reads are resolved.
   const other = feed(scene(), content(5), frameAt(2000));
   assert.deepEqual([lifecycle(other), ids(other.results)], [[timeout('track-1', 2000)],
     Array.from({ length: 16 }, (_, k) => `result-${k + 2}`)]);
@@ -1442,8 +1439,8 @@ for (const first of [1, 2]) {
   tracker.destroy();
 }
 
-// T18: sigma = 0.15 + dt (s), so a 0.6-size move costs (0.6 / sigma)² (closed form). Restarts
-// (6.4) and the smoothed x 0.1 + 0.35 x 0.008 = 0.1028 and 0.18 + 0.35 x 0.006 = 0.1821 (6.5).
+// T18: sigma = 0.15 + dt (s), so a 0.6-size move costs (0.6 / sigma)² (closed form).
+// Restarts, and the smoothed x 0.1 + 0.35 x 0.008 = 0.1028 and 0.18 + 0.35 x 0.006 = 0.1821.
 {
   const at = (x, observedAt, more) => [report(code('VDE4', [quad(sq(x, 100))])),
     frameWith(observedAt, more)];
@@ -1468,7 +1465,7 @@ for (const first of [1, 2]) {
   const repeated = feed(same, ...at(100, 0, { sequence: 2 }));
   assert.deepEqual([repeated.status, repeated.events, rows(repeated), restarts(repeated)],
     ['updated', [], [['track-1', 'tracked', 0]], ['gap']]);
-  // (d) 1300 after 0: staleness applied at step 4, then the match; expiry at 2000 is not due.
+  // (d) 1300 after 0: staleness applies before the match; expiry at 2000 is not due.
   const gap = createDetectionTracker();
   feed(gap, ...at(100, 0));
   const back = feed(gap, ...at(100, 1300));
@@ -1487,7 +1484,7 @@ for (const first of [1, 2]) {
   }
 }
 
-// Geometry (DESIGN section 9 C): one copy per frame, 100 ms apart from 0, 1000 x 1000.
+// Geometry: one copy per frame, 100 ms apart from 0, 1000 x 1000.
 const quadOf = points => ({ kind: 'quad', points, reader: 'rxing' });
 const segmentOf = (p0, p1) => ({ kind: 'segment', points: [p0, p1], reader: 'rxing' });
 const follow = (shapes, { symbology = 'qr_code', width = 1000, height = width,
@@ -1500,7 +1497,7 @@ const geometryOf = snap => snap.tracks[0].geometry;
 const norm = (points, width = 1000, height = width) =>
   points.map(p => ({ x: p.x / width, y: p.y / height }));
 
-// T29: one case per row of 6.1 (tolerance max(2, 0.02 x 1000) = 20 px).
+// T29: one case per validation rule (tolerance max(2, 0.02 x 1000) = 20 px).
 {
   const first = (geometry, symbology) => follow([geometry], { symbology })[0];
   const partial = (snap, points, downgrade) => {
@@ -1520,7 +1517,7 @@ const norm = (points, width = 1000, height = width) =>
   partial(first(quadOf(bow)), bow, 'not-convex');
   const ccw = [a, d, c, b];
   partial(first(quadOf(ccw)), ccw, 'counter-clockwise');
-  // The segment row has no T29 bullet; one endpoint at x 1100 > 1020 gives 'outside'.
+  // A segment too: one endpoint at x 1100 > 1020 gives 'outside'.
   const long = [{ x: 100, y: 500 }, { x: 1100, y: 500 }];
   partial(first(segmentOf(...long), 'code128'), [long[0]], 'outside');
   const short = [{ x: 100, y: 500 }, { x: 100.5, y: 500 }];
@@ -1571,9 +1568,9 @@ const norm = (points, width = 1000, height = width) =>
   assert.deepEqual([snap.events, g.restart, g.smoothed, g.measured], [[], null, true, norm(moved)]);
   near(g.points[0].x, 0.10035);
   near(g.points[0].y, 0.1);
-  // Derived from 6.3 (no design case): a square turned by theta costs sin²(theta / 2) against
-  // sin²(45° - theta / 2) for the next shift. At 41° the ratio 1.402 <= 1.5 restarts
-  // 'reoriented' (RMS 49.5 px, no jump); at 40° it is 1.527. The QR family keeps identity.
+  // A square turned by theta costs sin²(theta / 2) against sin²(45° - theta / 2) for the
+  // next shift. At 41° the ratio 1.402 <= 1.5 restarts 'reoriented' (RMS 49.5 px, no jump);
+  // at 40° it is 1.527. The QR family keeps identity.
   near(Math.sin(24.5 * Math.PI / 180) ** 2 / Math.sin(20.5 * Math.PI / 180) ** 2, 1.402, 5e-4);
   near(Math.sin(25 * Math.PI / 180) ** 2 / Math.sin(20 * Math.PI / 180) ** 2, 1.527, 5e-4);
   const turnedBy = degrees => sq(100, 100).map(({ x, y }) => {
@@ -1585,8 +1582,8 @@ const norm = (points, width = 1000, height = width) =>
     quadOf(turnedBy(degrees))], { symbology })[1]).restart;
   assert.deepEqual([restartOf(41, 'data_matrix'), restartOf(40, 'data_matrix'),
     restartOf(41, 'qr_code')], ['reoriented', null, null]);
-  // Derived from 6.3 (no design case): an exact tie keeps the smallest shift. Each corner of the
-  // square is 2900 px² from two diamond vertices, so shifts 0 and 3 both cost 11600.
+  // An exact tie keeps the smallest shift. Each corner of the square is 2900 px² from two
+  // diamond vertices, so shifts 0 and 3 both cost 11600.
   const diamond = [{ x: 150, y: 80 }, { x: 220, y: 150 }, { x: 150, y: 220 }, { x: 80, y: 150 }];
   const [, tie] = follow([quadOf(sq(100, 100)), quadOf(diamond)], { symbology: 'data_matrix' });
   assert.deepEqual([geometryOf(tie).restart, geometryOf(tie).measured],
@@ -1599,9 +1596,9 @@ const norm = (points, width = 1000, height = width) =>
   const g = geometryOf(snap);
   assert.deepEqual([snap.events, g.restart, g.smoothed, g.points], [[], 'jump', false, g.measured]);
   near(g.points[0].x, 0.16);
-  // Derived from 6.4 row 6 (no design case): the ratios alone. Side 145 has an area ratio
-  // 2.1025 with RMS 45 px; side 140 (1.96, RMS 40 px) blends. A segment of length 300 cut to
-  // 200 has a squared-length ratio 0.444 with RMS 50 px < 150 px.
+  // The jump test's size ratios alone. Side 145 has an area ratio 2.1025 with RMS 45 px;
+  // side 140 (1.96, RMS 40 px) blends. A segment of length 300 cut to 200 has a
+  // squared-length ratio 0.444 with RMS 50 px < 150 px.
   const grown = side => geometryOf(follow([quadOf(sq(100, 100)), quadOf(sq(100, 100, side))])[1]);
   assert.deepEqual([grown(145).restart, grown(140).restart, grown(140).smoothed],
     ['jump', null, true]);
@@ -1625,14 +1622,14 @@ const norm = (points, width = 1000, height = width) =>
   geometries.forEach((g, k) => near(g.lag, lags[k], 1e-9));
   [19.5, 32.18, 40.41].forEach((lag, i) => near(lags[1 + i], lag, 0.005));
   near(lags[20], 55.71, 0.01);
-  // The design's values after the stop decay from the steady state 55.714; from L20 = 55.704
-  // the fourth one is 9.9435 instead of 9.9453 (reported as a deviation).
+  // Rounded values after the stop, decayed from the steady state 55.714. This input stops
+  // at L20 = 55.704, so its fourth value is 9.9435 rather than 9.9453.
   [36.21, 23.54, 15.30, 9.95, 6.46, 4.20].forEach((lag, i) =>
     near(30 * 0.65 / 0.35 * 0.65 ** (i + 1), lag, 0.005));
   [36.21, 23.54, 15.30, 9.94, 6.46, 4.20].forEach((lag, i) => near(lags[21 + i], lag, 0.005));
   assert.deepEqual(geometries.map(g => g.precise),
     [true, ...Array(25).fill(false), ...Array(5).fill(true)]);
-  // Derived from 6.8 (closed form): precise holds below 6 / (0.1 x 0.65 / 0.35) = 32.3 px/s;
+  // Closed form: precise holds below 6 / (0.1 x 0.65 / 0.35) = 32.3 px/s;
   // at 33 px/s the lag 6.129 (1 - 0.65^k) first exceeds 6 px at k = 9.
   near(6 / (0.1 * 0.65 / 0.35), 32.3, 0.01);
   const steady = speed => follow(Array.from({ length: 40 }, (_, k) =>
@@ -1670,8 +1667,7 @@ const norm = (points, width = 1000, height = width) =>
   near(g.points[1].y, 0.5);
 }
 
-// T36: partial geometry is never smoothed. Derived from 6.4 row 2 (no design case): a quad
-// after a partial restarts as 'kind'.
+// T36: partial geometry is never smoothed, and a quad after a partial restarts as 'kind'.
 {
   const part = dx => ({ kind: 'partial', points: sq(100 + dx, 100).slice(0, 3), reader: 'rxing' });
   const snaps = follow([part(0), part(1), part(2), quadOf(sq(103, 100)), part(4)]);
@@ -1693,8 +1689,8 @@ const norm = (points, width = 1000, height = width) =>
   near(geometryOf(snaps[39]).points[0].x * 1000 - 100, -0.106, 5e-4);
 }
 
-// Derived from section 2 and 6.5 (no design case): { kind: 'fixed', alpha } equals the number
-// form; { kind: 'none' } publishes every measurement unsmoothed and still names restarts.
+// { kind: 'fixed', alpha } equals the number form; { kind: 'none' } publishes every
+// measurement unsmoothed and still names restarts.
 {
   const xs = (smoothing, ...steps) => follow(steps.map(x => quadOf(sq(x, 100))), { smoothing })
     .map(snap => [geometryOf(snap).points[0].x, geometryOf(snap).smoothed,
@@ -1706,19 +1702,18 @@ const norm = (points, width = 1000, height = width) =>
     [0.102, false, null], [0.162, false, 'jump']]);
 }
 
-// Derived from 6.2 and 4.1 (isotropic units u; no design case): halving the resolution at the
-// same aspect ratio leaves every decision and the fixed-alpha estimate unchanged. One-euro's
-// speed is in source px/s (6.6), so its state is carried in u/s: v̂ halves with the frame.
+// Halving the resolution at the same aspect ratio leaves every decision and the fixed-alpha
+// estimate unchanged: positions and history are compared in isotropic units u = px / long side.
 {
-  const pan = (smoothing, halve) => {
-    const tracker = createDetectionTracker({ smoothing });
+  const pan = halve => {
+    const tracker = createDetectionTracker({ smoothing: 0.35 });
     return [256, 268.8, 281.6].map((x, k) => {
       const f = halve && k === 2 ? 0.5 : 1;
       return feed(tracker, report(code('SVNP', [quad(sq(x * f, 288 * f, 128 * f))])),
         frameAt(100 * k, 1280 * f, 720 * f));
     });
   };
-  const [full, half] = [pan(0.35, false), pan(0.35, true)].map(snaps => snaps.map(snap =>
+  const [full, half] = [pan(false), pan(true)].map(snaps => snaps.map(snap =>
     [snap.events, geometryOf(snap).restart, geometryOf(snap).smoothed, geometryOf(snap).points]));
   assert.deepEqual(half.map(row => row.slice(0, 3)), full.map(row => row.slice(0, 3)));
   assert.deepEqual(half[2].slice(1, 3), [null, true]);
@@ -1726,41 +1721,26 @@ const norm = (points, width = 1000, height = width) =>
     near(p.x, full[2][3][i].x, 1e-12);
     near(p.y, full[2][3][i].y, 1e-12);
   });
-  const alpha = f => 1 / (1 + 1 / (2 * Math.PI * f * 0.1));
-  const v1 = alpha(1) * 128, e1 = 256 + alpha(1 + 0.01 * v1) * 12.8;
-  const v2 = v1 / 2 + alpha(1) * ((140.8 - e1 / 2) / 0.1 - v1 / 2);
-  const e2 = e1 / 2 + alpha(1 + 0.01 * v2) * (140.8 - e1 / 2);
-  const euro = pan({ kind: 'one-euro', minCutoffHz: 1, beta: 0.01 }, true);
-  assert.deepEqual([geometryOf(euro[2]).restart, geometryOf(euro[2]).smoothed], [null, true]);
-  near(geometryOf(euro[2]).points[0].x, e2 / 640, 1e-12);
 }
 
-// T38 (experimental one-euro): the 6.6 reference values at Te = 0.1 s, through 10 px steps;
-// alpha(f) = 1 / (1 + 1 / (2 pi f Te)).
+// T38: one-euro is not a smoothing option of this module (it runs only as the replay candidate
+// replay/candidates/one-euro.mjs), so { kind: 'one-euro' } is refused like any unknown kind.
 {
-  const alpha = f => 1 / (1 + 1 / (2 * Math.PI * f * 0.1));
-  near(alpha(0.7), 0.305470);
-  near(alpha(2.8), 0.637588);
-  near(alpha(1), 0.385870);
-  // v = 100 px/s, v̂ = 38.587 px/s, fc = 1.385870 Hz and alpha 0.465460.
-  near(alpha(1) * 100, 38.587, 5e-4);
-  near(1 + 0.01 * alpha(1) * 100, 1.385870);
-  near(alpha(1 + 0.01 * alpha(1) * 100), 0.465460);
-  const moves = (smoothing, xs) => follow(xs.map(x => quadOf(sq(x, 100))), { smoothing })
-    .map(snap => geometryOf(snap).points[0].x * 1000 - xs[0]);
-  const euro = (minCutoffHz, beta, more) => ({ kind: 'one-euro', minCutoffHz, beta, ...more });
-  near(moves(euro(0.7, 0), [100, 110])[1], 3.05470, 5e-5);
-  near(moves(euro(2.8, 0), [100, 110])[1], 6.37588, 5e-5);
-  near(moves(euro(1, 0.01), [100, 110])[1], 4.6546, 5e-5);
-  near(moves(euro(1, 0.01, { derivativeCutoffHz: 1 }), [100, 110])[1], 4.6546, 5e-5);
-  // Derived from 6.6 (no design case): the speed is taken against the previous estimate, and a
-  // restart (a gated 60 px jump to x 180) sets v̂ back to 0, so the next step moves 4.6546.
-  const v1 = alpha(1) * 100, m1 = 10 * alpha(1 + 0.01 * v1);
-  const v2 = v1 + alpha(1) * ((20 - m1) / 0.1 - v1);
-  const steps = moves(euro(1, 0.01), [100, 110, 120, 180, 190]);
-  near(steps[2], m1 + alpha(1 + 0.01 * v2) * (20 - m1), 1e-6);
-  near(steps[3], 80, 1e-9);
-  near(steps[4] - 80, 4.6546, 5e-5);
+  const refusal = smoothing => {
+    try {
+      createDetectionTracker({ smoothing }).destroy();
+    } catch (error) {
+      return [error.constructor, error.message];
+    }
+    return null;
+  };
+  const refused = [RangeError,
+    'smoothing must be a number in (0, 1], { kind: \'fixed\', alpha } or { kind: \'none\' }.'];
+  assert.deepEqual([{ kind: 'one-euro', minCutoffHz: 1, beta: 0.01 },
+    { kind: 'one-euro', minCutoffHz: 1, beta: 0.01, derivativeCutoffHz: 1 }, { kind: 'one-euro' },
+    { kind: 'kalman', alpha: 0.35 }, {}].map(refusal), Array(5).fill(refused));
+  assert.deepEqual([0.35, { kind: 'fixed', alpha: 1 }, { kind: 'none' }].map(refusal),
+    [null, null, null]);
 }
 
 // T39: contain and cover keep their results; fill maps u x viewWidth and v x viewHeight.
@@ -1789,7 +1769,7 @@ const norm = (points, width = 1000, height = width) =>
   assert.deepEqual([three.valid, three.inView, three.precise], [false, true, false]);
   assert.equal(projectVideoGeometry(shape(norm(sq(64, 64, 3), 128)), fill, { minArea: 9 }).valid,
     true);
-  // Mirroring flips the screen winding; one shared sign is accepted (6.9).
+  // Mirroring flips the screen winding; one shared sign is accepted.
   const mirrored = projectVideoGeometry(shape(norm(four, 128)), { ...fill, mirror: true });
   assert.deepEqual(mirrored, { kind: 'quad', points: four.map(p => ({ x: 128 - p.x, y: p.y })),
     valid: true, inView: true, precise: true });
@@ -1797,8 +1777,7 @@ const norm = (points, width = 1000, height = width) =>
     fill);
   assert.deepEqual([broken.valid, broken.precise], [false, false]);
   assert.equal(projectVideoGeometry(shape(norm(four, 128), false), fill).precise, false);
-  // Derived from the section 2 declaration (no design case): a partial is valid when finite,
-  // a segment when finite and at least 1 CSS px long.
+  // A partial is valid when finite, a segment when finite and at least 1 CSS px long.
   const loose = (kind, points) =>
     projectVideoGeometry({ kind, points, precise: false }, fill).valid;
   assert.deepEqual([loose('partial', norm(four, 128)),
@@ -1829,7 +1808,7 @@ const norm = (points, width = 1000, height = width) =>
       true, true]);
 }
 
-// ------------------------------------------------------------ capture controller (section 7)
+// ------------------------------------------------------------------------ capture controller
 // The legacy L42-87 assertions live on as T44, T46, T54, T55 and T57. The block keeps these
 // fakes apart from the tracker cases' report, change and fakeClock.
 {
@@ -2432,7 +2411,7 @@ const norm = (points, width = 1000, height = width) =>
     assert.deepEqual([c.scanner.state, dec.calls[0].context.signal.aborted, c.errors.length],
       ['starting', true, 0]);
     grant(env.stream);
-    // 7.6: the start rejects with the object onError received once.
+    // The start rejects with the object that onError received, once.
     assert.equal(await rejection(starting), c.errors[0]);
     assert.equal(c.scanner.state, 'failed');
     assert.deepEqual(c.errors.map(e => [e.code, e.cause.code]),
@@ -2599,7 +2578,7 @@ const norm = (points, width = 1000, height = width) =>
     assert.deepEqual([c.scanner.state, env.video.srcObject, env.track.stops], ['failed', null, 2]);
   }
 
-  // T55 + 7.6 (the stream ends while play() is pending: start() rejects with onError's object)
+  // T55 (the stream ends while play() is pending: start() rejects with onError's object)
   {
     const env = rig();
     let playing;
@@ -2742,7 +2721,7 @@ const norm = (points, width = 1000, height = width) =>
       [2, 1, 0, 1]);
   }
 
-  // 7.5 (constraints given while not started are stored for the next start)
+  // Device switch (constraints given while not started are stored for the next start)
   {
     const env = rig();
     const c = camera(env, { scanFrame: decoder().scanFrame });
@@ -2866,7 +2845,7 @@ const norm = (points, width = 1000, height = width) =>
       [1, 1, 0, 1]);
   }
 
-  // 7.5 (a switch during the permission prompt: the first answer is discarded and released)
+  // Device switch (during the permission prompt: the first answer is discarded and released)
   {
     const env = rig();
     const grants = [];
@@ -2893,7 +2872,7 @@ const norm = (points, width = 1000, height = width) =>
       env.stream, 0]);
   }
 
-  // 7.5 (a switch while recovering aborts the recovery; the new session recovers first)
+  // Device switch (while recovering: it aborts the recovery; the new session recovers first)
   {
     const env = rig();
     const worker = abortingWorker();
@@ -2923,7 +2902,7 @@ const norm = (points, width = 1000, height = width) =>
       c.results[0].frame.epoch], [1, 1, c.scanner.epoch]);
   }
 
-  // 7.8 (with the tracker option, each epoch end resets it once, at the new epoch)
+  // Tracker wiring (with the tracker option, each epoch end resets it once, at the new epoch)
   {
     const env = rig();
     const tracker = fakeTracker(env.log);
@@ -2952,7 +2931,7 @@ const norm = (points, width = 1000, height = width) =>
       ['starting', 'constraints', e0 + 4], ['failed', 'error', e0 + 5]]);
   }
 
-  // 7.8 (epochs only grow across controllers that share one tracker)
+  // Tracker wiring (epochs only grow across controllers that share one tracker)
   {
     const env = rig();
     const seen = [];
@@ -3001,7 +2980,7 @@ const norm = (points, width = 1000, height = width) =>
     return tracker;
   }
 
-  // 7.8 (camera.stop() and tracker.destroy() in either order: no exception, nothing left armed)
+  // Tracker teardown: camera.stop() and tracker.destroy() in either order, nothing left armed.
   for (const order of [['camera', 'tracker'], ['tracker', 'camera']]) {
     const env = rig();
     const dec = decoder();
@@ -3028,7 +3007,7 @@ const norm = (points, width = 1000, height = width) =>
       [1, 1, 0, 1]);
   }
 
-  // 7.8 (a destroyed tracker while the camera keeps running: results continue, nothing raises)
+  // Tracker wiring: a destroyed tracker while the camera runs; results continue, nothing raises.
   {
     const env = rig();
     const dec = decoder();
@@ -3046,7 +3025,7 @@ const norm = (points, width = 1000, height = width) =>
     assert.deepEqual([c.scanner.state, env.clock.pending(), c.errors.length], ['stopped', [], 0]);
   }
 
-  // 7.8 (stop during a decode: only the decode timeout stays armed, until the request settles)
+  // Tracker wiring (stop during a decode: only the decode timeout stays armed until it settles)
   {
     const env = rig();
     const dec = decoder();
@@ -3061,7 +3040,7 @@ const norm = (points, width = 1000, height = width) =>
     assert.deepEqual([env.clock.pending(), c.results.length, c.scanner.state], [[], 0, 'stopped']);
   }
 
-  // Real-tracker halves (7.8 wiring): a QR inside the rig's 64 x 48 frames, complete trace.
+  // Real-tracker halves (tracker wiring): a QR inside the rig's 64 x 48 frames, complete trace.
   const framedQr = () => ({ detections: [code('VDIw', [quad(sq(10, 10, 20))])], trace: COMPLETE });
   const lostStale = at => ({ type: 'lost', trackId: 'track-1', at, reason: 'stale' });
   const realTracker = (env, options) => {
@@ -3167,7 +3146,7 @@ const norm = (points, width = 1000, height = width) =>
     assert.deepEqual([changes.length, reset.status, reset.epoch, reset.now, reset.events,
       reset.tracks], [2, 'reset', before + 1, 150,
       [{ type: 'expired', trackId: 'track-1', at: 150, reason: 'epoch' }], []]);
-    // present follows lastObservedAt, not tracks (5.8): 150 - 100 = 50 < staleMs.
+    // present follows lastObservedAt, not tracks: 150 - 100 = 50 < staleMs.
     assert.deepEqual(reset.results.map(r => [r.id, r.present, r.lastObservedAt, r.trackIds]),
       [['result-1', true, 100, []]]);
     await switching;
@@ -3285,10 +3264,24 @@ const norm = (points, width = 1000, height = width) =>
     third.scanner.stop();
   }
 
-  // T57, lifecycle calls from callbacks (derived from 7.1 and the stop() contract of section 2,
-  // no design case; review findings CTRL-F1 and CTRL-F2): a stop() from onState, or from the
-  // tracker's onChange during the reset, is final, and a start() from onState shares the
-  // pending start instead of opening the camera again.
+  // getUserMedia answers every call with a new track. The returned live() counts the tracks not
+  // stopped, and env.track follows the newest one, so setMuted() and 'ended' reach it.
+  const freshTracks = env => {
+    const tracks = [];
+    env.gum.next = () => {
+      const track = new EventTarget();
+      Object.assign(track, { muted: false, stops: 0, stop() { track.stops++; } });
+      tracks.push(track);
+      env.track = track;
+      return Promise.resolve({ getTracks: () => [track] });
+    };
+    return () => tracks.filter(track => track.stops === 0).length;
+  };
+
+  // T57, lifecycle calls from callbacks: a stop() from onState, or from the tracker's onChange
+  // during the reset, is final; a start() from such a callback shares the pending start; and a
+  // switch or a restart requested on the 'starting' change replaces that start before its camera
+  // request. No case opens more than one camera.
   {
     const transition = change => `${change.previous}->${change.state}(${change.reason})`;
     const scene = (react, options = {}) => {
@@ -3352,11 +3345,58 @@ const norm = (points, width = 1000, height = width) =>
       s4.c.scanner.state, s4.env.track.stops], [2, true, 2, 'running', 1]);
     s4.c.scanner.stop();
     assert.deepEqual([s4.env.track.stops, s4.c.scanner.state], [2, 'stopped']);
+    // start() from the real tracker's onChange (status 'reset') during setConstraints(): the
+    // switch is already the pending start, so start() returns the switch's own promise.
+    const env5 = rig(), dec5 = decoder(), seen5 = [], live5 = freshTracks(env5);
+    let c5 = null, armed = false, inner5 = null;
+    const { tracker: tracker5, changes: changes5 } = realTracker(env5, { onChange: snapshot => {
+      changes5.push(snapshot.status);
+      if (armed && snapshot.status === 'reset') {
+        armed = false;
+        inner5 = c5.scanner.start();
+      }
+    } });
+    c5 = camera(env5, { scanFrame: dec5.scanFrame, tracker: tracker5,
+      onState: change => seen5.push(transition(change)) });
+    await c5.scanner.start();
+    armed = true;
+    const sw5 = c5.scanner.setConstraints({ deviceId: 'b' });
+    assert.deepEqual([await sw5, inner5 === sw5, changes5, env5.gum.calls.length, live5(),
+      c5.scanner.state, seen5], [undefined, true, ['reset'], 2, 1, 'running',
+      ['idle->starting(start)', 'starting->running(start)', 'running->starting(constraints)',
+        'starting->running(constraints)']]);
+    c5.scanner.stop();
+    tracker5.destroy();
+    // setConstraints() on the 'starting' change of start(): the switch replaces that start before
+    // its camera request, so one camera opens, with the new constraints, and both promises settle.
+    const s6 = scene((change, c, inner) => {
+      if (change.previous === 'idle') inner.push(c.scanner.setConstraints({ deviceId: 'b' }));
+    });
+    const live6 = freshTracks(s6.env), outer6 = s6.c.scanner.start();
+    assert.deepEqual([await outer6, await s6.inner[0]], [undefined, undefined]);
+    assert.deepEqual([s6.env.gum.calls.map(call => call.video), live6(), s6.c.scanner.state,
+      s6.seen], [[{ deviceId: 'b' }], 1, 'running', ['idle->starting(start)',
+      'starting->starting(constraints)', 'starting->running(constraints)']]);
+    s6.c.scanner.stop();
+    // stop() then start() on the 'starting' change of start(): the stop is final for the first
+    // start, which settles with the restart; only the restart requests a camera.
+    const s7 = scene((change, c, inner) => {
+      if (change.previous !== 'idle') return;
+      c.scanner.stop();
+      inner.push(c.scanner.start());
+    });
+    const live7 = freshTracks(s7.env), outer7 = s7.c.scanner.start();
+    assert.deepEqual([await outer7, await s7.inner[0]], [undefined, undefined]);
+    assert.deepEqual([s7.env.gum.calls.length, live7(), s7.c.scanner.state, s7.seen],
+      [1, 1, 'running', ['idle->starting(start)', 'starting->stopped(stop)',
+        'stopped->starting(start)', 'starting->running(start)']]);
+    s7.c.scanner.stop();
+    assert.deepEqual([live7(), s7.c.scanner.state], [0, 'stopped']);
   }
 
-  // T58, a throw from tracker.reset (derived from 7.1, 7.6 and the stop() contract, no design
-  // case; review finding CTRL-F3): the epoch end still releases the camera and applies its own
-  // transition, and the throw reaches onError as callback_failed with its native cause.
+  // T58, a throw from tracker.reset: the epoch end still releases the camera and applies its own
+  // transition, and the throw reaches onError as callback_failed with a message naming the reset
+  // and its native cause.
   {
     const thrown = new RangeError('reset needs a larger epoch');
     const failing = () => {
@@ -3364,7 +3404,10 @@ const norm = (points, width = 1000, height = width) =>
       tracker.reset = () => { throw thrown; };
       return tracker;
     };
-    const codes = c => c.errors.map(e => [e instanceof CameraScannerError, e.code, e.cause]);
+    const resetFailed = [true, 'callback_failed',
+      'Resetting the tracker at the end of a camera session failed.', thrown];
+    const codes = c => c.errors.map(e => (e.code === 'callback_failed'
+      ? [e instanceof CameraScannerError, e.code, e.message, e.cause] : e.code));
     const opened = async () => {
       const env = rig(), dec = decoder();
       const c = camera(env, { scanFrame: dec.scanFrame, tracker: failing() });
@@ -3375,14 +3418,13 @@ const norm = (points, width = 1000, height = width) =>
     stopped.c.scanner.stop();
     assert.deepEqual([stopped.c.scanner.state, stopped.c.scanner.epoch, stopped.env.track.stops,
       stopped.env.video.srcObject, stopped.c.reasons(), codes(stopped.c)],
-    ['stopped', stopped.e0 + 1, 1, null, ['start', 'start', 'stop'],
-      [[true, 'callback_failed', thrown]]]);
+    ['stopped', stopped.e0 + 1, 1, null, ['start', 'start', 'stop'], [resetFailed]]);
     // The hidden page's listener does not throw either.
     const hidden = await opened();
     hidden.env.document.hidden = true;
     hidden.env.document.dispatchEvent(new Event('visibilitychange'));
     assert.deepEqual([hidden.c.scanner.state, hidden.env.track.stops, codes(hidden.c)],
-      ['stopped', 1, [[true, 'callback_failed', thrown]]]);
+      ['stopped', 1, [resetFailed]]);
     // A decode failure: the session fails with its own error, after the reset's report.
     const failed = await opened();
     await failed.env.clock.advance(100);
@@ -3390,19 +3432,223 @@ const norm = (points, width = 1000, height = width) =>
     failed.dec.calls[0].reject(new Error('worker crashed'));
     await flush();
     assert.deepEqual([failed.c.scanner.state, lastState(failed.c).error.code,
-      failed.env.track.stops, failed.env.video.srcObject, failed.c.errors.map(e => e.code)],
-    ['failed', 'decode_failed', 1, null, ['callback_failed', 'decode_failed']]);
+      failed.env.track.stops, failed.env.video.srcObject, codes(failed.c)],
+    ['failed', 'decode_failed', 1, null, [resetFailed, 'decode_failed']]);
     // A device switch goes on: the reset failure is reported, the new device opens.
     const moved = await opened();
     await moved.c.scanner.setConstraints({ deviceId: 'b' });
     assert.deepEqual([moved.c.scanner.state, moved.env.gum.calls.length, moved.env.track.stops,
-      codes(moved.c)], ['running', 2, 1, [[true, 'callback_failed', thrown]]]);
+      codes(moved.c)], ['running', 2, 1, [resetFailed]]);
     moved.c.scanner.stop();
   }
 
-  // T49, stop() during recovering (derived from 7.4 'stop() during recovering aborts the
-  // recovery', no design case): the recovery signal aborts, and a recover that resolves later
-  // changes neither the generation nor the state, and captures nothing.
+  // T58, a throw from onState: transitions, camera requests and timers are those of an onState
+  // that returned. start() and setConstraints() still return their promise, and each throw
+  // reaches onError as callback_failed with the native error as cause.
+  {
+    const thrown = new TypeError('overlay failed');
+    const stateFailed = [true, 'callback_failed',
+      'The onState callback threw on a camera state change.', thrown];
+    const codes = errors => errors.map(e => (e.code === 'callback_failed'
+      ? [e instanceof CameraScannerError, e.code, e.message, e.cause] : e.code));
+    const transition = change => `${change.previous}->${change.state}(${change.reason})`;
+    const scene = (throwsOn, options = {}) => {
+      const env = rig(), dec = decoder(), seen = [], live = freshTracks(env);
+      const c = camera(env, { scanFrame: dec.scanFrame, ...options, onState: change => {
+        seen.push(transition(change));
+        if (throwsOn(change)) throw thrown;
+      } });
+      return { env, dec, seen, live, c };
+    };
+    // On the 'starting' change of start(): one camera opens and the session captures.
+    const a = scene(change => change.state === 'starting' && change.reason === 'start');
+    const started = a.c.scanner.start();
+    assert.deepEqual([await started, a.seen, a.env.gum.calls.length, a.live(), a.c.scanner.state,
+      codes(a.c.errors)], [undefined, ['idle->starting(start)', 'starting->running(start)'], 1, 1,
+      'running', [stateFailed]]);
+    await a.env.clock.advance(100);
+    assert.deepEqual([a.env.video.requests, a.env.clock.pending()], [1, [2100]]);
+    a.c.scanner.stop();
+    // On the 'starting' change of setConstraints(): the device switch goes on.
+    const b = scene(change => change.state === 'starting' && change.reason === 'constraints');
+    await b.c.scanner.start();
+    const switched = b.c.scanner.setConstraints({ deviceId: 'b' });
+    assert.deepEqual([await switched, b.seen, b.env.gum.calls.map(call => call.video), b.live(),
+      b.c.scanner.state, codes(b.c.errors)], [undefined, ['idle->starting(start)',
+      'starting->running(start)', 'running->starting(constraints)',
+      'starting->running(constraints)'], [{ facingMode: { ideal: 'environment' } },
+      { deviceId: 'b' }], 1, 'running', [stateFailed]]);
+    b.c.scanner.stop();
+    // Without onError the report is rethrown from a microtask, and so is a throw from onError
+    // while it receives a report (here of onState, then of a tracker reset). No call throws.
+    const caught = [], hook = error => caught.push(error), late = new Error('onError failed');
+    const resetThrows = fakeTracker([]);
+    resetThrows.reset = () => { throw new RangeError('reset needs a larger epoch'); };
+    process.on('uncaughtException', hook);
+    const bare = scene(() => true, { onError: undefined });
+    const bareStart = bare.c.scanner.start();
+    assert.deepEqual(caught, []);
+    await bareStart;
+    const bareLive = bare.live();
+    bare.c.scanner.stop();
+    const loud = scene(change => change.state === 'starting',
+      { onError: () => { throw late; }, tracker: resetThrows });
+    await loud.c.scanner.start();
+    loud.c.scanner.stop();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    process.off('uncaughtException', hook);
+    assert.deepEqual(caught.map(e => (e === late ? 'late' : codes([e])[0])),
+      [stateFailed, stateFailed, stateFailed, 'late', 'late']);
+    const stopped = ['idle->starting(start)', 'starting->running(start)', 'running->stopped(stop)'];
+    assert.deepEqual([bareLive, bare.seen, bare.live(), loud.seen, loud.live(),
+      loud.env.gum.calls.length], [1, stopped, 0, stopped, 0, 1]);
+    // A whole session where every transition throws: stall and resume, a decode timeout and its
+    // recovery, mute, a switch, a stream that ends, a restart and a stop. Each step matches the
+    // calm run, and each throw is reported in order, before the error of the failing session.
+    const journey = async throwing => {
+      const recovers = recorder('resolve');
+      const j = scene(() => throwing, { recover: recovers.recover });
+      const { env, dec, c } = j, marks = [];
+      const mark = () => marks.push([c.scanner.state, c.scanner.stalled, j.live(),
+        env.gum.calls.length, env.video.requests, dec.calls.length, c.results.length,
+        recovers.length, c.scanner.decoderGeneration, env.clock.pending()]);
+      await c.scanner.start();
+      await env.clock.advance(100);
+      env.video.fire(100, { presentedFrames: 1 });
+      dec.calls[0].resolve(report('a'));
+      await env.clock.advance(2100);
+      mark();
+      await env.clock.advance(100);
+      env.video.fire(2300, { presentedFrames: 2 });
+      mark();
+      await env.clock.advance(5000);
+      mark();
+      setMuted(env, true);
+      setMuted(env, false);
+      await env.clock.advance(100);
+      mark();
+      await c.scanner.setConstraints({ deviceId: 'b' });
+      mark();
+      env.track.dispatchEvent(new Event('ended'));
+      mark();
+      await c.scanner.start();
+      c.scanner.stop();
+      mark();
+      return { seen: j.seen, marks, errors: codes(c.errors) };
+    };
+    const calm = await journey(false), noisy = await journey(true);
+    assert.deepEqual(calm.seen, ['idle->starting(start)', 'starting->running(start)',
+      'running->running(stalled)', 'running->running(frames-resumed)',
+      'running->recovering(recover)', 'recovering->running(recovered)', 'running->running(muted)',
+      'running->running(unmuted)', 'running->starting(constraints)',
+      'starting->running(constraints)', 'running->failed(error)', 'failed->starting(start)',
+      'starting->running(start)', 'running->stopped(stop)']);
+    assert.deepEqual(calm.marks, [['running', true, 1, 1, 2, 1, 1, 0, 0, []],
+      ['running', false, 1, 1, 2, 2, 1, 0, 0, [7300]],
+      ['running', false, 1, 1, 2, 2, 1, 1, 1, [7400]],
+      ['running', false, 1, 1, 3, 2, 1, 1, 1, [9400]],
+      ['running', false, 1, 2, 3, 2, 1, 1, 1, [7500]],
+      ['failed', false, 0, 2, 3, 2, 1, 1, 1, []],
+      ['stopped', false, 0, 3, 3, 2, 1, 1, 1, []]]);
+    assert.deepEqual([noisy.seen, noisy.marks], [calm.seen, calm.marks]);
+    assert.deepEqual([calm.errors, noisy.errors], [['stream_ended'],
+      [...Array(11).fill(stateFailed), 'stream_ended', ...Array(3).fill(stateFailed)]]);
+  }
+
+  // T57, a stop() from onError while it receives a throw from onState, or from onState itself.
+  // The report runs inside the change, so the stop is final there: the step that announced the
+  // change decodes, recovers and attaches nothing after it, no timer stays armed, and a restart
+  // decodes only its own frames. A mute from the 'frames-resumed' change pauses instead.
+  for (const via of ['onError', 'onState']) {
+    const scene = (on, { act = c => c.scanner.stop(), rvfc = true, ...options } = {}) => {
+      const env = rig({ rvfc }), dec = decoder(), seen = [], reports = [];
+      const c = camera(env, { scanFrame: dec.scanFrame, ...options, onState: change => {
+        seen.push(`${change.previous}->${change.state}(${change.reason})`);
+        if (change.reason !== on) return;
+        if (via === 'onState') act(c, env);
+        else throw new Error(on);
+      }, onError: error => {
+        reports.push([error.code, error.cause.message]);
+        act(c, env);
+      } });
+      return { env, dec, seen, reports, c };
+    };
+    const reported = on => (via === 'onError' ? [['callback_failed', on]] : []);
+    const left = s => [s.c.scanner.state, s.env.track.stops, s.env.video.srcObject,
+      s.env.video.pending, s.dec.calls.length, s.env.clock.pending()];
+    const initial = ['idle->starting(start)', 'starting->running(start)'];
+    const resumed = [...initial, 'running->running(stalled)', 'running->running(frames-resumed)'];
+    // rVFC path: the frame that ends the stall is neither drawn nor decoded.
+    const r = scene('frames-resumed');
+    await r.c.scanner.start();
+    await r.env.clock.advance(2100);
+    r.env.video.fire(2100, { presentedFrames: 1 });
+    assert.deepEqual([...left(r), r.env.draws.length, r.seen, r.reports],
+      ['stopped', 1, null, null, 0, [], 0, [...resumed, 'running->stopped(stop)'],
+        reported('frames-resumed')]);
+    // The restart keeps that epoch, as no other controller took one: its first decode and its
+    // first result are its own frame.
+    const e1 = r.c.scanner.epoch;
+    await r.c.scanner.start();
+    await r.env.clock.advance(100);
+    r.env.video.fire(2200, { presentedFrames: 1 });
+    r.dec.calls[0].resolve(report('fresh'));
+    await flush();
+    const decodes = r.dec.calls.map(({ context: { frame } }) =>
+      [frame.epoch, frame.sequence, frame.observedAt]);
+    const results = r.c.results.map(({ report: rep, frame }) => [rep.label, frame.observedAt]);
+    assert.deepEqual([r.c.scanner.epoch, decodes, results],
+      [e1, [[e1, 1, 2200]], [['fresh', 2200]]]);
+    r.c.scanner.stop();
+    // Timer path: a video unready for stallMs stalls; its first readable frame is drawn, to be
+    // hashed, and not decoded.
+    const t = scene('frames-resumed', { rvfc: false });
+    t.env.video.readyState = 1;
+    await t.c.scanner.start();
+    await t.env.clock.advance(2100);
+    t.env.video.readyState = 2;
+    await t.env.clock.advance(100);
+    assert.deepEqual([...left(t), t.env.draws.map(draw => draw.at), t.seen, t.reports],
+      ['stopped', 1, null, null, 0, [], [2200], [...resumed, 'running->stopped(stop)'],
+        reported('frames-resumed')]);
+    // A decode timeout: recover is never called, and its timeout is never armed.
+    const recovers = recorder();
+    const v = scene('recover', { recover: recovers.recover });
+    await v.c.scanner.start();
+    await v.env.clock.advance(100);
+    v.env.video.fire(100, { presentedFrames: 1 });
+    await v.env.clock.advance(5000);
+    assert.deepEqual([...left(v), recovers.length, v.c.scanner.decoderGeneration, v.seen,
+      v.reports], ['stopped', 1, null, null, 1, [], 0, 0, [...initial,
+      'running->recovering(recover)', 'recovering->stopped(stop)'], reported('recover')]);
+    // A track muted at open: its released stream never reaches the video, which never plays.
+    const m = scene('muted');
+    let plays = 0;
+    m.env.video.play = async () => { plays++; };
+    m.env.track.muted = true;
+    const outcome = await m.c.scanner.start();
+    assert.deepEqual([outcome, ...left(m), plays, m.seen, m.reports], [undefined, 'stopped', 1,
+      null, null, 0, [], 0, ['idle->starting(start)', 'starting->starting(muted)',
+        'starting->stopped(stop)'], reported('muted')]);
+    // A mute from the 'frames-resumed' change: that frame is not captured, and the first frame
+    // after the unmute is.
+    const p = scene('frames-resumed', { act: (c, env) => setMuted(env, true) });
+    await p.c.scanner.start();
+    await p.env.clock.advance(2100);
+    p.env.video.fire(2100, { presentedFrames: 1 });
+    assert.deepEqual([...left(p), p.c.scanner.stalled, p.env.draws.length],
+      ['running', 0, p.env.stream, null, 0, [], false, 0]);
+    setMuted(p.env, false);
+    await p.env.clock.advance(100);
+    p.env.video.fire(2200, { presentedFrames: 2 });
+    assert.deepEqual([p.dec.calls.map(call => call.context.frame.observedAt), p.seen, p.reports],
+      [[2200], [...resumed, 'running->running(muted)', 'running->running(unmuted)'],
+        reported('frames-resumed')]);
+    p.c.scanner.stop();
+  }
+
+  // T49, stop() during recovering aborts the recovery: its signal aborts, and a recover
+  // that resolves later changes neither the generation nor the state, and captures nothing.
   {
     const env = rig(), dec = decoder(), recovers = recorder();
     const c = camera(env, { scanFrame: dec.scanFrame, recover: recovers.recover });
@@ -3421,8 +3667,8 @@ const norm = (points, width = 1000, height = width) =>
       ['start', 'start', 'recover', 'stop'], []]);
   }
 
-  // T50, timeout after stop() with recover (derived from 7.4 'A timeout that fires after stop()
-  // marks the decoder as hung. The next start() recovers it first', no design case).
+  // T50, timeout after stop() with recover: a timeout that fires after stop() marks the
+  // decoder as hung, and the next start() recovers it first.
   {
     const env = rig(), dec = decoder(), recovers = recorder('resolve');
     const c = camera(env, { scanFrame: dec.scanFrame, recover: recovers.recover });

@@ -1,5 +1,7 @@
-// Replay cases T66-T70 (10.6, 9 F). Scenes are generated in memory; the module under
-// test comes from QRSCAN_CAMERA_MODULE when set (the installed package), else ./camera.js.
+// Replay cases T66-T70: the instrument's self-tests, association against a brute-force
+// reference, determinism, identity under smoothing and the default gates. Scenes are generated
+// in memory; the module under test comes from QRSCAN_CAMERA_MODULE when set (the installed
+// package), else ./camera.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -17,17 +19,7 @@ const near = (actual, expected, tolerance, label = '') => assert.ok(
   `${label} ${actual} is not within ${tolerance} of ${expected}`);
 const run = (camera, lines, trackerOptions = {}) =>
   replay(lines, { createDetectionTracker: camera.createDetectionTracker, trackerOptions });
-// One-euro is experimental and may leave camera.js before the freeze (10.7).
-function supportsOneEuro(camera) {
-  try {
-    camera.createDetectionTracker({ smoothing: { kind: 'one-euro', minCutoffHz: 1, beta: 0.01 } })
-      .destroy();
-    return true;
-  } catch (error) {
-    if (error instanceof RangeError) return false;
-    throw error;
-  }
-}
+const unsmoothed = { smoothing: { kind: 'none' } };
 
 // A single QR on a 1280 x 720 frame at 10 Hz without noise, its centre x given per frame.
 function panScene(xs, { y = 360, offsets = () => 0 } = {}) {
@@ -43,7 +35,7 @@ function panScene(xs, { y = 360, offsets = () => 0 } = {}) {
 }
 const lagOf = (trace, k) => trace.steps[k].snapshot.tracks[0].geometry.lag;
 
-test('T66 instrument self-tests (10.6)', async t => {
+test('T66 instrument self-tests', async t => {
   const camera = await loaded;
 
   await t.test('1. truth replay: zero noise and no smoothing give no error and no jitter', () => {
@@ -96,35 +88,52 @@ test('T66 instrument self-tests (10.6)', async t => {
     assert.equal(stop.frames, 9, 'settle_frames: 55.71 x 0.65^10 < 1 px');
   });
 
-  await t.test('3. one-euro values: the factors and the 10 px step of 6.6', st => {
-    near(oneEuro.alphaFor(0.7, 0.1), 0.305470, 5e-7, 'alpha(0.7 Hz)');
-    near(oneEuro.alphaFor(2.8, 0.1), 0.637588, 5e-7, 'alpha(2.8 Hz)');
-    near(oneEuro.alphaFor(1, 0.1), 0.385870, 5e-7, 'alpha_d(1 Hz)');
+  // One-euro is a replay candidate only: camera.js refuses it as a smoothing option.
+  await t.test('3. one-euro candidate: closed forms, and its steps through the post-filter', () => {
+    // alpha(f) = 1 / (1 + 1 / (2 pi f Te)) at Te = 0.1 s.
+    const alpha = f => oneEuro.alphaFor(f, 0.1), alphaD = alpha(1);
+    near(alpha(0.7), 0.305470, 5e-7, 'alpha(0.7 Hz)');
+    near(alpha(2.8), 0.637588, 5e-7, 'alpha(2.8 Hz)');
+    near(alphaD, 0.385870, 5e-7, 'alpha_d(1 Hz)');
+    // A 10 px step from rest: speed 100 px/s filters to 38.587, cutoff 1.385870 Hz.
     const params = { minCutoffHz: 1, beta: 0.01 }, candidate = oneEuro.createCandidate(params);
     const estimate = square(640, 360), aligned = estimate.map(p => ({ x: p.x + 10, y: p.y }));
     const next = candidate.blend({ estimate, aligned, dt: 100, state: candidate.reset() });
     near(next.state.speed, 38.587, 5e-4, 'filtered speed');
     near(next.alpha, 0.465460, 5e-7, 'alpha after the step');
     next.points.forEach((p, i) => near(p.x - estimate[i].x, 4.6546, 5e-5, `vertex ${i}`));
-    if (!supportsOneEuro(camera)) {
-      st.diagnostic('the module rejects one-euro: tracker values and parity not checked');
-      return;
-    }
-    const smoothing = { kind: 'one-euro', ...params };
-    const step = run(camera, panScene([...Array(10).fill(640), 650, 650]), { smoothing });
-    near(step.steps[10].snapshot.tracks[0].geometry.points[0].x * 1280 - 580, 4.6546, 5e-5,
-      'tracker step');
-    // The candidate, run as a post-filter, reproduces the module's one-euro publications.
-    let max = 0, publications = 0;
-    for (const scene of SCENES) {
-      const lines = generateScene(scene);
-      const filtered = postFilter(run(camera, lines, { smoothing: { kind: 'none' } }), candidate);
-      const diff = publishedDifference(run(camera, lines, { smoothing }), filtered);
-      max = Math.max(max, diff.max);
-      publications += diff.publications;
-    }
-    assert.ok(max <= 1e-12, `one-euro parity: largest deviation ${max}`);
-    st.diagnostic(`one-euro parity over ${publications} publications: ${max}`);
+    // Over a smoothing 'none' replay: no move at rest, the 10 px step, then a step that follows
+    // the filtered speed. An 80 px jump restarts at the measurement with speed 0, so the next
+    // 10 px step moves 4.6546 px again.
+    const xs = [...Array(10).fill(640), 650, 660, 740, 750];
+    const pan = postFilter(run(camera, panScene(xs), unsmoothed), candidate);
+    const at = k => pan.steps[k].snapshot.tracks[0].geometry;
+    const offset = k => at(k).points[0].x * 1280 - 580;
+    const v1 = alphaD * 100, m1 = 10 * alpha(1 + 0.01 * v1);
+    const v2 = v1 + alphaD * ((20 - m1) / 0.1 - v1);
+    assert.deepEqual([9, 10, 11, 12, 13].map(k => [at(k).restart, at(k).smoothed]),
+      [[null, true], [null, true], [null, true], ['jump', false], [null, true]]);
+    near(offset(9), 0, 1e-9, 'at rest');
+    near(offset(10), 4.6546, 5e-5, 'first step');
+    near(offset(10), m1, 1e-9, 'first step, closed form');
+    near(offset(11), m1 + alpha(1 + 0.01 * v2) * (20 - m1), 1e-9, 'second step');
+    near(offset(12), 100, 1e-9, 'jump');
+    near(offset(13) - 100, 4.6546, 5e-5, 'step after the jump');
+    // A same-aspect halving of the resolution: the estimate and the filtered speed are rescaled
+    // with the frame before the blend (12.8 px steps, square side 120, then 60 at 640 x 360).
+    const b = createBuilder({ scene: 'self-test', seed: 1, noise: 0 });
+    const code = makeCode('qr_code', 'SELF-TEST');
+    [640, 652.8, 665.6].forEach((x, k) => b.frame({ at: k * 100,
+      copies: [{ copy: 'A', code, kind: 'quad', points: square(x, 360) }] }));
+    Object.assign(b.lines[3], { width: 640, height: 360 });
+    b.lines[3].report.detections[0].occurrences[0].geometry.points = square(332.8, 180, 60);
+    const halved = postFilter(run(camera, b.lines, unsmoothed), candidate).steps[2]
+      .snapshot.tracks[0].geometry;
+    const u1 = alphaD * 128, e1 = 640 + alpha(1 + 0.01 * u1) * 12.8;
+    const u2 = u1 / 2 + alphaD * ((332.8 - e1 / 2) / 0.1 - u1 / 2);
+    const e2 = e1 / 2 + alpha(1 + 0.01 * u2) * (332.8 - e1 / 2);
+    assert.deepEqual([halved.restart, halved.smoothed], [null, true]);
+    near(halved.points[0].x, (e2 - 30) / 640, 1e-12, 'halved frame');
   });
 
   await t.test('4. injected faults count exactly once', () => {
@@ -208,7 +217,8 @@ test('T66 instrument self-tests (10.6)', async t => {
 
   await t.test('7. recorder: salted digests only, and its JSONL replays a session', async () => {
     const { createRecorder, sha256Hex, projectInput } = await import('./replay/recorder.js');
-    const texts = ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'b'.repeat(64), 'é漢🙂'.repeat(5)];
+    const texts = ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'b'.repeat(64),
+      'é漢🙂'.repeat(5)];
     for (const text of texts) {
       assert.equal(sha256Hex(text), createHash('sha256').update(text, 'utf8').digest('hex'));
     }
@@ -237,8 +247,9 @@ test('T66 instrument self-tests (10.6)', async t => {
           live.steps.map(s => withoutKeys(s.snapshot)), `${scene}: identity after the round trip`);
         assert.equal(publishedDifference(live, replayed).max, 0, `${scene}: published points`);
       }
-      // Digests reorder distinct contents among position-less reads (4.11 orders them by key),
-      // so ids may be relabelled: per step, the multisets of tracks and events are the same.
+      // Digests reorder distinct contents among position-less reads, which are sorted by
+      // content key, so ids may be relabelled: per step, the multisets of tracks and events
+      // are the same.
       const label = s => ({ status: s.status, tracks: s.tracks.map(t => JSON.stringify([t.state,
         t.basis, t.misses, t.firstSeenAt, t.lastSeenAt, t.geometry && t.geometry.points])).sort(),
       events: s.events.map(({ type, at, reason, cause }) => JSON.stringify([type, at, reason,
@@ -270,7 +281,7 @@ test('T66 instrument self-tests (10.6)', async t => {
     assert.equal(projectInput([], undefined, x => x).trace.budget_exhausted, true);
   });
 
-  await t.test('8. adoption rule: a missing measurement counts as worse (10.7)', () => {
+  await t.test('8. adoption rule: a missing measurement counts as worse', () => {
     const scene = (jitter, lag, settle, norm = 0.01) => ({ corner_err_norm: norm, violations: 0,
       unexplained_splits: 0, jitter_px: jitter, lag_px: lag, settle_frames: settle });
     const settled = { mean: 9, max: 9, events: 1, unsettled: 0 };
@@ -320,7 +331,7 @@ function matchings(z) {
   return out;
 }
 
-// Total of the augmented assignment (4.8): matched costs, leave costs of unmatched rows and the
+// Total of the augmented assignment: matched costs, leave costs of unmatched rows and the
 // start cost of unmatched columns (the remaining dummy cells cost 0).
 function totalOf(z, leave, pairs) {
   let total = START * (z[0].length - pairs.length);
@@ -397,7 +408,7 @@ function quadCost(t, o, dt) {
 }
 
 /**
- * The decisions expected from one frame (4.7 cascade, 4.8 split): tracks
+ * The decisions expected from one frame (matching cascade by level, then splits): tracks
  * { id, ref, lastSeenAt, level, lost } by level, observations { index, desc } at `at` ms.
  */
 function expectedFrame(tracks, observations, at) {
@@ -526,7 +537,7 @@ function checkInstance(camera, lines) {
     size: live.length + occurrences.length };
 }
 
-test('T67 association decisions against a brute-force reference (4.7-4.8)', async t => {
+test('T67 association decisions against a brute-force reference', async t => {
   const camera = await loaded, rnd = createRandom(67);
   // Augmented matrices to solve with the co-observed rule (stage 0) and without (later levels).
   const want = { ruled: 1850, unruled: 1850 }, seen = { ruled: 0, unruled: 0 };
@@ -570,7 +581,7 @@ function firstDifference(a, b) {
   return -1;
 }
 
-test('T68 determinism: shuffled wire order gives the same canonical snapshots (4.11)',
+test('T68 determinism: shuffled wire order gives the same canonical snapshots',
   async () => {
     const camera = await loaded, canon = s => canonical(s.snapshot, camera.contentKey);
     for (const scene of SCENES) {
@@ -584,13 +595,9 @@ test('T68 determinism: shuffled wire order gives the same canonical snapshots (4
     }
   });
 
-test('T69 smoothing never changes identity: ids, slots, bases, states and events', async t => {
+test('T69 smoothing never changes identity: ids, slots, bases, states and events', async () => {
   const camera = await loaded;
   const options = [{ kind: 'none' }, { kind: 'fixed', alpha: 0.6 }, 1, 0.1];
-  if (supportsOneEuro(camera)) {
-    options.push({ kind: 'one-euro', minCutoffHz: 1, beta: 0.01 },
-      { kind: 'one-euro', minCutoffHz: 0.7, beta: 0.007, derivativeCutoffHz: 1 });
-  } else t.diagnostic('the module rejects one-euro: in-module one-euro runs skipped');
   for (const scene of SCENES) {
     const lines = generateScene(scene);
     const reference = run(camera, lines).steps.map(s => identityOf(s.snapshot));
@@ -604,7 +611,7 @@ test('T69 smoothing never changes identity: ids, slots, bases, states and events
   }
 });
 
-test('T70 default gates on R1-R16 with fixed 0.35 (10.5)', async t => {
+test('T70 default gates on R1-R16 with fixed 0.35', async t => {
   const camera = await loaded, survival = ['R1', 'R6', 'R13', 'R15', 'R16'];
   // The closed forms assume centre scan rows: R15 is also run that way.
   const runs = SCENES.map(scene => ({ name: scene, scene, lines: generateScene(scene) }));

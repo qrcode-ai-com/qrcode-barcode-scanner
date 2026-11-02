@@ -225,7 +225,7 @@ export function createBuilder({ scene, seed, noise = NOISE, rows = 'uniform', wi
   };
 }
 
-// ------------------------------------------- reference cost model (4.1-4.4)
+// ----------------------------------------------------- reference cost model
 
 export const LEAVE_SEEN = 9.5, LEAVE_LOST = 6.5, START = 6.5, MARGIN = 4, BIG = 1e6;
 const SIZE_FLOOR = 0.02 * 0.02, COS2_20 = 0.8830222215594891, COST_GATE = 9;
@@ -272,7 +272,11 @@ function quadDistance2(x, y, quad) {
   return inside ? 0 : best;
 }
 
-/** Gates 3-6 and z² of reference t against observation o, dt seconds apart; Infinity if gated. */
+/**
+ * z² of reference t against observation o, dt seconds apart, or Infinity when a gate fails:
+ * a size ratio above 2 between quads or between segments, segment axes more than 20 degrees
+ * apart, a centre distance above 1.5 sizes, or z² above 9.
+ */
 export function referenceCost(t, o, dt) {
   const segments = t.kind === 'segment' && o.kind === 'segment';
   if ((segments || (t.kind === 'quad' && o.kind === 'quad')) &&
@@ -308,7 +312,7 @@ function locatedOf(line, copy) {
 }
 
 /**
- * 4.13 at the generated geometry: every twin's first absent frame (one copy measured in
+ * The twin limit at the generated geometry: every twin's first absent frame (one copy measured in
  * the previous frame and not in this one, beside one copy measured in both) with its predicted
  * extra = z²(hidden, o) - z²(visible, o). A split is predicted when extra < MARGIN.
  */
@@ -575,7 +579,7 @@ const SCENE_BUILDERS = {
 };
 
 /**
- * Limit splits of the closed forms (4.13), which assume centre scan rows: one per hide
+ * Limit splits of the closed forms, which assume centre scan rows: one per hide
  * at g = 0.3 in R15, one per twin disappearance at 516 ms in R16.
  */
 export const NOMINAL = Object.freeze({ R15: { limitSplits: 1 }, R16: { limitSplits: 3 } });

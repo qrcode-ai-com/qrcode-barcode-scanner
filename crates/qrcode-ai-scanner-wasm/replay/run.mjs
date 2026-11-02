@@ -1,4 +1,4 @@
-// Replay runner (10.4): feeds JSONL v1 lines to createDetectionTracker of the module under
+// Replay runner: feeds JSONL v1 lines to createDetectionTracker of the module under
 // test, runs smoothing candidates as post-filters and writes a metrics report.
 // Usage: node replay/run.mjs --module <camera.js> [--input <file.jsonl>]... [--candidate <json>]...
 //   [--out <report.json>]. Without --input, the synthetic scenes R1-R16 are generated in memory.
@@ -29,7 +29,7 @@ export function replay(lines, { createDetectionTracker, trackerOptions = {} }) {
   return { header, steps };
 }
 
-/** The baseline smoother of camera.js (fixed alpha, 6.5) as a post-filter candidate. */
+/** The baseline smoother of camera.js (fixed alpha) as a post-filter candidate. */
 export function fixedCandidate(alpha = 0.35) {
   return {
     name: `fixed-${alpha}`,
@@ -54,7 +54,7 @@ function measuredPx(track, line) {
 
 /**
  * Runs a candidate over each track's measured sequence of a smoothing 'none' replay. Restarts
- * come from the replay; a blend that fails the 6.7 check restarts as 'invalid-blend'. Returns a
+ * come from the replay; a blend that fails validation restarts as 'invalid-blend'. Returns a
  * copy of the trace whose published points are the candidate's.
  */
 export function postFilter(trace, candidate) {
@@ -105,13 +105,13 @@ function measure(t, line, previous, candidate) {
     restart: null };
 }
 
-// ------------------------------------------------------------ comparisons (4.11, T69)
+// ------------------------------------------------------------------ comparisons (T69)
 
 const byJson = (a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1);
 
 /**
- * A snapshot with each detection replaced by [contentKey, ECI list] and wire addresses removed
- * (4.11). Unassigned and dropped entries lose their addresses, so they compare as sorted
+ * A snapshot with each detection replaced by [contentKey, ECI list] and wire addresses
+ * removed. Unassigned and dropped entries lose their addresses, so they compare as sorted
  * multisets.
  */
 export function canonical(snapshot, contentKey) {
@@ -155,9 +155,9 @@ export function publishedDifference(a, b) {
 const orInfinity = v => (typeof v === 'number' && !Number.isNaN(v) ? v : Infinity);
 
 /**
- * Adoption rule 10.7, synthetic part: safety, no scene's corner_err_norm more than 5% worse,
+ * The adoption rule, synthetic part: safety, no scene's corner_err_norm more than 5% worse,
  * and R1 jitter <= 0.7 x baseline with R2 lag and R9 settle no worse, or R2 lag <= 0.7 x
- * baseline with R1 jitter and R9 settle no worse. Captures (condition 3) are not evaluated.
+ * baseline with R1 jitter and R9 settle no worse. Local captures are not evaluated.
  * A missing candidate value counts as worse than any measured baseline.
  */
 export function adoption(baseline, candidate, identityEqual) {
@@ -182,7 +182,7 @@ export function adoption(baseline, candidate, identityEqual) {
     captures: 'not evaluated: needs at least 3 sessions from 2 devices, one a phone' };
 }
 
-/** The comparison of section 10: baseline (in-module default) and post-filter candidates. */
+/** The smoothing comparison: baseline (in-module default) and post-filter candidates. */
 export function compare({ createDetectionTracker, inputs, candidates = [], trackerOptions = {} }) {
   const baseline = {}, none = {}, results = candidates.map(c => ({ name: c.name, params: c.params,
     scenes: {}, identityEqual: true }));

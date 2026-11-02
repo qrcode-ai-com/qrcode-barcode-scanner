@@ -1,4 +1,4 @@
-// Pure replay metrics (10.5). A trace is { header, steps: [{ line, snapshot }] }: line is
+// Pure replay metrics. A trace is { header, steps: [{ line, snapshot }] }: line is
 // a JSONL frame or time line, snapshot the tracker's answer (or a post-filtered copy of it).
 // Published and truth points are compared in normalized units, then scaled to source px.
 
@@ -30,7 +30,7 @@ export function quadProblem(points) {
 }
 
 /**
- * The blend is validated again (6.2 step 6 with 6.1 and 6.7): finite points within the
+ * The blend is validated again, as camera.js does: finite points within the
  * frame tolerance max(2, 2% of the long side); a quad keeps area >= 4 px² and positive turns, a
  * segment a squared length >= 1 px².
  */
@@ -182,7 +182,7 @@ const merged = (line, raw) => {
 /**
  * Splits are ambiguous expiries, one per contest (shared successors). unexplained: every copy of
  * the content was reported in this frame and in the previous updated frame, none merged.
- * limit: a twin's first absent frame (4.13). Any other split is explained.
+ * limit: a twin's first absent frame (predicted by generate.mjs). Any other split is explained.
  */
 export function splits(trace) {
   const result = { unexplained: 0, limit: 0, explained: 0, list: [] };

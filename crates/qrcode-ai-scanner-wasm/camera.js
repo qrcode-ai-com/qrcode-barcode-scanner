@@ -7,7 +7,7 @@ const LEAVE_SEEN = 9.5, LEAVE_LOST = 6.5, START = 6.5, MARGIN = 4, BIG = 1e6;
 const COST_GATE = 9, COS2_20 = 0.8830222215594891, SIZE_FLOOR = 0.0004;
 const TALL_BARS = ['ean13', 'ean8', 'upc_a', 'upc_e'];
 
-// ------------------------------------------------------------------ identities (3.1)
+// ------------------------------------------------------------------------ identities
 
 /** spec/01 dedupe key; two located ECI lists can share it (use sameContent). */
 export function contentKey({ symbology, content }) {
@@ -32,7 +32,7 @@ export function sameContent(a, b) {
   return contentKey(a) === contentKey(b) && eciCompatible(eciOf(a), eciOf(b));
 }
 
-// ------------------------------------------------------------------ validation (6.1)
+// ------------------------------------------------------------------------ validation
 
 const finitePoint = p => p !== null && typeof p === 'object' &&
   Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -86,7 +86,7 @@ function validateGeometry(geometry, width, height) {
   return { kind, points: kept, downgrade: null };
 }
 
-// ----------------------------------------------- correspondence and smoothing (6.3-6.7)
+// --------------------------------------------------------- correspondence and smoothing
 
 const QR_FAMILY = ['qr_code', 'micro_qr_code', 'rectangular_micro_qr_code'];
 const shifted = (points, k) => points.map((_, i) => points[(i + k) % points.length]);
@@ -99,7 +99,7 @@ function squaredDistances(a, b) {
   return sum;
 }
 
-/** 6.3: the measurement in the track's vertex order, and whether that order is in doubt. */
+/** The measurement in the track's vertex order, and whether that order is in doubt. */
 function correspond(points, previous, kind, symbology) {
   if (kind === 'segment') {
     // Segments have no origin: a swap is not a restart.
@@ -127,7 +127,8 @@ function size2(kind, p) {
   return dx * dx + dy * dy;
 }
 
-// 6.4 row 6, squared: RMS displacement above half the previous size, or a ratio outside [0.5, 2].
+// A jump, tested on squares: RMS vertex displacement above half the previous size, or a
+// squared-size ratio outside [0.5, 2].
 function jumped(kind, points, previous) {
   const before = size2(kind, previous), after = size2(kind, points);
   return squaredDistances(points, previous) / points.length > 0.25 * before ||
@@ -136,18 +137,8 @@ function jumped(kind, points, previous) {
 
 const blend = (estimate, points, alpha) => estimate.map((e, i) => ({
   x: e.x + alpha * (points[i].x - e.x), y: e.y + alpha * (points[i].y - e.y) }));
-// 6.6: the smoothing factor of a first-order low-pass at f Hz over te seconds.
-const cutoffAlpha = (hz, te) => 1 / (1 + 1 / (2 * Math.PI * hz * te));
-function centroid(p) {
-  let x = 0, y = 0;
-  for (const q of p) {
-    x += q.x;
-    y += q.y;
-  }
-  return { x: x / p.length, y: y / p.length };
-}
 
-// ------------------------------------------------- descriptors, order and cost (4.1-4.4)
+// ----------------------------------------------------------- descriptors, order and cost
 
 /** Descriptor in isotropic units u = px / max(width, height). */
 function describe(kind, points, scale, symbology) {
@@ -215,8 +206,10 @@ function quadDistance2(x, y, quad) {
 }
 
 /**
- * Gates 3-6 and the cost z² of a reference t against an observation o, dt seconds apart;
- * Infinity when a gate fails. Only + - * / and comparisons decide.
+ * The cost z² of a reference t against an observation o, dt seconds apart, or Infinity when
+ * a gate fails: a size ratio above 2 between quads or between segments, segment axes more
+ * than 20 degrees apart, a centre distance above 1.5 sizes, or z² above 9. Only + - * / and
+ * comparisons decide.
  */
 function pairCost(t, o, dt) {
   const segments = t.kind === 'segment' && o.kind === 'segment';
@@ -244,7 +237,7 @@ function pairCost(t, o, dt) {
   return z2 <= COST_GATE ? z2 : Infinity;
 }
 
-// --------------------------------------------------------------------- solver (4.7, 4.8)
+// -------------------------------------------------------------------------------- solver
 
 /** Kuhn-Munkres with potentials, O(n³). Strict comparisons: the lowest index wins ties. */
 function assign(a) {
@@ -331,7 +324,8 @@ function components(z) {
 
 /**
  * Solves one component: z holds gated costs (Infinity otherwise), leave the leave cost of each
- * track row. Returns the uncontested pairs and the contested rows and columns (4.8 split).
+ * track row. Returns the uncontested pairs and the contested rows and columns: contested
+ * tracks retire as ambiguous, and their observations start new tracks (a split).
  */
 function solveComponent(z, leave, stageZero) {
   const T = z.length, O = z[0].length, n = T + O, a = [];
@@ -366,7 +360,7 @@ function solveComponent(z, leave, stageZero) {
   return { pairs: pairs.filter(([r]) => !contestedRows.has(r)), contestedRows, contestedCols };
 }
 
-// ------------------------------------------------------------- options and arguments (2)
+// ----------------------------------------------------------------- options and arguments
 
 // The default clock of the tracker and the controller reads the globals at call time, never
 // at import.
@@ -380,13 +374,11 @@ const isUnit = x => typeof x === 'number' && x > 0 && x <= 1;
 const isPositive = x => Number.isFinite(x) && x > 0;
 
 function checkSmoothing(s) {
-  const valid = typeof s === 'number' ? isUnit(s) : s !== null && typeof s === 'object' && (
-    s.kind === 'fixed' ? isUnit(s.alpha) : s.kind === 'none' || (s.kind === 'one-euro' &&
-      isPositive(s.minCutoffHz) && Number.isFinite(s.beta) && s.beta >= 0 &&
-      (s.derivativeCutoffHz === undefined || isPositive(s.derivativeCutoffHz))));
+  const valid = typeof s === 'number' ? isUnit(s) : s !== null && typeof s === 'object' &&
+    (s.kind === 'fixed' ? isUnit(s.alpha) : s.kind === 'none');
   if (!valid) {
-    throw new RangeError('smoothing must be a number in (0, 1], { kind: \'fixed\', alpha }, ' +
-      '{ kind: \'none\' } or { kind: \'one-euro\', minCutoffHz, beta, derivativeCutoffHz? }.');
+    throw new RangeError('smoothing must be a number in (0, 1], { kind: \'fixed\', alpha } ' +
+      'or { kind: \'none\' }.');
   }
 }
 
@@ -449,15 +441,14 @@ const noSaturation = () => ({ detections: false, occurrences: false, observation
 
 // ------------------------------------------------------------------------- tracker
 
-/** Follows measured copies (occurrences) and decoded contents between reports (sections 3-5). */
+/** Follows measured copies (occurrences) and decoded contents between reports. */
 export function createDetectionTracker(options = {}) {
   const settings = readOptions(options);
   const { staleMs, reacquireMs, maxMisses, clock } = settings;
   // Read once at creation; a number is a fixed alpha.
   const s = settings.smoothing;
-  const smoothing = typeof s === 'number' ? { kind: 'fixed', alpha: s } : { kind: s.kind,
-    alpha: s.alpha, minCutoffHz: s.minCutoffHz, beta: s.beta,
-    derivativeCutoffHz: s.derivativeCutoffHz ?? 1 };
+  const smoothing = typeof s === 'number' ? { kind: 'fixed', alpha: s } :
+    { kind: s.kind, alpha: s.alpha };
   const limits = TRACKER_LIMITS;
   let trackSerial = 0, resultSerial = 0, tracks = [], results = [], quarantine = [];
   let epoch = 0, accepted = null, lastSequence = null, lastNow = -Infinity, resetNow = -Infinity;
@@ -498,7 +489,7 @@ export function createDetectionTracker(options = {}) {
   }
   const unassignedOf = (o, reason) => ({ ...o.address, key: o.key, reason });
 
-  // 3.3: observations of one accepted frame in canonical order, capped per content key.
+  // The observations of one accepted frame in canonical order, capped per content key.
   function extract(detections, frame, contentOnly) {
     const saturated = noSaturation(), dropped = [], unassigned = [], all = [];
     const keys = { present: new Set(), legacy: new Set(), truncated: new Set() };
@@ -542,7 +533,7 @@ export function createDetectionTracker(options = {}) {
       });
     });
     all.sort(compareObservations);
-    // 4.11: no wire order either; the address only orders entries that are otherwise equal.
+    // dropped ignores wire order too: the address only orders entries that are otherwise equal.
     dropped.sort((a, b) => compareValues(a.key, b.key) || compareValues(a.eciJson, b.eciJson) ||
       compareValues(a.reason, b.reason) || a.detectionIndex - b.detectionIndex ||
       a.occurrenceIndex - b.occurrenceIndex);
@@ -563,7 +554,7 @@ export function createDetectionTracker(options = {}) {
         ({ detectionIndex, occurrenceIndex, reason })) };
   }
 
-  // 5.2: whether the frame proves absence at all.
+  // Whether the frame proves absence at all.
   function completeness(input, detections, complete) {
     if (complete === false || detections.length > limits.detections) return false;
     if (Array.isArray(input)) return complete === true;
@@ -576,10 +567,11 @@ export function createDetectionTracker(options = {}) {
       saturation.detections === false;
   }
 
-  // 4.6: before the solve, in serial order, a content track adopts the only located observation
-  // of its content, or is superseded by the tracks that take its content's observations.
-  // Condition 3 is read against the observation, as 4.9 reads it against a read: a [] copy that a
-  // spatial track could also own goes to the solve, where a measured track has the first claim.
+  // Before the solve, in serial order, a content track adopts the only located observation of
+  // its content, or is superseded by the tracks that take its content's observations. It
+  // adopts only an observation that no spatial track could own, as placeReads() asks of a
+  // read: a [] copy that a spatial track could also own goes to the solve, where a measured
+  // track has the first claim.
   function adopt(located) {
     const content = tracks.filter(t => t.basis === 'content'), supersessions = [];
     const spatial = tracks.filter(t => t.basis === 'spatial');
@@ -599,7 +591,7 @@ export function createDetectionTracker(options = {}) {
     return supersessions;
   }
 
-  // 4.7: the matching cascade. A track measured in the previous frame is matched first.
+  // The matching cascade. A track measured in the previous frame is matched first.
   function associate(located, observedAt, frameIndex) {
     const contests = [], levelOf = t => frameIndex - t.seenFrame - 1;
     const spatial = tracks.filter(t => t.basis === 'spatial' && !t.touched);
@@ -635,7 +627,7 @@ export function createDetectionTracker(options = {}) {
     return contests;
   }
 
-  // 4.9: a read without a position never refreshes a spatial track. Returns the reads that
+  // A read without a position never refreshes a spatial track. Returns the reads that
   // create content tracks.
   function placeReads(entering, observedAt, contentOnly, out) {
     const reads = entering.filter(o => !o.located), claimed = new Set(), creations = [];
@@ -659,7 +651,7 @@ export function createDetectionTracker(options = {}) {
         if (!contentOnly) {
           unresolved(live.filter(t => t.basis === 'spatial' && fits(t) && !t.touched &&
             !claimed.has(t)), true);
-          // 5.2: the read may be a compatible content track's copy, so it proves no absence;
+          // The read may be a compatible content track's copy, so it proves no absence;
           // left unclaimed, such a track can still be refreshed by a later exact group.
           live.forEach(t => { if (t.basis === 'content' && fits(t)) t.unobserved = true; });
         }
@@ -691,7 +683,7 @@ export function createDetectionTracker(options = {}) {
     if (o.track) o.track.resultId = result.id;
   }
 
-  // 3.5: phase 1 resolves matched reads through their track, phase 2 every other read.
+  // Phase 1 resolves matched reads through their track, phase 2 every other read.
   function resolveResults(all, observedAt) {
     const later = [];
     for (const o of all) {
@@ -737,25 +729,25 @@ export function createDetectionTracker(options = {}) {
     }
   }
 
-  // A measurement as published geometry; points equal measured on a restart. speed is the
-  // one-euro filtered speed (6.6), 0 after every restart.
+  // A measurement as published geometry; points equal measured on a restart.
   const measurement = (o, frame, observedAt, restart) => ({ kind: o.kind, measured: o.points,
     points: o.points, observedAt,
     reader: o.reader === 'rxing' || o.reader === 'rqrr' ? o.reader : null,
     downgrade: o.downgrade, smoothed: false, restart: o.kind === 'partial' ? null : restart,
-    width: frame.width, height: frame.height, speed: 0 });
+    width: frame.width, height: frame.height });
 
   /**
-   * 6.2 steps 3-7 for a matched located observation. Points are kept in source pixels of their
-   * frame, u x max(width, height); a resolution change at the same aspect ratio rescales the
-   * history first, so every decision is the one made in isotropic units u.
+   * The geometry of a matched located observation: vertex order, restart tests, then the
+   * blend. Points are kept in source pixels of their frame, u x max(width, height); a
+   * resolution change at the same aspect ratio rescales the history first, so every
+   * decision is the one made in isotropic units u.
    */
   function smooth(t, o, frame, wasLost) {
     const g = t.geometry, next = measurement(o, frame, frame.observedAt, null);
     // Partial geometry is never smoothed and never restarts.
     if (o.kind === 'partial') return next;
     const restart = reason => Object.assign(next, { restart: reason });
-    // A content track that adopts a position (4.6) has no geometry either.
+    // A content track that adopts a position has no geometry either.
     if (g === null) return restart('new');
     if (g.kind !== o.kind) return restart('kind');
     const f = Math.max(frame.width, frame.height) / Math.max(g.width, g.height);
@@ -769,28 +761,20 @@ export function createDetectionTracker(options = {}) {
     if (aligned.reoriented) return restart('reoriented');
     if (jumped(o.kind, aligned.points, previous)) return restart('jump');
     if (smoothing.kind === 'none') return next;
-    let alpha = smoothing.alpha, speed = 0;
-    if (smoothing.kind === 'one-euro') {
-      // Te > 0 here: dt <= 0 restarted as 'gap'. The raw speed is in source px per second.
-      const te = dt / 1000, from = centroid(estimate), to = centroid(aligned.points);
-      const dx = to.x - from.x, dy = to.y - from.y, raw = Math.sqrt(dx * dx + dy * dy) / te;
-      speed = g.speed * f + cutoffAlpha(smoothing.derivativeCutoffHz, te) * (raw - g.speed * f);
-      alpha = cutoffAlpha(smoothing.minCutoffHz + smoothing.beta * speed, te);
-    }
-    const points = blend(estimate, aligned.points, alpha);
-    // 6.7: the blend is validated again in source pixels.
+    const points = blend(estimate, aligned.points, smoothing.alpha);
+    // The blend is validated again in source pixels.
     const check = validateGeometry({ kind: o.kind, points }, frame.width, frame.height);
     if (check.kind !== o.kind || check.downgrade !== null) return restart('invalid-blend');
-    return Object.assign(next, { points, smoothed: true, speed });
+    return Object.assign(next, { points, smoothed: true });
   }
 
-  // 5.1: matched and refreshed tracks. Content tracks never emit resumed or reappeared.
+  // Matched and refreshed tracks. Content tracks never emit resumed or reappeared.
   function applyMatches(entering, frame, frameIndex, contentOnly, out) {
     const { observedAt } = frame;
     for (const o of entering) {
       const t = o.track;
       if (!t) continue;
-      // An adopted position is new evidence, not the continuation of a measured copy (4.6).
+      // An adopted position is new evidence, not the continuation of a measured copy.
       if (o.adopted) out.localized.push({ type: 'localized', trackId: t.id, at: observedAt });
       else if (t.basis === 'spatial' && t.state === 'held') {
         out.continued.push({ type: 'resumed', trackId: t.id, at: observedAt });
@@ -813,7 +797,7 @@ export function createDetectionTracker(options = {}) {
     }
   }
 
-  // 5.2: a track that was not matched counts a miss only when the frame proves its absence.
+  // A track that was not matched counts a miss only when the frame proves its absence.
   function countMisses(complete, occurrencesProven, keys, at, out) {
     for (const t of tracks) {
       if (t.touched) continue;
@@ -838,7 +822,7 @@ export function createDetectionTracker(options = {}) {
   }
 
   const STATE_RANK = { lost: 0, held: 1, tracked: 2 };
-  // 4.10: creation in C order, after eviction when a cap is reached; the lowest free slot.
+  // Creation in C order, after eviction when a cap is reached; the lowest free slot.
   function createTracks(creations, frame, frameIndex, contentOnly, out) {
     const { observedAt } = frame;
     for (const o of creations) {
@@ -854,8 +838,8 @@ export function createDetectionTracker(options = {}) {
         }
         const evicted = pool[0].id;
         out.expired.push(retire(pool[0], 'capacity', observedAt));
-        // No later event of the frame names it: its miss (step 8.8) and its place among the
-        // candidates of an unresolved read (4.9) go, and an event left with none is dropped.
+        // No later event of the frame names it: its miss and its place among the candidates
+        // of an unresolved read go, and an event left with none is dropped.
         out.loss = out.loss.filter(event => event.trackId !== evicted);
         out.unresolved = out.unresolved.map(event => ({ ...event,
           trackIds: event.trackIds.filter(id => id !== evicted) }))
@@ -876,7 +860,8 @@ export function createDetectionTracker(options = {}) {
     }
   }
 
-  // 5.4 step 8, or step 7 for content_only: one accepted frame, events in 5.7 order.
+  // One accepted frame, content_only included. Its events go out as expired, localized,
+  // entered, continued, unresolved, then loss.
   function processFrame(input, detections, frame, completeOption, contentOnly) {
     const { observedAt } = frame;
     for (const t of tracks) {
@@ -922,8 +907,9 @@ export function createDetectionTracker(options = {}) {
       ...out.continued.sort(bySerial), ...out.unresolved, ...out.loss];
   }
 
-  // 5.1: staleness at lastSeenAt + staleMs; identity expiry at E = lastSeenAt + reacquireMs,
-  // applied by a frame observed at or after E (5.4 step 4), otherwise by time from E + staleMs.
+  // Staleness at lastSeenAt + staleMs; identity expiry at E = lastSeenAt + reacquireMs,
+  // applied by a frame observed at or after E (before that frame is processed), otherwise
+  // by time from E + staleMs.
   // Result presence is derived from now; retention and the maxResults bound remove results.
   function advanceTo(until, byFrame = false) {
     const due = [];
@@ -938,12 +924,12 @@ export function createDetectionTracker(options = {}) {
       t.state = 'lost';
       return { type: 'lost', trackId: t.id, at, reason: 'stale' };
     });
-    // Step 4 applies retention only: the bound waits until the frame's own reads are resolved.
+    // Before a frame, retention only: the bound waits until the frame's own reads are resolved.
     pruneResults(until, !byFrame);
     return events;
   }
 
-  // 5.8: a result without a live track goes once retainMs old, then oldest first (lowest
+  // A result without a live track goes once retainMs old, then oldest first (lowest
   // serial on ties) while results exceed maxResults. results is kept in serial order.
   function pruneResults(until, bound = true) {
     const orphan = r => !tracks.some(t => t.resultId === r.id);
@@ -1040,7 +1026,7 @@ export function createDetectionTracker(options = {}) {
       const dx = p.x - g.measured[i].x, dy = p.y - g.measured[i].y;
       lag2 = Math.max(lag2, dx * dx + dy * dy);
     });
-    // 6.8: compared squared, so that no square root decides.
+    // Compared squared, so that no square root decides.
     const precise = t.state === 'tracked' && g.kind === 'quad' && g.observedAt === t.lastSeenAt &&
       g.points.every(inFrame) && g.measured.every(inFrame) &&
       lag2 <= Math.max(4, 0.0025 * Math.abs(doubleArea(g.measured)) / 2);
@@ -1049,7 +1035,7 @@ export function createDetectionTracker(options = {}) {
       downgrade: g.downgrade, smoothed: g.smoothed, restart: g.restart, precise };
   }
 
-  // 5.5: the earliest finite deadline, or null.
+  // The earliest finite deadline, or null.
   function deadline(now) {
     let next = Infinity;
     for (const t of tracks) {
@@ -1090,7 +1076,7 @@ export function createDetectionTracker(options = {}) {
     };
   }
 
-  // ------------------------------------------------------- deadlines and teardown (5.5)
+  // ------------------------------------------------------------- deadlines and teardown
   const MAX_DELAY = 2147483647;
   let destroyed = false, timer = null, { onChange, onError } = settings;
   const destroyedView = () => ({ ...view('destroyed', null, lastNow, []), nextDeadline: null });
@@ -1228,9 +1214,11 @@ function viewMapping({ sourceWidth, sourceHeight, viewWidth, viewHeight, fit = '
   if (fit === 'fill') {
     return point => ({ x: (mirror ? 1 - point.x : point.x) * viewWidth, y: point.y * viewHeight });
   }
-  const scale = Math[fit === 'cover' ? 'max' : 'min'](viewWidth / sourceWidth, viewHeight / sourceHeight);
+  const scale = Math[fit === 'cover' ? 'max' : 'min'](viewWidth / sourceWidth,
+    viewHeight / sourceHeight);
   return point => ({
-    x: (viewWidth - sourceWidth * scale) / 2 + (mirror ? 1 - point.x : point.x) * sourceWidth * scale,
+    x: (viewWidth - sourceWidth * scale) / 2 +
+      (mirror ? 1 - point.x : point.x) * sourceWidth * scale,
     y: (viewHeight - sourceHeight * scale) / 2 + point.y * sourceHeight * scale,
   });
 }
@@ -1258,7 +1246,7 @@ export function projectVideoGeometry(geometry, view, { minArea = 16 } = {}) {
   const finite = points.length > 0 && points.every(finitePoint);
   let valid = finite && kind === 'partial';
   if (finite && kind === 'quad' && points.length === 4) {
-    // A mirrored view flips the winding: one shared sign is enough (6.9).
+    // A mirrored view flips the winding: one shared sign is enough.
     const turns = points.map((p, i) => turn(p, points[(i + 1) % 4], points[(i + 2) % 4]));
     valid = (turns.every(t => t > 0) || turns.every(t => t < 0)) &&
       Math.abs(doubleArea(points)) / 2 >= minArea;
@@ -1271,7 +1259,7 @@ export function projectVideoGeometry(geometry, view, { minArea = 16 } = {}) {
   return { kind, points, valid, inView, precise: geometry.precise === true && valid && inView };
 }
 
-// ---------------------------------------------------------------- capture controller (7)
+// -------------------------------------------------------------------- capture controller
 
 // One counter issues the epochs of every controller in this module instance, so a tracker
 // reused with a new controller never sees an epoch decrease.
@@ -1361,9 +1349,29 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
   let intervalTimer = null, stallTimer = null, frameRequest = null;
   let lastPresented = null, lastMediaTime = null, lastHash = null;
 
+  // Reports a throw from onState or from the tracker's reset, which no step of the controller
+  // waits for. Without onError, or when onError throws too, it is rethrown from a microtask.
+  // It runs inside the change, so onError can stop or restart the session there as onState
+  // can: a step that would capture, recover or open a camera after announcing a change first
+  // checks that its session survived it.
+  const report = error => {
+    try {
+      if (!onError) throw error;
+      onError(error);
+    } catch (failure) {
+      queueMicrotask(() => { throw failure; });
+    }
+  };
+  // onState observes a transition already made: a throw from it changes no step.
   const emit = (previous, reason, error = null) => {
-    if (onState) onState({ state, previous, reason, error, epoch, decoderGeneration: generation,
-      muted, stalled, source });
+    if (!onState) return;
+    try {
+      onState({ state, previous, reason, error, epoch, decoderGeneration: generation, muted,
+        stalled, source });
+    } catch (cause) {
+      report(new CameraScannerError('callback_failed',
+        'The onState callback threw on a camera state change.', { cause }));
+    }
   };
   const setState = (next, reason, error) => {
     const previous = state;
@@ -1380,12 +1388,16 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
     intervalTimer = stallTimer = frameRequest = null;
   };
   // The stall timer runs from a frame request until a new frame: repeats do not reset it.
+  // False when a callback of the 'frames-resumed' change (onState, or onError receiving its
+  // throw) stopped, switched or paused the session: the new frame is then not captured.
   const progressed = () => {
     if (stallTimer !== null) clock.clearTimeout(stallTimer);
     stallTimer = null;
-    if (!stalled) return;
+    if (!stalled) return true;
+    const token = epoch;
     stalled = false;
     emit(state, 'frames-resumed');
+    return epoch === token && active();
   };
   const onStall = () => {
     stallTimer = null;
@@ -1429,7 +1441,7 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
     lastPresented = presentedFrames;
     lastMediaTime = mediaTime;
     const captured = finiteOrNull(metadata?.captureTime);
-    progressed();
+    if (!progressed()) return;
     capture(now, { captureTime: captured !== null && captured <= now ? captured : null,
       mediaTime, presentedFrames });
   };
@@ -1452,7 +1464,7 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
       const hash = progressHash(image.data, image.width, image.height);
       if (hash === lastHash) { schedule(); return; }
       lastHash = hash;
-      progressed();
+      if (!progressed()) return;
     }
     sequence += 1;
     const request = { epoch, generation, sequence, abandoned: false, error: null, timer: null,
@@ -1510,6 +1522,8 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
     const attempt = { controller: new AbortController(), timer: null };
     recovery = attempt;
     setState('recovering', 'recover', cause);
+    // A stop or a switch from a callback of that change has already aborted this attempt.
+    if (recovery !== attempt) return;
     const failed = (message, reason) => {
       if (recovery !== attempt) return;
       recovery = null;
@@ -1570,7 +1584,8 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
       try {
         tracker.reset({ epoch: token });
       } catch (cause) {
-        broken = new CameraScannerError('callback_failed', undefined, { cause });
+        broken = new CameraScannerError('callback_failed',
+          'Resetting the tracker at the end of a camera session failed.', { cause });
       }
     }
     if (epoch === token) {
@@ -1578,10 +1593,7 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
       stalled = muted = false;
       setState(next, reason, error);
     }
-    if (broken !== null) {
-      if (onError) onError(broken);
-      else queueMicrotask(() => { throw broken; });
-    }
+    if (broken !== null) report(broken);
     return token;
   };
   const fail = error => {
@@ -1634,6 +1646,8 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
         track.addEventListener?.('unmute', onUnmute);
       });
       if (acquired.getTracks().some(track => track.muted === true)) onMute();
+      // A callback of that 'muted' change may have ended this session, releasing these tracks.
+      if (token !== epoch) return;
       video.srcObject = acquired;
       video.muted = true;
       video.playsInline = true;
