@@ -164,9 +164,10 @@ jobs:
   # exact contents, primary, occurrences, score or null per case), on both
   # supported Node majors, as npm-publish.yml consume-native and consume-wasm
   # run them at tag time: the tarballs the smoke jobs packed and read back,
-  # installed offline outside the checkout. The judge's own planted-defect
-  # scenarios run first. The native rows start at the floor the package
-  # advertises (engines.node >= 18).
+  # installed offline outside the checkout, then the option table
+  # (scripts/option-domains.mjs) on every scan path. The judges' own
+  # planted-defect scenarios run first. The native rows start at the floor
+  # the package advertises (engines.node >= 18).
   node-consumer:
     needs: node-smoke
     runs-on: ubuntu-24.04
@@ -186,6 +187,7 @@ jobs:
           name: npm-native-linux-x64-gnu
           path: ${{ runner.temp }}/native-tarballs
       - run: node scripts/consumer-truth.mjs --self-test
+      - run: node scripts/option-domains.mjs --self-test
       - name: clean offline install + the shared truth set
         run: |
           set -euo pipefail
@@ -212,6 +214,7 @@ jobs:
           name: npm-wasm-tarball
           path: ${{ runner.temp }}/wasm-tarball
       - run: node scripts/consumer-truth.mjs --self-test
+      - run: node scripts/option-domains.mjs --self-test
       - name: clean offline install + the shared truth set
         run: |
           set -euo pipefail

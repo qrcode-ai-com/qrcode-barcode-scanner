@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { identitiesDigest, identity, judge, load as loadTruth, stage, TRUTH } from "./consumer-truth.mjs";
+import { assertOptionDomains, pngSize } from "./option-domains.mjs";
 
 const [mode, archivesArg, fixtureArg, expectedVersion, suffix] = process.argv.slice(2);
 assert.ok(["native", "wasm"].includes(mode) && archivesArg && fixtureArg && expectedVersion,
@@ -112,13 +113,25 @@ if (mode === "native") {
   full = scan(bytes, "full");
   assert.throws(() => qr.scan_frame(new Uint8Array(10), 2, 2), /\[QRS-004\]/);
   // the installed scan_frame carries scan_image's options after budget_ms
+  // (their domains: the option table below)
   const blank = new Uint8Array(16 * 16 * 4).fill(255);
-  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, 15), /\[QRS-002\]$/);
-  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, undefined, 255), /\[QRS-003\]$/);
-  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, 0), /invalid option `max_dimension`: .* \[QRS-006\]$/);
   assert.throws(() => qr.scan_frame(blank, 16, 16, "full", 0, undefined, undefined, ["tilt"]), /unknown stress axis/);
-  assert.deepEqual(qr.scan_frame(blank, 16, 16, "fast", 0, 16, 256).detections, [], "each cap admits its exact value");
 }
+// The option table (option-domains.mjs) through the installed API, on every
+// path a JavaScript number reaches the core by.
+const imagePath = (pathName, call) => ({ name: pathName, call, input: bytes, texts: [text], size: pngSize(bytes),
+  unreadable: Buffer.from("garbage"), unreadableCode: "QRS-001" });
+const optionPaths = mode === "native"
+  ? [["scanSync", qr.scanSync], ["scan", qr.scan]].map(([pathName, call]) =>
+    imagePath(pathName, (options, image) => call(image, { profile: "fast", ...options })))
+  : [imagePath("scan_image", ({ budgetMs, maxDimension, maxPixels }, image) =>
+    qr.scan_image(image, "fast", maxDimension, maxPixels, budgetMs)),
+  { name: "scan_frame", call: ({ budgetMs, maxDimension, maxPixels }, rgba) =>
+    qr.scan_frame(rgba, 16, 16, "fast", budgetMs, maxDimension, maxPixels),
+  input: new Uint8Array(16 * 16 * 4).fill(255), texts: [], size: [16, 16], unreadable: new Uint8Array(3),
+  unreadableCode: "QRS-004" }];
+const optionDomains = { paths: optionPaths.map(({ name: pathName }) => pathName), cases: 0 };
+for (const path of optionPaths) optionDomains.cases += await assertOptionDomains(path);
 assert.equal(qr.version(), expectedVersion);
 assert.deepEqual(full.versions, { scanner: expectedVersion, pipeline: 5, score_contract: 5 });
 // the installed build lists the readers it carries: both engines and every
@@ -171,6 +184,7 @@ for (const { testCase, path } of stage(truth, join(consumer, "truth"))) {
 assert.deepEqual(problems, [], problems.join("\n"));
 const receipt = { verdict: "PASS", mode, node: process.version, platform: process.platform, arch: process.arch,
   consumer, imported, version: expectedVersion, full_score: full.score.value, fixture_sha256: digest(fixture),
+  option_domains: optionDomains,
   truth: { file: "fixtures/consumer-truth.json", sha256: digest(TRUTH), cases: truth.cases.length,
     identities_sha256: identitiesDigest(identities) },
   installed_tarballs: selected.map(({ path, sha256 }) => ({ path, sha256 })),

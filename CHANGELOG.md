@@ -60,7 +60,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   WASM ran `budget_ms: 1e300` without a practical bound, also lifted the size
   cap on `max_dimension: -1`, and replaced `max_pixels: 0` or `NaN` by the
   default cap and `Infinity` by none. Both now take doubles through one
-  mapping, and the same table of cases passes on both packages.
+  mapping. One table of cases (`scripts/option-domains.mjs`: unset, zero,
+  negative, fractional, non-finite, cap-boundary and out-of-range values,
+  each also beside an unreadable input) runs on both workspace builds and,
+  in the packed Node consumers, on every scan path of both installed
+  packages; its self-test refuses those 0.10.1 conversions and eight
+  neighbouring defects.
 - A zero `max_dimension` or `max_pixels` is an option error (`QRS-006`) on
   every surface, no longer a `QRS-002`/`QRS-003` that blamed every image.
 - Python `__all__` names each public name once: 0.10 listed `scan` and
