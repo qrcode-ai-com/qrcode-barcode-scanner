@@ -1601,7 +1601,15 @@ export function createCameraScanner({ video, scanFrame, tracker, onResult, onErr
       failure = { epoch, error };
       end('failed', 'error', error);
     } else if (state !== 'failed') setState('failed', 'error', error);
-    if (onError) onError(error);
+    // A throw from onError is rethrown from a microtask, as for every other report: the step
+    // that failed (start(), a capture or a stream event) completes as if onError had returned.
+    if (onError) {
+      try {
+        onError(error);
+      } catch (thrown) {
+        queueMicrotask(() => { throw thrown; });
+      }
+    }
     return error;
   };
   function onEnded() { if (stream) fail(new CameraScannerError('stream_ended')); }

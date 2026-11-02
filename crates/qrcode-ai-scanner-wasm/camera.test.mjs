@@ -2418,6 +2418,45 @@ const norm = (points, width = 1000, height = width) =>
       [['decode_timeout', 'decode_timeout']]);
     assert.deepEqual([env.video.requests, dec.calls.length, env.video.srcObject], [1, 1, null]);
   }
+  // A throw from onError while the session fails is rethrown from a microtask, like every other
+  // report: start() still returns its promise, which rejects with the error onError received,
+  // whether the hung decoder refuses the start up front or fails it once the camera opened.
+  for (const abandonedBeforeStart of [true, false]) {
+    const env = rig();
+    const dec = decoder();
+    const received = [], caught = [], late = new Error('onError failed');
+    const hook = error => caught.push(error);
+    const c = camera(env, { scanFrame: dec.scanFrame, onError: error => {
+      received.push(error);
+      throw late;
+    } });
+    await c.scanner.start();
+    await env.clock.advance(100);
+    env.video.fire(100, { presentedFrames: 1 });
+    c.scanner.stop();
+    process.on('uncaughtException', hook);
+    let starting = null, threw = null;
+    try {
+      if (abandonedBeforeStart) {
+        await env.clock.advance(5000);
+        starting = c.scanner.start();
+      } else {
+        let grant;
+        env.gum.next = () => new Promise(resolve => { grant = resolve; });
+        starting = c.scanner.start();
+        await env.clock.advance(5000);
+        grant(env.stream);
+      }
+    } catch (error) {
+      threw = error;
+    }
+    const error = starting ? await rejection(starting) : null;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    process.off('uncaughtException', hook);
+    assert.deepEqual([threw, error instanceof CameraScannerError, error === received[0],
+      received.length, error?.code, c.scanner.state, caught],
+    [null, true, true, 1, 'decode_timeout', 'failed', [late]]);
+  }
 
   // T51
   {
