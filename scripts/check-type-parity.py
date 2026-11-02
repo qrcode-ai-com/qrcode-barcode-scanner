@@ -49,7 +49,7 @@ GS1_RS = "crates/qrcode-ai-scanner/src/gs1.rs"
 CAPABILITIES_RS = "crates/qrcode-ai-scanner/src/capabilities.rs"
 TS_PATH = "bindings/report-types.d.ts"
 DART_PATH = "bindings/flutter/lib/report.dart"
-PYI_PATH = "crates/qrcode-ai-scanner-py/qrcode_ai_scanner.pyi"
+PYI_PATH = "crates/qrcode-ai-scanner-py/qrcode_barcode_scanner.pyi"
 
 # Contract structs: (rust source, name). The mirror name is identical on every
 # surface (ts interface · schema $def · dart class). ScanReport is the schema

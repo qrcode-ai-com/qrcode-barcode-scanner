@@ -1,11 +1,11 @@
-# qrcode-ai-scanner (Python)
+# qrcode-barcode-scanner (Python)
 
 QR decoding + scannability scoring for **artistic / AI-generated / photo-captured** QR
-codes — the Rust [`qrcode-ai-scanner`](https://crates.io/crates/qrcode-ai-scanner) engine,
+codes — the Rust [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner) engine,
 via PyO3. Same versioned `ScanReport` contract as the Rust, Node and WASM surfaces.
 
 ```python
-import qrcode_ai_scanner as qr
+import qrcode_barcode_scanner as qr
 
 with open("image.png", "rb") as f:
     report = qr.scan(f.read(), profile="full")   # "full" | "fast" | "frame"
@@ -45,5 +45,13 @@ if report["detections"]:
 
 The returned `dict` is the same `ScanReport` documented in the
 [spec](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec).
+
+Releases up to 0.9.0 were published as `qrcode-ai-scanner`.
+
+To migrate, uninstall the previous distribution, install this one and import
+`qrcode_barcode_scanner` instead: the rename itself changes no function name and no
+report field. The
+[migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+covers every runtime.
 
 License: AGPL-3.0-or-later · © SuperNovae Studio.

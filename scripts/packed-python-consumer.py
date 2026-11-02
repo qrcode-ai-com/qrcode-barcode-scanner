@@ -32,18 +32,27 @@ def inside(path, root):
 
 
 def probe(args):
-    import qrcode_ai_scanner as qr
+    import qrcode_barcode_scanner as qr
 
     prefix = Path(sys.prefix).resolve()
     imported = Path(qr.__file__).resolve()
     assert sys.prefix != sys.base_prefix, "the consumer must run in a fresh venv"
     assert inside(imported, prefix), (imported, prefix)
     extensions = [Path(module.__file__).resolve() for name, module in sys.modules.items()
-                  if name.startswith("qrcode_ai_scanner.") and getattr(module, "__file__", "").endswith(tuple(EXTENSION_SUFFIXES))]
+                  if name.startswith("qrcode_barcode_scanner.") and getattr(module, "__file__", "").endswith(tuple(EXTENSION_SUFFIXES))]
     assert len(extensions) == 1, f"expected one loaded native extension, found {extensions}"
     extension = extensions[0]
     assert inside(extension, prefix), (extension, prefix)
-    assert qr.__version__ == importlib.metadata.version("qrcode-ai-scanner") == args.version
+    assert qr.__version__ == importlib.metadata.version("qrcode-barcode-scanner") == args.version
+    # Releases up to 0.9.0 were published as qrcode-ai-scanner. The wheel brings no
+    # alias under that name: neither its import package nor its distribution resolves.
+    assert importlib.util.find_spec("qrcode_ai_scanner") is None, "the previous import package resolves"
+    try:
+        importlib.metadata.version("qrcode-ai-scanner")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    else:
+        raise AssertionError("the previous distribution qrcode-ai-scanner is installed")
     data = Path(args.fixture).read_bytes()
     text = "https://qrcode-ai.com/c/v5q"
     full = qr.scan(data, "full", budget_ms=0)

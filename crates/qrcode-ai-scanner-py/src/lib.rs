@@ -1,4 +1,4 @@
-//! Python bindings for `qrcode-ai-scanner` (PyO3).
+//! Python bindings for `qrcode-barcode-scanner` (PyO3).
 //!
 //! Thin wrapper over the Rust core: bytes → scan → the same versioned `ScanReport`,
 //! returned as a native Python `dict` (serialized via the core's serde contract, the
@@ -275,7 +275,7 @@ fn capabilities(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 }
 
 #[pymodule]
-fn qrcode_ai_scanner(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn qrcode_barcode_scanner(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // `add` and `add_function` append each name to `__all__` once: the
     // module's public names are exactly what is added here
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

@@ -613,7 +613,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrcode-ai-scanner"
+name = "qrcode-barcode-scanner"
 version = "0.11.0"
 dependencies = [
  "base64",
@@ -629,12 +629,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrcode-ai-scanner-py"
+name = "qrcode-barcode-scanner-py"
 version = "0.11.0"
 dependencies = [
  "pyo3",
  "pythonize",
- "qrcode-ai-scanner",
+ "qrcode-barcode-scanner",
  "serde_json",
 ]
 

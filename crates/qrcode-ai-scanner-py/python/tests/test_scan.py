@@ -1,4 +1,4 @@
-"""Tests for the qrcode-ai-scanner Python binding (PyO3).
+"""Tests for the qrcode-barcode-scanner Python binding (PyO3).
 
 Run after `maturin develop` (or a wheel install):  pytest
 Optional deps unlock more coverage: jsonschema (spec contract), Pillow (frames).
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-import qrcode_ai_scanner as qr
+import qrcode_barcode_scanner as qr
 
 REPO = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = REPO / "spec" / "scan-report.schema.json"
@@ -80,7 +80,7 @@ def test_module_surface():
     # One version end to end: the crate manifest, the compiled module and the
     # installed distribution's metadata.
     assert qr.__version__ == crate_version()
-    assert importlib.metadata.version("qrcode-ai-scanner") == qr.__version__
+    assert importlib.metadata.version("qrcode-barcode-scanner") == qr.__version__
     assert callable(qr.scan) and callable(qr.scan_frame) and callable(qr.capabilities)
 
 
@@ -338,7 +338,7 @@ def test_scan_frame_zero_dimension_raises():
 
 
 def test_all_exported():
-    # each public name once: `from qrcode_ai_scanner import *` brings exactly these
+    # each public name once: `from qrcode_barcode_scanner import *` brings exactly these
     assert sorted(qr.__all__) == ["__version__", "capabilities", "scan", "scan_frame"]
 
 

@@ -1,4 +1,4 @@
-"""Type stubs for qrcode-ai-scanner (PyO3 native bindings).
+"""Type stubs for qrcode-barcode-scanner (PyO3 native bindings).
 
 QR decoding + scannability scoring for artistic, AI-generated and photo-captured
 QR codes. Every call returns the same versioned ScanReport (the cross-surface
