@@ -23,11 +23,14 @@ system library, kernel32) keep a misread binary from passing empty.
 `--complete` also requires each of the six release targets exactly once.
 """
 import argparse
+import contextlib
+import io
 import json
 import re
 import struct
 import sys
 import tarfile
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -117,7 +120,7 @@ def macho_slice(data, base):
         elif cmd in (0x24, 0x25):  # LC_VERSION_MIN_MACOSX / _IPHONEOS
             minos, sdk = struct.unpack_from("<II", data, offset + 8)
             found["min_os"] = {"platform": "macos" if cmd == 0x24 else "ios", "minos": packed(minos), "sdk": packed(sdk)}
-        elif cmd in (0xC, 0x80000018, 0x8000001F, 0x80000023):  # LOAD, WEAK, REEXPORT, LAZY dylib
+        elif cmd in (0xC, 0x20, 0x80000018, 0x8000001F, 0x80000023):  # LOAD, LAZY, WEAK, REEXPORT, UPWARD
             found["dylibs"].append(cstr(data, offset + struct.unpack_from("<I", data, offset + 8)[0]))
         offset += size
     return found
@@ -295,13 +298,15 @@ def make_elf(machine=62, needed=("libc.so.6", "libgcc_s.so.1"), versions=("GLIBC
     return header + b"".join(body) + shdrs
 
 
-def make_macho(cpu=0x0100000C, minos=(11, 0), dylibs=("/usr/lib/libSystem.B.dylib",)):
+def make_macho(cpu=0x0100000C, minos=(11, 0), dylibs=("/usr/lib/libSystem.B.dylib",), more=()):
+    """`dylibs` through LC_LOAD_DYLIB, then `more` as (load command, dylib) pairs."""
     commands = struct.pack("<IIIIII", 0x32, 24, 1, minos[0] << 16 | minos[1] << 8, 26 << 16, 0)
-    for name in dylibs:
+    loads = [(0xC, name) for name in dylibs] + list(more)
+    for cmd, name in loads:
         raw = name.encode() + b"\0"
         raw += bytes(-(24 + len(raw)) % 8)
-        commands += struct.pack("<IIIIII", 0xC, 24 + len(raw), 24, 0, 0, 0) + raw
-    return struct.pack("<IiiIIIII", 0xFEEDFACF, cpu, 0, 8, 1 + len(dylibs), len(commands), 0, 0) + commands
+        commands += struct.pack("<IIIIII", cmd, 24 + len(raw), 24, 0, 0, 0) + raw
+    return struct.pack("<IiiIIIII", 0xFEEDFACF, cpu, 0, 8, 1 + len(loads), len(commands), 0, 0) + commands
 
 
 def make_pe(imports=("KERNEL32.dll", "api-ms-win-core-synch-l1-2-0.dll"), delayed=(), machine=0x8664):
@@ -360,6 +365,9 @@ def self_test():
         ("x86_64 slice under the arm64 name", mac, make_macho(cpu=0x01000007)),
         ("no libSystem", mac, make_macho(dylibs=("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",))),
         ("a bundled dylib", mac, make_macho(dylibs=("/usr/lib/libSystem.B.dylib", "@rpath/libscan.dylib"))),
+        *((f"a bundled dylib by {kind}", mac, make_macho(more=((cmd, "@rpath/libscan.dylib"),)))
+          for kind, cmd in (("LC_LAZY_LOAD_DYLIB", 0x20), ("LC_LOAD_WEAK_DYLIB", 0x80000018),
+                            ("LC_REEXPORT_DYLIB", 0x8000001F), ("LC_LOAD_UPWARD_DYLIB", 0x80000023))),
         ("the Visual C++ runtime", win, make_pe(imports=("KERNEL32.dll", "VCRUNTIME140.dll"))),
         ("a delay-loaded msvcp", win, make_pe(delayed=("MSVCP140.dll",))),
         ("no kernel32", win, make_pe(imports=("ntdll.dll",))),
@@ -376,29 +384,64 @@ def self_test():
     for reason, label, data in planted:
         if not node_problems(label, inspect(data)):
             failures.append(f"accepted {reason}")
-    # --complete counts targets: five of six, and a duplicate, are refused
-    names = [label for label, _ in clean]
-    report = {"input": "x"}
+    # The command line on npm tarballs as pack-native packs them (each addon at
+    # package/<name>.<suffix>.node, the main package with none): binaries(),
+    # judge() and main(), the label a problem names, the receipt it prints and
+    # writes, and its exit code.
+    with tempfile.TemporaryDirectory(prefix="native-floor-") as scratch:
+        root = Path(scratch)
 
-    def counted(inputs):
-        seen = [m.group(1) for n in inputs if (m := re.search(r"\.([a-z0-9-]+)\.node$", n))]
-        return [t for t in NODE_FLOOR if seen.count(t) != 1]
-    if counted(names) or not counted(names[1:]) or not counted([*names, names[0]]):
-        failures.append(f"--complete counting {report}")
+        def tarball(name, members):
+            path = root / name
+            path.parent.mkdir(exist_ok=True)
+            with tarfile.open(path, "w:gz") as archive:
+                for member, data in members:
+                    info = tarfile.TarInfo(f"package/{member}")
+                    info.size = len(data)
+                    archive.addfile(info, io.BytesIO(data))
+            return str(path)
+        addons = [tarball(f"qrcode-ai-scanner-{label.split('.')[1]}-1.2.3.tgz", [(label, data)])
+                  for label, data in clean]
+        main_package = tarball("qrcode-ai-scanner-1.2.3.tgz", [("package.json", b"{}"), ("index.js", b"")])
+        twin = tarball("qrcode-ai-scanner-linux-x64-gnu-1.2.4.tgz", [clean[0]])
+        # The win32 package under its own name, its addon importing the Visual C++ runtime (as 0.10.0's did)
+        vc_runtime = tarball("planted/qrcode-ai-scanner-win32-x64-msvc-1.2.3.tgz",
+                             [(win, make_pe(imports=("KERNEL32.dll", "VCRUNTIME140.dll")))])
+        runs = [
+            ("the release set", ["--complete", *addons, main_package], []),
+            ("a planted addon", ["--complete", *addons[:-1], vc_runtime, main_package],
+             [f"qrcode-ai-scanner-win32-x64-msvc-1.2.3.tgz!package/{win}: imports VCRUNTIME140.dll,"
+              " which node.exe does not carry"]),
+            ("five of six", ["--complete", *addons[1:], main_package], ["linux-x64-gnu: 0 addons, expected 1"]),
+            ("a target twice", ["--complete", *addons, twin, main_package], ["linux-x64-gnu: 2 addons, expected 1"]),
+            ("no addon at all", [main_package], ["no native binary among the inputs"]),
+        ]
+        for index, (name, argv, want) in enumerate(runs):
+            out = root / f"receipt-{index}.json"
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                code = main(["--policy", "node", "--out", str(out), *argv])
+            text = out.read_text()
+            receipt = json.loads(text)
+            got = (code, receipt["verdict"], receipt["problems"])
+            expected = (1, "FAIL", want) if want else (0, "PASS", [])
+            if got != expected:
+                failures.append(f"{name}: exit, verdict, problems {got}, want {expected}")
+            if printed.getvalue() != text:
+                failures.append(f"{name}: the printed receipt is not the one --out wrote")
     verdict = "FAIL" if failures else "PASS"
     print(json.dumps({"self_test": verdict, "clean": len(clean), "refused": len(planted) - len(
-        [f for f in failures if f.startswith("accepted")]), "failures": failures}))
+        [f for f in failures if f.startswith("accepted")]), "archive_runs": len(runs), "failures": failures}))
     return 1 if failures else 0
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("inputs", nargs="*")
     parser.add_argument("--policy", choices=["node"])
     parser.add_argument("--complete", action="store_true", help="node: each release target exactly once")
     parser.add_argument("--out", help="write the JSON receipt here")
     parser.add_argument("--self-test", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.self_test:
         return self_test()
     if not args.inputs:

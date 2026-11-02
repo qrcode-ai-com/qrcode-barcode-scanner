@@ -121,12 +121,24 @@ as HEAD when the candidate is not committed yet.
 cargo +1.99.1 fmt --all --check
 RUSTFLAGS="-D warnings" cargo +1.99.1 clippy --workspace --all-targets --all-features --locked
 cargo +1.99.1 nextest run --workspace --locked && cargo +1.99.1 test --doc --workspace --locked
+# the core with one engine, as a dependency without default features builds it
+RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-ai-scanner --locked --no-default-features \
+  --features engine-rqrr,serde --lib
+RUSTFLAGS="-D warnings" cargo +1.99.1 clippy -p qrcode-ai-scanner --locked --no-default-features \
+  --features engine-rxing,serde --lib
+cargo +1.99.1 nextest run -p qrcode-ai-scanner --locked --no-default-features \
+  --features engine-rqrr,serde --lib --test capabilities \
+  -E 'binary(capabilities) | test(/^capabilities::/)'
+cargo +1.99.1 nextest run -p qrcode-ai-scanner --locked --no-default-features \
+  --features engine-rxing,serde --test capabilities
 python3 scripts/check-type-parity.py
 cargo +1.88 check -p qrcode-ai-scanner --all-features --locked   # MSRV
 python3 scripts/check-publish-guards.py --self-test   # both workflow policies' own scenarios
 python3 scripts/check-publish-guards.py               # the publishing-job policy (§ Publishing)
 python3 scripts/check-publish-guards.py --toolchains  # one Rust toolchain (§ Toolchain)
 python3 scripts/package-inspect.py selftest           # the archive inspector's own scenarios
+python3 scripts/native-floor.py --self-test           # the native platform floor's own scenarios
+python3 scripts/wasm_provenance.py --self-test        # the WASM build record's own scenarios
 ```
 
 Core/dependency changes can invalidate four graphs outside the workspace, even
@@ -177,12 +189,13 @@ The two publishing workflows, `crates-publish.yml` and `npm-publish.yml`,
 run on no branch push and no pull request, so the loop above never sees
 them: their own jobs — crates-publish's packaging, each `.crate` built from
 its archive and read back; npm-publish's platform builds, tarball
-inspections and `operand-proof` (npm must read every `npm publish` operand
-as a file, § Publishing) — first run on the tag, unless the owner
-dispatches them on the release branch. A dispatch from a branch builds and
-inspects every archive, then stops before the registry: it publishes
-nothing. Recommended, as the owner's step before the tag (not part of the
-gate above): one successful dispatch of each on the release branch.
+inspections, the platform floor of every packed addon and `operand-proof`
+(npm must read every `npm publish` operand as a file; both in § Publishing) —
+first run on the tag, unless the owner dispatches them on the release
+branch. A dispatch from a branch builds and inspects every archive, then
+stops before the registry: it publishes nothing. Recommended, as the
+owner's step before the tag (not part of the gate above): one successful
+dispatch of each on the release branch.
 
 ```bash
 gh workflow run crates-publish.yml --ref "$(git branch --show-current)"
@@ -307,6 +320,23 @@ tagging builds, inspects and parses everything without publishing, and is the
 owner's call. On a pull request, ci › lint holds the spellings themselves
 (absolute and identical in the operand, the record and the proof).
 
+**What a native addon may need.** The main package admits Node 18
+(`engines.node >= 18`), so no addon may need more from the system than Node
+18 does on its platform (nodejs/node v18.x BUILDING.md): glibc 2.28 on
+linux-x64-gnu and linux-arm64-gnu, musl on linux-x64-musl, macOS 10.15 on
+x64 and 11 on arm64, and on Windows no Visual C++ runtime DLL, which node.exe
+does not import (the addon links the C runtime statically:
+`crates/qrcode-ai-scanner-node/.cargo/config.toml`). Every library it loads
+must belong to the operating system.
+`scripts/native-floor.py --policy node --complete` reads each packed addon's
+own bytes (ELF needed libraries and symbol versions, Mach-O load commands
+and minimum OS, PE imports and delay imports) and requires each of the six
+release targets exactly once: pack-native runs it on every run, a branch
+dispatch included, and publish-native again before its first upload. A
+refusal names the addon and what it needs. The consumer jobs cannot stand in
+for it: GitHub's Windows runners carry the Visual C++ Redistributable.
+ci › packaging runs its self-test on every pull request.
+
 **What a publishing job may run.** A job holding `id-token: write` exposes
 the OIDC token request to every one of its steps, and ios-release holds
 `contents: write`. In these six jobs (the policy check reads each point):
@@ -344,8 +374,12 @@ checked against the sha256 its download index publishes, with an empty global
 cache under `RUNNER_TEMP` (mlugg/setup-zig restored its Zig tarball from the
 Actions cache under a fixed key on every ref, a hit skipping the signature
 check). `scripts/check-publish-guards.py` holds every job whose artifacts a
-publishing job downloads, then theirs, to this. They are not privileged, and
-the inspections read file sets and texts, not compiled binaries.
+publishing job downloads, then theirs, to this. They are not privileged. The
+inspections read file sets, texts and what the compiled binaries require:
+each native addon's libraries, symbol versions and minimum OS
+(`scripts/native-floor.py`, above) and the WASM module's code features
+(`scripts/wasm_provenance.py`). None of them can tell a tampered binary from
+a sound one (accepted residuals, below).
 
 The iOS xcframework zip carries the root `LICENSE` and `LICENSING.md` inside
 `QrcodeAiScannerFFI.xcframework/`, preserving the single binary artifact at
@@ -396,11 +430,14 @@ performs them):
      repository secrets (Settings › Secrets and variables › Actions): nothing
      at this revision reads them, while every older ref's crates and npm jobs
      publish with them on any dispatch.
-   - Look for the same two names at the organization and in every
-     environment (`gh secret list --org supernovae-st`, `gh secret list --env
-     <name>` for each environment): once the repository secret is gone, an
-     older workflow's `secrets.NPM_TOKEN` resolves to an organization or
-     environment secret of that name. Revoke and delete any found.
+   - Look for the same two names at the organization that owns the
+     repository and in every environment (`gh secret list --org qrcode-ai-com`,
+     `gh secret list --env <name>` for each environment): once the repository
+     secret is gone, an older workflow's `secrets.NPM_TOKEN` resolves to an
+     organization or environment secret of that name. Revoke and delete any
+     found. Since the transfer, no `supernovae-st` organization secret
+     reaches this repository; revoke any copy of the two tokens kept there
+     all the same.
    - Add the tag rule `v*` to the existing `release` environment (Settings ›
      Environments › release › Deployment branches and tags › Selected
      branches and tags): it also gates the pre-change python.yml, which

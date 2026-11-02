@@ -492,10 +492,11 @@ jobs:
           esac
           verify_live
 
-  # Real installs from the inspected tarballs, on both supported Node lines
-  # and every native target. No registry fallback, lifecycle script or OIDC.
-  # From the floor the main package advertises (engines.node >= 18) through
-  # the current majors, on every target.
+  # Real installs from the inspected tarballs, on every native target
+  # (linux-x64-musl in Node's Alpine images: consume-native-musl, below) and
+  # Node 18, 20, 22 and 24: from the floor the main package advertises
+  # (engines.node >= 18) through the current majors. No registry fallback,
+  # lifecycle script or OIDC.
   consume-native:
     needs: pack-native
     runs-on: ${{ matrix.platform.runner }}

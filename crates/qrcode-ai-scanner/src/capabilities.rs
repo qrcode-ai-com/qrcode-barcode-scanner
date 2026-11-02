@@ -51,11 +51,14 @@ impl Capabilities {
     /// This build's capabilities.
     #[must_use]
     pub fn current() -> Self {
-        let mut engines = Vec::new();
-        #[cfg(feature = "engine-rxing")]
-        engines.push(EngineKind::Rxing);
-        #[cfg(feature = "engine-rqrr")]
-        engines.extend([EngineKind::Rqrr, EngineKind::Rescue]);
+        let engines = vec![
+            #[cfg(feature = "engine-rxing")]
+            EngineKind::Rxing,
+            #[cfg(feature = "engine-rqrr")]
+            EngineKind::Rqrr,
+            #[cfg(feature = "engine-rqrr")]
+            EngineKind::Rescue,
+        ];
         // rxing's readers cover every symbology (`rxing_engine::map_symbology`);
         // rqrr and the rescue stage read QR Code only
         let symbologies = if cfg!(feature = "engine-rxing") {
