@@ -242,8 +242,8 @@ SHA="$(git rev-parse 'HEAD^{commit}')"     # the full commit the tag will name
 git ls-remote --tags origin 'refs/tags/vX.Y.Z*'                 # prints nothing
 gh release list --limit 1000 --json tagName,isDraft \
   --jq '.[] | select(.tagName == "vX.Y.Z")'                     # prints nothing
-python3 scripts/cli-release.py notes --version X.Y.Z > notes.md
-gh release create vX.Y.Z --draft --target "$SHA" --title vX.Y.Z --notes-file notes.md
+python3 scripts/cli-release.py notes --version X.Y.Z > notes.md &&
+  gh release create vX.Y.Z --draft --target "$SHA" --title vX.Y.Z --notes-file notes.md
 gh release view vX.Y.Z --json isDraft,targetCommitish           # true, and $SHA
 git tag -a vX.Y.Z "$SHA"          # annotated: headline + expected-red note
 git push origin vX.Y.Z
