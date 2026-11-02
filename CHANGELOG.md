@@ -13,12 +13,17 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   0.10.0's addon imported `VCRUNTIME140.dll`, which a Windows install without
   the Visual C++ Redistributable lacks; GitHub's Windows runners carry it, so
   the consumer jobs could not see the difference.
-  `scripts/native-floor.py` reads each release addon's bytes (ELF, Mach-O,
-  PE) and refuses one that needs more than Node 18 needs on its platform:
-  glibc 2.28, macOS 10.15 on x64 and 11 on arm64, no Visual C++ runtime DLL
-  and no library outside the operating system. `npm-publish` runs it on the
-  packed release set and again on the tarballs about to be uploaded; CI runs
-  its planted-defect self-test.
+  `scripts/native-floor.py` reads each release addon's bytes (ELF needed
+  libraries and symbol versions, Mach-O load commands and minimum OS, PE
+  imports and delay imports). It refuses an addon that needs more than Node
+  18 needs on its platform: glibc 2.28, macOS 10.15 on x64 and 11 on arm64,
+  no Visual C++ runtime DLL, and no library outside the operating system,
+  including one a Mach-O addon loads lazily, weakly, upward or as a
+  re-export. `npm-publish` runs it on the packed release set and again on
+  the tarballs about to be uploaded. On every pull request CI runs its
+  self-test: planted binaries, then the command line on npm tarballs (a
+  release set, the same set with a win32 addon importing `VCRUNTIME140.dll`,
+  five of six targets, a target twice, no addon).
 - A QR code found in the downscaled pyramid no longer suppresses a readable
   neighboring barcode or small matrix code. One budgeted non-QR read at input resolution
   completes QR pyramid results before the early return.
@@ -62,10 +67,29 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   default cap and `Infinity` by none. Both now take doubles through one
   mapping. One table of cases (`scripts/option-domains.mjs`: unset, zero,
   negative, fractional, non-finite, cap-boundary and out-of-range values,
-  each also beside an unreadable input) runs on both workspace builds and,
-  in the packed Node consumers, on every scan path of both installed
-  packages; its self-test refuses those 0.10.1 conversions and eight
-  neighbouring defects.
+  every refused value also beside an unreadable input) runs on both
+  workspace builds and, in the packed Node consumers, on every scan path of
+  both installed packages; its self-test refuses those 0.10.1 conversions
+  and ten neighbouring defects.
+- Node `scan`: a signal aborted while the scan is queued rejects with an
+  `AbortError` DOMException, the class a signal already aborted at the call
+  gets; the addon's rejection was a plain `Error` named `AbortError`. One
+  `AbortSignal` may serve several scans: napi stopped an abort at the
+  signal's first task that had completed, so a signal reused after a
+  completed scan did not cancel the scans queued behind it. Each scan now
+  hands the addon a signal of its own; one listener links them to the
+  caller's signal and is removed once the last scan sharing it settles, and
+  the caller's `signal.onabort` is no longer replaced. A running scan is
+  still not interrupted and settles as if not aborted: its report, or its
+  own `[QRS-xxx]` fault. A `signal` that is not an `AbortSignal` rejects
+  with `TypeError: options.signal must be an AbortSignal` instead of being
+  ignored; `null` still means no signal.
+- The core crate's README and rustdoc, the `alpha_palette` field doc and the
+  UniFFI `ScanFailed` and `scan` docs name `QRS-006`, an option outside its
+  domain. `spec/02-profiles.md` § Option domains gives Rust
+  `ScanConfig.budget_ms` its own row: `None` is unbounded and `Some(0)` a
+  zero-millisecond budget, while the CLI and the bindings keep `0` =
+  unbounded.
 - A zero `max_dimension` or `max_pixels` is an option error (`QRS-006`) on
   every surface, no longer a `QRS-002`/`QRS-003` that blamed every image.
 - Python `__all__` names each public name once: 0.10 listed `scan` and
@@ -119,7 +143,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `capabilities()` as a JSON string, and `qrscan --capabilities`. It says
   which readers are included, not that an image decodes; never part of a
   report. Flutter does not expose it in this release. Rules:
-  `spec/01-report.md` § Capabilities.
+  `spec/01-report.md` § Capabilities. CI also builds the core with one
+  engine (rqrr only, rxing only), as a dependency without default features
+  gets it, lints each build and runs its capabilities tests.
 - `/camera-overlay` provides framework-free corner brackets, stable keyboard
   target selection and an explicit HTTP(S) payload action, with host theming,
   contain/cover/fill geometry, mirroring and complete teardown.
@@ -130,12 +156,14 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   witness, QR with a small Data Matrix, Hanzi, GS1, EXIF orientation, a
   partial artistic read, the rescue path, refusals, a valid empty image and a
   malformed input. Twin Python and JavaScript judges
-  (`scripts/consumer_truth.py`, `scripts/consumer-truth.mjs`) refuse each
-  departure in their self-tests. The packed Rust (library on the packaged and
-  the latest-compatible graph, installed CLI), native Node, WASM and Python
+  (`scripts/consumer_truth.py`, `scripts/consumer-truth.mjs`) also require a
+  final, unsaturated trace and refuse each departure in their self-tests.
+  The packed Rust (library on the packaged and the latest-compatible graph,
+  installed CLI), native Node, WASM and Python
   consumers run every input through the installed package and record one
-  identity digest; CI runs the Rust consumer and the native Node
-  (linux-x64-gnu) and WASM ones on Node 22 and 24 for every pull request.
+  identity digest; for every pull request CI runs the Rust consumer, the
+  native Node one (linux-x64-gnu) on Node 18, 20, 22 and 24 and the WASM one
+  on Node 22 and 24.
   New fixtures: `symbology/upce.png`, `symbology/qr-twins-code128.png`,
   `symbology/qr-small-datamatrix.png` and `eci/eci4-eci26-equal-text.png`.
 - **Load and initialization phases** of the installed packages
@@ -143,8 +171,10 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   in a fresh process. Native: the main package installed without its
   platform package throws `Cannot find native binding` at `require`, its
   cause naming that package, with no WASI binding standing in; on one pool
-  thread, an aborted queued scan rejects with `AbortError` while an aborted
-  running scan resolves with its report. WASM: through the installed `./auto`
+  thread, an aborted queued scan rejects with an `AbortError` DOMException,
+  also through a signal reused after a completed scan, while the decodable
+  fixture aborted as it runs still resolves with its report. WASM: through
+  the installed `./auto`
   loader, each `ScannerInitError` code a Node realm can reach
   (`invalid_options`, `asset_network_failed`, `asset_http_failed` with its
   status, `asset_read_failed`, `binary_invalid`, `wasm_validation_failed`,
@@ -182,11 +212,13 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.
   The floor itself is unchanged.
-- The packed Python consumer runs on interpreters back to the advertised
+- The packed Python consumer can run on interpreters back to the advertised
   floor (`requires-python >= 3.8`, abi3-py38): its probe no longer needs
   3.9's `Path.is_relative_to`, and its venv links the interpreter like
   `python -m venv`, since a copied standalone 3.8–3.10 interpreter cannot
-  find its `libpython`. Its pytest suite keeps its 3.11 floor.
+  find its `libpython`. CPython 3.8, 3.9 and 3.10 were run locally; the
+  Python workflow's consumer rows remain 3.11 and 3.14. Its pytest suite
+  keeps its 3.11 floor.
 - Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.
@@ -199,7 +231,8 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   disagree with that record. Measured locally on twelve 1280×720 frames
   (Node 22, V8, darwin-arm64), the portable build took 1.09× the SIMD build's
   time in `frame` and 1.03× in `fast`, with identical reports, and is about
-  2 % smaller.
+  2 % smaller. CI runs the record's own self-test
+  (`scripts/wasm_provenance.py --self-test`) on every pull request.
 - Cleared open dependency advisories outside the scanner's own graph: the
   Flutter Rust lock moves tokio 1.34.0 to 1.38.2 (GHSA-rr8g-9fpq-6wmg), the
   packed Python consumer suite pins Pillow 13.0.0 with every wheel hashed
@@ -211,6 +244,15 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   stays `0` in the bindings and `None` in Rust. In Node and WASM a fractional
   `max_dimension`/`max_pixels` is refused instead of truncated, and a
   negative one instead of becoming no cap or the default.
+- **Upgrade note (Rust).** `Scanner::scan` runs `ScanConfig::validate` and
+  `Limits::validate` before it reads the input, so a `ScanConfig` that 0.10
+  scanned can now return `QRS-006`: more than 32 `alpha_palette` colors
+  (`ScanConfig::MAX_ALPHA_PALETTE`; 0.10 applied no cap in the core) or a
+  `pyramid_side` or `max_engine_side` of 0 (0.10 downscaled to 1 px: the S1
+  pyramid image, or every engine input).
+  Only direct Rust embedders are affected: the bindings and the CLI already
+  refused a longer palette with their own argument error, and none of them
+  exposes the two sides.
 - **Upgrade note (browser).** `scanner.variant` is `"portable"`.
   `{variant: "compatible"}` loads that same module; `{variant: "simd"}` rejects
   with `invalid_options`, and `simd_unavailable` is no longer a code. The
