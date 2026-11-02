@@ -696,9 +696,10 @@ performs them):
    name is still free just before the tag. The publisher of the former
    project `qrcode-ai-scanner` (0.9.0: owner `supernovae-st`, repository
    `qrcode-ai-scanner`) stays as recorded and is never re-bound.
-6. pub.dev, only if the Flutter package ships in the release. Its first upload
-   is a user's, made only from the `flutter-stage` artifact of a `flutter.yml`
-   run on the tag whose `test`, `build-android` and `build-ios` jobs passed,
+6. pub.dev, only if the Flutter package ships in the release, under the name
+   `qr_barcode_scanner`. Its first upload is a user's, made only from the
+   `flutter-stage` artifact of an owner-authorized `flutter.yml` run on the
+   tag whose `test`, `build-android` and `build-ios` jobs passed,
    re-inspected first with `scripts/package-inspect.py flutter --package-root …
    --strict --release-set`. The package then moves to the verified publisher
    `qrcode-ai.com`; that transfer cannot be undone. Before its trusted
