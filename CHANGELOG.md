@@ -88,6 +88,11 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   answers and results, track revocation and cleanup on page departure. Geometry
   stays absent when the reader only measured a scan line. Consumers own their
   visual treatment and explicit actions on decoded content.
+- WASM `scan_frame` takes `scan_image`'s other options after `budget_ms`
+  (positional #6 to #12): `max_dimension`, `max_pixels`, `score_skip_axes`,
+  `score_skip_checks`, `alpha_background`, `alpha_palette` and `score_preset`,
+  with the same domains and errors. Calls with five arguments are unchanged;
+  a transparent frame flattens over `alpha_background` before luma.
 - `/camera-overlay` provides framework-free corner brackets, stable keyboard
   target selection and an explicit HTTP(S) payload action, with host theming,
   contain/cover/fill geometry, mirroring and complete teardown.

@@ -108,6 +108,13 @@ if (mode === "native") {
   scan = (input, profile) => qr.scan_image(input, profile, undefined, undefined, 0);
   full = scan(bytes, "full");
   assert.throws(() => qr.scan_frame(new Uint8Array(10), 2, 2), /\[QRS-004\]/);
+  // the installed scan_frame carries scan_image's options after budget_ms
+  const blank = new Uint8Array(16 * 16 * 4).fill(255);
+  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, 15), /\[QRS-002\]$/);
+  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, undefined, 255), /\[QRS-003\]$/);
+  assert.throws(() => qr.scan_frame(blank, 16, 16, "fast", 0, 0), /invalid option `max_dimension`: .* \[QRS-006\]$/);
+  assert.throws(() => qr.scan_frame(blank, 16, 16, "full", 0, undefined, undefined, ["tilt"]), /unknown stress axis/);
+  assert.deepEqual(qr.scan_frame(blank, 16, 16, "fast", 0, 16, 256).detections, [], "each cap admits its exact value");
 }
 assert.equal(qr.version(), expectedVersion);
 assert.deepEqual(full.versions, { scanner: expectedVersion, pipeline: 5, score_contract: 5 });

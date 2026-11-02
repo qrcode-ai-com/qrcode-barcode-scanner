@@ -6,6 +6,7 @@
 // a score runs unbudgeted (budget_ms 0).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 const { initSync, scan_image, scan_frame, version } = await import("./pkg/qrcode-ai-scanner.js");
 
 initSync({ module: readFileSync(new URL("./pkg/qrcode-ai-scanner_bg.wasm", import.meta.url)) });
@@ -173,6 +174,84 @@ assert.equal(frame.score, null, "frame profile skips scoring");
 const framed = scan_frame(rgba, side, side, "fast", 0);
 assert.deepEqual(texts(framed), []);
 assert.equal(framed.score, null, "no detection, no judgment");
+
+// scan_frame takes scan_image's other options after budget_ms (#6-#12), with
+// the same domains and errors. The frames are the fixtures' own pixels: a
+// non-interlaced 8-bit gray (0) or RGBA (6) PNG, inflated and unfiltered here.
+const pngFrame = (bytes) => {
+  const view = Buffer.from(bytes);
+  const width = view.readUInt32BE(16), height = view.readUInt32BE(20);
+  const [depth, color, , , interlace] = view.subarray(24, 29);
+  const channels = { 0: 1, 6: 4 }[color];
+  assert.ok(depth === 8 && channels && interlace === 0, "test helper: 8-bit gray or RGBA, not interlaced");
+  const idat = [];
+  for (let at = 8; at < view.length;) {
+    const length = view.readUInt32BE(at), type = view.toString("latin1", at + 4, at + 8);
+    if (type === "IDAT") idat.push(view.subarray(at + 8, at + 8 + length));
+    at += 12 + length;
+  }
+  const packed = inflateSync(Buffer.concat(idat)), stride = width * channels;
+  const rows = new Uint8Array(height * stride);
+  for (let y = 0; y < height; y++) {
+    const filter = packed[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const raw = packed[y * (stride + 1) + 1 + x];
+      const a = x >= channels ? rows[y * stride + x - channels] : 0;
+      const b = y > 0 ? rows[(y - 1) * stride + x] : 0;
+      const c = x >= channels && y > 0 ? rows[(y - 1) * stride + x - channels] : 0;
+      let predictor = 0;
+      if (filter === 1) predictor = a;
+      else if (filter === 2) predictor = b;
+      else if (filter === 3) predictor = (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+        predictor = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      rows[y * stride + x] = (raw + predictor) & 255;
+    }
+  }
+  if (channels === 4) return { data: rows, width, height };
+  const data = new Uint8Array(width * height * 4);
+  rows.forEach((gray, index) => data.set([gray, gray, gray, 255], index * 4));
+  return { data, width, height };
+};
+const v2lFrame = pngFrame(v2l);
+const frameScan = (profile, ...options) => scan_frame(v2lFrame.data, v2lFrame.width, v2lFrame.height, profile, 0, ...options);
+assert.deepEqual(texts(frameScan("full")), ["qrc.ai/v2l"], "the RGBA copy reads like the encoded image");
+// max_dimension (#6) and max_pixels (#7): the same caps, codes and domains
+assert.throws(() => frameScan("fast", 263), /\[QRS-002\]$/);
+assert.throws(() => frameScan("fast", undefined, 264 * 264 - 1), /\[QRS-003\]$/);
+assert.deepEqual(texts(frameScan("fast", 264, 264 * 264)), ["qrc.ai/v2l"], "each cap admits its exact value");
+assert.throws(() => frameScan("fast", 0), refused("max_dimension"));
+assert.throws(() => frameScan("fast", undefined, NaN), refused("max_pixels"));
+assert.throws(() => scan_frame(new Uint8Array(3), 16, 16, "fast", 0, -1), refused("max_dimension"),
+  "an option is refused before the buffer is read");
+// score_skip_axes (#8), score_skip_checks (#9) and score_preset (#12)
+const frameSkipped = frameScan("full", undefined, undefined, ["perspective", "rotation"]);
+assert.deepEqual(frameSkipped.score.axes.map((a) => a.axis), ["resolution", "blur", "contrast", "lighting"]);
+assert.equal(frameSkipped.score.weights_run, 70);
+const frameDesigned = frameScan("full", undefined, undefined, undefined, undefined, undefined, undefined, "design");
+assert.deepEqual(frameDesigned.score, frameSkipped.score, "design is the same skip on frames");
+const frameNoChecks = frameScan("full", undefined, undefined, undefined, ["uec", "iso15415"]);
+assert.equal(frameNoChecks.score.uec, null);
+assert.equal(frameNoChecks.score.iso15415, null);
+assert.throws(() => frameScan("full", undefined, undefined, ["tilt"]), /unknown stress axis/);
+assert.throws(() => frameScan("full", undefined, undefined, ["blur"], undefined, undefined, undefined, "design"),
+  /mutually exclusive/);
+// alpha_background (#10) and alpha_palette (#11): a transparent frame
+// flattens before luma, as the encoded path does
+const transparentFrame = pngFrame(new Uint8Array(readFileSync(here("../../playground/public/samples/transparent.png"))));
+const alphaFrame = (...options) => scan_frame(transparentFrame.data, transparentFrame.width, transparentFrame.height,
+  "full", 0, undefined, undefined, undefined, undefined, ...options);
+const frameFlat = alphaFrame();
+assert.deepEqual(texts(frameFlat), ["https://qrc-ai.com/76xMa"]);
+assert.equal(frameFlat.alpha.mode, "auto");
+assert.deepEqual(texts(alphaFrame("none")), [], "none keeps the exporter-dependent pixels on frames too");
+const frameThemed = alphaFrame(undefined, ["#f3f4f6", "black"]);
+assert.deepEqual(frameThemed.alpha.envelope.palette.map(({ background, decoded }) => ({ background, decoded })),
+  [{ background: "#f3f4f6", decoded: true }, { background: "black", decoded: false }]);
+assert.throws(() => alphaFrame("transparent"), /unknown alpha background/);
+assert.throws(() => alphaFrame(undefined, ["auto"]), /unknown palette color/);
 
 // alpha_background (#8): a transparent input carries the alpha block through
 // the serde_wasm_bindgen boundary (the skip_serializing_if key must be ABSENT

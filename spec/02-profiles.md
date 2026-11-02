@@ -90,14 +90,16 @@ reading "NO" on valid product output is the documented trap.
 
 | Limit | Default | Surface knobs |
 |---|---|---|
-| `max_dimension` (px per side) | 10 000 | Rust `Limits` · Node `maxDimension` · WASM `scan_image` arg · Python/UniFFI `max_dimension` |
-| `max_pixels` (total) | 64 000 000 | Rust `Limits` · Node `maxPixels` · WASM `scan_image` arg · Python/UniFFI `max_pixels` |
+| `max_dimension` (px per side) | 10 000 | Rust `Limits` · Node `maxDimension` · WASM `scan_image` / `scan_frame` arg · Python/UniFFI `max_dimension` |
+| `max_pixels` (total) | 64 000 000 | Rust `Limits` · Node `maxPixels` · WASM `scan_image` / `scan_frame` arg · Python/UniFFI `max_pixels` |
 | `max_engine_side` (internal) | 2 048 | Rust `ScanConfig` only — engines NEVER see larger |
 | decoder allocation cap | `max_pixels × 8` bytes | automatic (decompression-bomb guard) |
 | detections per report | 16 | fixed |
 | rescue candidates per scan | 4 | fixed |
 
-WASM `scan_frame` and Flutter take no limits: they scan under the defaults.
+WASM `scan_frame` takes them after `budget_ms` (positional args #6 and #7),
+followed by `scan_image`'s scoring and alpha options. Flutter takes no
+limits: it scans under the defaults.
 Server guidance: lower `maxDimension`/`maxPixels` for untrusted uploads
 (e.g. 4096 / 16M). Violations are `QRS-002`/`QRS-003` errors — see
 [03-errors.md](03-errors.md).

@@ -116,6 +116,9 @@ const judged = report.score !== null || !report.trace.budget_exhausted;
 // live camera (ImageData — no PNG roundtrip)
 const frame = ctx.getImageData(0, 0, w, h);
 const live = scan_frame(new Uint8Array(frame.data.buffer), w, h);
+// after profile and budget_ms, scan_frame takes scan_image's other options:
+// max_dimension, max_pixels, score_skip_axes, score_skip_checks,
+// alpha_background, alpha_palette, score_preset (same domains and errors)
 ```
 
 Same versioned `ScanReport` contract as the native package — detections,

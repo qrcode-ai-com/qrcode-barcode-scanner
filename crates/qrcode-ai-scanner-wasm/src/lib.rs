@@ -245,7 +245,17 @@ pub fn scan_image(
 /// Scan a raw RGBA8 frame (`ImageData.data`, width, height). Defaults to the
 /// `frame` profile (decode-only, tight budget) — pass another to override.
 /// `budget_ms` overrides the profile's wall-clock budget, in the same
-/// domain as [`scan_image`]'s.
+/// domain as [`scan_image`]'s. The arguments after it are [`scan_image`]'s
+/// other options with the same domains and errors, appended so that a
+/// positional call written for the earlier five arguments keeps its
+/// meaning: `max_dimension`, `max_pixels`, `score_skip_axes`,
+/// `score_skip_checks`, `alpha_background` (transparent pixels of the
+/// frame flatten over it before luma), `alpha_palette`, `score_preset`.
+// allow, not expect: the same wasm_bindgen re-emission as `scan_image`.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the wasm signature IS the cross-binding contract (profile + budget + caps + skips + alpha)"
+)]
 #[wasm_bindgen]
 pub fn scan_frame(
     data: &[u8],
@@ -253,20 +263,28 @@ pub fn scan_frame(
     height: u32,
     profile: Option<String>,
     budget_ms: Option<f64>,
+    max_dimension: Option<f64>,
+    max_pixels: Option<f64>,
+    score_skip_axes: Option<Vec<String>>,
+    score_skip_checks: Option<Vec<String>>,
+    alpha_background: Option<String>,
+    alpha_palette: Option<Vec<String>>,
+    score_preset: Option<String>,
 ) -> Result<JsValue, JsError> {
-    let profile = match profile {
-        Some(_) => config_from(profile, budget_ms, None, None, None, None, None)?,
-        None => config_from(
-            Some("frame".to_owned()),
+    run_scan(
+        ImageInput::rgba8(data, width, height),
+        config_from(
+            Some(profile.unwrap_or_else(|| "frame".to_owned())),
             budget_ms,
-            None,
-            None,
-            None,
-            None,
-            None,
+            score_skip_axes,
+            score_skip_checks,
+            alpha_background,
+            alpha_palette,
+            score_preset,
         )?,
-    };
-    run_scan(ImageInput::rgba8(data, width, height), profile, None, None)
+        max_dimension,
+        max_pixels,
+    )
 }
 
 /// Crate version (the `versions.scanner` of every report).

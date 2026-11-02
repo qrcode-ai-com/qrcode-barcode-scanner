@@ -62,6 +62,9 @@ await init(); // once — fetches + instantiates the .wasm
 const report = scan_image(bytes, "full", undefined, undefined, 1500);
 
 // raw RGBA frames (live camera) — defaults to the `frame` profile
+// args: data, width, height, profile?, budget_ms?, then scan_image's other
+//       options in its order: max_dimension?, max_pixels?, score_skip_axes?,
+//       score_skip_checks?, alpha_background?, alpha_palette?, score_preset?
 const ctx = canvas.getContext("2d")!;
 const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const frame = scan_frame(new Uint8Array(img.data.buffer),
