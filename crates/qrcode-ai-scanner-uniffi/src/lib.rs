@@ -263,6 +263,16 @@ pub fn scan_frame(
     serde_json::to_string(&report).map_err(|e| ScanBindingError::ScanFailed(e.to_string()))
 }
 
+/// The readers compiled into this library as a JSON **String**: its report
+/// `versions`, decode `engines` and the `symbologies` they can return
+/// (spec/01-report.md § Capabilities). Says which readers are included, not
+/// that an image will decode.
+#[uniffi::export]
+pub fn capabilities() -> Result<String, ScanBindingError> {
+    serde_json::to_string(&scanner_core::Capabilities::current())
+        .map_err(|e| ScanBindingError::ScanFailed(format!("serialize capabilities: {e}")))
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -661,5 +671,30 @@ mod tests {
             matches!(err, ScanBindingError::UnknownAlphaBackground(ref n) if n == "transparent"),
             "typo must be the typed loud error, got {err:?}"
         );
+    }
+
+    // The library is a default build: both engines and every symbology in the
+    // schema's order, with the markers its reports carry.
+    #[test]
+    fn capabilities_list_the_default_build_readers() {
+        let caps: Value = serde_json::from_str(&capabilities().unwrap()).unwrap();
+        let schema: Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../spec/scan-report.schema.json"
+            ))
+            .expect("schema present"),
+        )
+        .unwrap();
+        let defs = &schema["$defs"];
+        assert_eq!(caps["engines"], defs["EngineKind"]["enum"]);
+        assert_eq!(caps["symbologies"], defs["Symbology"]["enum"]);
+        let report = assert_envelope(
+            &scan(clean_qr(), "fast".into(), None, None, Some(0), None, None, None, None, None).unwrap(),
+        );
+        assert_eq!(caps["versions"], report["versions"]);
+        let mut keys: Vec<&str> = caps.as_object().unwrap().keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["engines", "symbologies", "versions"]);
     }
 }

@@ -31,7 +31,12 @@ report = q.scan(
 frame = q.scan_frame(rgba_bytes, width, height, "frame")
 
 q.__version__  # the installed package version, a string
+q.capabilities()  # the compiled readers: {"versions", "engines", "symbologies"}
 ```
+
+`capabilities()` says which readers the installed extension includes —
+`engines` in order `rxing`, `rqrr`, `rescue`, and the `symbologies` they can
+return (spec/01 § Capabilities) — not that an image will decode.
 
 `scan` / `scan_frame` return the [`ScanReport`](/api/report) as a plain dict
 (`detections`, `score`, `hints`, `trace`, `versions`) — schema-conformant, since

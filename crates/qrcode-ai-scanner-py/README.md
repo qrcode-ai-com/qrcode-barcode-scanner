@@ -25,6 +25,8 @@ if report["detections"]:
   -> dict` — decode encoded bytes (PNG/JPEG/WebP/GIF).
 - `scan_frame(rgba: bytes, width: int, height: int, profile="frame", max_dimension=None,
   max_pixels=None, budget_ms=None) -> dict` — raw RGBA frame, no image-format roundtrip.
+- `capabilities() -> dict` — the readers compiled into the extension: `versions`,
+  decode `engines` and the `symbologies` they can return (not that an image decodes).
 - Optional kwargs: `max_dimension` / `max_pixels` cap inputs BEFORE any pixel work
   (defaults 10000 px / 64 MP — lower them for untrusted uploads); `budget_ms` bounds the
   scan wall-clock once the image is decoded, the caps bound the decode (unset = the

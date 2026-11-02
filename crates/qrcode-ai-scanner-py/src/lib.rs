@@ -263,11 +263,24 @@ fn scan_frame<'py>(
     report_to_py(py, &report)
 }
 
+/// The readers compiled into this extension: its report `versions`, decode
+/// `engines` and the `symbologies` they can return (spec/01-report.md
+/// § Capabilities), as a `dict`. Says which readers are included, not that
+/// an image will decode.
+#[pyfunction]
+fn capabilities(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
+    let value = serde_json::to_value(scanner_core::Capabilities::current())
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    pythonize::pythonize(py, &value).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pymodule]
 fn qrcode_ai_scanner(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // `add` and `add_function` append each name to `__all__` once: the
+    // module's public names are exactly what is added here
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("__all__", vec!["scan", "scan_frame", "__version__"])?;
     m.add_function(wrap_pyfunction!(scan, m)?)?;
     m.add_function(wrap_pyfunction!(scan_frame, m)?)?;
+    m.add_function(wrap_pyfunction!(capabilities, m)?)?;
     Ok(())
 }

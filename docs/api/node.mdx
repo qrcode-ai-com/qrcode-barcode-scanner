@@ -13,7 +13,7 @@ Prebuilt for macOS (arm64/x64), Linux (gnu+musl, arm64/x64), Windows
 ## API
 
 ```ts
-import { scan, scanSync, version } from "@supernovae-st/qrcode-ai-scanner";
+import { capabilities, scan, scanSync, version } from "@supernovae-st/qrcode-ai-scanner";
 import type { ScanReport, ScanOptions } from "@supernovae-st/qrcode-ai-scanner";
 
 // async on the libuv pool — NEVER blocks the event loop
@@ -29,7 +29,14 @@ const report: ScanReport = await scan(imageBuffer, {
 } satisfies ScanOptions);
 
 const sync = scanSync(buffer, { profile: "fast" }); // scripts only
+
+// the readers compiled into the loaded addon (spec/01 § Capabilities)
+const { versions, engines, symbologies } = capabilities();
 ```
+
+`capabilities()` (typed `Capabilities`) says which readers are included —
+`engines` in order `rxing`, `rqrr`, `rescue`, and the `symbologies` they
+can return — not that an image will decode.
 
 <Warning>
 `signal` rejects tasks still QUEUED on the pool (and pre-aborted signals

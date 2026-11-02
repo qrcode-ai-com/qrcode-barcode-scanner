@@ -29,6 +29,9 @@ final report = await QrcodeAiScanner.scan(pngBytes); // profile: 'full' (default
 final frame = await QrcodeAiScanner.scanFrame(rgba, w, h); // profile: 'frame'
 ```
 
+This release does not expose `capabilities()` (spec/01 § Capabilities); the
+package builds the core with its default engines.
+
 Scans run on flutter_rust_bridge's Rust worker pool, so `await` never blocks the
 UI isolate. Profiles: `'full'` · `'fast'` · `'frame'`, each under its default
 wall-clock budget (4000 · 800 · 80 ms — this release cannot override it),

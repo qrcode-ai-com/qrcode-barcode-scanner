@@ -6,8 +6,8 @@
 //! `raw` as base64) — identical shape to the server/CLI surfaces.
 
 use qrcode_ai_scanner::{
-    AlphaBackground, ImageInput, Limits, ScanConfig, ScanError, ScanProfile, Scanner, ScoreCheck,
-    ScorePreset, StressAxis, options,
+    AlphaBackground, Capabilities, ImageInput, Limits, ScanConfig, ScanError, ScanProfile, Scanner,
+    ScoreCheck, ScorePreset, StressAxis, options,
 };
 use serde::Serialize as _;
 use wasm_bindgen::prelude::*;
@@ -291,4 +291,15 @@ pub fn scan_frame(
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_owned()
+}
+
+/// The readers compiled into this module: its report `versions`, decode
+/// `engines` and the `symbologies` they can return (spec/01-report.md
+/// § Capabilities). Says which readers are included, not that an image
+/// will decode.
+#[wasm_bindgen]
+pub fn capabilities() -> Result<JsValue, JsError> {
+    Capabilities::current()
+        .serialize(&serde_wasm_bindgen::Serializer::new())
+        .map_err(|e| JsError::new(&e.to_string()))
 }

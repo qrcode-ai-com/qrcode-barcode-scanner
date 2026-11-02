@@ -292,3 +292,12 @@ pub fn scan_sync(
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_owned()
 }
+
+/// The readers compiled into this addon as JSON (index.js parses): its
+/// report `versions`, decode `engines` and the `symbologies` they can
+/// return. Says which readers are included, not that an image will decode.
+#[napi]
+pub fn capabilities_json() -> Result<String> {
+    serde_json::to_string(&qrcode_ai_scanner::Capabilities::current())
+        .map_err(|e| Error::from_reason(format!("serialize: {e}")))
+}

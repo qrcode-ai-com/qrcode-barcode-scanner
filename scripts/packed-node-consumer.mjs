@@ -118,6 +118,11 @@ if (mode === "native") {
 }
 assert.equal(qr.version(), expectedVersion);
 assert.deepEqual(full.versions, { scanner: expectedVersion, pipeline: 5, score_contract: 5 });
+// the installed build lists the readers it carries: both engines and every
+// symbology, in the contract's order (a published package is a default build)
+const contract = JSON.parse(readFileSync(new URL("../spec/scan-report.schema.json", import.meta.url), "utf8")).$defs;
+assert.deepEqual(qr.capabilities(), { versions: full.versions, engines: contract.EngineKind.enum,
+  symbologies: contract.Symbology.enum });
 assert.equal(full.trace.budget_exhausted, false);
 assert.equal(full.detections.length, 1);
 assert.equal(full.detections[0].symbology, "qr_code");

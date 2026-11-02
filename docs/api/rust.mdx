@@ -109,6 +109,13 @@ Everything the report contains is re-exported at the crate root:
 `EcLevel` · `Point` · `Versions`.
 All public enums/structs are `#[non_exhaustive]` — match with `_` arms.
 
+`Capabilities::current()` describes the build itself, never a report: its
+`versions`, the decode `engines` compiled in (`rxing` with `engine-rxing`;
+`rqrr` and `rescue` with `engine-rqrr`) and the `symbologies` they can
+return — every one with rxing, `QrCode` alone in an rqrr-only build. It says
+which readers are included, not that an image will decode (spec/01
+§ Capabilities).
+
 <Note>
 Scoring evaluates the PRIMARY detection. wasm builds: keep the `parallel`
 feature OFF and the crate is wasm32-clean (`web_time` clocks, no threads).

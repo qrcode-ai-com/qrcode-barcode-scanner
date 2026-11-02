@@ -40,4 +40,11 @@ function scanSync(image, options = {}) {
   );
 }
 
-module.exports = { scan, scanSync, version: native.version };
+/** The readers compiled into the loaded addon (spec/01-report.md § Capabilities). */
+function capabilities() {
+  return JSON.parse(native.capabilitiesJson());
+}
+
+// Node's ESM named-import detection (cjs-module-lexer) stops at the first
+// non-identifier value: `version: native.version` stays last.
+module.exports = { scan, scanSync, capabilities, version: native.version };

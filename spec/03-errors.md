@@ -44,7 +44,7 @@ one; the other bindings expose no cancellation.
 
 | Exit | Meaning |
 |---|---|
-| `0` | At least one symbol decoded, of any symbology. With `--score-only`, its score value is on stdout; a printed value is a complete judgment and does not depend on the budget. |
+| `0` | At least one symbol decoded, of any symbology. With `--score-only`, its score value is on stdout; a printed value is a complete judgment and does not depend on the budget. With `--capabilities` (no image, no other option), the build's capabilities JSON is on stdout (01-report.md § Capabilities). |
 | `1` | No symbol decoded, in ALL output modes including `--score-only`. Final only when the scan was not cut: `trace.budget_exhausted` is `false` in the JSON report. `--score-only` and `--pretty` say when the budget ran out first. |
 | `2` | Invalid input, usage or fault: a QRS error · an unreadable file · `--score-only` with a configuration that computes no score (the `frame` profile, or every stress axis skipped) · `--score-only` when a contained internal fault left the score absent. |
 | `3` | `--score-only` only: a symbol was decoded, but the wall-clock budget ran out before its score was judged (`score: null`, `trace.budget_exhausted: true`). Nothing is printed on stdout. Retry with a larger `--budget-ms`; `0` (unbounded) never yields 3. |

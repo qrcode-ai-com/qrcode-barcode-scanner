@@ -49,7 +49,7 @@ Safari and historical browser floors need their own acceptance evidence.
 ## Direct API
 
 ```ts
-import init, { scan_image, scan_frame, version }
+import init, { capabilities, scan_image, scan_frame, version }
   from "@supernovae-st/qrcode-ai-scanner-wasm";
 
 await init(); // once — fetches + instantiates the .wasm
@@ -69,7 +69,14 @@ const ctx = canvas.getContext("2d")!;
 const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const frame = scan_frame(new Uint8Array(img.data.buffer),
                          canvas.width, canvas.height);
+
+// the readers compiled into the module (spec/01 § Capabilities)
+const { engines, symbologies } = capabilities();
 ```
+
+`capabilities()` (typed `Capabilities`) says which readers the module
+includes — `engines` in order `rxing`, `rqrr`, `rescue`, and the
+`symbologies` they can return — not that an image will decode.
 
 <Warning>
 The scan runs **synchronously on the calling thread**. In UI contexts

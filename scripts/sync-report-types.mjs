@@ -27,6 +27,14 @@ if (existsSync(wasmDts)) {
   }
   dts = dts
     .replace(
+      'import type { ScanReport } from "./report-types";',
+      'import type { Capabilities, ScanReport } from "./report-types";'
+    )
+    .replace(
+      /export function capabilities\(\): any;/,
+      "export function capabilities(): Capabilities;"
+    )
+    .replace(
       /export function scan_frame\(([^)]*)\): any;/,
       "export function scan_frame($1): ScanReport;"
     )

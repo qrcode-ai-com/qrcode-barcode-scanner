@@ -32,6 +32,7 @@ compile_error!(
 );
 
 mod alpha;
+mod capabilities;
 mod engine;
 mod error;
 mod gs1;
@@ -45,6 +46,7 @@ mod rescue;
 mod score;
 mod transform;
 
+pub use capabilities::Capabilities;
 pub use error::{Result, ScanError};
 pub use gs1::Gs1Element;
 pub use input::{ImageInput, Limits};

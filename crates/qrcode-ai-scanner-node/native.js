@@ -596,6 +596,7 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
+module.exports.capabilitiesJson = nativeBinding.capabilitiesJson
 module.exports.scanJson = nativeBinding.scanJson
 module.exports.scanSyncJson = nativeBinding.scanSyncJson
 module.exports.version = nativeBinding.version

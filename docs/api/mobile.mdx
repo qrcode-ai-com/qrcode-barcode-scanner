@@ -28,6 +28,9 @@ import uniffi.qrcode_ai_scanner_uniffi.scan
 
 val json: String = scan(imageBytes, "full")   // "full" | "fast" | "frame"
 // parse `json` into your ScanReport model; empty detections = no QR
+
+// the compiled readers as JSON: {"versions", "engines", "symbologies"}
+val readers: String = uniffi.qrcode_ai_scanner_uniffi.capabilities()
 ```
 
 minSdk 21, 16 KB-page-safe (NDK r27). The scan is synchronous — call it off the
@@ -45,7 +48,14 @@ import QrcodeAiScanner
 
 let json = try scan(image: imageData, profile: "full")  // empty detections = no QR
 let report = try JSONDecoder().decode(ScanReport.self, from: Data(json.utf8))
+
+// the compiled readers as JSON: {"versions", "engines", "symbologies"}
+let readers = try capabilities()
 ```
+
+`capabilities()` says which readers the library includes — `engines` in
+order `rxing`, `rqrr`, `rescue`, and the `symbologies` they can return
+(spec/01 § Capabilities) — not that an image will decode.
 
 iOS 13+. A native app on the App Store is almost always closed-source and needs
 the **commercial** license (it links the AGPL core) — `studio.supernovae@gmail.com`.

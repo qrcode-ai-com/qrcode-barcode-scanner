@@ -339,6 +339,20 @@ export interface Saturation {
 }
 export interface Versions { scanner: string; pipeline: number; score_contract: number }
 
+/**
+ * The readers compiled into a build (spec/01 § Capabilities) — what a
+ * `capabilities()` call returns, never part of a report. Says which readers
+ * are included, not that an image will decode.
+ */
+export interface Capabilities {
+  /** The markers every report of this build carries. */
+  versions: Versions;
+  /** Decode engines compiled in, in this order: rxing; rqrr and its rescue stage. */
+  engines: EngineKind[];
+  /** Every symbology a compiled reader can return, in Symbology order. */
+  symbologies: Symbology[];
+}
+
 export interface ScanReport {
   /** Empty = no QR found (a valid outcome, not an error) — final only when trace.budget_exhausted === false. */
   detections: Detection[];

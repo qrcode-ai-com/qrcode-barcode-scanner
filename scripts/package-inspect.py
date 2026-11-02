@@ -639,9 +639,9 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         dts = files.get("qrcode-ai-scanner.d.ts", b"").decode()
         retyped = all(
             re.search(rf"export function {fn}\([^)]*\): ScanReport;", dts) for fn in ("scan_image", "scan_frame")
-        )
-        art.check("qrcode-ai-scanner.d.ts re-exports report-types and returns ScanReport",
-                  'export * from "./report-types"' in dts and retyped)
+        ) and re.search(r"export function capabilities\(\): Capabilities;", dts)
+        art.check("qrcode-ai-scanner.d.ts re-exports report-types and returns ScanReport / Capabilities",
+                  'export * from "./report-types"' in dts and bool(retyped))
         check_equal_file(art, "README.md", files.get("README.md"), WASM_DIR / "README.md")
     elif name.startswith(NODE_NAME + "-"):
         binaries = sorted(f for f in files if f.endswith(".node"))
@@ -1700,6 +1700,7 @@ def _npm_wasm(version: str) -> dict:
     info = {"schema": wasm_provenance().SCHEMA, "version": version, "inputs": wasm_provenance().inputs_digest(ROOT),
             "wasm": {"sha256": hashlib.sha256(wasm).hexdigest(), "features": []}}
     dts = ('export * from "./report-types";\n'
+           "export function capabilities(): Capabilities;\n"
            "export function scan_frame(data: Uint8Array, width: number, height: number): ScanReport;\n"
            "export function scan_image(bytes: Uint8Array): ScanReport;\n")
     return {"package.json": json.dumps(pkg, indent=2).encode(), "README.md": (WASM_DIR / "README.md").read_bytes(),

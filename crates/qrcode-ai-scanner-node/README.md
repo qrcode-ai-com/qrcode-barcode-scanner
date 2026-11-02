@@ -27,6 +27,8 @@ if (report.detections.length) {
   bound the decode). A report the budget cut says so:
   `trace.budget_exhausted === true`.
 - `scanSync(image, { profile })` — blocking, scripts only.
+- `capabilities()` — the readers compiled into the addon: `versions`, decode
+  `engines` and the `symbologies` they can return (not that an image decodes).
 - "No QR found" **resolves** with empty `detections`; rejections carry
   `[QRS-xxx]` codes (invalid input only).
 - Full TypeScript contract in `index.d.ts` — the same versioned shape as the

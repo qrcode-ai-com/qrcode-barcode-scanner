@@ -98,7 +98,7 @@ Safari, mobile devices, arbitrary CSP rules, or a consumer's deployed binary.
 ## Direct entry
 
 ```js
-import init, { scan_image, scan_frame } from "@supernovae-st/qrcode-ai-scanner-wasm";
+import init, { capabilities, scan_image, scan_frame } from "@supernovae-st/qrcode-ai-scanner-wasm";
 
 await init(); // loads the wasm module once
 
@@ -119,6 +119,10 @@ const live = scan_frame(new Uint8Array(frame.data.buffer), w, h);
 // after profile and budget_ms, scan_frame takes scan_image's other options:
 // max_dimension, max_pixels, score_skip_axes, score_skip_checks,
 // alpha_background, alpha_palette, score_preset (same domains and errors)
+
+// the readers compiled into the module: versions, engines, symbologies
+// (which readers are included, not that an image decodes)
+const { engines, symbologies } = capabilities();
 ```
 
 Same versioned `ScanReport` contract as the native package — detections,

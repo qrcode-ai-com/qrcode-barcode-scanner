@@ -1,16 +1,16 @@
 //! `qrscan` — scan and validate QR codes from the command line.
 //!
 //! JSON (the `ScanReport` contract) by default; `--pretty` for humans.
-//! Exit codes: 0 = symbol found · 1 = no symbol found · 2 = invalid input/usage/error ·
-//! 3 = --score-only: decoded, not judged within the budget.
+//! Exit codes: 0 = symbol found (or `--capabilities` printed) · 1 = no symbol found ·
+//! 2 = invalid input/usage/error · 3 = --score-only: decoded, not judged within the budget.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
 use qrcode_ai_scanner::{
-    AlphaBackground, Charset, DecodedContent, ImageInput, ScanConfig, ScanProfile, ScanReport,
-    Scanner, ScoreCheck, ScoreDepth, ScorePreset, StressAxis,
+    AlphaBackground, Capabilities, Charset, DecodedContent, ImageInput, ScanConfig, ScanProfile,
+    ScanReport, Scanner, ScoreCheck, ScoreDepth, ScorePreset, StressAxis,
 };
 
 mod term;
@@ -40,7 +40,15 @@ impl From<ProfileArg> for ScanProfile {
 #[command(name = "qrscan", version, about, styles = term::clap_styles())]
 struct Cli {
     /// Image file (PNG, JPEG, WebP, GIF).
-    image: PathBuf,
+    #[arg(required_unless_present = "capabilities")]
+    image: Option<PathBuf>,
+
+    /// Print the readers compiled into this binary as JSON — its report
+    /// `versions`, decode `engines` and the `symbologies` they can return —
+    /// and exit 0. Says which readers are included, not that an image will
+    /// decode (spec/01 § Capabilities). Takes no other argument.
+    #[arg(long, exclusive = true)]
+    capabilities: bool,
 
     /// Scan profile.
     #[arg(long, value_enum, default_value = "full")]
@@ -563,17 +571,40 @@ fn parse_alpha_arg(arg: Option<&str>) -> Result<Option<AlphaBackground>, ExitCod
     Err(ExitCode::from(2))
 }
 
+/// `--capabilities`: this binary's readers as JSON on stdout (spec/01
+/// § Capabilities), exit 0.
+fn print_capabilities() -> ExitCode {
+    match serde_json::to_string_pretty(&Capabilities::current()) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            let th = term::Theme::auto_stderr();
+            eprintln!("{} serialization failed: {error}", th.err_strong("✖"));
+            ExitCode::from(2)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    let bytes = match std::fs::read(&cli.image) {
+    if cli.capabilities {
+        return print_capabilities();
+    }
+    // clap requires the image whenever --capabilities is absent
+    let Some(image) = cli.image.as_deref() else {
+        return ExitCode::from(2);
+    };
+    let bytes = match std::fs::read(image) {
         Ok(bytes) => bytes,
         Err(error) => {
             let th = term::Theme::auto_stderr();
             eprintln!(
                 "{} cannot read {}: {error}",
                 th.err_strong("✖"),
-                cli.image.display()
+                image.display()
             );
             return ExitCode::from(2);
         }

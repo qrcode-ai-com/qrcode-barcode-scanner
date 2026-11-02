@@ -2,7 +2,7 @@
 // package — see bindings/report-types.d.ts at the repo root (copied here
 // as ./report-types.d.ts at pack time by scripts/sync-report-types.mjs).
 export * from "./report-types";
-import type { ScanReport, StressAxis } from "./report-types";
+import type { Capabilities, ScanReport, StressAxis } from "./report-types";
 
 /** A skippable report section (`score.uec` / `score.iso15415` / `alpha.envelope`) — config-only, never serialized. */
 export type ScoreCheck = "uec" | "iso15415" | "alpha_envelope";
@@ -97,3 +97,9 @@ export function scan(image: Buffer | Uint8Array, options?: ScanOptions): Promise
 export function scanSync(image: Buffer | Uint8Array, options?: Omit<ScanOptions, "signal">): ScanReport;
 /** Native crate version. */
 export function version(): string;
+/**
+ * The readers compiled into the loaded addon: its report `versions`, decode
+ * `engines` and the `symbologies` they can return. Says which readers are
+ * included, not that an image will decode.
+ */
+export function capabilities(): Capabilities;

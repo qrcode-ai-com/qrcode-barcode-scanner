@@ -52,6 +52,8 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   mapping, and the same table of cases passes on both packages.
 - A zero `max_dimension` or `max_pixels` is an option error (`QRS-006`) on
   every surface, no longer a `QRS-002`/`QRS-003` that blamed every image.
+- Python `__all__` names each public name once: 0.10 listed `scan` and
+  `scan_frame` twice, since PyO3 already appends every added function.
 
 ### Added
 
@@ -93,6 +95,15 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `score_skip_checks`, `alpha_background`, `alpha_palette` and `score_preset`,
   with the same domains and errors. Calls with five arguments are unchanged;
   a transparent frame flattens over `alpha_background` before luma.
+- **Capabilities**: the readers compiled into a build — its report
+  `versions`, the decode `engines` (`rxing`; `rqrr` and `rescue`) and the
+  `symbologies` they can return, all of them with rxing and `qr_code` alone in
+  an rqrr-only build. Rust `Capabilities::current()`, WASM, Node and Python
+  `capabilities()` (typed `Capabilities` in TypeScript and the stub), UniFFI
+  `capabilities()` as a JSON string, and `qrscan --capabilities`. It says
+  which readers are included, not that an image decodes; never part of a
+  report. Flutter does not expose it in this release. Rules:
+  `spec/01-report.md` § Capabilities.
 - `/camera-overlay` provides framework-free corner brackets, stable keyboard
   target selection and an explicit HTTP(S) payload action, with host theming,
   contain/cover/fill geometry, mirroring and complete teardown.

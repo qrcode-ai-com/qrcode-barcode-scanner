@@ -81,7 +81,20 @@ def test_module_surface():
     # installed distribution's metadata.
     assert qr.__version__ == crate_version()
     assert importlib.metadata.version("qrcode-ai-scanner") == qr.__version__
-    assert callable(qr.scan) and callable(qr.scan_frame)
+    assert callable(qr.scan) and callable(qr.scan_frame) and callable(qr.capabilities)
+
+
+@pytest.mark.skipif(not SCHEMA, reason="no spec/ schema")
+def test_capabilities_list_the_default_build_readers():
+    # A published wheel is a default build: both engines and every symbology,
+    # in the contract's order, with the markers its reports carry.
+    defs = SCHEMA["$defs"]
+    report = qr.scan(V5Q.read_bytes(), "fast", budget_ms=0)
+    assert qr.capabilities() == {
+        "versions": report["versions"],
+        "engines": defs["EngineKind"]["enum"],
+        "symbologies": defs["Symbology"]["enum"],
+    }
 
 
 @pytest.mark.skipif(not SCHEMA, reason="no spec/ schema")
@@ -325,7 +338,8 @@ def test_scan_frame_zero_dimension_raises():
 
 
 def test_all_exported():
-    assert set(qr.__all__) == {"scan", "scan_frame", "__version__"}
+    # each public name once: `from qrcode_ai_scanner import *` brings exactly these
+    assert sorted(qr.__all__) == ["__version__", "capabilities", "scan", "scan_frame"]
 
 
 def test_score_skip_axes_thread_through_and_reject_typos():

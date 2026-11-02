@@ -56,6 +56,26 @@ class ScanReport(TypedDict):
     budget."""
     versions: dict[str, Any]
 
+class Capabilities(TypedDict):
+    """The readers compiled into this extension (spec/01-report.md
+    § Capabilities). Says which readers are included, not that an image will
+    decode."""
+
+    versions: dict[str, Any]
+    """The markers every report of this build carries: ``scanner``,
+    ``pipeline`` and ``score_contract``."""
+    engines: list[str]
+    """Decode engines compiled in, in this order: ``"rxing"``; ``"rqrr"`` and
+    its ``"rescue"`` stage."""
+    symbologies: list[str]
+    """Every symbology a compiled reader can return, in the schema's
+    ``Symbology`` order."""
+
+def capabilities() -> Capabilities:
+    """The readers compiled into this extension: its report ``versions``,
+    decode ``engines`` and the ``symbologies`` they can return."""
+    ...
+
 def scan(
     image: bytes,
     profile: str = "full",

@@ -7,13 +7,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
-const { initSync, scan_image, scan_frame, version } = await import("./pkg/qrcode-ai-scanner.js");
+const { initSync, capabilities, scan_image, scan_frame, version } = await import("./pkg/qrcode-ai-scanner.js");
 
 initSync({ module: readFileSync(new URL("./pkg/qrcode-ai-scanner_bg.wasm", import.meta.url)) });
 
 const here = (rel) => new URL(rel, import.meta.url);
 const pkg = JSON.parse(readFileSync(here("./pkg/package.json"), "utf8"));
-const markers = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs.Versions.properties;
+const schemaDefs = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs;
+const markers = schemaDefs.Versions.properties;
 const fixture = (rel) => new Uint8Array(readFileSync(here(`../../fixtures/${rel}`)));
 const attempts = (report) => report.trace.stages.reduce((n, stage) => n + stage.transforms_tried, 0);
 const texts = (report) => report.detections.map((d) => d.content.text);
@@ -39,6 +40,18 @@ console.log("PASS mixed QR + Code128: fast, frame, full");
 
 // one version end to end: the generated manifest, the module, the report
 assert.equal(version(), pkg.version);
+
+// the module is the default build: both engines, every symbology in schema
+// order, and the markers its reports carry
+assert.deepEqual(capabilities(), {
+  versions: {
+    scanner: pkg.version,
+    pipeline: markers.pipeline.const,
+    score_contract: markers.score_contract.const,
+  },
+  engines: schemaDefs.EngineKind.enum,
+  symbologies: schemaDefs.Symbology.enum,
+});
 
 // scan_image: clean symbol → exact content + a complete unbudgeted judgment
 const cleanBytes = fixture("clean/OK_68ms_100_4e875a2c.png");

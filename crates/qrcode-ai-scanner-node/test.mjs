@@ -4,7 +4,7 @@
 // (budgetMs 0) — under a profile budget, machine load alone would turn the
 // score null and this smoke red. The contract markers come from the JSON
 // Schema, which every contract change updates (the AGENTS.md cascade).
-import { scan, scanSync, version } from "./index.js";
+import { capabilities, scan, scanSync, version } from "./index.js";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,7 +14,8 @@ import assert from "node:assert/strict";
 
 const here = (rel) => new URL(rel, import.meta.url);
 const pkg = JSON.parse(readFileSync(here("./package.json"), "utf8"));
-const markers = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs.Versions.properties;
+const schemaDefs = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs;
+const markers = schemaDefs.Versions.properties;
 const fixture = (rel) => readFileSync(here(`../../fixtures/${rel}`));
 const attempts = (report) => report.trace.stages.reduce((n, stage) => n + stage.transforms_tried, 0);
 const untimed = ({ trace, ...rest }) => ({
@@ -26,6 +27,18 @@ const AXES = ["resolution", "blur", "contrast", "perspective", "rotation", "ligh
 
 // one version end to end: the manifest, the binary, the report
 assert.equal(version(), pkg.version);
+
+// the published addon is the default build: both engines, every symbology
+// in schema order, and the same markers its reports carry
+assert.deepEqual(capabilities(), {
+  versions: {
+    scanner: pkg.version,
+    pipeline: markers.pipeline.const,
+    score_contract: markers.score_contract.const,
+  },
+  engines: schemaDefs.EngineKind.enum,
+  symbologies: schemaDefs.Symbology.enum,
+});
 
 const clean = fixture("clean/gen_v5_q.png");
 const report = await scan(clean, { profile: "full", budgetMs: 0 });

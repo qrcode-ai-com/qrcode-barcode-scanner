@@ -49,6 +49,10 @@ def probe(args):
     assert [axis["axis"] for axis in full["score"]["axes"]] == [
         "resolution", "blur", "contrast", "perspective", "rotation", "lighting"]
     assert full["score"]["uec"]["grade"] == full["score"]["iso15415"]["overall"] == "a"
+    # the installed build lists the readers it carries, in the contract's order
+    contract = json.loads((Path(__file__).resolve().parents[1] / "spec/scan-report.schema.json").read_text())["$defs"]
+    assert qr.capabilities() == {"versions": full["versions"], "engines": contract["EngineKind"]["enum"],
+                                 "symbologies": contract["Symbology"]["enum"]}
     frame = qr.scan(data, "frame", budget_ms=0)
     assert frame["score"] is None
     assert [det["content"]["text"] for det in frame["detections"]] == [text]

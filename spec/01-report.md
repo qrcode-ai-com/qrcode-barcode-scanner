@@ -578,6 +578,34 @@ establish; a confirmation decode's reads are counted nowhere
 { "scanner": "0.11.0", "pipeline": 5, "score_contract": 5 }
 ```
 
+## Capabilities
+
+A build descriptor, never part of a report: each runtime returns the
+readers compiled into the build it loaded — Rust
+`Capabilities::current()`, WASM, Node and Python `capabilities()`, UniFFI
+`capabilities()` as a JSON string, and `qrscan --capabilities`. The
+Flutter binding does not expose it in 0.11.
+
+```jsonc
+{
+  "versions":    Versions,      // the markers every report of this build carries
+  "engines":     [EngineKind],  // compiled in, in this order: rxing; rqrr, rescue
+  "symbologies": [Symbology]    // every symbology a compiled reader can return
+}
+```
+
+- `engines` lists `rxing` with the `engine-rxing` feature, then `rqrr`
+  and `rescue` with `engine-rqrr`: the rescue stage only reconstructs grids
+  rqrr located, so it is present exactly when rqrr is.
+- `symbologies` follows the `Symbology` order of the schema: all of them
+  with rxing, `qr_code` alone in an rqrr-only build. `Symbology` names
+  every symbology in every build; this list is what the build can return.
+- A listed symbology says that a reader for it is compiled in. It does not
+  say that a given image decodes, which profile reaches it, or how well
+  that reader measures its geometry (§ Occurrences).
+- A published package is a default build: both engines, every symbology.
+- Later releases can add keys: ignore the keys you do not know.
+
 ## Score — see [04-score.md](04-score.md) for full semantics
 
 ```jsonc
