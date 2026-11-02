@@ -1,8 +1,9 @@
 # Security Policy
 
-`qrcode-ai-scanner` decodes **untrusted images** (uploaded files, camera
-frames) across native, Node and browser/WASM targets. Input handling is part
-of the threat model, so security reports are taken seriously.
+`qrcode-barcode-scanner` (formerly `qrcode-ai-scanner`) decodes **untrusted
+images** (uploaded files, camera frames) across native, Node and browser/WASM
+targets. Input handling is part of the threat model, so security reports are
+taken seriously.
 
 ## Supported versions
 
@@ -17,8 +18,9 @@ of the threat model, so security reports are taken seriously.
 
 - Preferred: GitHub **private vulnerability reporting** — the *Report a
   vulnerability* button under the repository's *Security* tab.
-- Or email **studio.supernovae@gmail.com** with `[security] qrcode-ai-scanner`
-  in the subject line.
+- Or email **studio.supernovae@gmail.com** with `[security] qrcode-barcode-scanner`
+  in the subject line (reports with the former `[security] qrcode-ai-scanner`
+  tag remain welcome).
 
 Please include: the affected version and surface (core / CLI / Node / WASM),
 the platform or runtime, a minimal reproducer (the image or bytes if you can

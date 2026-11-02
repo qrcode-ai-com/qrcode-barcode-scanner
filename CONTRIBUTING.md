@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution! `qrcode-ai-scanner` is one Rust core
+Thanks for considering a contribution! `qrcode-barcode-scanner` is one Rust core
 (`crates/qrcode-ai-scanner`) with thin façades on top (CLI, Node/napi, browser/WASM,
 Python/PyO3, and Kotlin+Swift via UniFFI). Most changes land in the core; the façades
 stay thin.
@@ -21,7 +21,7 @@ overrides a contributor's default, so use the explicit compiler selector.
 A first core check with the current pin is:
 
 ```bash
-cargo +1.99.1 test -p qrcode-ai-scanner --all-targets --locked
+cargo +1.99.1 test -p qrcode-barcode-scanner --all-targets --locked
 cargo +1.99.1 fmt --all --check
 ```
 

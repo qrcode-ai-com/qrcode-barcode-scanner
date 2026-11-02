@@ -1,4 +1,4 @@
-# qrcode-ai-scanner — specification
+# QR Code & Barcode Scanner — specification
 
 This directory is the **normative contract** of the scanner. If code and
 spec disagree, one of them has a bug — file it. Everything here is

@@ -7,8 +7,8 @@
 
 | Crate | Role |
 |---|---|
-| `qrcode-ai-scanner` | the core library — pure, sync, deterministic |
-| `qrcode-ai-scanner-cli` | `qrscan` binary (JSON default · exit codes 0/1/2/3) |
+| `qrcode-barcode-scanner` | the core library — pure, sync, deterministic |
+| `qrcode-barcode-scanner-cli` | `qrscan` binary (JSON default · exit codes 0/1/2/3) |
 | `qrcode-ai-scanner-node` | napi bindings (phase B) |
 | `qrcode-ai-scanner-wasm` | browser wasm (phase C) |
 | `xtask` | repo automation: gen-fixtures · corpus-report · baseline |
@@ -18,9 +18,14 @@ skips them by design — see the root `Cargo.toml` comment):
 
 | Crate / tree | Role |
 |---|---|
-| `qrcode-ai-scanner-py` | PyO3/maturin wheel (PyPI) |
+| `qrcode-barcode-scanner-py` | PyO3/maturin wheel `qrcode-barcode-scanner` (PyPI) |
 | `qrcode-ai-scanner-uniffi` | UniFFI wrapper behind Kotlin (JitPack) + Swift (SwiftPM) |
 | `bindings/flutter/rust` | flutter_rust_bridge crate inside the pub.dev package |
+
+Crate names here are Cargo package names. The directories under `crates/` keep
+their earlier `qrcode-ai-scanner*` names, and so do the packages that are never
+published (`qrcode-ai-scanner-node`, `qrcode-ai-scanner-wasm`,
+`qrcode-ai-scanner-uniffi`).
 
 ## Core invariants
 

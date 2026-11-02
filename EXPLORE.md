@@ -6,7 +6,7 @@ landing uses). This is a ~20-minute hands-on tour that shows every feature, with
 the **real output you should expect** at each step.
 
 ```text
-qrcode-ai-scanner
+qrcode-barcode-scanner
 ├── crates/        core lib · CLI (qrscan) · node (napi) · wasm (portable)
 ├── docs/          Mintlify site   → cd docs && mint dev        → http://localhost:3000
 ├── playground/    Vite wasm app   → cd playground && npm run dev → http://localhost:5173
