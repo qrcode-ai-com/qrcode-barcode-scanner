@@ -60,7 +60,9 @@ def probe(args):
         "resolution", "blur", "contrast", "perspective", "rotation", "lighting"]
     assert full["score"]["uec"]["grade"] == full["score"]["iso15415"]["overall"] == "a"
     # the installed build lists the readers it carries, in the contract's order
-    contract = json.loads((Path(__file__).resolve().parents[1] / "spec/scan-report.schema.json").read_text())["$defs"]
+    # UTF-8, never the locale's encoding (cp1252 on Windows)
+    contract = json.loads((Path(__file__).resolve().parents[1] / "spec/scan-report.schema.json")
+                          .read_text(encoding="utf-8"))["$defs"]
     assert qr.capabilities() == {"versions": full["versions"], "engines": contract["EngineKind"]["enum"],
                                  "symbologies": contract["Symbology"]["enum"]}
     frame = qr.scan(data, "frame", budget_ms=0)
@@ -111,7 +113,7 @@ def probe(args):
                "fixture_sha256": sha256(Path(args.fixture)),
                "truth": {"file": "fixtures/consumer-truth.json", "sha256": sha256(truth_lib.TRUTH),
                          "cases": len(truth["cases"]), "identities_sha256": truth_lib.identities_digest(identities)}}
-    Path(args.receipt).write_text(json.dumps(receipt, indent=2) + "\n")
+    Path(args.receipt).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(receipt))
 
 
@@ -176,14 +178,14 @@ def main():
                   for name in ["tests", "failures", "errors", "skipped"]}
         assert totals["tests"] > 0 and totals["failures"] == totals["errors"] == totals["skipped"] == 0, totals
         assert all(sha256(suite / relative) == digest for relative, digest in suite_inputs.items()), "pytest changed an input"
-        report = json.loads(receipt.read_text())
+        report = json.loads(receipt.read_text(encoding="utf-8"))
         report["pytest"] = {**totals, "junit": str(junit), "junit_sha256": sha256(junit),
                             "requirements_sha256": sha256(requirements),
                             "suite_inputs": suite_inputs}
-        receipt.write_text(json.dumps(report, indent=2) + "\n")
+        receipt.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report))
     if "GITHUB_OUTPUT" in env:
-        with open(env["GITHUB_OUTPUT"], "a") as output:
+        with open(env["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             output.write(f"receipt={receipt}\n")
             if args.suite:
                 output.write(f"junit={junit}\n")

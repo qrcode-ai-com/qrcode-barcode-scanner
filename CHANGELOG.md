@@ -147,6 +147,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `RUSTUP_TOOLCHAIN`, else `RUST_TOOLCHAIN`, else the one CI pin, exported to
   every Cargo call and checked against `rustc -vV`. Its receipt records
   `rustc -vV` and `cargo -V`, so a local rustup default no longer selects it.
+- The packed Rust and Python consumers read every process output and file as
+  UTF-8, not in the locale's encoding: on Windows (cp1252) the Rust consumer
+  turned `中文`, `Ą` and `日本` into mojibake before judging them.
 - The native Node package's advertised floor (`engines.node >= 18`) is
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.

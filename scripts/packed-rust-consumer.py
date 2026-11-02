@@ -29,8 +29,11 @@ import zlib
 
 
 def run(args, cwd, env):
+    # Every text this consumer reads or writes is UTF-8, never the locale's
+    # encoding: text=True decodes as cp1252 on Windows, turning 中文 into
+    # mojibake before the judge sees it.
     print(json.dumps(args), flush=True)
-    return subprocess.check_output(args, cwd=cwd, env=env, text=True)
+    return subprocess.check_output(args, cwd=cwd, env=env, encoding="utf-8")
 
 
 def sha(path):
@@ -54,7 +57,7 @@ def toolchain(env):
     if env.get("RUST_TOOLCHAIN"):
         return env["RUST_TOOLCHAIN"], "RUST_TOOLCHAIN"
     pins = set(re.findall(r'^\s*RUST_TOOLCHAIN:\s*"?([0-9][^"\s]*)"?\s*$',
-                          (ROOT / ".github/workflows/ci.yml").read_text(), re.M))
+                          (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"), re.M))
     assert len(pins) == 1, f"ci.yml must pin one RUST_TOOLCHAIN, found {pins}"
     return pins.pop(), ".github/workflows/ci.yml"
 
@@ -86,7 +89,7 @@ def main():
     core = consumer / f"qrcode-ai-scanner-{args.version}"
     cli = consumer / f"qrcode-ai-scanner-cli-{args.version}"
     for root in (core, cli):
-        package = tomllib.loads((root / "Cargo.toml").read_text())["package"]
+        package = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]
         assert package["version"] == args.version
     fixture = consumer / "fixture.png"
     shutil.copyfile(args.fixture.resolve(), fixture)
@@ -105,7 +108,7 @@ def main():
         '[package]\nname = "packed-scanner-consumer"\nversion = "0.0.0"\nedition = "2024"\n'
         'rust-version = "1.88"\n[dependencies]\nqrcode-ai-scanner = { path = '
         + json.dumps(str(core)) + ', features = ["serde"] }\nserde_json = "1"\n'
-        '[profile.release.package.rxing]\noverflow-checks = true\n')
+        '[profile.release.package.rxing]\noverflow-checks = true\n', encoding="utf-8")
     (app / "src/main.rs").write_text('''use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -130,12 +133,12 @@ fn main() {
     assert_eq!(report.score.as_ref().unwrap().value, 100);
     assert_eq!(report.trace.budget_exhausted, Some(false));
 }
-''')
+''', encoding="utf-8")
     shutil.copyfile(core / "Cargo.lock", app / "Cargo.lock")
     original_core_lock = sha(core / "Cargo.lock")
     registry_before = {
         (p["name"], p["version"], p["source"]): p.get("checksum")
-        for p in tomllib.loads((core / "Cargo.lock").read_text())["package"] if "source" in p
+        for p in tomllib.loads((core / "Cargo.lock").read_text(encoding="utf-8"))["package"] if "source" in p
     }
     graphs = {}
     # Cargo adds this consumer root to the packaged graph; no registry package
@@ -143,7 +146,7 @@ fn main() {
     run(["cargo", "metadata", "--format-version", "1"], app, env)
     registry_after = {
         (p["name"], p["version"], p["source"]): p.get("checksum")
-        for p in tomllib.loads((app / "Cargo.lock").read_text())["package"] if "source" in p
+        for p in tomllib.loads((app / "Cargo.lock").read_text(encoding="utf-8"))["package"] if "source" in p
     }
     # Cargo may prune the package's development-only dependencies. Every
     # retained registry dependency must be the same pinned, checksummed one.
@@ -195,18 +198,18 @@ fn main() {
     white.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 64, 8, 2, 0, 0, 0))
                       + chunk(b"IDAT", zlib.compress((b"\0" + b"\xff" * 192) * 64)) + chunk(b"IEND", b""))
     empty = subprocess.run([str(binary), str(white), "--profile", "full", "--budget-ms", "0"],
-                           cwd=consumer, env=env, capture_output=True, text=True)
+                           cwd=consumer, env=env, capture_output=True, encoding="utf-8")
     empty_report = json.loads(empty.stdout)
     assert empty.returncode == 1 and empty_report["detections"] == [] and empty_report["score"] is None
     assert empty_report["trace"]["budget_exhausted"] is False
     invalid = consumer / "invalid.png"
     invalid.write_bytes(b"not an image")
-    result = subprocess.run([str(binary), str(invalid)], cwd=consumer, env=env, capture_output=True, text=True)
+    result = subprocess.run([str(binary), str(invalid)], cwd=consumer, env=env, capture_output=True, encoding="utf-8")
     assert result.returncode == 2 and "[QRS-001]" in result.stderr and not result.stdout
     scan = truth["scan"]
     for case, path in staged:
         result = subprocess.run([str(binary), str(path), "--profile", scan["profile"], "--budget-ms",
-                                 str(scan["budget_ms"])], cwd=consumer, env=env, capture_output=True, text=True)
+                                 str(scan["budget_ms"])], cwd=consumer, env=env, capture_output=True, encoding="utf-8")
         if "error" in case:
             if not (result.returncode == 2 and f"[{case['error']}]" in result.stderr and not result.stdout):
                 problems.append(f"cli: {case['id']}: exit {result.returncode}, stderr {result.stderr[-160:]!r}")
@@ -232,9 +235,9 @@ fn main() {
                          "identities_sha256": truth_lib.identities_digest(agreed)},
                "qualification": "exact archives with local core substitution; registry replay required"}
     receipt_path = consumer / "receipt.json"
-    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     if "GITHUB_OUTPUT" in env:
-        with open(env["GITHUB_OUTPUT"], "a") as output:
+        with open(env["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             output.write(f"receipt={receipt_path}\n")
     print(json.dumps(receipt))
 
