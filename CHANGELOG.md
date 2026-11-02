@@ -150,6 +150,13 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - The packed Rust and Python consumers read every process output and file as
   UTF-8, not in the locale's encoding: on Windows (cp1252) the Rust consumer
   turned `中文`, `Ą` and `日本` into mojibake before judging them.
+- Package metadata names the transferred source repository,
+  `qrcode-ai-com/qrcode-barcode-scanner` (the `supernovae-st` addresses
+  redirect): Cargo `repository`, npm `repository.url` (npm provenance requires
+  it to match the building repository), Python project URLs, the pubspec,
+  podspec and POM. Package names, the JitPack coordinate and the OCI image
+  names are unchanged. RELEASING.md records that each registry's trusted
+  publisher must be re-bound to the new repository before its first upload.
 - The native Node package's advertised floor (`engines.node >= 18`) is
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.

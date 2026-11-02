@@ -15,7 +15,7 @@
 # Usage:  bindings/swift/release.sh v0.4.0      (from anywhere in the repo)
 set -euo pipefail
 
-REPO_SLUG="supernovae-st/qrcode-ai-scanner"
+REPO_SLUG="qrcode-ai-com/qrcode-barcode-scanner"
 LIB="libqrcode_ai_scanner_uniffi"
 MP="crates/qrcode-ai-scanner-uniffi/Cargo.toml"
 T="crates/qrcode-ai-scanner-uniffi/target"

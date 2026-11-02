@@ -164,7 +164,7 @@ Feed empty results as well as detections into the tracker to expire holds.
 Missing or degenerate geometry stays absent. The overlay supports centered
 contain/cover/fill, explicit mirroring, reduced motion and localized `labels`.
 Theme it through `--qr-scanner-highlight`, `--qr-scanner-surface` and
-`--qr-scanner-text`. The [browser API guide](https://github.com/supernovae-st/qrcode-barcode-scanner/blob/main/docs/api/wasm.mdx)
+`--qr-scanner-text`. The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/wasm.mdx)
 describes lifecycle and integration; synthetic browser checks do not qualify a
 physical camera or every mobile browser.
 

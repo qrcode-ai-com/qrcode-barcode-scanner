@@ -12,7 +12,7 @@ QR codes to styled, AI-generated and photographed QR codes.
 [![npm](https://img.shields.io/npm/v/@supernovae-st/qrcode-ai-scanner?style=flat-square&logo=npm&logoColor=white&label=npm&color=CB3837)](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner)
 [![PyPI](https://img.shields.io/pypi/v/qrcode-ai-scanner?style=flat-square&logo=pypi&logoColor=white&label=PyPI&color=3776AB)](https://pypi.org/project/qrcode-ai-scanner/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0%20or%20Commercial-blue?style=flat-square)](LICENSING.md)
-[![CI](https://img.shields.io/github/actions/workflow/status/supernovae-st/qrcode-barcode-scanner/ci.yml?style=flat-square&logo=github&label=CI)](https://github.com/supernovae-st/qrcode-barcode-scanner/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?style=flat-square&logo=github&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions)
 
 **[Formats](#supported-formats) · [Install](#install) · [Quick start](#quick-start) · [QR quality](#qr-quality-and-recovery) · [Results](#corpus-results) · [Documentation](#documentation--spec)**
 
@@ -69,9 +69,11 @@ other formats do not receive invented QR scores. See the
 ## Install
 
 > **Repository name and package names are different.** The source repository is
-> `supernovae-st/qrcode-barcode-scanner`. Existing releases still use the
-> `qrcode-ai-scanner` names below. The repository rename does not create a new
-> release, rename a package or change its license.
+> `qrcode-ai-com/qrcode-barcode-scanner`, transferred from
+> `supernovae-st/qrcode-barcode-scanner`, whose addresses redirect. Existing
+> releases still use the `qrcode-ai-scanner` names below. The transfer and the
+> earlier rename do not create a new release, rename a package or change its
+> license.
 
 The retained release references are **0.10.1 for Rust, CLI, Node and WASM**,
 and **0.9.0 for Python**. Use each registry page to check the version you install
@@ -102,7 +104,7 @@ Consult each binding's README for its implementation and current install path:
 [GHCR](https://github.com/orgs/supernovae-st/packages/container/package/qrcode-ai-scanner)
 and [Docker Hub](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner).
 The MCP adapter and portable skill 0.1.0 are in the
-[agents release](https://github.com/supernovae-st/qrcode-barcode-scanner/releases/tag/agents-v0.1.0),
+[agents release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.1.0),
 and the skill is also on [ClawHub](https://clawhub.ai/thibautmelen/skills/qr-image-scanner).
 Use the [installation guide](distribution/README.md) for exact downloads,
 immutable digests, licenses and qualified clients.
@@ -366,7 +368,7 @@ can differ by registry; a source version does not establish a successful release
 ## Contributing & security
 
 Develop this scanner in
-[`supernovae-st/qrcode-barcode-scanner`](https://github.com/supernovae-st/qrcode-barcode-scanner).
+[`qrcode-ai-com/qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner).
 It is one multiformat engine with a family of runtime bindings. The QR Code AI
 application and its creation engine have separate sources and release processes.
 See the [source and package contract](SOURCE-AND-EXTRACTION.md).

@@ -246,7 +246,7 @@ jobs:
       # accepts OIDC from a package whose admin has enabled GitHub-Actions
       # publishing — a setting that exists only once the package exists. The
       # first `flutter pub publish` is a manual operator act (Google account),
-      # then enable automated publishing (repo supernovae-st/qrcode-ai-scanner,
+      # then enable automated publishing (repo qrcode-ai-com/qrcode-barcode-scanner,
       # tag pattern v{{version}}, required environment `pub`) and every later
       # tag publishes hands-free.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1

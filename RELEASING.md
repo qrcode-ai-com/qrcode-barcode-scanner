@@ -2,7 +2,9 @@
 
 ## Source identity and existing releases
 
-The source repository is `supernovae-st/qrcode-barcode-scanner`. Release one
+The source repository is `qrcode-ai-com/qrcode-barcode-scanner`, transferred
+from `supernovae-st/qrcode-barcode-scanner` (earlier `supernovae-st/qrcode-ai-scanner`)
+on 1 November 2026; the old addresses redirect. Release one
 multiformat engine and its runtime bindings; no QR/barcode extraction is required.
 Existing package names, tags, registry artifacts and OCI image metadata retain
 their identities. See [SOURCE-AND-EXTRACTION.md](SOURCE-AND-EXTRACTION.md).
@@ -10,6 +12,15 @@ their identities. See [SOURCE-AND-EXTRACTION.md](SOURCE-AND-EXTRACTION.md).
 The repository rename does not publish packages or change publisher grants.
 Before a future release, verify trusted-publisher/OIDC settings and source links
 against the actual repository identity. Follow the artifact-specific gates below.
+The transfer changed the GitHub OIDC identity every trusted publisher matches
+on: tokens now name owner `qrcode-ai-com` and repository
+`qrcode-barcode-scanner`. Package metadata already names that repository (npm
+provenance requires `repository.url` to match the building repository). The
+publishers on crates.io, npm and PyPI recorded below as of 0.10.1 name the
+pre-transfer `supernovae-st/qrcode-ai-scanner`; their owner re-binds each one to
+`qrcode-ai-com/qrcode-barcode-scanner` (same workflow file and environment)
+before the first upload from the new repository, and pub.dev at its first
+automated publish. Until then a publishing job stops at authentication.
 
 The proven runbook — three releases shipped with it on 2026-07-08 alone
 (0.6.0 · 0.7.0 · 0.7.1). Every step exists because skipping it bit us once;
@@ -423,15 +434,17 @@ performs them):
    unprotected environment accepts a run from any branch. The old `pub.dev`
    environment is no longer referenced and can go.
 2. crates.io, for `qrcode-ai-scanner` and for `qrcode-ai-scanner-cli`:
-   Settings › Trusted Publishing › add GitHub: owner `supernovae-st`,
-   repository `qrcode-ai-scanner`, workflow `crates-publish.yml`,
+   Settings › Trusted Publishing › add GitHub: owner `qrcode-ai-com`,
+   repository `qrcode-barcode-scanner` (the 0.10.x binding named
+   `supernovae-st` / `qrcode-ai-scanner`), workflow `crates-publish.yml`,
    environment `crates-io`; then restrict both crates to trusted publishing.
 3. npmjs.com, for each of the eight packages —
    `@supernovae-st/qrcode-ai-scanner`, `-darwin-arm64`, `-darwin-x64`,
    `-linux-x64-gnu`, `-linux-arm64-gnu`, `-linux-x64-musl`,
    `-win32-x64-msvc` and `-wasm`: Settings › Trusted Publisher › GitHub
-   Actions: organization or user `supernovae-st`, repository
-   `qrcode-ai-scanner`, workflow `npm-publish.yml`, environment `npm`; then
+   Actions: organization or user `qrcode-ai-com`, repository
+   `qrcode-barcode-scanner` (0.10.x: `supernovae-st` / `qrcode-ai-scanner`),
+   workflow `npm-publish.yml`, environment `npm`; then
    Settings › Publishing access › *Require two-factor authentication and
    disallow tokens*.
 4. **Recommended: required reviewers** on `crates-io`, `npm` and `release`
@@ -440,9 +453,10 @@ performs them):
    staffing allows), so every publish waits for a second person. On `release`
    it also holds the pre-change python.yml of the tags v0.5.0 to v0.9.0,
    which no token revocation stops (step 0).
-5. PyPI: confirm the existing trusted publisher still reads owner
-   `supernovae-st`, repository `qrcode-ai-scanner`, workflow `python.yml`,
-   environment `release` (unchanged here).
+5. PyPI: re-bind the existing trusted publisher (0.9.0: owner
+   `supernovae-st`, repository `qrcode-ai-scanner`) to owner `qrcode-ai-com`,
+   repository `qrcode-barcode-scanner`, workflow `python.yml`, environment
+   `release`.
 6. pub.dev, once a user has made the first upload. Before its trusted
    publisher is configured, in one change: pin the Flutter and Dart SDKs of
    flutter › publish to exact versions, take the lockfile decision for its
@@ -450,7 +464,7 @@ performs them):
    recorded no), and delete the named exception from
    scripts/check-publish-guards.py (the check fails on a waiver left with
    nothing to waive). Then Admin › Automated publishing › enable GitHub
-   Actions: repository `supernovae-st/qrcode-ai-scanner`, tag pattern
+   Actions: repository `qrcode-ai-com/qrcode-barcode-scanner`, tag pattern
    `v{{version}}`, require environment `pub`.
    Use `scripts/stage-flutter-package.py` from the exact committed candidate
    for the manual upload too; never publish `bindings/flutter` directly.
