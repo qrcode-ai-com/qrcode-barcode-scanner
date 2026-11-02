@@ -165,7 +165,8 @@ jobs:
   # supported Node majors, as npm-publish.yml consume-native and consume-wasm
   # run them at tag time: the tarballs the smoke jobs packed and read back,
   # installed offline outside the checkout. The judge's own planted-defect
-  # scenarios run first.
+  # scenarios run first. The native rows start at the floor the package
+  # advertises (engines.node >= 18).
   node-consumer:
     needs: node-smoke
     runs-on: ubuntu-24.04
@@ -173,7 +174,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [18, 20, 22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

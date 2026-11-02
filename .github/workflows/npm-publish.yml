@@ -481,6 +481,8 @@ jobs:
 
   # Real installs from the inspected tarballs, on both supported Node lines
   # and every native target. No registry fallback, lifecycle script or OIDC.
+  # From the floor the main package advertises (engines.node >= 18) through
+  # the current majors, on every target.
   consume-native:
     needs: pack-native
     runs-on: ${{ matrix.platform.runner }}
@@ -488,7 +490,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [18, 20, 22, 24]
         platform:
           - { runner: ubuntu-24.04, suffix: linux-x64-gnu }
           - { runner: ubuntu-24.04-arm, suffix: linux-arm64-gnu }
@@ -533,7 +535,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Official Node Alpine amd64 manifests, resolved 2026-10-13.
+          # Official Node Alpine amd64 manifests: 18 (18.20.8) and 20 (20.20.2)
+          # resolved 2026-11-02, 22 and 24 resolved 2026-10-13.
+          - { node: 18, image: 'node:18-alpine@sha256:929b04d7c782f04f615cf785488fed452b6569f87c73ff666ad553a7554f0006' }
+          - { node: 20, image: 'node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb' }
           - { node: 22, image: 'node:22-alpine@sha256:2c752226d477b4a886378baa95b9af252be59301b725fdb0b7e15208131505a8' }
           - { node: 24, image: 'node:24-alpine@sha256:83f1c388c31fb2e51f7cbd4dea949b96260798c98f206e8e4696bc93bd964e3a' }
     steps:

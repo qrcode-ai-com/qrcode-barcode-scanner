@@ -136,6 +136,10 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `RUSTUP_TOOLCHAIN`, else `RUST_TOOLCHAIN`, else the one CI pin, exported to
   every Cargo call and checked against `rustc -vV`. Its receipt records
   `rustc -vV` and `cargo -V`, so a local rustup default no longer selects it.
+- The native Node package's advertised floor (`engines.node >= 18`) is
+  executed: its packed consumers run on Node 18, 20, 22 and 24 for every
+  release target, musl included, and for linux-x64-gnu on every pull request.
+  The floor itself is unchanged.
 - Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.
