@@ -1747,7 +1747,7 @@ fn known_limits() -> Value {
         "same_cut": "pairs both variants cut at the same share of their own reference walks carry no speed verdict; budget_bound.same_cut counts them per class",
         "lost_decodes": "a decode the budget costs one side only is an A/B disagreement exclusion, outside the McNemar tests; the status line names it, and a dry run's pre-screen reports its share per set",
         "prescreen": "dry runs: per budgeted mode and set, the images whose A/B outputs disagree between the variants or across one variant's repetitions, as a share of the set's images; above 10 % a gated run of that mode would end partial — information to re-scope the mode before any gated timing, never a gated decision",
-        "knee_bisection": "a budget that cuts a knee bisection leaves the score complete and drops only that axis's refined_failed_at, which the judgment signature does not carry, so the truncation test cannot see it; the candidate's trace.budget_exhausted reports the cut (counted per side); seeing it would take a per-axis refined marker in the three signature builders (library worker, CLI report parser, Node and WASM drivers) and a worker protocol bump",
+        "knee_bisection": "a budget that cuts a knee bisection leaves the score complete and drops only that axis's refined_failed_at, which the judgment signature does not carry, so the truncation test cannot see it; each side's trace.budget_exhausted reports the cut (0.10.1 and this tree both report it; counted per side); seeing it would take a per-axis refined marker in the three signature builders (library worker, CLI report parser, Node and WASM drivers) and a worker protocol bump",
     })
 }
 
@@ -2167,10 +2167,11 @@ pub(crate) fn write(m: &Measurement, out: &Path) -> Result<i32, String> {
         .collect();
     let excluded = excluded_totals(&segments);
     let mut body = format!(
-        "\n## Latency (outer call, ms; A = base 0.9.0, B = candidate; over the valid pairs; set rows — groups in receipt.json)\n\n\
+        "\n## Latency (outer call, ms; A = base {base}, B = candidate; over the valid pairs; set rows — groups in receipt.json)\n\n\
          | target | class | n | A p50 | A p95 | A max | B p50 | B p95 | B max | excluded pairs | complete / valid pairs | Δ HL [95 % CI] | p50 | p95 tail |\n\
          |---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n{}",
-        tables.latency
+        tables.latency,
+        base = super::BASE_VERSION
     );
     if !tables.budget.is_empty() {
         let _ = write!(
@@ -3214,6 +3215,26 @@ mod tests {
         assert!(!format!("{json}{md}").contains("qrscan-oracle"));
     }
 
+    /// The latency table names the base it reads as A: the release the
+    /// harness pins, never an earlier one.
+    #[test]
+    fn the_latency_table_names_the_pinned_base() {
+        let m = measurement(&complete_scope(), 10, vec![segment(10, 10.0, 1.0)]);
+        let dir =
+            std::env::temp_dir().join(format!("qrscan-bench-base-label-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("dir");
+        write(&m, &dir).expect("written");
+        let md = std::fs::read_to_string(dir.join("receipt.md")).expect("receipt.md");
+        let _ = std::fs::remove_dir_all(&dir);
+        let heading = format!(
+            "## Latency (outer call, ms; A = base {}, B = candidate;",
+            super::super::BASE_VERSION
+        );
+        assert!(md.contains(&heading), "{md}");
+        assert!(!md.contains("A = base 0.9.0"), "{md}");
+    }
+
     /// Every metric of the frozen scope a run did not measure is declared,
     /// not testable, with why — 209 rows for one lib/frame segment on the
     /// vendored set.
@@ -3962,6 +3983,64 @@ mod tests {
         .expect("json");
         assert_eq!(sample["alpha"], "envelope");
         assert!(sample["budget_exhausted"].is_boolean());
+    }
+
+    /// A budget that cuts a knee bisection on the base — 0.10.1 reports
+    /// its own `trace.budget_exhausted`, as this tree does — leaves the
+    /// walk and the judgment as the reference's: every pair stays complete,
+    /// and the base's flags are counted on its side, beside the
+    /// candidate's.
+    #[test]
+    fn a_base_budget_flag_is_counted_on_its_own_side() {
+        let judged = "v80w100,5/5";
+        let flag = |s: Sample, exhausted: bool| Sample {
+            budget_exhausted: Some(exhausted),
+            ..s
+        };
+        let images = (0..6)
+            .map(|i| {
+                let t = 900.0 + f64::from(i);
+                let text = format!("qr{i}");
+                let reference = flag(call(0, 1.0, (3, 6), &text, Some(judged)), false);
+                let base: Vec<Sample> = calls(&[t; 5], (3, 6), &text, Some(judged))
+                    .into_iter()
+                    .map(|s| {
+                        let cut = s.rep == 3;
+                        flag(s, cut)
+                    })
+                    .collect();
+                let candidate: Vec<Sample> = calls(&[t; 5], (3, 6), &text, Some(judged))
+                    .into_iter()
+                    .map(|s| flag(s, false))
+                    .collect();
+                [(base, reference.clone()), (candidate, reference)]
+            })
+            .collect();
+        let m = measurement(&complete_scope(), 6, vec![model(Mode::Full, images)]);
+        let json = segment_json(
+            &m,
+            &m.segments[0],
+            false,
+            &mut Vec::new(),
+            &mut Tables::default(),
+        );
+        let set = json["classes"]
+            .as_array()
+            .and_then(|c| c.iter().find(|c| c["class"] == "vendored"))
+            .expect("set row");
+        let flags = |side: &str| {
+            (
+                set[side]["budget_exhausted"]["calls_reporting"].clone(),
+                set[side]["budget_exhausted"]["exhausted"].clone(),
+            )
+        };
+        assert_eq!(flags("base"), (json!(30), json!(6)));
+        assert_eq!(flags("candidate"), (json!(30), json!(0)));
+        assert_eq!(
+            (&set["pairs"]["valid"], &set["pairs"]["truncated"]),
+            (&json!(6), &json!(0)),
+            "the flag is information: every pair complete"
+        );
     }
 
     /// Memory median shift and tail, δ 10 % each, and the 512 MiB envelope

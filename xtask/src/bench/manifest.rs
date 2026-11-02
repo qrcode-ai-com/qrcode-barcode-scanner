@@ -5,8 +5,8 @@
 //! dirty flag — and what the build itself reported. `bench stamp` runs the
 //! build: for cargo it reads the `--message-format=json` stream (how the
 //! artifact's unit, the scanner and rxing compiled), for a WASM package it
-//! records the binaryen and the script's recipe; both keep the codegen
-//! environment. The manifest lands next to the artifact
+//! records the binaryen and the script's recipe for that package; both
+//! keep the codegen environment. The manifest lands next to the artifact
 //! (`<file>.build.json`, or `build.json` inside a package directory);
 //! `bench run` reads it back, checks that it describes the file it
 //! measures, and refuses a gated pair whose compilers, profiles, builds or
@@ -534,7 +534,8 @@ pub(crate) struct Build {
 }
 
 /// A WASM package's build beyond its module: the binaryen that optimized
-/// it, with the flags and `RUSTFLAGS` its build script passes.
+/// it, with the flags and `RUSTFLAGS` its build script passes for that
+/// package ([`script_recipe_for`]).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct WasmBuild {
     pub(crate) command: Vec<String>,
@@ -818,11 +819,12 @@ pub(crate) fn stamp_build(
 }
 
 /// The wasm-opt flags and `RUSTFLAGS` a WASM build script passes: the
-/// options of the line that runs `wasm-opt` (its command word, after any
-/// `VAR=value`) up to its `-o`, and the `RUSTFLAGS="…"` value. A line that
-/// only mentions it — `command -v wasm-opt`, `wasm-opt --version` — is no
-/// recipe. CRLF line ends (a Windows checkout) read as LF, so a line that
-/// continues with `\` still joins the next one.
+/// options of the first line that runs `wasm-opt` (its command word, after
+/// any `VAR=value`) up to its `-o`, and the first `RUSTFLAGS="…"` value. A
+/// line that only mentions it — `command -v wasm-opt`, `wasm-opt
+/// --version` — is no recipe. CRLF line ends (a Windows checkout) read as
+/// LF, so a line that continues with `\` still joins the next one. A stamp
+/// reads the recipe of the package it names ([`script_recipe_for`]).
 pub(crate) fn script_recipe(script: &str) -> (Vec<String>, Option<String>) {
     let joined = script.replace("\r\n", "\n").replace("\\\n", " ");
     let flags = joined
@@ -847,10 +849,135 @@ pub(crate) fn script_recipe(script: &str) -> (Vec<String>, Option<String>) {
     (flags, rustflags)
 }
 
+/// The recipe of the one package a WASM build script built in `package`,
+/// for a script that builds several (v0.10.1: a SIMD module in `pkg`, a
+/// portable one in `pkg/compatible`): the `RUSTFLAGS="…"` prefix of the
+/// first `wasm-pack build` whose `--out-dir` (default `pkg`) ends
+/// `package`'s path, and the options of the first `wasm-opt` run whose
+/// input lies in such a directory — both matched by whole path components,
+/// so `pkg` never reads the lines of `pkg/compatible`, nor the reverse.
+/// Each falls back to [`script_recipe`]'s first match when no line names
+/// the package's directory (or the matching `wasm-pack` carries no
+/// `RUSTFLAGS` prefix): a script that builds one package reads the same
+/// either way.
+pub(crate) fn script_recipe_for(script: &str, package: &Path) -> (Vec<String>, Option<String>) {
+    let (first_flags, first_rustflags) = script_recipe(script);
+    let names = |dir: &Path| {
+        let dir: PathBuf = dir
+            .components()
+            .filter(|c| !matches!(c, std::path::Component::CurDir))
+            .collect();
+        !dir.as_os_str().is_empty() && package.ends_with(&dir)
+    };
+    let mut flags: Option<Vec<String>> = None;
+    let (mut packed, mut rustflags) = (false, None);
+    let joined = script.replace("\r\n", "\n").replace("\\\n", " ");
+    for line in joined.lines() {
+        let words = shell_words(line);
+        let at = words
+            .iter()
+            .position(|w| !is_assignment(w))
+            .unwrap_or(words.len());
+        let (assignments, command) = words.split_at(at);
+        match command.first().map(String::as_str) {
+            Some("wasm-pack")
+                if !packed
+                    && command.get(1).is_some_and(|w| w == "build")
+                    && names(Path::new(out_dir(&command[2..]))) =>
+            {
+                packed = true;
+                rustflags = assignments
+                    .iter()
+                    .find_map(|w| w.strip_prefix("RUSTFLAGS=").map(str::to_owned));
+            }
+            Some("wasm-opt") if flags.is_none() => {
+                let options: Vec<&String> =
+                    command[1..].iter().take_while(|w| *w != "-o").collect();
+                let input = options.iter().find(|w| !w.starts_with('-'));
+                let probe = options.iter().any(|w| *w == "--version");
+                if !probe
+                    && input
+                        .and_then(|i| Path::new(i.as_str()).parent())
+                        .is_some_and(names)
+                {
+                    flags = Some(
+                        options
+                            .into_iter()
+                            .filter(|w| w.starts_with('-'))
+                            .cloned()
+                            .collect(),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    (flags.unwrap_or(first_flags), rustflags.or(first_rustflags))
+}
+
+/// One script line split into words as the shell splits these build
+/// steps: blanks separate words, single and double quotes group and are
+/// dropped. No expansion, no escapes.
+fn shell_words(line: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut quote: Option<char> = None;
+    let mut started = false;
+    for c in line.chars() {
+        match quote {
+            Some(open) if c == open => quote = None,
+            Some(_) => word.push(c),
+            None if c == '"' || c == '\'' => {
+                quote = Some(c);
+                started = true;
+            }
+            None if c.is_whitespace() => {
+                if started {
+                    words.push(std::mem::take(&mut word));
+                    started = false;
+                }
+            }
+            None => {
+                word.push(c);
+                started = true;
+            }
+        }
+    }
+    if started {
+        words.push(word);
+    }
+    words
+}
+
+/// A `NAME=value` word: a variable the shell sets for the command after it.
+fn is_assignment(word: &str) -> bool {
+    word.split_once('=').is_some_and(|(name, _)| {
+        name.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    })
+}
+
+/// The output directory of a `wasm-pack build`'s arguments: `--out-dir`
+/// (`-d`) before the `--` that starts cargo's own, `pkg` without one;
+/// empty — no directory named — when the flag has no value.
+fn out_dir(args: &[String]) -> &str {
+    let mut args = args.iter().take_while(|a| *a != "--");
+    while let Some(arg) = args.next() {
+        if arg == "--out-dir" || arg == "-d" {
+            return args.next().map_or("", String::as_str);
+        }
+        if let Some(dir) = arg.strip_prefix("--out-dir=") {
+            return dir;
+        }
+    }
+    "pkg"
+}
+
 /// Run `command` (the WASM build script) and stamp the package it built in
 /// `package`: the module's facts, the toolchain, `wasm-opt --version` from
-/// `wasm_opt` (on the build's PATH), and the script's recipe. The package
-/// must lie under `source`, the source the manifest names.
+/// `wasm_opt` (on the build's PATH), and the script's recipe for that
+/// package ([`script_recipe_for`]). The package must lie under `source`,
+/// the source the manifest names.
 pub(crate) fn stamp_wasm(
     package: &Path,
     source: &Path,
@@ -879,9 +1006,12 @@ pub(crate) fn stamp_wasm(
         .iter()
         .find(|a| Path::new(a).extension().is_some_and(|e| e == "sh"))
         .and_then(|a| std::fs::read(a).ok());
+    // the package as the script's lines name it: its whole path, so a
+    // relative `--package` (even `.`) still ends with its directory
+    let named = std::fs::canonicalize(package).unwrap_or_else(|_| package.to_path_buf());
     let (wasm_opt_flags, rustflags) = script
         .as_deref()
-        .map(|s| script_recipe(&String::from_utf8_lossy(s)))
+        .map(|s| script_recipe_for(&String::from_utf8_lossy(s), &named))
         .unwrap_or_default();
     manifest.wasm_build = Some(WasmBuild {
         command: redacted(command),
@@ -1232,24 +1362,54 @@ mod tests {
         assert_eq!(embedded_rustc_commits(b"no compiler here").len(), 0);
     }
 
-    /// The CLI pair: the published crate has no profile (cargo's defaults),
-    /// the candidate overrides the workspace profile back to the defaults.
-    /// Both effective profiles are the same map.
+    /// The one profile table of the published 0.10.1 CLI crate's manifest.
+    const PUBLISHED_CLI_PROFILE: &str = "[profile.release.package.rxing]\noverflow-checks = true\n";
+
+    /// The `--config` overrides that bring the workspace profile to the
+    /// published CLI crate's: cargo's defaults, rxing's overflow checks kept.
+    const CLI_OVERRIDES: [&str; 3] = [
+        "profile.release.lto=false",
+        "profile.release.codegen-units=16",
+        "profile.release.strip=\"debuginfo\"",
+    ];
+
+    /// The CLI pair: the published crate carries one profile table —
+    /// rxing's overflow checks — over cargo's defaults; the candidate
+    /// overrides the workspace profile back to the defaults and keeps
+    /// rxing's checks. Both effective profiles are the same map. Turning
+    /// rxing's checks off too, as the 0.9.0 crate (no profile at all)
+    /// needed, is now a refused profile.
     #[test]
     fn profiles_compare_after_defaults_and_overrides() {
-        let published = profile(None, &[]);
-        let candidate = profile(
-            Some(WORKSPACE_PROFILE),
-            &[
-                "profile.release.lto=false",
-                "profile.release.codegen-units=16",
-                "profile.release.strip=\"debuginfo\"",
-                "profile.release.package.rxing.overflow-checks=false",
-            ],
-        );
+        let published = profile(Some(PUBLISHED_CLI_PROFILE), &[]);
+        let candidate = profile(Some(WORKSPACE_PROFILE), &CLI_OVERRIDES);
         assert_eq!(published, candidate);
         assert_eq!(published.get("lto").map(String::as_str), Some("false"));
-        assert_eq!(published.len(), RELEASE_DEFAULTS.len());
+        assert_eq!(
+            published
+                .get("package.rxing.overflow-checks")
+                .map(String::as_str),
+            Some("true")
+        );
+        assert_eq!(published.len(), RELEASE_DEFAULTS.len() + 1);
+        assert_eq!(
+            profile(None, &[]).len(),
+            RELEASE_DEFAULTS.len(),
+            "a crate without a profile table builds with cargo's defaults"
+        );
+        let c1 = vec![String::from("1111111111111111111111111111111111111111")];
+        let base = manifest("aa", &c1[0], Some(PUBLISHED_CLI_PROFILE), &[]);
+        let fit = manifest("bb", &c1[0], Some(WORKSPACE_PROFILE), &CLI_OVERRIDES);
+        assert!(
+            native_parity(("aa", &c1, Some(&base)), ("bb", &c1, Some(&fit))).is_empty(),
+            "the three overrides: a fit CLI pair"
+        );
+        let mut unchecked = CLI_OVERRIDES.to_vec();
+        unchecked.push("profile.release.package.rxing.overflow-checks=false");
+        let stale = manifest("bb", &c1[0], Some(WORKSPACE_PROFILE), &unchecked);
+        let found = native_parity(("aa", &c1, Some(&base)), ("bb", &c1, Some(&stale)));
+        assert_eq!(whats(&found), vec!["profile"]);
+        assert_eq!(found[0].detail, "package.rxing.overflow-checks: true vs -");
 
         let workspace = profile(Some(WORKSPACE_PROFILE), &[]);
         assert_eq!(workspace.get("lto").map(String::as_str), Some("\"thin\""));
@@ -1835,6 +1995,139 @@ mod tests {
         );
     }
 
+    /// The v0.10.1 `scripts/build-wasm.sh` up to its first variant: the
+    /// binaryen probes, then the SIMD module built and optimized in `pkg`.
+    const V0101_SIMD: &str = r#"if ! command -v wasm-opt >/dev/null; then
+  exit 1
+fi
+opt_version=$(wasm-opt --version | sed -nE 's/.*version ([0-9]+).*/\1/p')
+cd "$(dirname "$0")/../crates/qrcode-ai-scanner-wasm"
+RUSTFLAGS="-C target-feature=+simd128,-relaxed-simd" wasm-pack build \
+  --target web --release --out-name qrcode-ai-scanner -- --locked
+
+wasm-opt pkg/qrcode-ai-scanner_bg.wasm \
+  -O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
+  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --enable-simd \
+  -o pkg/qrcode-ai-scanner_bg.wasm.opt
+mv pkg/qrcode-ai-scanner_bg.wasm.opt pkg/qrcode-ai-scanner_bg.wasm
+"#;
+
+    /// Its second variant: the portable module built and optimized in
+    /// `pkg/compatible`, then validated without SIMD into `/dev/null`.
+    const V0101_PORTABLE: &str = r#"RUSTFLAGS="-C target-feature=-simd128,-relaxed-simd" wasm-pack build \
+  --target web --release --out-dir pkg/compatible --out-name qrcode-ai-scanner -- --locked
+wasm-opt pkg/compatible/qrcode-ai-scanner_bg.wasm \
+  -O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
+  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
+  -o pkg/compatible/qrcode-ai-scanner_bg.wasm.opt
+mv pkg/compatible/qrcode-ai-scanner_bg.wasm.opt pkg/compatible/qrcode-ai-scanner_bg.wasm
+wasm-opt pkg/compatible/qrcode-ai-scanner_bg.wasm \
+  --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
+  --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
+  -o /dev/null
+WASM_VARIANT=compatible node test.mjs
+"#;
+
+    /// The recipe of one v0.10.1 variant: the optimizer's floor with its
+    /// SIMD switch, and the `RUSTFLAGS` its `wasm-pack` builds with.
+    fn v0101_recipe(simd: bool) -> (Vec<String>, Option<String>) {
+        let switch = if simd {
+            "--enable-simd"
+        } else {
+            "--disable-simd"
+        };
+        let flags = [
+            "-O3",
+            "--mvp-features",
+            "--enable-mutable-globals",
+            "--enable-nontrapping-float-to-int",
+            "--enable-bulk-memory",
+            "--enable-sign-ext",
+            "--enable-reference-types",
+            "--enable-multivalue",
+            switch,
+        ];
+        let rustflags = if simd {
+            "-C target-feature=+simd128,-relaxed-simd"
+        } else {
+            "-C target-feature=-simd128,-relaxed-simd"
+        };
+        (
+            flags.map(String::from).to_vec(),
+            Some(String::from(rustflags)),
+        )
+    }
+
+    /// A script that builds two packages records the stamped one's recipe,
+    /// in either order: `pkg` never reads the lines of `pkg/compatible` nor
+    /// the reverse (whole path components), the portable module's recipe
+    /// is its optimizer line — not the validation into `/dev/null` after
+    /// it — and a relative package path matches like an absolute one.
+    #[test]
+    fn a_two_variant_script_yields_the_recipe_of_the_stamped_package() {
+        let (simd, portable) = (v0101_recipe(true), v0101_recipe(false));
+        let wasm = Path::new("/w/qrcode-ai-scanner-0.10.1/crates/qrcode-ai-scanner-wasm");
+        let (pkg, compatible) = (wasm.join("pkg"), wasm.join("pkg/compatible"));
+        let release = format!("{V0101_SIMD}{V0101_PORTABLE}");
+        assert_eq!(script_recipe_for(&release, &pkg), simd);
+        assert_eq!(script_recipe_for(&release, &compatible), portable);
+        assert_eq!(
+            script_recipe(&release),
+            simd,
+            "the first match alone would give the portable package the SIMD recipe"
+        );
+        assert_eq!(
+            script_recipe_for(
+                &release,
+                Path::new("crates/qrcode-ai-scanner-wasm/pkg/compatible/")
+            ),
+            portable,
+            "a relative package path"
+        );
+        let reversed = format!("{V0101_PORTABLE}{V0101_SIMD}");
+        assert_eq!(script_recipe_for(&reversed, &pkg), simd);
+        assert_eq!(script_recipe_for(&reversed, &compatible), portable);
+        assert_eq!(
+            script_recipe(&reversed),
+            portable,
+            "the first match alone would give the SIMD package the portable recipe"
+        );
+        let unnamed = Path::new("/w/dist");
+        assert_eq!(
+            script_recipe_for(&release, unnamed),
+            script_recipe(&release),
+            "a package no line names: the script's first recipe"
+        );
+    }
+
+    /// A script that builds one package reads the same recipe whichever
+    /// package is stamped — the release script of this tree, and lines that
+    /// name no directory — and a `wasm-pack` without its own `RUSTFLAGS`
+    /// prefix leaves the script's first one.
+    #[test]
+    fn a_one_package_script_falls_back_to_its_first_recipe() {
+        let script = std::fs::read_to_string(crate::repo_root().join("scripts/build-wasm.sh"))
+            .expect("the release script");
+        assert_eq!(
+            script_recipe_for(
+                &script,
+                Path::new("/w/tree/crates/qrcode-ai-scanner-wasm/pkg")
+            ),
+            script_recipe(&script)
+        );
+        let crlf = "RUSTFLAGS=\"-C x\" b\r\nwasm-opt in.wasm \\\r\n  -O3 \\\r\n  -o o\r\n";
+        assert_eq!(
+            script_recipe_for(crlf, Path::new("/w/pkg")),
+            (vec![String::from("-O3")], Some(String::from("-C x")))
+        );
+        let exported = "export RUSTFLAGS=\"-C y\"\nwasm-pack build --out-dir dist\n\
+                        wasm-opt dist/w_bg.wasm -Oz -o dist/w.opt\n";
+        assert_eq!(
+            script_recipe_for(exported, Path::new("/w/dist")),
+            (vec![String::from("-Oz")], Some(String::from("-C y")))
+        );
+    }
+
     /// `stamp --wasm` runs the build script, then records the module, the
     /// toolchain, `wasm-opt --version` and the script's recipe.
     #[test]
@@ -1885,6 +2178,47 @@ mod tests {
             Some("-C target-feature=+simd128")
         );
         assert_eq!(built.command, vec!["sh", "…/build-wasm.sh"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `stamp --wasm` of a script that builds two packages records the
+    /// recipe of the package it was given: the base's portable
+    /// `pkg/compatible` gets the portable recipe, its SIMD `pkg` the SIMD
+    /// one.
+    #[test]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn a_wasm_stamp_records_the_recipe_of_the_package_it_names() {
+        let dir =
+            std::env::temp_dir().join(format!("qrscan-bench-wasm-variants-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let crate_dir = dir.join("crates/qrcode-ai-scanner-wasm");
+        let (pkg, compatible) = (crate_dir.join("pkg"), crate_dir.join("pkg/compatible"));
+        std::fs::create_dir_all(&compatible).expect("dir");
+        std::fs::write(dir.join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        // the recipe follows `exit 0`: read from the text, never run
+        let script = dir.join("build-wasm.sh");
+        std::fs::write(
+            &script,
+            format!(
+                "printf '\\000asm\\001\\000\\000\\000' > {p}/qrcode-ai-scanner_bg.wasm\n\
+                 printf '\\000asm\\001\\000\\000\\000' > {c}/qrcode-ai-scanner_bg.wasm\n\
+                 exit 0\n{V0101_SIMD}{V0101_PORTABLE}",
+                p = pkg.display(),
+                c = compatible.display()
+            ),
+        )
+        .expect("script");
+        let command = vec![
+            String::from("sh"),
+            script.to_str().expect("utf-8").to_owned(),
+        ];
+        let recipe = |package: &Path| {
+            let stamped = stamp_wasm(package, &dir, &command, "true").expect("stamped");
+            let built = stamped.wasm_build.expect("a wasm build record");
+            (built.wasm_opt_flags, built.rustflags)
+        };
+        assert_eq!(recipe(&compatible), v0101_recipe(false));
+        assert_eq!(recipe(&pkg), v0101_recipe(true));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

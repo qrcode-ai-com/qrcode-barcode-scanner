@@ -1,5 +1,5 @@
 //! `xtask bench` — outer-call latency, memory, allocations, throughput and
-//! WASM cost of the scanner, base (the published 0.9.0) versus candidate
+//! WASM cost of the scanner, base (the published 0.10.1) versus candidate
 //! (this tree), by the benchmark method `qrscan-bench/v5`: the
 //! oracle's sets, four runtimes and four modes, the environment, the method
 //! and host gate, and the receipts, as `bench/README.md` states them.
@@ -10,9 +10,9 @@
 //!   crates outside the workspace — each its own `[workspace]` root with a
 //!   lockfile seeded from the workspace lock and the workspace release
 //!   profile — one depending on this tree by path, one on
-//!   `qrcode-ai-scanner = "=0.9.0"` from crates.io; given a built napi
+//!   `qrcode-ai-scanner = "=0.10.1"` from crates.io; given a built napi
 //!   library it also assembles the candidate Node package.
-//! - `bench prepare-base --work DIR …` extracts the v0.9.0 sources the base
+//! - `bench prepare-base --work DIR …` extracts the v0.10.1 sources the base
 //!   artifacts are rebuilt from (the release commit's `git archive`, the
 //!   published CLI crate), prints how to build each, and assembles the base
 //!   Node package.
@@ -78,17 +78,17 @@ const USAGE: &str = "usage: xtask bench <prepare --work <dir> [--node-addon <lib
                      | prepare-base --work <dir> [--node-addon <lib>] [--cli-crate <file>] \
                      | stamp --source <dir> (--artifact <file> | --wasm --package <dir>) -- <build command…> \
                      | inspect <path> | gate [--wait <seconds>] | run --out <dir> …>";
-/// The v0.9.0 release commit (tag `v0.9.0`): the source every rebuilt base
+/// The v0.10.1 release commit (tag `v0.10.1`): the source every rebuilt base
 /// artifact comes from.
-const BASE_COMMIT: &str = "170e3fb30008f0dc20793712213f7d4c6f2d233e";
+const BASE_COMMIT: &str = "af440882cd50728a3340eddf089ea2ce89d72a3f";
 /// The scanner version of that release: what a base worker's hello names
 /// and the version of the registry crate a base worker and CLI link.
-const BASE_VERSION: &str = "0.9.0";
-/// sha256 of the published `qrcode-ai-scanner-cli-0.9.0.crate` — the
+const BASE_VERSION: &str = "0.10.1";
+/// sha256 of the published `qrcode-ai-scanner-cli-0.10.1.crate` — the
 /// checksum crates.io lists for it: the base CLI's source.
-const CLI_CRATE_SHA256: &str = "f833a97b851ff95e2ec74da76ca0b428918b087c308f29e03b07e5f42d0043af";
+const CLI_CRATE_SHA256: &str = "74b5cdc747e4faa5f7d509c49acd0a778270d8734af7d8a305d24ab79b23a517";
 /// The directory `prepare-base` extracts that commit into.
-const BASE_DIR: &str = "qrcode-ai-scanner-0.9.0";
+const BASE_DIR: &str = "qrcode-ai-scanner-0.10.1";
 
 pub(crate) fn run(args: Vec<String>) {
     let mut args = args.into_iter();
@@ -152,6 +152,12 @@ fn write_file(path: &Path, content: &[u8]) -> Result<(), String> {
     std::fs::write(path, content).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+/// The base worker's requirement on the registry crate: exactly the base
+/// release.
+fn base_dependency() -> String {
+    format!("\"={BASE_VERSION}\"")
+}
+
 /// The worker crate for one side: manifest, seeded lock, main.
 fn write_worker(
     work: &Path,
@@ -205,7 +211,7 @@ fn prepare_in(work: &Path, node_addon: Option<&Path>) -> Result<(), String> {
         .ok_or("unusable scanner path")?;
     let tree = env::source(&root);
     let generated = [String::from("Cargo.toml"), String::from("src/main.rs")];
-    let base = write_worker(work, "base", "\"=0.9.0\"", &root)?;
+    let base = write_worker(work, "base", &base_dependency(), &root)?;
     let candidate = write_worker(work, "candidate", &format!("{{ path = '{core}' }}"), &root)?;
     for dir in [&base, &candidate] {
         manifest::mark_source(
@@ -218,7 +224,7 @@ fn prepare_in(work: &Path, node_addon: Option<&Path>) -> Result<(), String> {
     }
     println!("worker crates (outside the workspace, lock seeded from Cargo.lock):");
     println!(
-        "  {}  — qrcode-ai-scanner =0.9.0 from crates.io",
+        "  {}  — qrcode-ai-scanner ={BASE_VERSION} from crates.io",
         base.display()
     );
     println!(
@@ -381,7 +387,33 @@ fn is_empty_dir(dir: &Path) -> bool {
     std::fs::read_dir(dir).map_or(true, |mut entries| entries.next().is_none())
 }
 
-/// The v0.9.0 source tree, extracted once from `git archive` of
+/// The commit the base release's tag (`v` + [`BASE_VERSION`]) names in
+/// `root`, when the tag resolves there; a clone without tags has none.
+fn release_tag(root: &Path) -> Option<String> {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("rev-parse")
+        .arg(format!("v{BASE_VERSION}^{{commit}}"))
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+}
+
+/// A release tag that names another commit than [`BASE_COMMIT`] is refused:
+/// the version and the commit are one identity. Without the tag the pinned
+/// commit is archived as it is.
+fn check_release_tag(tag: Option<&str>) -> Result<(), String> {
+    match tag {
+        Some(commit) if commit != BASE_COMMIT => Err(format!(
+            "tag v{BASE_VERSION} names {tag:?}, not {BASE_COMMIT}"
+        )),
+        _ => Ok(()),
+    }
+}
+
+/// The v0.10.1 source tree, extracted once from `git archive` of
 /// [`BASE_COMMIT`] and marked; a later call checks the mark instead.
 fn base_source(work: &Path, root: &Path) -> Result<PathBuf, String> {
     let src = work.join(BASE_DIR);
@@ -389,7 +421,7 @@ fn base_source(work: &Path, root: &Path) -> Result<PathBuf, String> {
         let id = manifest::source_of(&src);
         if id.kind != "archive" || id.sha != BASE_COMMIT || id.tree != "clean" {
             return Err(format!(
-                "{}: not the clean v0.9.0 extraction ({} {} {})",
+                "{}: not the clean v{BASE_VERSION} extraction ({} {} {})",
                 src.display(),
                 id.kind,
                 id.sha,
@@ -404,17 +436,7 @@ fn base_source(work: &Path, root: &Path) -> Result<PathBuf, String> {
             src.display()
         ));
     }
-    let tag = std::process::Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["rev-parse", "v0.9.0^{commit}"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
-    if tag.as_deref().is_some_and(|t| t != BASE_COMMIT) {
-        return Err(format!("tag v0.9.0 names {tag:?}, not {BASE_COMMIT}"));
-    }
+    check_release_tag(release_tag(root).as_deref())?;
     let out = std::process::Command::new("git")
         .arg("-C")
         .arg(root)
@@ -431,7 +453,7 @@ fn base_source(work: &Path, root: &Path) -> Result<PathBuf, String> {
     manifest::mark_source(
         &src,
         "archive",
-        "git archive of tag v0.9.0",
+        &format!("git archive of tag v{BASE_VERSION}"),
         (BASE_COMMIT, "clean"),
         &files,
     )?;
@@ -443,7 +465,7 @@ fn base_source(work: &Path, root: &Path) -> Result<PathBuf, String> {
     Ok(src)
 }
 
-/// `prepare-base`: the v0.9.0 sources of the rebuilt base artifacts,
+/// `prepare-base`: the v0.10.1 sources of the rebuilt base artifacts,
 /// outside the workspace — the git archive of the release commit (the Node
 /// addon, and anything else built from the tree) and, given the published
 /// `.crate`, the CLI crate with its packaged lock. With a built and stamped
@@ -496,15 +518,17 @@ fn prepare_base_in(
         );
     }
     println!(
-        "v0.9.0 WASM package — build and stamp it from {s} on the candidate toolchain with the \
-         release recipe (wasm-bindgen of its lock, binaryen version_130 on PATH):\n  \
-         xtask bench stamp --wasm --source {s} --package {s}/crates/qrcode-ai-scanner-wasm/pkg \
+        "v{BASE_VERSION} WASM package — its portable module, pkg/compatible, built by the candidate's \
+         recipe (its SIMD pkg against the candidate is a refused pair); build and stamp it from {s} \
+         on the candidate toolchain with the release script (wasm-bindgen of its lock, binaryen \
+         version_130 on PATH):\n  \
+         xtask bench stamp --wasm --source {s} --package {s}/crates/qrcode-ai-scanner-wasm/pkg/compatible \
          -- bash {s}/scripts/build-wasm.sh",
         s = src.display()
     );
     let Some(addon) = addon else {
         println!(
-            "v0.9.0 source in {s} — build and stamp the base Node addon on the candidate toolchain, \
+            "v{BASE_VERSION} source in {s} — build and stamp the base Node addon on the candidate toolchain, \
              its own lock and workspace release profile (one cargo process at a time):\n  \
              xtask bench stamp --source {s} --artifact <target>/base-node/release/<cdylib> \
              -- cargo build -p qrcode-ai-scanner-node --release --locked --manifest-path {s}/Cargo.toml \
@@ -518,7 +542,7 @@ fn prepare_base_in(
     let stamped = manifest::read(&manifest::manifest_path(addon))?;
     if stamped.source.kind != "archive" || stamped.source.sha != BASE_COMMIT {
         return Err(format!(
-            "{}: the addon's manifest names source {} {}, not the v0.9.0 archive",
+            "{}: the addon's manifest names source {} {}, not the v{BASE_VERSION} archive",
             addon.display(),
             stamped.source.kind,
             stamped.source.sha
@@ -542,7 +566,7 @@ fn prepare_base_in(
         &dir,
     )?;
     println!(
-        "  {}  — the v0.9.0 Node package with the rebuilt addon",
+        "  {}  — the v{BASE_VERSION} Node package with the rebuilt addon",
         dir.display()
     );
     Ok(())
@@ -1141,7 +1165,7 @@ mod tests {
             .expect("workspace manifest");
         let template = WORKER_TOML
             .replace("@VARIANT@", "base")
-            .replace("@DEPENDENCY@", "\"=0.9.0\"");
+            .replace("@DEPENDENCY@", &base_dependency());
         let profile = |text: &str| {
             manifest::effective_profile(Some(text), &[])
                 .expect("profile")
@@ -1152,6 +1176,58 @@ mod tests {
             profile(&template).get("lto").map(String::as_str),
             Some("\"thin\""),
             "the template carries a profile, not cargo's defaults"
+        );
+    }
+
+    /// The base is one release: the extraction directory and the base
+    /// worker's registry requirement name its version, and the pins have
+    /// the shape of a commit and of a sha256.
+    #[test]
+    fn the_base_identity_is_one_release() {
+        let hex = |s: &str, len: usize| {
+            s.len() == len
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        assert!(hex(BASE_COMMIT, 40), "{BASE_COMMIT}");
+        assert!(hex(CLI_CRATE_SHA256, 64), "{CLI_CRATE_SHA256}");
+        assert_eq!(BASE_DIR, format!("qrcode-ai-scanner-{BASE_VERSION}"));
+        let manifest: toml::Table = toml::from_str(
+            &WORKER_TOML
+                .replace("@VARIANT@", "base")
+                .replace("@DEPENDENCY@", &base_dependency()),
+        )
+        .expect("the base worker manifest");
+        let requirement = manifest
+            .get("dependencies")
+            .and_then(|d| d.get("qrcode-ai-scanner"))
+            .and_then(toml::Value::as_str);
+        assert_eq!(
+            requirement,
+            Some(format!("={BASE_VERSION}").as_str()),
+            "the base worker links exactly the base release from the registry"
+        );
+    }
+
+    /// The release tag holds the base commit: a tag naming another commit
+    /// is refused, by version; an absent tag (a clone without tags) leaves
+    /// the pinned commit; and this clone's tag, when it has it, names
+    /// [`BASE_COMMIT`].
+    #[test]
+    fn the_release_tag_names_the_base_commit() {
+        assert_eq!(check_release_tag(Some(BASE_COMMIT)), Ok(()));
+        assert_eq!(check_release_tag(None), Ok(()));
+        let previous = "170e3fb30008f0dc20793712213f7d4c6f2d233e";
+        assert_eq!(
+            check_release_tag(Some(previous)),
+            Err(format!(
+                "tag v{BASE_VERSION} names Some({previous:?}), not {BASE_COMMIT}"
+            ))
+        );
+        let tag = release_tag(&repo());
+        assert!(
+            tag.is_none() || tag.as_deref() == Some(BASE_COMMIT),
+            "tag v{BASE_VERSION} names {tag:?}, not {BASE_COMMIT}"
         );
     }
 

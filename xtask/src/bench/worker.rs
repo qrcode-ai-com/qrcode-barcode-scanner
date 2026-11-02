@@ -2,7 +2,7 @@
 //!
 //! Compiled here (lints and tests) and, through a `#[path]` module, into
 //! the two binaries `xtask bench prepare` generates outside the workspace:
-//! one linked against this tree, one against the published `=0.9.0` crate.
+//! one linked against this tree, one against the published `=0.10.1` crate.
 //! The same source must build against both, so it uses std and the
 //! scanner's public API only — no other crate, nothing from `xtask`.
 //!
@@ -419,9 +419,10 @@ fn hello() -> String {
 /// `w<contract weights that ran>`, then per axis, in report order, the
 /// cells passed over the cells planned, `x` when a failing cell is named
 /// (`v85w100,5/5,3/5x,…`); `-` when no score came back. A budget that cuts
-/// the judgment drops it (this tree) or stops axes short (0.9.0): either
-/// way the signature differs from the unbudgeted reference's. The Node and
-/// WASM drivers and the CLI parser build the same string from the JSON.
+/// the judgment drops it (0.10.1 and this tree; 0.9.0 stopped axes
+/// short): either way the signature differs from the unbudgeted
+/// reference's. The Node and WASM drivers and the CLI parser build the
+/// same string from the JSON.
 pub fn judgment(report: &ScanReport) -> String {
     report.score.as_ref().map_or_else(
         || String::from("-"),
@@ -449,10 +450,10 @@ pub fn alpha_state(report: &ScanReport) -> &'static str {
 }
 
 /// The build's `trace.budget_exhausted`: `1`, `0`, or `-` when the trace
-/// has no such field (0.9.0) or does not know. Read from the trace's
-/// `Debug` form — the one way a single source builds against a scanner
-/// with the field and one without; the trace carries stage names and
-/// numbers, never decoded text.
+/// has no such field (builds before 0.10) or does not know. Read from the
+/// trace's `Debug` form — the one way a single source builds against a
+/// scanner with the field and one without; the trace carries stage names
+/// and numbers, never decoded text.
 pub fn budget_exhausted(report: &ScanReport) -> &'static str {
     budget_flag(&format!("{:?}", report.trace))
 }
@@ -884,8 +885,9 @@ mod tests {
         assert_eq!(budget_exhausted(&report), "0");
     }
 
-    /// Every shape a trace prints its flag in: this tree's `Option<bool>`,
-    /// a bare `bool`, an unknown `None`, and the 0.9.0 trace without one.
+    /// Every shape a trace prints its flag in: the `Option<bool>` of 0.10.1
+    /// and this tree (here followed by later fields), a bare `bool`, an
+    /// unknown `None`, and a trace from before 0.10 (0.9.0) without one.
     #[test]
     fn the_budget_flag_reads_every_trace_shape() {
         for (trace, flag) in [
@@ -908,6 +910,11 @@ mod tests {
             (
                 "PipelineTrace { total_ms: 1.5, budget_exhausted: None }",
                 "-",
+            ),
+            (
+                "PipelineTrace { stages: [], engine_panics: 0, total_ms: 1.5, \
+                 budget_exhausted: Some(true), saturation: None }",
+                "1",
             ),
             (
                 "PipelineTrace { stages: [], engine_panics: 0, total_ms: 1.5 }",
