@@ -44,11 +44,15 @@ reading "NO" on valid product output is the documented trap.
   CLI `--budget-ms` · Node `budgetMs` ·
   WASM `budget_ms` (positional arg #5 of `scan_image`, #5 of `scan_frame`) ·
   Python `budget_ms` kwarg · Kotlin/Swift (UniFFI) `budget_ms`.
-- `0` = **unbounded** — NOT a zero-millisecond budget. The accepted values,
+- CLI and bindings: `0` = **unbounded** — NOT a zero-millisecond budget —
+  and an unset `budget_ms` keeps the profile default (`full` 4000 · `fast`
+  800 · `frame` 80 ms), so reproducible reports need `0`. Rust
+  `ScanConfig.budget_ms` is an `Option`: a preset carries its profile's
+  default, `None` = **unbounded** (the reproducible mode) and `Some(0)` IS a
+  zero-millisecond budget: the deadline has passed before the first stage,
+  which does not run (`trace.budget_exhausted: true`). The accepted values,
   the maximum and the one mapping of a JavaScript number are in § Option
-  domains. An unset `budget_ms` keeps the profile default (`full` 4000 ·
-  `fast` 800 · `frame` 80 ms): reproducible reports need `0` (Rust:
-  `budget_ms: None`).
+  domains.
 - A planned unit the deadline prevents does not run: a ladder attempt or
   stage (including a stage the walk continues to because every QR Code
   read so far only signals an ECI it could not locate — 07-pipeline.md
@@ -113,7 +117,8 @@ input is read: an invalid option beside unreadable bytes is `QRS-006`, never
 
 | Option | Admitted | `QRS-006` |
 |---|---|---|
-| `budget_ms` | unset (the profile default) · `0` (unbounded) · 1 to 4 294 967 295 ms | above 4 294 967 295 |
+| `budget_ms` (CLI, bindings) | unset (the profile default) · `0` (unbounded) · 1 to 4 294 967 295 ms | above 4 294 967 295 |
+| `budget_ms` (Rust `ScanConfig`) | `None` (unbounded) · `Some(0)` (a zero-millisecond budget) · `Some(1)` to `Some(4 294 967 295)` ms | `Some` above 4 294 967 295 |
 | `max_dimension` | 1 to 4 294 967 295 px | `0` |
 | `max_pixels` | 1 to 2⁶⁴ − 1 px (JavaScript: to 2⁵³ − 1) | `0` |
 | `alpha_palette` (Rust `ScanConfig`) | at most 32 colors | more |

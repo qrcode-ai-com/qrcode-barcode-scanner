@@ -148,12 +148,14 @@ pub struct ScanConfig {
     /// neutral sweep — "does my design survive on MY theme/brand colors",
     /// answered inside one scan instead of one full scan per color
     /// (`alpha.envelope.palette`). Probes are luma-space like the rest of
-    /// the sweep and budget-bounded per probe. Every BINDING rejects more
-    /// than [`ScanConfig::MAX_ALPHA_PALETTE`] colors loudly (a palette is
-    /// the first caller-sized loop in the scan path — unbounded, it would
-    /// be a CPU amplifier under `budget_ms: None`); direct Rust embedders
-    /// hold the same line themselves. Empty (every profile's default) =
-    /// the neutral sweep only.
+    /// the sweep and budget-bounded per probe. At most
+    /// [`ScanConfig::MAX_ALPHA_PALETTE`] colors (a palette is the first
+    /// caller-sized loop in the scan path — unbounded, it would be a CPU
+    /// amplifier under `budget_ms: None`): [`ScanConfig::validate`], which
+    /// every scan runs first, refuses a longer one with `QRS-006`, and the
+    /// bindings refuse a longer list before the core sees it, with their own
+    /// argument error. Empty (every profile's default) = the neutral sweep
+    /// only.
     pub alpha_palette: Vec<[u8; 3]>,
 }
 
@@ -312,9 +314,11 @@ impl AlphaBackground {
 }
 
 impl ScanConfig {
-    /// Hard cap every binding enforces on `alpha_palette` (anti-DoS: a
-    /// palette entry costs a composite + up to three decode attempts).
-    /// 32 covers any real theme/brand palette with headroom.
+    /// Hard cap on `alpha_palette` (anti-DoS: a palette entry costs a
+    /// composite + up to three decode attempts). [`ScanConfig::validate`]
+    /// refuses a longer palette with `QRS-006`; every binding refuses one
+    /// before the core sees it. 32 covers any real theme/brand palette with
+    /// headroom.
     pub const MAX_ALPHA_PALETTE: usize = 32;
 
     /// The largest `budget_ms` a scan accepts: 4 294 967 295 ms (about 49.7

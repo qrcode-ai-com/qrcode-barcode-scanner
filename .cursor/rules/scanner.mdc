@@ -14,8 +14,8 @@ alwaysApply: true
 - Existing public package contracts: the `ScanReport` wire is
   additive-only forever; score semantic changes bump `score_contract`;
   public enums stay `#[non_exhaustive]`.
-- No supported code found is `Ok` with empty detections — `Err` = `QRS-001..005`
-  only (stable registry, never reused).
+- No supported code found is `Ok` with empty detections — `Err` = `QRS-001..006`
+  only (stable registry, never reused; `QRS-006` = an option outside its domain).
 - Determinism follows AGENTS.md/spec: unbounded attempts are reproducible,
   with the documented upstream PDF417 confidence-tie exception. Introduce no
   hidden RNG or wall-clock dependency; time-budget cuts retain their flags.

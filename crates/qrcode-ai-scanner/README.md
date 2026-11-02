@@ -22,7 +22,11 @@ let report = scanner.scan(ImageInput::encoded(&bytes))?;
 ```
 
 "No QR found" is `Ok` with empty detections — `Err` is reserved for invalid
-input and cancellation (`QRS-001..005`). A report is final when
+input (`QRS-001..004`), cancellation (`QRS-005`) and an option outside its
+domain (`QRS-006`, refused before the input is read: a zero `Limits` cap or
+`ScanConfig` side, a palette above `ScanConfig::MAX_ALPHA_PALETTE`, a
+`budget_ms` above `ScanConfig::MAX_BUDGET_MS`); branch on `err.code()`.
+A report is final when
 `report.trace.budget_exhausted == Some(false)`; set `budget_ms: None` for the
 unbounded, reproducible scan. Camera frames skip the PNG roundtrip
 via `ImageInput::rgba8`. Full docs: the

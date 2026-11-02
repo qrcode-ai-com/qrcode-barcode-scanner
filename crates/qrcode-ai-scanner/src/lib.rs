@@ -6,7 +6,9 @@
 //! Contract (the normative wire format lives in the `spec/` directory):
 //!
 //! - **No QR found is `Ok`** with empty detections — `Err` is reserved for real
-//!   faults (corrupt image, invalid buffer, cancellation).
+//!   faults: an option outside its domain (`QRS-006`, checked before the
+//!   input), invalid or oversized input (`QRS-001..004`) or cancellation
+//!   (`QRS-005`).
 //! - **Deterministic**: same bytes + same config + same scanner build ⇒ the
 //!   same report, bit for bit on a given platform (wall clock aside) — no
 //!   RNG anywhere. Three caveats, all bounded:

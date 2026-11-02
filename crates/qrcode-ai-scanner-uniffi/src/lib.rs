@@ -45,7 +45,10 @@ pub enum ScanBindingError {
     /// `score_preset` and `score_skip_axes` were BOTH passed.
     #[error("score_preset and score_skip_axes are mutually exclusive — pass one")]
     ScorePresetConflict,
-    /// A real scan fault (invalid/oversized buffer, cancellation).
+    /// A scan fault. A core error carries its `[QRS-xxx]` code in the
+    /// message: an option outside its domain (`QRS-006`: a `budget_ms` above
+    /// 4 294 967 295 or a zero cap, refused before the image is read) or an
+    /// invalid or oversized image or frame buffer (`QRS-001..004`).
     #[error("scan failed: {0}")]
     ScanFailed(String),
 }
@@ -177,8 +180,10 @@ fn limits_from(max_dimension: Option<u32>, max_pixels: Option<u64>) -> Limits {
 /// Decode + score an encoded image (PNG · JPEG · WebP · GIF).
 ///
 /// Returns the `ScanReport` as a JSON string. "No QR found" is a normal result
-/// (empty `detections`); an error is raised only for invalid input / bad
-/// profile / cancellation.
+/// (empty `detections`); an error is raised only for a bad argument (its own
+/// case, such as `UnknownProfile` or `PaletteTooLarge`) or a scan fault
+/// (`ScanFailed`): an option outside its domain (`QRS-006`) or an invalid or
+/// oversized image (`QRS-001..003`).
 ///
 /// `max_dimension` / `max_pixels` cap the input before any pixel work
 /// (defaults 10000 px / 64 MP — lower them on server/mobile hardening paths).
