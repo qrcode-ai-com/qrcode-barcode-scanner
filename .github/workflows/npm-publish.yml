@@ -1,7 +1,10 @@
 name: npm-publish
 
-# Builds the napi platform matrix + the wasm package and publishes both npm
-# packages. Trigger: release tag vX.Y.Z.
+# Builds the napi platform matrix + the wasm package and publishes the eight
+# npm packages: @qrcode-ai-com/qrcode-barcode-scanner, the six platform
+# packages napi names after it (@qrcode-ai-com/qrcode-barcode-scanner-<suffix>,
+# one per napi target) and @qrcode-ai-com/qrcode-barcode-scanner-wasm.
+# Trigger: release tag vX.Y.Z.
 #
 # Publishing is tag-only: `publish-native` and `publish-wasm` run for
 # refs/tags/v* alone. Any other run — a workflow_dispatch from a branch
@@ -11,8 +14,22 @@ name: npm-publish
 # Publishing authenticates through npm trusted publishing (GitHub OIDC): no
 # token in the repo, provenance attestations generated automatically. Each of
 # the eight packages binds this workflow file and the `npm` environment on
-# npmjs.com first (RELEASING.md § Publishing). npm's CLI must be >= 11.5.1,
-# which Node 24 ships, hence node-version 24 in the publish jobs.
+# npmjs.com (RELEASING.md § Publishing). npm's CLI must be >= 11.5.1, which
+# Node 24 ships, hence node-version 24 in the publish jobs.
+#
+# A trusted publisher binds only a package that already exists, so the first
+# version under a name cannot come from this workflow: a maintainer uploads
+# it, without npm provenance, from the tarballs of a tag run in which every
+# job the publish jobs need passed, re-inspected first, in this workflow's
+# order (platform packages, main package, wasm package). Each package's own
+# publisher is bound after that, allowing `npm publish` and not only staged
+# publishing, at most two days before the tag run that first publishes
+# through it (npm expires a new binding no publish used within two days); a
+# binding is proven only by a publish through it. A publish job that finds a
+# version already live uploads nothing for it and compares it with the
+# tarball it inspected. The publishers of the packages released up to 0.10.1
+# under their former names are never bound to this workflow, so no run of it
+# uploads under a former name.
 #
 # The publish jobs hold the OIDC token, so they install nothing and run no
 # napi, no pnpm and no package script. `pack-native` and `build-wasm` pack
@@ -112,10 +129,12 @@ jobs:
       # the committed native.js is what ships (it reads its own version);
       # napi's generated loader would bake the version in as a literal.
       - run: pnpm exec napi build --platform --release --target ${{ matrix.settings.target }} --no-js --dts native.d.ts ${{ matrix.settings.cross }} -- --locked
+      # The addon by its napi binaryName: an addon under any other name never
+      # rides along into the platform packages.
       - uses: actions/upload-artifact@v7
         with:
           name: binding-${{ matrix.settings.target }}
-          path: crates/qrcode-ai-scanner-node/*.node
+          path: crates/qrcode-ai-scanner-node/qrcode-barcode-scanner.*.node
           if-no-files-found: error
 
   # The npm packages assembled exactly as they publish, on every run: the
@@ -310,7 +329,7 @@ jobs:
           # The main package by its name, never by its directory: exactly one.
           main=""
           for tgz in "$PWD"/npm-release/*/*.tgz; do
-            if [ "$(field "$tgz" name)" = "@supernovae-st/qrcode-ai-scanner" ]; then
+            if [ "$(field "$tgz" name)" = "@qrcode-ai-com/qrcode-barcode-scanner" ]; then
               if [ -n "$main" ]; then echo "::error::two main package tarballs: $main, $tgz"; exit 1; fi
               main=$tgz
             fi
@@ -447,7 +466,7 @@ jobs:
           field() { tar -xzOf "$tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).$1"; }
           name=$(field name)
           version=$(field version)
-          if [ "$name" != "@supernovae-st/qrcode-ai-scanner-wasm" ]; then
+          if [ "$name" != "@qrcode-ai-com/qrcode-barcode-scanner-wasm" ]; then
             echo "::error::$tgz is $name, not the wasm package"
             exit 1
           fi
