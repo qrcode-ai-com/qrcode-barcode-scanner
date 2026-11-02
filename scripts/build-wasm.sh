@@ -2,7 +2,9 @@
 # Build the browser wasm package: wasm-pack (no bundled wasm-opt — its cached
 # binaryen is too old for Rust ≥1.87 wasm features) + manual wasm-opt + size
 # report. Run from the repo root. Requires: wasm-pack, binaryen (wasm-opt),
-# python3 (build-info) and node.
+# python3 (build-info), Node >= 22.21 or >= 24.5 (destination-node.test.mjs
+# starts a child with --use-env-proxy), and openssl for the TLS cases of
+# destination-node.test.mjs (skipped without it, except under CI=true).
 set -euo pipefail
 
 if ! command -v wasm-opt >/dev/null; then
@@ -15,6 +17,16 @@ fi
 opt_version=$(wasm-opt --version | sed -nE 's/.*version ([0-9]+).*/\1/p')
 if [ -z "$opt_version" ] || [ "$opt_version" -lt 130 ]; then
   echo "error: wasm-opt ${opt_version:-of unknown version} is too old — binaryen >= 130 required" >&2
+  exit 1
+fi
+# The package tests below need a Node that accepts --use-env-proxy (22.21 and
+# 24.5 added it): refuse a missing or older one now, not after the build.
+if ! command -v node >/dev/null; then
+  echo "error: node not on PATH — Node >= 22.21 or >= 24.5 required" >&2
+  exit 1
+fi
+if ! node --use-env-proxy -e 0 >/dev/null 2>&1; then
+  echo "error: node $(node --version) lacks --use-env-proxy — Node >= 22.21 or >= 24.5 required" >&2
   exit 1
 fi
 
@@ -60,8 +72,15 @@ python3 "$root/scripts/wasm_provenance.py" write pkg \
 
 node test.mjs
 node camera.test.mjs
+node camera-replay.test.mjs
+# The destination suites use fake transports and loopback fixtures only: no
+# request leaves this machine.
+node destination.test.mjs
+node destination-node.test.mjs
 # camera-overlay.test.mjs needs a real browser: scripts/packed-wasm-browser.mjs
-# runs it against the packed archive.
+# runs it against the packed archive. destination.browser.test.mjs needs one
+# too, and no script or CI job runs it yet: run it by hand (its header lists
+# the Playwright, Vite and package variables it reads).
 
 raw=$(wc -c <pkg/qrcode-ai-scanner_bg.wasm)
 gz=$(gzip -9 -c pkg/qrcode-ai-scanner_bg.wasm | wc -c)

@@ -11,7 +11,11 @@ may only hold files git tracks in the directories it packs, plus what cargo
 and maturin generate. A tar member that is not a regular file or a directory
 fails. The npm main package ships the committed loader, JavaScript and
 manifest (napi adds only the pins) and no install-time script; the wasm and
-platform packages carry no scripts at all. Nothing is ever uploaded: packing
+platform packages carry no scripts at all. The wasm package's destination
+modules are also read statically: the core imports nothing and uses none of
+the refused syntax or APIs past its browser floor; the Node resolver loads
+only node:http, node:https, node:dns and the core, reads no environment
+variables, and keeps certificate checks on. Nothing is ever uploaded: packing
 goes through `cargo package`, `npm pack --pack-destination`,
 scripts/build-wasm.sh (wasm-pack), maturin and `pub publish --dry-run`.
 pypi-live alone reads the network: one GET of PyPI's public JSON for the
@@ -63,6 +67,7 @@ unavailable) · 1 otherwise · 2 usage. Stdlib only, Python >= 3.11.
 """
 
 import argparse
+import bisect
 import contextlib
 import dataclasses
 import datetime
@@ -135,6 +140,7 @@ WASM_FILES = frozenset({
     "qrcode-ai-scanner.js", "qrcode-ai-scanner.d.ts", "qrcode-ai-scanner_bg.wasm",
     "report-types.d.ts",
     "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
+    "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts",
     "auto.js", "auto.d.ts", "build-info.json",
 })
 # 0.10.x exported its no-SIMD module under compatible/; from 0.11 these export
@@ -651,8 +657,10 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         check_wasm_build(art, files, pkg.get("version"))
         for notice in ("LICENSE-APACHE-2.0", "THIRD-PARTY.md"):
             check_equal_file(art, notice, files.get(notice), ROOT / "crates/qrcode-ai-scanner" / notice)
-        for source in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts"):
+        for source in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
+                       "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts"):
             check_equal_file(art, source, files.get(source), WASM_DIR / source)
+        check_destination_modules(art, files)
         dts = files.get("qrcode-ai-scanner.d.ts", b"").decode()
         retyped = all(
             re.search(rf"export function {fn}\([^)]*\): ScanReport;", dts) for fn in ("scan_image", "scan_frame")
@@ -731,6 +739,40 @@ def check_wasm_manifest(art: Artifact, pkg: dict) -> None:
               all(exports.get(f"./{name}") == {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
                   for name in ("camera", "camera-overlay"))
               and exports.get("./report-types") == {"types": "./report-types.d.ts"})
+    problems = destination_export_problems(exports)
+    art.check("browser-safe destination core and Node-only resolver exports", not problems, "; ".join(problems))
+
+
+# The destination core runs anywhere. The Node resolver is exported under `node` alone (types
+# first): with no import, default or browser target, a browser build fails at resolution instead
+# of bundling node: modules. The null key keeps "./*" from serving that file without conditions,
+# and no other key or pattern may reach it.
+DESTINATION_EXPORTS = {
+    "./destination": {"types": "./destination.d.ts", "import": "./destination.js", "default": "./destination.js"},
+    "./destination-node": {"types": "./destination-node.d.ts", "node": "./destination-node.js"},
+}
+
+
+def destination_export_problems(exports: dict) -> list:
+    """How EXPORTS departs from a browser-safe destination core and a Node-only resolver."""
+    problems = []
+    for key, want in DESTINATION_EXPORTS.items():
+        got = exports.get(key)
+        # Conditions match in object order: the same targets in another order are another export.
+        if not isinstance(got, dict) or list(got.items()) != list(want.items()):
+            problems.append(f"{key} is {json.dumps(got)}, not {json.dumps(want)}")
+    if "./destination-node.js" not in exports:
+        problems.append("no ./destination-node.js key (want null: the file stays unexported)")
+    elif exports["./destination-node.js"] is not None:
+        problems.append(f"./destination-node.js is {json.dumps(exports['./destination-node.js'])}, not null")
+    others = sorted(key for key, value in exports.items()
+                    if key != "./destination-node" and "./destination-node.js" in json.dumps(value))
+    patterns = sorted(key for key in exports if "*" in key and key != "./*")
+    if others:
+        problems.append(f"also exported as {', '.join(others)}")
+    if patterns:  # only "./*" is shadowed by the null key; another pattern could map onto the file
+        problems.append(f"subpath patterns besides ./*: {', '.join(patterns)}")
+    return problems
 
 
 def check_pins(art: Artifact, optional: dict, pkg: dict) -> None:
@@ -958,7 +1000,439 @@ def cmd_wasm(host: Host) -> None:
     inspect_npm(host, tarball, notes=[note])
 
 
-# ---------------------------------------------------------------- python
+# ---------------------------------------------------------------- wasm · destination modules
+
+# The destination modules are read statically as they ship (each is also its crate file
+# verbatim). The core imports nothing and keeps to the oldest browser the package is tested in
+# (the Chromium build scripts/install-no-simd-browser.mjs installs): ES2020 syntax, the
+# consumer build target of scripts/packed-wasm-browser.mjs, and none of the newer APIs below.
+# These lists refuse known forms; they cannot prove the floor, which only a run of the module
+# in that browser does. The Node resolver loads only these modules, never reads the proxy or
+# TLS environment switches, and states certificate checks and strict HTTP parsing as literals.
+NODE_RESOLVER_IMPORTS = frozenset({"node:http", "node:https", "node:dns", "./destination.js"})
+# Static members, read as `Owner.name`, `Owner?.name` or `Owner['name']`.
+FLOOR_STATICS = (("AbortSignal", "any"), ("AbortSignal", "timeout"), ("URL", "canParse"), ("URL", "parse"),
+                 ("Promise", "withResolvers"), ("Promise", "try"), ("Object", "groupBy"), ("Map", "groupBy"),
+                 ("Array", "fromAsync"), ("RegExp", "escape"))
+FLOOR_GLOBALS = frozenset(owner for owner, _name in FLOOR_STATICS)
+# Names no older API uses: refused wherever they appear, a quoted member (`xs['toSorted']`) included.
+FLOOR_NAMES = ("toSorted", "toReversed", "toSpliced", "structuredClone", "isWellFormed", "toWellFormed",
+               "symmetricDifference", "isSubsetOf", "isSupersetOf", "isDisjointFrom", "Iterator")
+# Common words, refused only as a called member: `xs.with(…)`, `a?.union(…)`, `it['take'](…)`.
+# Iterator helpers that share an Array method's name (map, filter, …) cannot be told apart here.
+FLOOR_METHODS = ("with", "union", "intersection", "difference", "take", "drop", "toArray")
+# A modifier group, `(?i:…)` or `(?-s:…)`; `(?:…)` has no flag. A named group, not a lookbehind.
+JS_REGEX_MODIFIERS = re.compile(r"\(\?([ims]*)(?:-([ims]*))?:")
+JS_REGEX_GROUP_NAME = re.compile(r"\(\?<([^=!>][^>]*)>")
+# Longest first; `?.` before a digit is `?` (a conditional), handled where it is read.
+JS_PUNCTUATORS = sorted({
+    ">>>=", "...", "===", "!==", "**=", "<<=", ">>=", ">>>", "&&=", "||=", "??=", "=>", "==", "!=", "<=", ">=",
+    "&&", "||", "??", "?.", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "**", "<<", ">>",
+    *"{}()[];,<>+-*/%&|^!~?:=."}, key=len, reverse=True)
+# After these words an expression starts, so a `/` opens a regular expression, not a division.
+JS_REGEX_AFTER = frozenset({"return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case",
+                            "do", "else", "yield", "await"})
+JS_PUNCT = re.compile("|".join(map(re.escape, JS_PUNCTUATORS)))
+# Whitespace (with U+FEFF) and comments; `//` and `/*` never open a regular expression.
+JS_SKIP = re.compile(r"(?:[\s" + chr(0xFEFF) + r"]|//[^\n]*|/\*[\s\S]*?\*/)+")
+JS_NAME = re.compile(r"(?:[^\W\d]|\$)[\w$]*")
+JS_NUMBER = re.compile(r"(?:0[xXoObB][0-9a-fA-F_]+|(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:[eE][+-]?[\d_]+)?)n?")
+JS_STRING = re.compile(r"'(?:[^'\\\n]|\\[\s\S])*'" + r'|"(?:[^"\\\n]|\\[\s\S])*"')
+JS_TEMPLATE = re.compile(r"(?:[^`\\$]|\\[\s\S]|\$(?!\{))*(?:`|\$\{)")  # a template's text through ` or ${
+JS_REGEXP = re.compile(r"/(?:[^/\\\[\n]|\\.|\[(?:[^\]\\\n]|\\.)*\])+/[\w$]*")
+
+
+def js_tokens(source: str) -> tuple:
+    """SOURCE as (kind, value, line) tokens without comments. A string's value is its text
+    between the quotes; a template literal yields one `template` token per text part, ending
+    with its delimiter (` or ${), with the tokens of each substitution between them. Enough of
+    the lexical grammar to read a module; what it cannot read raises ValueError, never a guess."""
+    tokens, braces, n = [], [], len(source)  # (kind, value, offset); braces: True for a `${`
+    i = (source.find("\n") if "\n" in source else n) if source.startswith("#!") else 0
+
+    def fail(what: str, at: int):
+        line = source.count("\n", 0, at) + 1
+        raise ValueError(f"line {line}: {what}")
+
+    def regex_allowed() -> bool:
+        if not tokens:
+            return True
+        kind, value, _offset = tokens[-1]
+        if kind == "name":
+            return value in JS_REGEX_AFTER
+        if kind == "punct":
+            return value not in (")", "]", "++", "--")
+        return kind == "template" and value.endswith("${")
+
+    while True:
+        skipped = JS_SKIP.match(source, i)
+        i = skipped.end() if skipped else i
+        if i >= n:
+            break
+        ch = source[i]
+        if source.startswith("/*", i):
+            fail("unterminated comment", i)
+        if ch == "`" or (ch == "}" and braces and braces[-1]):
+            if ch == "}":
+                braces.pop()
+            match = JS_TEMPLATE.match(source, i + 1)
+            if not match:
+                fail("unterminated template literal", i)
+            tokens.append(("template", match.group(), i))
+            if match.group().endswith("${"):
+                braces.append(True)
+        elif ch in "'\"":
+            match = JS_STRING.match(source, i)
+            if not match:
+                fail("unterminated string", i)
+            tokens.append(("str", match.group()[1:-1], i))
+        elif ch == "/" and regex_allowed():
+            match = JS_REGEXP.match(source, i)
+            if not match:
+                fail("unterminated regular expression", i)
+            tokens.append(("regex", match.group(), i))
+        elif ch.isdigit() or (ch == "." and source[i + 1:i + 2].isdigit()):
+            match = JS_NUMBER.match(source, i)
+            tokens.append(("num", match.group(), i))
+        elif ch == "#" and (match := JS_NAME.match(source, i + 1)):
+            tokens.append(("private", "#" + match.group(), i))
+        elif match := JS_NAME.match(source, i):
+            tokens.append(("name", match.group(), i))
+        else:
+            match = JS_PUNCT.match(source, i)
+            if not match:
+                fail(f"unexpected character {ch!r}", i)
+            punct = "?" if match.group() == "?." and source[i + 2:i + 3].isdigit() else match.group()
+            if punct == "{":
+                braces.append(False)
+            elif punct == "}" and braces:
+                braces.pop()
+            tokens.append(("punct", punct, i))
+            i += len(punct)
+            continue
+        i = match.end()
+    if True in braces:
+        fail("unterminated template substitution", n)
+    newlines = [match.start() for match in re.finditer("\n", source)]
+    return tuple((kind, value, bisect.bisect_right(newlines, at) + 1) for kind, value, at in tokens)
+
+
+@functools.lru_cache(maxsize=64)
+def read_module(judge, source: str) -> tuple:
+    """JUDGE's problems with SOURCE, or why SOURCE cannot be read. Cached: the self-test ships
+    the same module bytes in most of its archives."""
+    try:
+        return tuple(judge(js_tokens(source)))
+    except ValueError as error:
+        return (f"not readable as JavaScript: {error}",)
+
+
+def _at(tokens: list, k: int):
+    return tokens[k] if 0 <= k < len(tokens) else None
+
+
+def _is(token, *punctuators: str) -> bool:
+    return token is not None and token[0] == "punct" and token[1] in punctuators
+
+
+def _close(tokens: list, k: int) -> int:
+    """The index just past the bracket that closes the one at K."""
+    if not _is(_at(tokens, k), "(", "[", "{"):
+        line = tokens[min(k, len(tokens) - 1)][2] if tokens else 1
+        raise ValueError(f"line {line}: expected a bracket")
+    depth = 0
+    for j in range(k, len(tokens)):
+        depth += _is(tokens[j], "(", "[", "{") - _is(tokens[j], ")", "]", "}")
+        if depth == 0:
+            return j + 1
+    raise ValueError(f"line {tokens[k][2]}: unclosed {tokens[k][1]}")
+
+
+def _member(tokens: list, k: int):
+    """The property read right after tokens[K] (`.p`, `?.p`, `["p"]`, `?.["p"]`, `[`p`]`), or None."""
+    j = k + 1 + (_is(_at(tokens, k + 1), "?.") and _is(_at(tokens, k + 2), "["))
+    after = _at(tokens, j + 1)
+    if _is(_at(tokens, j), ".", "?.") and after and after[0] == "name":
+        return after[1]
+    if _is(_at(tokens, j), "[") and _is(_at(tokens, j + 2), "]") and _member_bracket(tokens, j):
+        return _quoted(after)
+    return None
+
+
+def _quoted(token):
+    """The text of a string token, or of a template token that opens and closes with no
+    substitution (a whole template right after `[`), else None."""
+    if token is not None and token[0] == "str":
+        return token[1]
+    if token is not None and token[0] == "template" and token[1].endswith("`"):
+        return token[1][:-1]
+    return None
+
+
+def _ends_expression(token) -> bool:
+    """TOKEN can end an expression, so a `[` right after it reads a member."""
+    if token is None:
+        return False
+    kind, value, _line = token
+    if kind == "name":
+        return value not in JS_REGEX_AFTER  # after `return`, `typeof`, … an expression starts
+    if kind == "punct":
+        return value in (")", "]")
+    return kind in ("str", "num", "regex") or (kind == "template" and value.endswith("`"))
+
+
+def _member_bracket(tokens: list, j: int) -> bool:
+    """tokens[J], a `[`, reads a member of the expression before it rather than opening an array
+    literal, a destructuring pattern or a computed key."""
+    return _is(_at(tokens, j - 1), "?.") or _ends_expression(_at(tokens, j - 1))
+
+
+def js_imports(tokens: list) -> list:
+    """(form, module, line) for each module a source loads: an import declaration or `export …
+    from` names its module (None when unreadable); import(), require() and getBuiltinModule()
+    calls are listed with None."""
+    found = []
+    for k, (kind, value, line) in enumerate(tokens):
+        after = _at(tokens, k + 1)
+        if kind != "name" or after is None:
+            continue
+        if value in ("require", "getBuiltinModule") and _is(after, "("):
+            found.append((f"{value}()", None, line))
+        if value not in ("import", "export") or _is(_at(tokens, k - 1), ".", "?.") or _is(after, ".", ":"):
+            continue
+        if value == "import" and _is(after, "("):
+            found.append(("import()", None, line))
+            continue
+        if value == "export":  # only `export * [as name] from` and `export {…} from` load a module
+            if _is(after, "*"):
+                j = k + 4 if _at(tokens, k + 2) and tokens[k + 2][1] == "as" else k + 2
+            elif _is(after, "{"):
+                j = _close(tokens, k + 1)
+            else:
+                continue
+            spec = _at(tokens, j + 1)
+            if _at(tokens, j) and tokens[j][1] == "from" and spec and spec[0] == "str":
+                found.append(("export … from", spec[1], line))
+            continue
+        j, module = k + 1, None
+        while j < len(tokens) and not _is(tokens[j], ";"):
+            token, spec = tokens[j], _at(tokens, j + 1)
+            if token[0] == "str" and j == k + 1:
+                module = token[1]
+                break
+            if token[0] == "name" and token[1] == "from" and spec and spec[0] == "str":
+                module = spec[1]
+                break
+            j = _close(tokens, j) if _is(token, "{") else j + 1
+        found.append(("import", module, line))
+    return found
+
+
+def judge_isolated_core(tokens: list) -> list:
+    """What makes a module load another one: it must have none."""
+    return [f"line {line}: {form}" + (f" {module!r}" if module else "") for form, module, line in js_imports(tokens)]
+
+
+def judge_node_resolver(tokens: list) -> list:
+    """The Node resolver's modules, environment reads and TLS/parser settings."""
+    loaded = js_imports(tokens)
+    problems = [f"line {line}: {form}" + ("" if form.endswith("()") else " (module unreadable)")
+                for form, module, line in loaded if module is None]
+    modules = {module for _form, module, _line in loaded if module is not None}
+    problems += [f"imports {module}" for module in sorted(modules - NODE_RESOLVER_IMPORTS)]
+    problems += [f"does not import {module}" for module in sorted(NODE_RESOLVER_IMPORTS - modules)]
+    literal, seen = {"rejectUnauthorized": "true", "insecureHTTPParser": "false"}, set()
+    for k, (kind, value, line) in enumerate(tokens):
+        prev, after, then = _at(tokens, k - 1), _at(tokens, k + 1), _at(tokens, k + 2)
+        is_key = kind == "name" or (kind == "str" and (_is(prev, "[") or _is(after, ":")))
+        member = _member(tokens, k) if _ends_expression(tokens[k]) else None
+        if member == "env":  # on any object: process.env, or process reached another way
+            problems.append(f"line {line}: {value if kind == 'name' else '…'}.env")
+        elif (kind == "name" and value == "process" and member != "versions" and not _is(prev, ".", "?.")
+              and not (_is(prev, "{", ",") and _is(after, ":"))):
+            # The global itself, except to read its versions: `const { env } = process`,
+            # process[`env`] or an alias would reach the environment.
+            problems.append(f"line {line}: process other than process.versions")
+        elif kind == "name" and value == "env" and not _is(prev, ".", "?."):
+            problems.append(f"line {line}: env")  # destructured or renamed: `const { env } = host`
+        elif is_key and value in ("globalAgent", "proxyEnv"):
+            problems.append(f"line {line}: {value}")
+        elif is_key and value == "agent" and _is(after, ":", "=") and then and then[:2] == ("name", "false"):
+            problems.append(f"line {line}: agent: false")
+        elif is_key and value in literal:
+            # Every mention is the literal itself: a value read from a caller, an expression or
+            # the opposite literal could turn certificate checks or strict parsing off.
+            if _is(after, ":") and then and then[0] == "name" and then[1] == literal[value] and not _is(prev, "."):
+                seen.add(value)
+            else:
+                problems.append(f"line {line}: {value} is not the literal {literal[value]}")
+    problems += [f"no {key}: {want}" for key, want in literal.items() if key not in seen]
+    return problems
+
+
+def judge_browser_floor(tokens: list) -> list:
+    """The syntax past ES2020 and the newer APIs listed above (FLOOR_*), in the forms this reader
+    knows. A list, not proof: an API it does not name passes."""
+    problems = []
+    for k, (kind, value, line) in enumerate(tokens):
+        prev, after = _at(tokens, k - 1), _at(tokens, k + 1)
+        quoted = _quoted(tokens[k]) if _is(prev, "[") and _is(after, "]") and _member_bracket(tokens, k - 1) else None
+        if kind == "punct" and value in ("||=", "&&=", "??="):
+            problems.append(f"line {line}: logical assignment {value}")
+        elif kind == "num" and "_" in value:
+            problems.append(f"line {line}: numeric separator {value}")
+        elif kind == "private":
+            problems.append(f"line {line}: private class member {value}")
+        elif kind == "regex":
+            problems += [f"line {line}: {problem}" for problem in _regex_floor(value)]
+        elif quoted in FLOOR_NAMES:  # a quoted member reads like the name: xs['toSorted']()
+            problems.append(f"line {line}: {quoted}")
+        elif quoted in FLOOR_METHODS and _is(_at(tokens, k + 2), "("):
+            problems.append(f"line {line}: .{quoted}()")
+        elif kind != "name":
+            continue
+        elif value in FLOOR_GLOBALS and (value, _member(tokens, k)) in FLOOR_STATICS:
+            problems.append(f"line {line}: {value}.{_member(tokens, k)}")
+        elif value in FLOOR_NAMES:
+            problems.append(f"line {line}: {value}")
+        elif value in FLOOR_METHODS and _is(prev, ".", "?.") and _is(after, "("):
+            problems.append(f"line {line}: .{value}()")
+        elif value == "RegExp" and _is(after, "("):
+            # new RegExp(source, flags) with literal flags: a quoted string or a plain template.
+            arguments = _call_arguments(tokens, k + 1)
+            flags = arguments[1] if len(arguments) > 1 else []
+            text = flags[0][1].removesuffix("`") if len(flags) == 1 and flags[0][0] in ("str", "template") else ""
+            problems += [f"line {line}: RegExp {flag} flag" for flag in "dv" if flag in text]
+        elif value == "class" and not _is(prev, ".", "?.") and after and (after[0] == "name" or _is(after, "{")):
+            problems += _class_fields(tokens, k)  # a declaration or expression, not a `class` key
+    return problems + [f"line {line}: top-level await" for line in _top_level_awaits(tokens)]
+
+
+def _regex_floor(literal: str) -> list:
+    """What a regular expression LITERAL needs past ES2020: the d and v flags, a modifier group
+    or a group name used twice. An older engine refuses each when it parses the module."""
+    end = literal.rindex("/")
+    body, problems = literal[1:end], [f"RegExp {flag} flag" for flag in "dv" if flag in literal[end + 1:]]
+    names, i, in_class = [], 0, False
+    while i < len(body):
+        ch = body[i]
+        if ch == "\\":  # an escaped character, in a class or not
+            i += 2
+            continue
+        if in_class:
+            in_class = ch != "]"
+        elif ch == "[":
+            in_class = True
+        elif ch == "(":
+            modifiers = JS_REGEX_MODIFIERS.match(body, i)
+            if modifiers and (modifiers.group(1) or modifiers.group(2)):
+                problems.append(f"RegExp modifier group {modifiers.group()}")
+            elif named := JS_REGEX_GROUP_NAME.match(body, i):
+                names.append(named.group(1))
+        i += 1
+    twice = sorted({name for name in names if names.count(name) > 1})
+    return problems + [f"RegExp group name {name!r} used twice" for name in twice]
+
+
+def _call_arguments(tokens: list, k: int) -> list:
+    """The top-level arguments of the call whose `(` is tokens[K], each a token list."""
+    arguments, current, end = [], [], _close(tokens, k) - 1
+    depth = 0
+    for token in tokens[k + 1:end]:
+        depth += _is(token, "(", "[", "{") - _is(token, ")", "]", "}")
+        if depth == 0 and _is(token, ","):
+            arguments.append(current)
+            current = []
+        else:
+            current.append(token)
+    return arguments + ([current] if current else [])
+
+
+def _class_fields(tokens: list, k: int) -> list:
+    """A field or static block in the body of the class whose keyword is tokens[K]: each body
+    member must be a method (fields and static blocks are ES2022)."""
+    j, depth = k + 1, 0
+    while j < len(tokens) and not (depth == 0 and _is(tokens[j], "{")):
+        depth += _is(tokens[j], "(", "[", "{") - _is(tokens[j], ")", "]", "}")
+        j += 1
+    end, j = _close(tokens, j) - 1, j + 1
+    while j < end:
+        line = tokens[j][2]
+        if _is(tokens[j], ";"):
+            j += 1
+            continue
+        if tokens[j][1] == "static" and _is(_at(tokens, j + 1), "{"):
+            return [f"line {line}: class static block"]
+        # static, async, get and set are modifiers when a member name follows, else the name.
+        while tokens[j][1] in ("static", "async", "get", "set") and not _is(_at(tokens, j + 1), "(", "=", ";", "}"):
+            j += 1
+        j += _is(tokens[j], "*")
+        j = _close(tokens, j) if _is(tokens[j], "[") else j + 1
+        if not _is(_at(tokens, j), "("):
+            return [f"line {line}: class field"]
+        j = _close(tokens, _close(tokens, j))  # the parameters, then the body
+    return []
+
+
+def _top_level_awaits(tokens: list) -> list:
+    """Lines of each `await` outside every function body (top-level await is ES2022). An arrow
+    function's expression body ends at a comma or semicolon of its own level, or at the bracket
+    that closes around it."""
+    lines, stack, closed = [], [], None  # stack: (kind, index) per open bracket or arrow body
+    for k, (kind, value, line) in enumerate(tokens):
+        if kind == "name" and value == "await":
+            if not (_is(_at(tokens, k - 1), ".", "?.") or _is(_at(tokens, k + 1), ":")
+                    or any(entry in ("function", "=>") for entry, _k in stack)):
+                lines.append(line)
+        elif kind != "punct":
+            continue
+        elif value in ("(", "["):
+            stack.append((value, k))
+        elif value == "{":
+            stack.append(("function" if _opens_function(tokens, k, closed) else "{", k))
+        elif value in (")", "]", "}", ",", ";"):
+            while stack and stack[-1][0] == "=>":
+                stack.pop()
+            if value in (")", "]", "}") and stack:
+                opener = stack.pop()[1]
+                closed = opener if value == ")" else None
+        elif value == "=>" and not _is(_at(tokens, k + 1), "{"):
+            stack.append(("=>", k))
+    return lines
+
+
+def _opens_function(tokens: list, k: int, paren) -> bool:
+    """tokens[K] (a `{`) opens a function body: it follows `=>`, or the `)` of a parameter list
+    (PAREN is its `(`) rather than of an if/for/while/switch/catch/with head."""
+    prev = _at(tokens, k - 1)
+    if _is(prev, "=>"):
+        return True
+    if not _is(prev, ")") or paren is None:
+        return False
+    head, before = _at(tokens, paren - 1), _at(tokens, paren - 2)
+    if head is not None and head[0] == "name" and head[1] in ("if", "for", "while", "switch", "catch", "with"):
+        return False
+    return not (head is not None and head[1] == "await" and before is not None and before[1] == "for")
+
+
+def check_destination_modules(art: Artifact, files: dict) -> None:
+    """The destination modules, read statically as they ship. A source the reader cannot read
+    fails: an unread module is not a judged one."""
+    for name, check, judge in (
+        ("destination.js", "destination.js imports nothing (no import declaration, import(), require() or "
+                           "export … from)", judge_isolated_core),
+        ("destination.js", "destination.js stays inside the browser floor (none of the refused post-ES2020 "
+                           "syntax or newer browser APIs)", judge_browser_floor),
+        ("destination-node.js", "destination-node.js loads only node:http, node:https, node:dns and "
+                                "./destination.js; reads no env, global agent or proxy settings (process only "
+                                "for its versions); keeps certificate checks and strict HTTP parsing literal",
+         judge_node_resolver),
+    ):
+        data = files.get(name)
+        problems = ([f"no {name} in the archive"] if data is None
+                    else list(read_module(judge, data.decode("utf-8", errors="replace"))))
+        shown = problems[:12] + ([f"… {len(problems) - 12} more"] if len(problems) > 12 else [])
+        art.check(check, not problems, "; ".join(shown))
 
 
 def metadata(data: bytes):
@@ -2251,7 +2725,7 @@ def check_cli_sums(host: Host) -> None:
 
 
 def check_cli_release_set(host: Host) -> None:
-    """R1: the release set is the five archives, the source archive and SHA256SUMS, once each, built from one
+    """The release set is the five archives, the source archive and SHA256SUMS, once each, built from one
     commit, Cargo.lock, compiler and standard library notice, with nothing else beside them."""
     files = [a for a in host.artifacts if a.kind in CLI_KINDS]
     art = host.add(Artifact("CLI release set", "cli-set"))
@@ -2613,7 +3087,9 @@ def _npm_wasm(version: str) -> dict:
            "main": "qrcode-ai-scanner.js", "types": "qrcode-ai-scanner.d.ts",
            "exports": {".": {"types": "./qrcode-ai-scanner.d.ts", "import": "./qrcode-ai-scanner.js", "default": "./qrcode-ai-scanner.js"},
                        **{f"./{name}": {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
-                          for name in ("auto", "camera", "camera-overlay")},
+                          for name in ("auto", "camera", "camera-overlay", "destination")},
+                       "./destination-node": {"types": "./destination-node.d.ts", "node": "./destination-node.js"},
+                       "./destination-node.js": None,
                        "./report-types": {"types": "./report-types.d.ts"},
                        "./qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm", **WASM_LEGACY_ALIASES,
                        "./build-info.json": "./build-info.json", "./*": "./*"}}
@@ -2631,7 +3107,8 @@ def _npm_wasm(version: str) -> dict:
             "build-info.json": json.dumps(info).encode(),
             "report-types.d.ts": CANON_TYPES.read_bytes(),
             **{f"{name}.{ext}": (WASM_DIR / f"{name}.{ext}").read_bytes()
-               for name in ("auto", "camera", "camera-overlay") for ext in ("js", "d.ts")}}
+               for name in ("auto", "camera", "camera-overlay", "destination", "destination-node")
+               for ext in ("js", "d.ts")}}
 
 
 def _with_scripts(files: dict, **scripts: str) -> dict:
@@ -2744,7 +3221,9 @@ def self_test() -> int:
         judge("clean platform package", [npm("platform", _npm_platform(version, "linux-x64-gnu"))], PASS)
         judge("clean main package", [npm("main", _npm_main(version))], PASS)
         judge("clean wasm package", [npm("wasm", _npm_wasm(version))], PASS)
-        for missing in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts", "LICENSE-APACHE-2.0", "THIRD-PARTY.md", "build-info.json"):
+        for missing in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
+                        "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts",
+                        "LICENSE-APACHE-2.0", "THIRD-PARTY.md", "build-info.json"):
             incomplete = {key: value for key, value in _npm_wasm(version).items() if key != missing}
             judge(f"wasm package missing {missing}", [npm("wasm-incomplete", incomplete)], FAIL, missing)
         # One physical module, and the recorded current build: a second binary,
@@ -2773,6 +3252,73 @@ def self_test() -> int:
               [npm("wasm-simd", _npm_wasm(version) | {"qrcode-ai-scanner_bg.wasm": simd_module,
                                                      "build-info.json": json.dumps(simd_info).encode()})],
               FAIL, "outside the floor")
+        # Tests, fixtures and replay tools sit beside the shipped modules and never ship.
+        for planted in ("destination.test.mjs", "destination-node.test.mjs", "destination.browser.test.mjs",
+                        "destination-fixtures.mjs", "camera-replay.test.mjs", "replay/metrics.mjs"):
+            judge(f"wasm package + {planted}",
+                  [npm(f"wasm-plant-{re.sub(r'[^a-z0-9]+', '-', planted)}", _npm_wasm(version) | {planted: b"//\n"})],
+                  FAIL, f"unexpected: {planted}")
+        # A trailing comment passes every static reading: only the copy check refuses it.
+        for name in ("destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts"):
+            altered = _npm_wasm(version)
+            altered[name] += b"\n// altered\n"
+            judge(f"wasm package with an altered {name}", [npm(f"wasm-altered-{name}", altered)], FAIL,
+                  f"{name} is crates/qrcode-ai-scanner-wasm/{name} verbatim")
+        # The Node resolver is exported under `node` alone, types first, and through no other key.
+        node_only = {"types": "./destination-node.d.ts", "node": "./destination-node.js"}
+        for label, key, value in (
+                ("a default target on the Node-only resolver", "./destination-node",
+                 node_only | {"default": "./destination-node.js"}),
+                ("an import target on the Node-only resolver", "./destination-node",
+                 node_only | {"import": "./destination-node.js"}),
+                ("a browser target on the Node-only resolver", "./destination-node",
+                 node_only | {"browser": "./destination.js"}),
+                ("the Node-only resolver's types after its node target", "./destination-node",
+                 {"node": "./destination-node.js", "types": "./destination-node.d.ts"}),
+                ("./destination-node.js exported instead of null", "./destination-node.js", "./destination-node.js"),
+                ("a second key exporting the Node resolver", "./server", {"default": "./destination-node.js"}),
+                ("a second subpath pattern", "./lib/*", "./*"),
+                ("a destination core without its default target", "./destination",
+                 {"types": "./destination.d.ts", "import": "./destination.js"}),
+                ("the null ./destination-node.js key removed", "./destination-node.js", None)):  # None: removed
+            manifest = json.loads(_npm_wasm(version)["package.json"])
+            if value is None:
+                del manifest["exports"][key]
+            else:
+                manifest["exports"][key] = value
+            judge(f"wasm package with {label}",
+                  [npm(f"wasm-exports-{re.sub(r'[^a-z0-9]+', '-', label)}",
+                       _npm_wasm(version) | {"package.json": json.dumps(manifest, indent=2).encode()})],
+                  FAIL, "browser-safe destination core and Node-only resolver exports")
+        # The modules are read as they ship (the copy check refuses each altered file as well).
+        for label, name, addition, needles in (
+                ("destination.js imports a module", "destination.js", b"import './camera.js';",
+                 ("destination.js imports nothing", "import './camera.js'")),
+                ("destination.js re-exports the Node resolver", "destination.js",
+                 b"export * from './destination-node.js';",
+                 ("destination.js imports nothing", "export … from './destination-node.js'")),
+                ("destination.js combines signals with AbortSignal.any", "destination.js",
+                 b"export const both = (a, b) => AbortSignal.any([a, b]);",
+                 ("destination.js stays inside the browser floor", "AbortSignal.any")),
+                ("destination.js memoizes with ??=", "destination.js", b"let memo;\nexport const once = () => (memo ??= {});",
+                 ("destination.js stays inside the browser floor", "logical assignment ??=")),
+                ("destination.js checks well-formed strings", "destination.js",
+                 b"export const wellFormed = (s) => s.isWellFormed();",
+                 ("destination.js stays inside the browser floor", "isWellFormed")),
+                ("destination-node.js imports node:net", "destination-node.js", b"import net from 'node:net';",
+                 ("destination-node.js loads only", "imports node:net")),
+                ("destination-node.js turns certificate checks off", "destination-node.js",
+                 b"export const lax = { rejectUnauthorized: false };",
+                 ("destination-node.js loads only", "rejectUnauthorized is not the literal true")),
+                ("destination-node.js reads the proxy environment", "destination-node.js",
+                 b"export const proxy = () => process.env.HTTPS_PROXY;", ("destination-node.js loads only", "process.env")),
+                ("destination-node.js destructures env from process", "destination-node.js",
+                 b"const { env } = process;\nexport const proxy = () => env.HTTPS_PROXY;",
+                 ("destination-node.js loads only", "process other than process.versions"))):
+            files = _npm_wasm(version)
+            files[name] += b"\n" + addition + b"\n"
+            judge(f"wasm package whose {label}", [npm(f"wasm-read-{re.sub(r'[^a-z0-9]+', '-', label)}", files)], FAIL,
+                  *needles)
 
         for i, planted in enumerate(PLANTED):
             ran += 1
@@ -3142,10 +3688,188 @@ def self_test() -> int:
     cli_count, cli_failures = cli_self_test()
     ran += cli_count
     failures.extend(cli_failures)
+    destination_count, destination_failures = destination_self_test()
+    ran += destination_count
+    failures.extend(destination_failures)
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
     print(f"self-test: {ran - len(failures)}/{ran} scenarios as expected")
     return 1 if failures else 0
+
+
+def destination_self_test():
+    """The static readers of the destination modules on small sources: each rule refuses its
+    form, and the same words in comments, strings, templates, regular expressions, nested
+    functions and property names pass."""
+    failures, ran = [], 0
+
+    def case(name: str, judge, source: str, *needles: str) -> None:
+        nonlocal ran
+        ran += 1
+        problems = read_module(judge, source)
+        text = "; ".join(problems)
+        if bool(problems) != bool(needles) or any(needle not in text for needle in needles):
+            failures.append(f"{name}: " + (f"problems {text!r}" if problems else "no problem")
+                            + (f" (want problems naming {list(needles)})" if needles else " (want none)"))
+
+    core, floor, node = judge_isolated_core, judge_browser_floor, judge_node_resolver
+    case("core: module words only in comments, strings, templates, patterns and keys", core,
+         "// import x from 'y'; export * from 'z'; require('fs'); import('w')\n"
+         "/* export { a } from './b.js'; */\n"
+         "const text = 'import x from \"y\"', other = \"require('fs')\";\n"
+         "const pattern = /import\\(|require\\(/u, where = import.meta.url;\n"
+         "const keys = { import: 1, require: 2 }.import;\n"
+         "export const label = `${text} from ${other}`;\n"
+         "export default function load() { return keys; }\n")
+    for label, source, needle in (
+            ("a default import", "import x from './y.js';", "import './y.js'"),
+            ("a side-effect import", "import './side.js';", "import './side.js'"),
+            ("a namespace import", "import * as ns from './y.js';", "import './y.js'"),
+            ("export * from", "export * from './y.js';", "export … from './y.js'"),
+            ("export * as … from", "export * as ns from './y.js';", "export … from './y.js'"),
+            ("export {…} from", "export { a, b as c } from './y.js';", "export … from './y.js'"),
+            ("a dynamic import", "export const load = () => import('./y.js');", "import()"),
+            ("require()", "const fs = require('node:fs');", "require()")):
+        case(f"core: {label}", core, source, needle)
+
+    case("floor: ES2020 forms, and newer names only in comments, strings, patterns and keys", floor, r"""
+// AbortSignal.any, structuredClone, a ??= b, 1_000, class A { x = 1 }, await x
+const words = 'AbortSignal.any(x) xs.toSorted() a ??= b 1_000 #private /v';
+const pattern = /[/`'"]+(?:\??=)?/gu, half = total / 2 / 1, big = 10n ** 2n, pick = words?.length ?? 0;
+const parts = `${words.at(-1)}/${pattern.source}${`${half}`}`;
+export const later = async () => await Promise.resolve(parts);
+export async function load(signal) { for await (const x of signal) await x; return { with: 1 }.with; }
+export const view = { async get() { return await later(); }, class: 'x' };
+class Base {
+  constructor(a) { this.a = a; }
+  static of(a) { return new Base(a); }
+  get value() { return this.a; }
+  set value(v) { this.a = v; }
+  async *items() { yield await this.a; }
+  ['computed']() { return new RegExp('a', 'gi'); }
+}
+export { Base };
+""")
+    case("floor: newer method words as plain names, keys, array items and uncalled members", floor, r"""
+const take = 1, drop = { union: 2, toArray: 3 }, words = ['toSorted', 'with', `isWellFormed`];
+const picked = words.indexOf('with') >= 0 ? drop.union : drop['toArray'];
+class Pool {
+  union(other) { return [this, other]; }
+  ['take']() { return take; }
+}
+export const pool = { intersection: new Pool(), difference: 0, ['drop']: drop, picked };
+export const patterns = [/\(?i:a\)/u, /[(?i:)]+/, /(?:a)|(?<x>b)|(?<z>c)/u, /(?<=a)(?<!b)c/];
+export const later = Promise.resolve(take), text = String.raw`(?i:x)`;
+""")
+    for label, source, needle in (
+            ("AbortSignal.any", "export const both = (a, b) => AbortSignal.any([a, b]);", "AbortSignal.any"),
+            ("AbortSignal.timeout", "fetch(url, { signal: AbortSignal.timeout(5000) });", "AbortSignal.timeout"),
+            ("AbortSignal?.['any']", "export const any = globalThis.AbortSignal?.['any'];", "AbortSignal.any"),
+            ("URL.canParse", "export const ok = (u) => URL.canParse(u);", "URL.canParse"),
+            ("URL.parse", "export const parsed = (u) => URL.parse(u);", "URL.parse"),
+            ("Promise.withResolvers", "const { promise, resolve } = Promise.withResolvers();", "Promise.withResolvers"),
+            ("Object.groupBy", "const kinds = Object.groupBy(items, (item) => item.kind);", "Object.groupBy"),
+            ("Map.groupBy", "const kinds = Map.groupBy(items, (item) => item.kind);", "Map.groupBy"),
+            ("Array.fromAsync", "export const all = (xs) => Array.fromAsync(xs);", "Array.fromAsync"),
+            ("toSorted", "export const sorted = (xs) => xs.toSorted();", "toSorted"),
+            ("toReversed", "export const back = (xs) => xs.toReversed();", "toReversed"),
+            ("toSpliced", "export const cut = (xs) => xs.toSpliced(0, 1);", "toSpliced"),
+            ("Array.prototype.with", "export const swap = (xs) => xs.with(0, 1);", ".with()"),
+            ("structuredClone", "export const copy = (x) => structuredClone(x);", "structuredClone"),
+            ("String isWellFormed", "export const ok = (s) => s.isWellFormed();", "isWellFormed"),
+            ("String toWellFormed", "export const fixed = (s) => s.toWellFormed();", "toWellFormed"),
+            ("Set union", "export const all = (a, b) => a.union(b);", ".union()"),
+            ("Set intersection", "export const both = (a, b) => a.intersection(b);", ".intersection()"),
+            ("Set difference", "export const rest = (a, b) => a.difference(b);", ".difference()"),
+            ("Set symmetricDifference", "export const odd = (a, b) => a.symmetricDifference(b);",
+             "symmetricDifference"),
+            ("Set isSubsetOf", "export const within = (a, b) => a.isSubsetOf(b);", "isSubsetOf"),
+            ("Set isSupersetOf", "export const covers = (a, b) => a.isSupersetOf(b);", "isSupersetOf"),
+            ("Set isDisjointFrom", "export const apart = (a, b) => a.isDisjointFrom(b);", "isDisjointFrom"),
+            ("Iterator.from", "export const wrap = (it) => Iterator.from(it);", "line 1: Iterator"),
+            ("an iterator's take", "export const first = (it) => it.take(1);", ".take()"),
+            ("an iterator's drop", "export const rest = (it) => it.drop(1);", ".drop()"),
+            ("an iterator's toArray", "export const list = (map) => map.keys().toArray();", ".toArray()"),
+            ("Promise.try", "export const run = (f) => Promise.try(f);", "Promise.try"),
+            ("RegExp.escape", "export const exact = (s) => new RegExp(RegExp.escape(s), 'u');", "RegExp.escape"),
+            ("a quoted toSorted member", "export const sorted = (xs) => xs['toSorted']();", "toSorted"),
+            ("a quoted with member", "export const swap = (xs) => xs['with'](0, 1);", ".with()"),
+            ("an optional quoted union member", "export const all = (a, b) => a?.['union'](b);", ".union()"),
+            ("a template-quoted static", "export const any = AbortSignal[`any`];", "AbortSignal.any"),
+            ("||=", "let a;\na ||= 1;", "line 2: logical assignment ||="),
+            ("&&=", "let a = 1;\na &&= 2;", "logical assignment &&="),
+            ("??= in a template substitution", "export const t = (o) => `${o.x ??= 1}`;", "logical assignment ??="),
+            ("a decimal numeric separator", "const limit = 16_384;", "numeric separator 16_384"),
+            ("a hexadecimal numeric separator", "const mask = 0xFF_FF;", "numeric separator 0xFF_FF"),
+            ("a class field", "class A { x = 1; }", "class field"),
+            ("a static field after a method", "class A { m() { return 1; } static y; }", "class field"),
+            ("a class static block", "class A { static { A.ready = true; } }", "class static block"),
+            ("a private method", "class A { #check() { return 1; } run() { return this.#check(); } }",
+             "private class member #check"),
+            ("a top-level await", "await ready();", "line 1: top-level await"),
+            ("an await in a top-level block", "if (ok) {\n  await ready();\n}", "line 2: top-level await"),
+            ("a top-level for await", "for await (const chunk of stream) use(chunk);", "top-level await"),
+            ("an await after an arrow argument", "run(() => 1, await ready());", "top-level await"),
+            ("the RegExp v flag", r"const letters = /[\p{L}--\p{Lu}]/v;", "RegExp v flag"),
+            ("the RegExp d flag", "const found = /a+/d.exec(text);", "RegExp d flag"),
+            ("the RegExp d flag by constructor", "const r = new RegExp(source, 'dg');", "RegExp d flag"),
+            ("the RegExp v flag after an arrow", "export const word = (x) => /[/]+/v.test(x);", "RegExp v flag"),
+            ("a RegExp modifier group", "export const word = /(?i:abc)d/u;", "RegExp modifier group (?i:"),
+            ("a RegExp modifier group removing a flag", "export const line = /(?-s:.)+/s;",
+             "RegExp modifier group (?-s:"),
+            ("a RegExp group name used twice", r"export const year = /(?<y>\d{4})|(?<y>\d{2})/u;",
+             "RegExp group name 'y' used twice"),
+            ("a source the reader cannot read", "const s = 'unterminated;", "not readable as JavaScript")):
+        case(f"floor: {label}", floor, source, needle)
+
+    base = ("import http from 'node:http';\nimport https from 'node:https';\nimport dns from 'node:dns';\n"
+            "import { resolveDestination } from './destination.js';\n"
+            "export const settings = { insecureHTTPParser: false, rejectUnauthorized: true };\n")
+    case("resolver: the four modules and the literal settings", node, base)
+    case("resolver: refused names only in comments and strings, and a local agent", node, base
+         + "// never process.env, https.globalAgent, proxyEnv or agent: false\n"
+         "const why = 'rejectUnauthorized: false and agent: false are never set';\n"
+         "const agent = new http.Agent({ keepAlive: false });\n"
+         "export const hop = { agent, node: process.versions.node, lookup: dns.lookup };\n")
+    case("resolver: process reached through globalThis for its versions only, and a process key", node, base
+         + "const scope = globalThis;\nconst host = scope.process;\n"
+         "export const onNode = () => typeof host.versions.node === 'string';\n"
+         "export const options = { process: 1, method: 'GET' };\n")
+    for label, source, needle in (
+            ("another built-in", base + "import net from 'node:net';", "imports node:net"),
+            ("a re-export of another module", base + "export * from 'node:fs';", "imports node:fs"),
+            ("node:dns not imported", base.replace("import dns from 'node:dns';\n", ""), "does not import node:dns"),
+            ("a dynamic import", base + "export const load = () => import('node:net');", "import()"),
+            ("require()", base + "const fs = require('node:fs');", "require()"),
+            ("process.getBuiltinModule()", base + "const net = process.getBuiltinModule('node:net');",
+             "getBuiltinModule()"),
+            ("process.env", base + "const proxy = process.env.HTTPS_PROXY;", "process.env"),
+            ("process['env']", base + "const env = process['env'];", "process.env"),
+            ("process[`env`]", base + "export const vars = process[`env`];", "process.env"),
+            ("env destructured from process", base + "const { env } = process;\nexport const proxy = env.HTTPS_PROXY;",
+             "process other than process.versions"),
+            ("the process global aliased", base + "const proc = process;\nexport const vars = proc['e' + 'nv'];",
+             "process other than process.versions"),
+            ("env read from process reached another way",
+             base + "const host = globalThis.process;\nexport const vars = host.env;", "host.env"),
+            ("env destructured from process reached another way",
+             base + "export const { env: vars } = globalThis.process;", "line 6: env"),
+            ("the global agent", base + "const shared = https.globalAgent;", "globalAgent"),
+            ("an agent's proxy environment", base + "const agent = new http.Agent({ proxyEnv: {} });", "proxyEnv"),
+            ("agent: false", base + "export const fresh = { agent: false };", "agent: false"),
+            ("insecureHTTPParser: true", base + "export const loose = { insecureHTTPParser: true };",
+             "insecureHTTPParser is not the literal false"),
+            ("rejectUnauthorized: false", base + "export const lax = { rejectUnauthorized: false };",
+             "rejectUnauthorized is not the literal true"),
+            ("rejectUnauthorized from a caller", base + "export const pick = (allow) => ({ rejectUnauthorized: allow });",
+             "rejectUnauthorized is not the literal true"),
+            ("rejectUnauthorized assigned", base + "options.rejectUnauthorized = false;",
+             "rejectUnauthorized is not the literal true"),
+            ("no rejectUnauthorized: true", base.replace(", rejectUnauthorized: true", ""), "no rejectUnauthorized: true"),
+            ("no insecureHTTPParser: false", base.replace("insecureHTTPParser: false, ", ""),
+             "no insecureHTTPParser: false")):
+        case(f"resolver: {label}", node, source, needle)
+    return ran, failures
 
 
 def flutter_self_test():
@@ -3940,7 +4664,7 @@ def cli_self_test():
                 if got != want:
                     failures.append(f"CLI {label}: {got!r} (want {want!r})")
 
-            # R1: the release set is complete, from one build, and holds nothing else.
+            # The release set is complete, from one build, and holds nothing else.
             def release_set(label: str, files: list, *needles: str) -> None:
                 judge(f"release set: {label}", [*files, sums(f"set-{slug(label)}", [
                     f for f in files if not f.name.endswith(".crate")])], FAIL, *needles,

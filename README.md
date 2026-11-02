@@ -42,7 +42,8 @@ scan reports. They illustrate supported use cases, not a promise to decode every
 ## What you get
 
 - **Local decoding.** Process encoded images or raw camera frames in your own
-  application. The scanner library makes no network calls.
+  application. Decoding makes no network calls; an optional destination module
+  checks an encoded URL only through a transport your code supplies.
 - **One report across runtimes.** Get decoded content, its format, structured
   payloads and diagnostic hints through Rust, CLI, Node, browser WASM or Python.
 - **Extra help for difficult QR designs.** Preprocessing, multiple decoders and

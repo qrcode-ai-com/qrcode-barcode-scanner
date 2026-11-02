@@ -27,8 +27,9 @@ rename or documentation amendment does not publish or retire any artifact.
 
 A Rust workspace producing EIGHT publish surfaces off one core —
 QR/barcode decoding + scannability scoring, specialty: artistic/
-AI-generated codes. Everything runs **locally** (no network calls
-anywhere in the library).
+AI-generated codes. The Rust core and WASM run **locally** with no network
+calls; the optional `./destination` module sends requests only through a
+transport the caller supplies.
 
 | Path | Artifact | Registry |
 |---|---|---|

@@ -149,7 +149,343 @@ Customize `--qr-scanner-highlight`, `--qr-scanner-surface`,
 `--qr-scanner-text` and the `labels` option for your product. Physical camera
 acceptance remains a separate check from synthetic video tests.
 
+## URL destination checks
+
+From 0.11.0, two optional JavaScript entries report where an encoded `http(s)`
+URL leads. Decoding and the WASM module never use them. `/camera-overlay`
+imports `destinationCandidate` to read eligibility and checks a destination
+only through a verifier you pass it, from a user action.
+
+| Entry | Runs in | Exports |
+| --- | --- | --- |
+| `/destination` | browsers, module workers, Node and SSR; no imports | `destinationCandidate`, `createDestinationVerifier`, `createDestinationSelection`, `resolveDestination`, `createFetchTransport`, `createEndpointTransport`, `createPreparedTransport`, `classifyAddress`, `classifyHost`, `DESTINATION_POLICY` |
+| `/destination-node` | Node only (tested on 22 and 24) | `createNodeTransport`, `createDestinationEndpoint` |
+
+This section describes browser behaviour from the web standards; no
+Safari/WebKit or physical-device behaviour is claimed.
+
+Importing an entry, creating a verifier and creating a transport send nothing
+and start no timer. A request leaves only from `verifier.resolve()`,
+`resolveDestination()` or a direct `transport.resolve()`, through the transport
+the application passed in. A result describes one check: the requested URL,
+the final URL and status observed, the redirect steps when the transport can
+see them, the transport and its provenance. It never says whether a
+destination is safe.
+
+<Warning>
+A check is a real `GET`, with whatever effect the destination attaches to it: a
+counted visit, a used scan cap, a consumed one-time link. Start checks only
+from an explicit user action. Render every URL of a result as text, never as a
+link, a navigation target or an open action.
+</Warning>
+
+```ts
+import {
+  createDestinationSelection,
+  createDestinationVerifier,
+  createEndpointTransport,
+} from "@supernovae-st/qrcode-ai-scanner-wasm/destination";
+
+// Create once, in client code; creation has no side effects.
+const verifier = createDestinationVerifier({
+  transport: createEndpointTransport({ endpoint: "/api/destination", label: "App server" }),
+});
+const selection = createDestinationSelection(verifier, {
+  onChange(view) { renderDestination(view); }, // { candidate, snapshot } or null
+});
+
+selection.select(detection); // whenever the displayed detection changes; null for none
+
+// On the "Check destination" button:
+const view = selection.view;
+if (view?.candidate.eligible && verifier.canResolve) {
+  await verifier.resolve(view.candidate);
+}
+
+// On teardown:
+selection.destroy();
+verifier.destroy();
+```
+
+`renderDestination` shows `view.candidate.encodedUrl`, the `requestUrl` when it
+differs, and the snapshot's `state`. Treat a destination as observed only when
+`snapshot.state === "resolved" && snapshot.provenance !== "simulated"`, and
+show `snapshot.transport.label` beside it. Create the endpoint transport in
+client code: a `/path` endpoint resolves against `globalThis.location`, so
+creating it on a server, during server rendering included, throws a TypeError.
+
+### Eligibility
+
+`destinationCandidate(input)` takes a `Detection`, a `Payload` or a string and
+returns a frozen candidate. It reads `payload.url` of the `url`,
+`gs1_digital_link` (whatever its `conformant` flag says) and `me_card` kinds,
+and tests a string as it is, with `source: null`.
+
+| `reason` | When |
+| --- | --- |
+| `no_url` | another payload kind (`text` included), an empty URL field or an empty string |
+| `lossy_text` | the detection's `content.charset` is `unknown` |
+| `not_http` | the value does not start with `http://` or `https://` at its first character, ASCII case ignored: a leading space, `www.example.com` or a string of plain text |
+| `control_or_space` | a control character, a space or other separator, a format character, a default-ignorable code point (a variation selector after an emoji included) or a lone surrogate, anywhere in the value |
+| `invalid_url` | the WHATWG URL parser refuses the value |
+| `credentials` | the value carries a user name or password |
+| `too_long` | the value or its `requestUrl` exceeds 16384 UTF-16 code units |
+
+Nothing is trimmed, joined or completed: the URL parser would delete tabs and
+line breaks, and IDNA would delete invisible characters inside a host, so
+checking the parsed form would request a URL the code does not contain. An
+eligible candidate keeps `encodedUrl`, the exact string and the verifier's
+key, apart from `requestUrl`, its WHATWG serialization without the fragment
+(scheme and host lowercased, IDNA applied, default port removed, dot segments
+resolved, percent-encoding added). Show `requestUrl` whenever it differs.
+Eligibility is stricter than opening a link: a code with a space or an
+invisible character is still displayed, but never checked.
+
+### Transports
+
+| Factory | `kind` | Provenance ceiling | Default `label` | Runs in |
+| --- | --- | --- | --- | --- |
+| `createFetchTransport({ scope: "network" })` | `fetch` | `network` | This browser | browsers, module workers |
+| `createFetchTransport({ scope: "fixture", fixtureOrigin })` | `fetch` | `fixture` | Local fixture (this browser) | browsers, module workers |
+| `createEndpointTransport({ endpoint, label })` | `endpoint` | `network`, or the `provenance` option | none: `label` is required | browsers, module workers |
+| `createPreparedTransport(entries, options)` | `prepared` | `simulated` | Prepared example | any runtime |
+| `createNodeTransport(options)` | `node` | `network`, or `fixture` in fixture mode | Server resolver (Node) | Node |
+
+The label is shown with every result; UIs must not infer trust from `kind`.
+Each built-in transport throws a TypeError or RangeError synchronously for an
+invalid request, and every observation passes the same validation before it
+is stored.
+
+- **Fetch.** `scope` is required: without `"network"` or `"fixture"`, creation
+  throws a TypeError, so a forgotten option never sends a real request. The
+  request is a `GET` with `mode: "cors"`, `credentials: "omit"`,
+  `cache: "no-store"`, `redirect: "follow"`, an empty `referrer` and
+  `referrerPolicy: "no-referrer"`; the body is canceled unread. Before sending,
+  in order: a server runtime (Node, Bun, Deno, no `location`) gives
+  `transport_unsupported`, whatever `fetch` is injected; in fixture scope,
+  another origin gives `out_of_scope`; a WHATWG Fetch bad port gives
+  `blocked_port`; in network scope, an address literal that is not public or a
+  special-use or malformed name gives `blocked_address`, and an `http:` target
+  from an HTTPS page gives `mixed_content`. A rejected fetch gives
+  `opaque_network_error` with `requestSent: null`, because the request may
+  still have arrived; an opaque response gives `opaque_response`. The response
+  is readable only when the destination allows CORS, which most sites do not.
+  After a redirect, `redirects` and `hopCount` are `null` and the browser
+  applies its own limit of 20 redirects. In fixture scope, a final URL outside
+  `fixtureOrigin` gives `left_fixture` after the browser may already have
+  contacted it; a fixture confines chains only when it grants CORS to explicit
+  page origins, never `*` or `null`.
+- **Endpoint.** `endpoint` is a `/path` on the page origin or an absolute
+  http(s) URL on that origin. Another origin needs `crossOrigin: true`, meant
+  only for third-party implementations of the wire that grant the CORS
+  preflight. The transport sends one `POST` with `credentials: "same-origin"`
+  by default (to the endpoint only, never to the destination),
+  `redirect: "error"` and a `DestinationWireRequest` body whose `timeoutMs`
+  leaves the client time to receive the server's timeout answer (9000 ms of
+  10000). The answer is untrusted: a rejection gives `endpoint_unreachable`, a
+  status other than 200 `endpoint_http_error`, no answer within the budget
+  `endpoint_timeout`, and a body that fails validation (media type, 2 MiB cap,
+  UTF-8, exact keys, chain rules, a provenance above the ceiling)
+  `endpoint_invalid_response`.
+- **Prepared.** Entries map a canonical `requestUrl` to a result, or to
+  `"pending"`, which never settles by itself, for showing the resolving,
+  canceled and timeout states. `delayMs` simulates latency. Every result has
+  `requestSent: false`, and any other URL gives `out_of_scope`.
+- **Custom.** Implement `DestinationTransport`: `kind: "custom"`, a `label` of
+  1 to 80 code points, a provenance ceiling and a `resolve(request)` method
+  that settles within `request.timeoutMs` and honours `request.signal`. An
+  invalid observation gives `invalid_observation`, a throw or rejection
+  `transport_error`, and a transport still pending 1000 ms after its budget
+  `transport_unresponsive`.
+
+### Verifier and results
+
+`createDestinationVerifier(options)` returns a store with one entry per exact
+`encodedUrl`.
+
+| Option | Default | Range or meaning |
+| --- | --- | --- |
+| `transport` | required key | a transport, or `null`: every `resolve()` then settles `unavailable` with `no_transport` |
+| `timeoutMs` | 10000 | 1 to 60000 ms per attempt; a transport still pending 1000 ms later is cut off |
+| `maxHops` | 10 | 0 to 20 redirects |
+| `maxConcurrent` | 2 | 1 to 8 attempts running |
+| `maxQueued` | 16 | 0 to 256 attempts waiting, oldest first; beyond that, `queue_full` |
+| `maxEntries` | 64 | more than `maxConcurrent + maxQueued`, at most 1024; beyond it, the least recently used settled entry returns to `unverified` |
+| `timers` | platform clocks | `now`, `monotonic`, `setTimeout` and `clearTimeout`, called unbound |
+| `reportError` | `globalThis.reportError`, else `console.error` | receives listener, transport and timer errors; never rethrows |
+
+- `get(target)` returns the current snapshot, the same object until the entry
+  changes, or `null` for an ineligible target. A target is a candidate or a
+  string.
+- `resolve(target, { signal })` starts an attempt, or joins the one in flight
+  for the same `encodedUrl`; its promise never rejects. It throws a TypeError
+  for an ineligible target, once `destroy()` has started, and for a signal that
+  is not an `AbortSignal`. A settled entry keeps its result until the next
+  `resolve()`, `forget()`, `clear()` or eviction; there is no expiry.
+- `cancel(target)` cancels a queued or running attempt (`canceled`), and an
+  aborted caller signal gives `aborted`. `forget(target)` and `clear()` return
+  entries to `unverified`; an attempt in flight then resolves its promise
+  `canceled` with `cleared`. `destroy()` clears the store and drops the
+  listeners, and every later call except `destroy()` throws.
+- `subscribe(listener)` delivers each stored change (`encodedUrl`, `snapshot`,
+  `previous`, `cause`) synchronously and in order, and returns an idempotent
+  unsubscribe function. `canResolve` and `transport` describe the
+  configuration without exposing the transport object.
+
+The methods are closures, so React can read the store directly:
+
+```tsx
+const snapshot = useSyncExternalStore(
+  verifier.subscribe,
+  () => (candidate?.eligible ? verifier.get(candidate) : null),
+);
+```
+
+Every snapshot is frozen and has the same 18 keys: `encodedUrl`, `requestUrl`,
+`state`, `reason`, `attemptId`, `transport`, `provenance`, `requestSent`,
+`finalUrl`, `status`, `redirected`, `changed`, `redirects`, `hopCount`,
+`startedAt`, `settledAt`, `durationMs` and `detail`.
+
+| `state` | `reason` |
+| --- | --- |
+| `unverified`, `resolving` (`startedAt: null` while queued), `resolved` | `null` |
+| `failed` | `timeout`, `too_many_redirects`, `redirect_loop`, `invalid_location`, `blocked_scheme`, `blocked_credentials`, `blocked_address`, `blocked_port`, `left_fixture`, `name_unusable`, `dns_error`, `connection_error`, `tls_error`, `invalid_response` |
+| `unavailable` | from a transport: `transport_unsupported`, `out_of_scope`, `opaque_network_error`, `opaque_response`, `mixed_content`, `endpoint_unreachable`, `endpoint_http_error`, `endpoint_invalid_response`, `endpoint_timeout`, `resolver_busy`; from validation: `transport_error`, `invalid_observation`, `transport_unresponsive`; from the store: `no_transport`, `queue_full` |
+| `canceled` | `canceled`, `aborted`; `cleared` appears only in the promise of a removed attempt |
+
+- `provenance` is `network` (a real request to whatever the URL names),
+  `fixture` (a real request to a local fixture) or `simulated` (prepared data,
+  always with `requestSent: false`). An observation that claims more than its
+  transport's ceiling is refused as `invalid_observation`, never upgraded.
+- `requestSent` is `true` once a request left (for the fetch transport: the
+  browser returned a response, which a service worker or its cache can also
+  produce), `false` when provably none did, and `null` when unknown.
+- `redirects` lists the redirect responses observed, each with `url`,
+  `status`, `location` (`null` when invalid, credentialed or not http(s)) and
+  `refusedScheme`. `hopCount` counts the redirects followed: a refused last
+  step is observed but not followed. Both are `null` when the chain is unknown.
+- `changed` says whether `finalUrl` differs from `requestUrl`.
+- `startedAt` and `settledAt` come from the verifier's wall clock and
+  `durationMs` from its monotonic clock. Time spent queued is excluded, and
+  transports supply no times. Order attempts by `attemptId`.
+- `detail` is English text of at most 300 code points. The built-in
+  transports and the verifier write fixed sentences, some completed by an
+  error code, a rule name or an HTTP status. A custom transport's or a
+  prepared entry's `detail` is its own text, with control and invisible
+  formatting characters replaced by U+FFFD. Only
+  `DESTINATION_POLICY.detailSentences` cross the endpoint wire. Translate the
+  `reason` codes for users.
+
+`createDestinationSelection(verifier, { onChange, cancelOnDeselect })` binds
+one verifier for its whole life. `select(input)` takes a detection, a payload,
+a string or `null`. Its `view` is `{ candidate, snapshot }`, with `snapshot`
+`null` exactly when the candidate is ineligible, and it always reads the
+selected code's own entry, so a late result for another code never appears
+under it. With `cancelOnDeselect: true` (default `false`), moving the
+selection cancels the previous entry's attempt.
+
+`resolveDestination(transport, { url, maxHops, timeoutMs, signal }, { timers })`
+runs one validated call without a store and never rejects; its `outcome` is
+`resolved`, `failed`, `unavailable` or `canceled`. `classifyAddress()` and
+`classifyHost()` expose the address and name tables without any lookup, and
+`DESTINATION_POLICY` holds the limits, the WHATWG Fetch bad ports, the fixed
+detail sentences and the tables' `snapshot` date.
+
+### Node resolver and endpoint
+
+`/destination-node` imports `node:http`, `node:https` and `node:dns`; importing
+it creates no socket, lookup, resolver, agent, server or timer.
+`createNodeTransport()` checks at every call that it runs on Node and answers
+`transport_unsupported` under Bun or Deno. On Node 22, importing `node:http`
+from an ES module compiles a WebAssembly HTTP parser, so this entry needs
+WebAssembly there and does not run under `--jitless`.
+
+```ts
+import { createDestinationEndpoint, createNodeTransport }
+  from "@supernovae-st/qrcode-ai-scanner-wasm/destination-node";
+
+const handler = createDestinationEndpoint({
+  transport: createNodeTransport(), // one per process
+  allowedHosts: ["app.example.com"],
+});
+// Before any body parser, on the page's own origin, behind your session check:
+// app.post("/api/destination", requireSession, rateLimit, handler);
+```
+
+The resolver follows redirects itself and applies its policy on every hop:
+http(s) only, bad ports refused and only `allowedPorts` reachable, special-use
+names refused, every DNS answer vetted, public addresses only, a post-connect
+address check, proxy settings ignored, certificate checks always on, bodies
+never read. The handler accepts only same-origin JSON `POST` requests for an
+allowed `Host`, and merges name failures into `name_unusable` by default. The
+[security model](/concepts/security#destination-layer-optional-js-module)
+details the policy and what the operator must still configure:
+authentication, rate limits, NAT64 prefixes and denied ranges.
+
+<AccordionGroup>
+  <Accordion title="createNodeTransport options">
+    | Option | Default | Notes |
+    | --- | --- | --- |
+    | `label` | Server resolver (Node); Local fixture (Node resolver) in fixture mode | 1 to 80 code points |
+    | `timeoutMs` | 10000 | cap on the request budget, 1 to 30000 ms; one deadline for the whole chain |
+    | `maxHops` | 10 | cap on followed redirects, 0 to 20 |
+    | `allowedPorts` | `[80, 443]` | network mode only; WHATWG Fetch bad ports are always refused |
+    | `maxConcurrent` | 2 | 1 to 16 attempts, 1 to 3 when `lookup` is `dns.lookup`; at most 32 attempts across the module; beyond either, `resolver_busy` |
+    | `userAgent` | `qrcode-ai-scanner-destination-bot/1` | printable ASCII, 1 to 256 characters |
+    | `lookup` | the per-attempt cancelable resolver | a `dns.lookup`-compatible function; in fixture mode, names resolve only through it |
+    | `dnsServers` | system configuration | network mode with the default resolver only: `"a.b.c.d[:port]"` or `"[v6][:port]"` |
+    | `translationPrefixes` | none | NAT64 prefixes, `"<prefix>/<length>"` with an RFC 6052 length: 32, 40, 48, 56, 64 or 96 |
+    | `deniedRanges` | none | IPv4 or IPv6 CIDRs refused besides the built-in tables |
+    | `fixture` | none | `{ address: "127.0.0.1" or "::1", port }`: closed-world mode with `fixture` provenance |
+    | `ca` | none | fixture mode only: PEM certificates for an HTTPS fixture |
+    | `timers` | platform timers | `now`, `monotonic`, `setTimeout` and `clearTimeout` |
+  </Accordion>
+  <Accordion title="createDestinationEndpoint options">
+    | Option | Default | Notes |
+    | --- | --- | --- |
+    | `transport` | required | a `node`, `prepared` or `custom` transport; `fetch` and `endpoint` throw a TypeError |
+    | `allowedHosts` | required | non-empty array of accepted `Host` values, such as `"app.example.com"` |
+    | `publicScheme` | `"https"` | the scheme browsers use; the expected `Origin` is `publicScheme://Host` |
+    | `allowedOrigins` | none | further exact origins, for reverse proxies that rewrite `Host` |
+    | `maxBodyBytes` | 65536 | 256 to 1048576 bytes |
+    | `bodyTimeoutMs` | 5000 | 100 to 60000 ms to receive the whole body |
+    | `allowMissingFetchMetadata` | `false` | accept requests with neither `Sec-Fetch-Site` nor `Origin` (non-browser clients) |
+    | `revealNameErrors` | `false` | keep `dns_error` and lookup-derived `blocked_address` apart on the wire |
+    | `timers` | platform timers | `now`, `monotonic`, `setTimeout` and `clearTimeout` |
+    | `reportError` | none | receives transport errors; nothing is logged |
+  </Accordion>
+  <Accordion title="Endpoint wire (version 1)">
+    The client sends a `DestinationWireRequest`: exactly
+    `{ "version": 1, "url": "https://example.com/a", "maxHops": 10, "timeoutMs": 9000 }`,
+    with a canonical `url` (the `requestUrl` of an eligible candidate) and
+    integer limits.
+
+    The handler answers 200 with `application/json; charset=utf-8` and the 11
+    keys of `DestinationWireResponse`: `version`, `url` (an exact echo),
+    `outcome`, `reason`, `finalUrl`, `status`, `redirected`, `redirects`,
+    `requestSent`, `provenance` and `detail`, which is one of
+    `DESTINATION_POLICY.detailSentences` (followed by an error code in
+    parentheses where that sentence allows one) or `null`. An `unavailable`
+    outcome on the wire is `out_of_scope` or `resolver_busy`; any other ends in
+    a 500.
+    The wire never carries times, addresses, header values or error messages.
+
+    Refusals are a `DestinationWireError` such as `{ "error": "forbidden" }`:
+    405 `method_not_allowed` (with `Allow: POST`), 403 `forbidden`, 415
+    `unsupported_media_type`, 413 `payload_too_large`, 408 `request_timeout`,
+    400 `bad_request`, 500 `body_already_read` and 500 `resolver_failed`. Every
+    response carries `cache-control: no-store` and
+    `x-content-type-options: nosniff`, never a CORS header. When the client
+    disconnects, the check is aborted and nothing is written.
+  </Accordion>
+</AccordionGroup>
+
 ## Bundler configuration
+
+`/destination-node` has only a `node` export condition (no `import`, `default`
+or `browser`), so a browser build fails to resolve it before bundling any
+`node:` module, and because Bun also matches `node`, its transport checks the
+runtime at every call.
 
 <AccordionGroup>
   <Accordion title="Vite / Nuxt">

@@ -66,7 +66,7 @@ const bytes = readFileSync(fixture);
 const text = "https://qrcode-ai.com/c/v5q";
 const axes = ["resolution", "blur", "contrast", "perspective", "rotation", "lighting"];
 const white = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAXklEQVR4nO3PMQ0AMAzAsPInvYLYYVWKESTzjhsd8KsBrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BrQGtAa0BbQHKU9LC7/CP1AAAAABJRU5ErkJggg==", "base64");
-let qr, scan, full, loaded, loaderPhases;
+let qr, scan, full, loaded, loaderPhases, destinationSubpaths = null;
 if (mode === "native") {
   process.env.NAPI_RS_ENFORCE_VERSION_CHECK = "1";
   qr = require(name);
@@ -122,6 +122,42 @@ if (mode === "native") {
   assert.throws(() => qr.scan_frame(blank, 16, 16, "full", 0, undefined, undefined, ["tilt"]), /unknown stress axis/);
   // initialization phases of the installed ./auto loader (loader-phases.mjs)
   loaderPhases = wasmLoaderPhases({ consumer, packageName: name, wasmPath: wasm, fixturePath: fixture, text });
+  // The destination subpaths through the installed exports map, by package
+  // name in a fresh process: the browser-safe core and the Node-only resolver
+  // (a "node" condition only) load with the values destination.d.ts and
+  // destination-node.d.ts declare, and the resolver's file path is a null
+  // target, so a deep import cannot bypass that condition through "./*".
+  const declared = {
+    "./destination": { DESTINATION_POLICY: "object", destinationCandidate: "function", classifyAddress: "function",
+      classifyHost: "function", resolveDestination: "function", createDestinationVerifier: "function",
+      createDestinationSelection: "function", createFetchTransport: "function", createEndpointTransport: "function",
+      createPreparedTransport: "function" },
+    "./destination-node": { createNodeTransport: "function", createDestinationEndpoint: "function" },
+  };
+  const deepImport = "./destination-node.js";
+  const observed = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", `
+    import { fileURLToPath } from "node:url";
+    const observed = {};
+    for (const subpath of ${JSON.stringify([...Object.keys(declared), deepImport])}) {
+      const specifier = ${JSON.stringify(name)} + subpath.slice(1);
+      try {
+        const namespace = await import(specifier);
+        observed[subpath] = { file: fileURLToPath(import.meta.resolve(specifier)),
+          exports: Object.fromEntries(Object.keys(namespace).map((key) => [key, typeof namespace[key]])) };
+      } catch (error) { observed[subpath] = { code: error.code ?? null, message: error.message }; }
+    }
+    console.log(JSON.stringify(observed));`], { cwd: consumer, encoding: "utf8", timeout: 30_000 }));
+  for (const [subpath, values] of Object.entries(declared)) {
+    const { file, exports: found } = observed[subpath];
+    assert.ok(file, `${name}${subpath.slice(1)} must import: ${JSON.stringify(observed[subpath])}`);
+    assert.equal(realpathSync(file), join(packageRoot, `${subpath.slice(2)}.js`), `${subpath} is the installed file`);
+    for (const [key, type] of Object.entries(values)) assert.equal(found[key], type, `${subpath} exports ${key}`);
+  }
+  assert.equal(observed[deepImport].code, "ERR_PACKAGE_PATH_NOT_EXPORTED",
+    `importing ${name}${deepImport.slice(1)} must reject: ${JSON.stringify(observed[deepImport])}`);
+  destinationSubpaths = Object.fromEntries(Object.entries(declared).map(([subpath, values]) =>
+    [subpath, { file: `${subpath.slice(2)}.js`, exports: values }]));
+  destinationSubpaths[deepImport] = { refused: observed[deepImport].code };
 }
 // The option table (option-domains.mjs) through the installed API, on every
 // path a JavaScript number reaches the core by.
@@ -196,6 +232,7 @@ const receipt = { verdict: "PASS", mode, node: process.version, platform: proces
   installed_tarballs: selected.map(({ path, sha256 }) => ({ path, sha256 })),
   platform_version_mismatch_refused: mode === "native" ? true : null,
   loader_phases: loaderPhases,
+  destination_subpaths: destinationSubpaths,
   loaded: loaded.map((path) => ({ path, sha256: digest(path) })) };
 writeFileSync(join(consumer, "receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(JSON.stringify(receipt));

@@ -150,6 +150,45 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - `/camera-overlay` provides framework-free corner brackets, stable keyboard
   target selection and an explicit HTTP(S) payload action, with host theming,
   contain/cover/fill geometry, mirroring and complete teardown.
+- **URL destination checks** (optional, JavaScript only). The browser
+  package's `/destination` entry (no imports; browsers, module workers, Node
+  and SSR) decides with `destinationCandidate()` whether the `url` of a `url`,
+  `gs1_digital_link` or `me_card` payload, or a given string, is a checkable
+  http(s) URL: `http://` or `https://` at its first character, a WHATWG URL
+  without credentials, at most 16384 UTF-16 code units, and no control,
+  separator (space included), format, default-ignorable or lone surrogate code
+  point. Nothing is trimmed or repaired; an ineligible value names its
+  `reason` and is never requested, and an eligible one keeps the exact
+  `encodedUrl` apart from its canonical `requestUrl`. Importing, scanning and
+  creating a verifier or a transport send nothing. A request leaves only from
+  `verifier.resolve()`, `resolveDestination()` or a transport's `resolve()`,
+  through a transport the application supplies: browser `fetch` in an explicit
+  `network` or `fixture` `scope` (no credentials, referrer or cache;
+  `transport_unsupported` on server runtimes), an application endpoint (same
+  origin by default), prepared `simulated` results, or a custom transport
+  whose every observation is validated. `createDestinationVerifier()` keeps
+  one frozen 18-key snapshot per encoded URL (state and reason, transport
+  label and provenance, `requestSent`, final URL, status, observed redirect
+  steps, times), joins repeated checks and bounds its attempts, queue and
+  entries; `createDestinationSelection()` never shows a late result under
+  another code. `/destination-node` (Node only, tested on Node 22 and 24; its
+  export has a `node` condition alone) adds `createNodeTransport()`, which
+  follows redirects itself and checks every hop: http(s) only, WHATWG Fetch
+  bad ports refused and only ports 80 and 443 by default, special-use names
+  refused, every DNS answer vetted through a cancelable per-attempt resolver,
+  public addresses only with configurable NAT64 prefixes and denied ranges, a
+  post-connect address check, proxy settings ignored, certificate checks
+  always on, bodies never read. Its `createDestinationEndpoint()` serves the
+  endpoint transport from the application's own origin and merges name
+  failures into `name_unusable` by default. `/camera-overlay` reads
+  eligibility through `destinationCandidate()` and checks a destination only
+  through a verifier the application passes it, from a user action. A result
+  is an observation of one request chain, never a safety verdict: it names its
+  transport and provenance and reports every URL as text. `destination.js`,
+  `destination-node.js` and their declarations ship in the package, whose npm
+  description names the optional checks. Decoding, the Rust core and the WASM
+  module make no network calls. Usage and operator duties: `docs/api/wasm.mdx`
+  and `docs/concepts/security.mdx`.
 - **Installed-package truth set**: `fixtures/consumer-truth.json`, 35 inputs
   with their exact contents as a multiset, primary, occurrence geometry and
   score/null association under the full profile with no budget: every
