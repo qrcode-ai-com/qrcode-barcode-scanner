@@ -1,0 +1,3383 @@
+{
+  "schema": "qrscan-readme-media/1",
+  "engine_version": "0.11.0",
+  "source_revision": "5767d3d262421037a1ae2c75824cac59c078a102",
+  "source_archive": {
+    "producer": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/41695982902/artifacts/13263444117",
+    "tarball_sha256": "02b5ef3e31274f2032ff88701553334bfda8b8fd4136198f4e2a757b6b95737c",
+    "final_release": false
+  },
+  "wasm": {
+    "path": "qrcode-barcode-scanner_bg.wasm",
+    "bytes": 2220640,
+    "sha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68",
+    "features": [
+      "bulk-memory",
+      "nontrapping-fptoint",
+      "sign-ext"
+    ]
+  },
+  "scan": {
+    "profile": "full",
+    "budget_ms": 0
+  },
+  "replay": "Post-decode visualization of a static fixture report; not a camera recording or camera-UI capture.",
+  "fixtures": [
+    {
+      "path": "fixtures/clean/gen_v2_h.png",
+      "sha256": "af123af19f96d6fc044de39b071b605604766ac7e2337dbfd8a48f0bbffc8c95",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "qrc.ai/v2h",
+              "raw": "cXJjLmFpL3YyaA==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": [
+              {
+                "x": 32,
+                "y": 32
+              },
+              {
+                "x": 240,
+                "y": 32
+              },
+              {
+                "x": 240,
+                "y": 240
+              },
+              {
+                "x": 32,
+                "y": 240
+              }
+            ],
+            "meta": {
+              "version": 2,
+              "ec_level": "h",
+              "mask": 4,
+              "modules": 25,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 32,
+                      "y": 32
+                    },
+                    {
+                      "x": 232,
+                      "y": 32
+                    },
+                    {
+                      "x": 232,
+                      "y": 232
+                    },
+                    {
+                      "x": 32,
+                      "y": 232
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 28
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 21.076458,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 22.414459,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/artistic/OK_1069ms_85_8b6a54b3.png",
+      "sha256": "1e1ecac4ddda990d8861fac35c11e3c8d84d68ba6cf060571141656bfc6c1f6a",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrc-ai.com/K1Ng2",
+              "raw": "aHR0cHM6Ly9xcmMtYWkuY29tL0sxTmcy",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrc-ai.com/K1Ng2"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": "m",
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 99.25497,
+                      "y": 99.82096
+                    },
+                    {
+                      "x": 925.327,
+                      "y": 99.32332
+                    },
+                    {
+                      "x": 927.2119,
+                      "y": 923.1974
+                    },
+                    {
+                      "x": 101.13979,
+                      "y": 923.695
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 70,
+          "weights_run": 100,
+          "grade": "good",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "26°",
+              "refined_failed_at": "26°"
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "25°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "hard shadow"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "pyramid",
+              "transforms_tried": 1,
+              "ms": 54.322167,
+              "detections_found": 0
+            },
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 87.760959,
+              "detections_found": 0
+            },
+            {
+              "stage": "enhance",
+              "transforms_tried": 6,
+              "ms": 621.620166,
+              "detections_found": 1
+            },
+            {
+              "stage": "deep",
+              "transforms_tried": 25,
+              "ms": 222.441542,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 986.26,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/microqr.png",
+      "sha256": "a158966d9261b85112f63b377ddca4e5e5176a668413c71fb555d934135971a2",
+      "report": {
+        "detections": [
+          {
+            "symbology": "micro_qr_code",
+            "content": {
+              "text": "HELLO42",
+              "raw": "SEVMTE80Mg==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": "m",
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 30,
+                      "y": 30
+                    },
+                    {
+                      "x": 180,
+                      "y": 30
+                    },
+                    {
+                      "x": 180,
+                      "y": 180
+                    },
+                    {
+                      "x": 30,
+                      "y": 180
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 97,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "glare"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 1.344833,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 1.3682919999999998,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/rmqr-url-kanji.png",
+      "sha256": "97bcf495768b09cbcdd870deeac2497c03d7d4bebc90adfba81b5e667797995b",
+      "report": {
+        "detections": [
+          {
+            "symbology": "rectangular_micro_qr_code",
+            "content": {
+              "text": "https://qrc-ai.com/日本",
+              "raw": "aHR0cHM6Ly9xcmMtYWkuY29tL5P6lns=",
+              "charset": "shift_jis"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrc-ai.com/日本"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": "m",
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 12,
+                      "y": 12
+                    },
+                    {
+                      "x": 270,
+                      "y": 12
+                    },
+                    {
+                      "x": 270,
+                      "y": 90
+                    },
+                    {
+                      "x": 12,
+                      "y": 90
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 58,
+          "weights_run": 100,
+          "grade": "fair",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "128px",
+              "refined_failed_at": "128px"
+            },
+            {
+              "axis": "blur",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "blur 1.0",
+              "refined_failed_at": "blur 1.0"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "34°",
+              "refined_failed_at": "34°"
+            },
+            {
+              "axis": "rotation",
+              "passed": 0,
+              "total": 5,
+              "failed_at": "10°",
+              "refined_failed_at": "5°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "raise_error_correction",
+            "current": "m"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 2.255459,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 2.273167,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/datamatrix.png",
+      "sha256": "0ab5c1c5d8d8f465242570f3a81728d96966bfa73aef0616ed65492d522d7dae",
+      "report": {
+        "detections": [
+          {
+            "symbology": "data_matrix",
+            "content": {
+              "text": "https://qrcode-ai.com/dm",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tL2Rt",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/dm"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 59.853554,
+                      "y": 59.853554
+                    },
+                    {
+                      "x": 180.28787,
+                      "y": 59.71213
+                    },
+                    {
+                      "x": 180.14645,
+                      "y": 180.14645
+                    },
+                    {
+                      "x": 59.853554,
+                      "y": 180.14645
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 2.201375,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 2.252041,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/datamatrix-gs1.png",
+      "sha256": "e5c3e24a97b2e5c62be9e663590cc4586c1fc6f79e6a4d9f8fe769cad71cc7d8",
+      "report": {
+        "detections": [
+          {
+            "symbology": "data_matrix",
+            "content": {
+              "text": "\u001d010950600013435210AB12",
+              "raw": "HTAxMDk1MDYwMDAxMzQzNTIxMEFCMTI=",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "gs1",
+              "elements": [
+                {
+                  "ai": "01",
+                  "value": "09506000134352"
+                },
+                {
+                  "ai": "10",
+                  "value": "AB12"
+                }
+              ],
+              "gtin": "09506000134352",
+              "conformant": false,
+              "issues": [
+                "FNC1-in-first-position mode header missing — valid GS1 element syntax in a non-GS1 carrier (ISO 18004 §7.4.9; regenerate with GS1 mode enabled)"
+              ]
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 54.853554,
+                      "y": 89.85355
+                    },
+                    {
+                      "x": 185.28787,
+                      "y": 89.712135
+                    },
+                    {
+                      "x": 185.14645,
+                      "y": 150.14645
+                    },
+                    {
+                      "x": 54.853554,
+                      "y": 150.14645
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 87,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "blur 2.5",
+              "refined_failed_at": "blur 2.5"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "30°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "glare"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 1.529792,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 1.54875,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/aztec.png",
+      "sha256": "443ea720d5905d369a9738135162942d8afb94262c3fe3acd91b9dfc4a4c45f2",
+      "report": {
+        "detections": [
+          {
+            "symbology": "aztec",
+            "content": {
+              "text": "https://qrcode-ai.com/aztec",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tL2F6dGVj",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/aztec"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 187.35715,
+                      "y": 52.642853
+                    },
+                    {
+                      "x": 187.35715,
+                      "y": 187.35715
+                    },
+                    {
+                      "x": 52.642853,
+                      "y": 187.35715
+                    },
+                    {
+                      "x": 52.642853,
+                      "y": 52.642853
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 65,
+          "weights_run": 100,
+          "grade": "acceptable",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "90px",
+              "refined_failed_at": "90px"
+            },
+            {
+              "axis": "blur",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "blur 2.5",
+              "refined_failed_at": "blur 2.25"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "18°",
+              "refined_failed_at": "14°"
+            },
+            {
+              "axis": "rotation",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "20°",
+              "refined_failed_at": "15°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "glare"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 2.073375,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 2.09475,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/pdf417.png",
+      "sha256": "222d8c16f7c4cd5f814215d7d55760866b177c19beb21621375b431801dbba09",
+      "report": {
+        "detections": [
+          {
+            "symbology": "pdf417",
+            "content": {
+              "text": "https://qrcode-ai.com/pdf417",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tL3BkZjQxNw==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/pdf417"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 8,
+                      "y": 8
+                    },
+                    {
+                      "x": 282,
+                      "y": 8
+                    },
+                    {
+                      "x": 282,
+                      "y": 64
+                    },
+                    {
+                      "x": 8,
+                      "y": 64
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 62,
+          "weights_run": 100,
+          "grade": "acceptable",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "179px",
+              "refined_failed_at": "179px"
+            },
+            {
+              "axis": "blur",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "blur 1.5",
+              "refined_failed_at": "blur 1.5"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "42°",
+              "refined_failed_at": "38°"
+            },
+            {
+              "axis": "rotation",
+              "passed": 0,
+              "total": 5,
+              "failed_at": "10°",
+              "refined_failed_at": "10°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 3.14325,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 3.163542,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/code128-stock-4827.png",
+      "sha256": "a40f82c781ed634c99abbcac1801b7c5601d60819e39ecac537d4abbc0ab3b21",
+      "report": {
+        "detections": [
+          {
+            "symbology": "code128",
+            "content": {
+              "text": "STOCK-4827",
+              "raw": "U1RPQ0stNDgyNw==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 64.5,
+                      "y": 232.5
+                    },
+                    {
+                      "x": 427.5,
+                      "y": 232.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 66,
+          "weights_run": 100,
+          "grade": "acceptable",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "256px",
+              "refined_failed_at": "256px"
+            },
+            {
+              "axis": "blur",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "blur 2.0",
+              "refined_failed_at": "blur 1.75"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "30°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "hard shadow"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 8.252583000000001,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 8.278458,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/ean13.png",
+      "sha256": "fa2206274e1c0a83405d879eb9306a82f10e6817a9937f69436963367ee59605",
+      "report": {
+        "detections": [
+          {
+            "symbology": "ean13",
+            "content": {
+              "text": "9506000134352",
+              "raw": "OTUwNjAwMDEzNDM1Mg==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "gs1",
+              "elements": [
+                {
+                  "ai": "01",
+                  "value": "09506000134352"
+                }
+              ],
+              "gtin": "09506000134352",
+              "conformant": true,
+              "issues": []
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 21.5,
+                      "y": 70.5
+                    },
+                    {
+                      "x": 297.5,
+                      "y": 70.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 70,
+          "weights_run": 100,
+          "grade": "good",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "179px",
+              "refined_failed_at": "217px"
+            },
+            {
+              "axis": "blur",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "blur 2.0",
+              "refined_failed_at": "blur 1.75"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "30°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "hard shadow"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 1.911375,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 1.933583,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/code39.png",
+      "sha256": "26a3bbfbd0d9a5e047cef649633817020af0356370c2e27834af379cb04ae6fd",
+      "report": {
+        "detections": [
+          {
+            "symbology": "code39",
+            "content": {
+              "text": "SCANNER-39",
+              "raw": "U0NBTk5FUi0zOQ==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 37,
+                      "y": 70.5
+                    },
+                    {
+                      "x": 335,
+                      "y": 70.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 62,
+          "weights_run": 100,
+          "grade": "acceptable",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "256px",
+              "refined_failed_at": "256px"
+            },
+            {
+              "axis": "blur",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "blur 1.5",
+              "refined_failed_at": "blur 1.25"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "25°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "hard shadow"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 2.71725,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 2.7364580000000003,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/upca.png",
+      "sha256": "51f40dfc6f820994cc51e6e0f36c82576dab66739f1d6a757f2da25ef4b4e1ff",
+      "report": {
+        "detections": [
+          {
+            "symbology": "upc_a",
+            "content": {
+              "text": "036000291452",
+              "raw": "MDM2MDAwMjkxNDUy",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "gs1",
+              "elements": [
+                {
+                  "ai": "01",
+                  "value": "00036000291452"
+                }
+              ],
+              "gtin": "00036000291452",
+              "conformant": true,
+              "issues": []
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 21.5,
+                      "y": 70.5
+                    },
+                    {
+                      "x": 297.5,
+                      "y": 70.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 70,
+          "weights_run": 100,
+          "grade": "good",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "179px",
+              "refined_failed_at": "217px"
+            },
+            {
+              "axis": "blur",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "blur 2.0",
+              "refined_failed_at": "blur 2.0"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "30°",
+              "refined_failed_at": "30°"
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "hard shadow"
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 1.6751660000000002,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 1.692208,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/payloads/wifi.png",
+      "sha256": "c0f8fff2f5e31f157355e87252da5ab11437c43681a1a01f59baa14227026aac",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "WIFI:T:WPA;S:QRCodeAI Guest;P:sunrise2027;;",
+              "raw": "V0lGSTpUOldQQTtTOlFSQ29kZUFJIEd1ZXN0O1A6c3VucmlzZTIwMjc7Ow==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "wifi",
+              "ssid": "QRCodeAI Guest",
+              "security": "WPA",
+              "password": "sunrise2027",
+              "hidden": false
+            },
+            "corners": [
+              {
+                "x": 24,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 228
+              },
+              {
+                "x": 24,
+                "y": 228
+              }
+            ],
+            "meta": {
+              "version": 4,
+              "ec_level": "q",
+              "mask": 7,
+              "modules": 33,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 24.000002,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 222
+                    },
+                    {
+                      "x": 24.000002,
+                      "y": 222
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 26
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 4.670125,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 4.693417,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/payloads/me_card.png",
+      "sha256": "55c7b885b6d9d6f1dce975ea5bc3b35c4e8c38b83be83b0b9111d3f45e27d9ea",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "MECARD:N:Doe,Jane;TEL:+33600000000;URL:https://qrcode-ai.com;;",
+              "raw": "TUVDQVJEOk46RG9lLEphbmU7VEVMOiszMzYwMDAwMDAwMDtVUkw6aHR0cHM6Ly9xcmNvZGUtYWkuY29tOzs=",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "me_card",
+              "name": "Doe,Jane",
+              "tel": "+33600000000",
+              "email": null,
+              "url": "https://qrcode-ai.com"
+            },
+            "corners": [
+              {
+                "x": 24,
+                "y": 24
+              },
+              {
+                "x": 252,
+                "y": 24
+              },
+              {
+                "x": 252,
+                "y": 252
+              },
+              {
+                "x": 24,
+                "y": 252
+              }
+            ],
+            "meta": {
+              "version": 5,
+              "ec_level": "q",
+              "mask": 5,
+              "modules": 37,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 24,
+                      "y": 24
+                    },
+                    {
+                      "x": 246,
+                      "y": 24
+                    },
+                    {
+                      "x": 246,
+                      "y": 246
+                    },
+                    {
+                      "x": 24,
+                      "y": 246
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 18
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 5.317375,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 5.343916,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/payloads/sms.png",
+      "sha256": "422f7cfd72c6e941f797cd02e52525bd425420643d6504084eadefdb5485f62a",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "SMSTO:+33600000000:Hello from a QR",
+              "raw": "U01TVE86KzMzNjAwMDAwMDAwOkhlbGxvIGZyb20gYSBRUg==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "sms",
+              "number": "+33600000000",
+              "body": "Hello from a QR"
+            },
+            "corners": [
+              {
+                "x": 24,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 228
+              },
+              {
+                "x": 24,
+                "y": 228
+              }
+            ],
+            "meta": {
+              "version": 4,
+              "ec_level": "h",
+              "mask": 3,
+              "modules": 33,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 24.000002,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 222
+                    },
+                    {
+                      "x": 24.000002,
+                      "y": 222
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 16
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 4.296917,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 4.319833,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/payloads/gs1-digital-link.png",
+      "sha256": "6be9d470ea67b281400a00e68fb24648541cd7e6c407e1e590a28e0c544a7c24",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://id.gs1.org/01/09506000134352/10/LOT1?17=271231",
+              "raw": "aHR0cHM6Ly9pZC5nczEub3JnLzAxLzA5NTA2MDAwMTM0MzUyLzEwL0xPVDE/MTc9MjcxMjMx",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "gs1_digital_link",
+              "url": "https://id.gs1.org/01/09506000134352/10/LOT1?17=271231",
+              "elements": [
+                {
+                  "ai": "01",
+                  "value": "09506000134352"
+                },
+                {
+                  "ai": "10",
+                  "value": "LOT1"
+                },
+                {
+                  "ai": "17",
+                  "value": "271231"
+                }
+              ],
+              "gtin": "09506000134352",
+              "conformant": true,
+              "issues": []
+            },
+            "corners": [
+              {
+                "x": 24,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 24
+              },
+              {
+                "x": 228,
+                "y": 228
+              },
+              {
+                "x": 24,
+                "y": 228
+              }
+            ],
+            "meta": {
+              "version": 4,
+              "ec_level": "q",
+              "mask": 3,
+              "modules": 33,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 24.000002,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 24.000002
+                    },
+                    {
+                      "x": 222,
+                      "y": 222
+                    },
+                    {
+                      "x": 24.000002,
+                      "y": 222
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 26
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 4.404333,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 4.426666999999999,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/mixed-code128-qr.png",
+      "sha256": "c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrc-ai.com/76xMa",
+              "raw": "aHR0cHM6Ly9xcmMtYWkuY29tLzc2eE1h",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrc-ai.com/76xMa"
+            },
+            "corners": [
+              {
+                "x": 670.3047,
+                "y": 117.2093
+              },
+              {
+                "x": 1568.3828,
+                "y": 113.95348
+              },
+              {
+                "x": 1578.1445,
+                "y": 1041.8605
+              },
+              {
+                "x": 660.54297,
+                "y": 1032.093
+              }
+            ],
+            "meta": {
+              "version": 2,
+              "ec_level": "m",
+              "mask": 6,
+              "modules": 25,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 664.90027,
+                      "y": 118.35588
+                    },
+                    {
+                      "x": 1539.4913,
+                      "y": 118.4313
+                    },
+                    {
+                      "x": 1538.928,
+                      "y": 992.8738
+                    },
+                    {
+                      "x": 664.956,
+                      "y": 993.4586
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          },
+          {
+            "symbology": "code128",
+            "content": {
+              "text": "STOCK-4827",
+              "raw": "U1RPQ0stNDgyNw==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 112.5,
+                      "y": 666.5
+                    },
+                    {
+                      "x": 475.5,
+                      "y": 666.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 16
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 1,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0.0148451645,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "pyramid",
+              "transforms_tried": 1,
+              "ms": 16.587666000000002,
+              "detections_found": 2
+            },
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 410.545833,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 427.251125,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "path": "fixtures/symbology/qr-twins-code128.png",
+      "sha256": "4fe4cbd4b186dcab6f3f129b406010122975f3adf0cd8961e842ee849e4cf318",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrc-ai.com/occurrences",
+              "raw": "aHR0cHM6Ly9xcmMtYWkuY29tL29jY3VycmVuY2Vz",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrc-ai.com/occurrences"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": "m",
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 60.623684,
+                      "y": 60.655273
+                    },
+                    {
+                      "x": 205.72327,
+                      "y": 60.674217
+                    },
+                    {
+                      "x": 204.92755,
+                      "y": 205.03433
+                    },
+                    {
+                      "x": 60.73313,
+                      "y": 205.17062
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              },
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 285.5067,
+                      "y": 60.88419
+                    },
+                    {
+                      "x": 430.3611,
+                      "y": 60.85239
+                    },
+                    {
+                      "x": 431.35428,
+                      "y": 205.51724
+                    },
+                    {
+                      "x": 285.37088,
+                      "y": 205.28192
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          },
+          {
+            "symbology": "code128",
+            "content": {
+              "text": "STOCK-4827",
+              "raw": "U1RPQ0stNDgyNw==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "text"
+            },
+            "corners": null,
+            "meta": {
+              "version": null,
+              "ec_level": null,
+              "mask": null,
+              "modules": null,
+              "inverted": null
+            },
+            "engines": [
+              "rxing"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "segment",
+                  "points": [
+                    {
+                      "x": 534.5,
+                      "y": 292.5
+                    },
+                    {
+                      "x": 897.5,
+                      "y": 292.5
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 63,
+          "weights_run": 100,
+          "grade": "acceptable",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 1,
+              "total": 5,
+              "failed_at": "256px",
+              "refined_failed_at": "256px"
+            },
+            {
+              "axis": "blur",
+              "passed": 2,
+              "total": 5,
+              "failed_at": "blur 1.5",
+              "refined_failed_at": "blur 1.25"
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 3,
+              "total": 5,
+              "failed_at": "34°",
+              "refined_failed_at": "34°"
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": null,
+          "uec": null,
+          "iso15415": null
+        },
+        "hints": [
+          {
+            "hint": "enlarge_modules"
+          },
+          {
+            "hint": "raise_error_correction",
+            "current": "m"
+          }
+        ],
+        "trace": {
+          "stages": [
+            {
+              "stage": "pyramid",
+              "transforms_tried": 1,
+              "ms": 12.448125000000001,
+              "detections_found": 2
+            },
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 54.36325,
+              "detections_found": 1
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 66.84979100000001,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    }
+  ],
+  "generated_qr_links": [
+    {
+      "file": "qr-website.png",
+      "encoded_url": "https://qrcode-ai.com/",
+      "sha256": "f91ef0b6883e6a6fe024fbbc9f1768b404e38a68f6141d3ea231e7cb1e7dfe86",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrcode-ai.com/",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tLw==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/"
+            },
+            "corners": [
+              {
+                "x": 32,
+                "y": 32
+              },
+              {
+                "x": 240,
+                "y": 32
+              },
+              {
+                "x": 240,
+                "y": 240
+              },
+              {
+                "x": 32,
+                "y": 240
+              }
+            ],
+            "meta": {
+              "version": 2,
+              "ec_level": "m",
+              "mask": 5,
+              "modules": 25,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 32,
+                      "y": 32
+                    },
+                    {
+                      "x": 232,
+                      "y": 32
+                    },
+                    {
+                      "x": 232,
+                      "y": 232
+                    },
+                    {
+                      "x": 32,
+                      "y": 232
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 97,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 4,
+              "total": 5,
+              "failed_at": "glare"
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 16
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 0.9254902,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 15.564958,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 16.52675,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "file": "qr-scanner.png",
+      "encoded_url": "https://qrcode-ai.com/en-US/qr-code-scanner",
+      "sha256": "b9aec8cb67e25abfb7fee899d24d30791b74e1a218a6aa2a5fddde36ce60e5e7",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrcode-ai.com/en-US/qr-code-scanner",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tL2VuLVVTL3FyLWNvZGUtc2Nhbm5lcg==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/en-US/qr-code-scanner"
+            },
+            "corners": [
+              {
+                "x": 32,
+                "y": 32
+              },
+              {
+                "x": 304,
+                "y": 32
+              },
+              {
+                "x": 304,
+                "y": 304
+              },
+              {
+                "x": 32,
+                "y": 304
+              }
+            ],
+            "meta": {
+              "version": 4,
+              "ec_level": "m",
+              "mask": 7,
+              "modules": 33,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 32,
+                      "y": 32
+                    },
+                    {
+                      "x": 296,
+                      "y": 32
+                    },
+                    {
+                      "x": 296,
+                      "y": 296
+                    },
+                    {
+                      "x": 32,
+                      "y": 296
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 18
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 0.9254902,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 6.679208,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 6.71525,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    },
+    {
+      "file": "barcode-scanner.png",
+      "encoded_url": "https://qrcode-ai.com/en-US/barcode-scanner",
+      "sha256": "254024810fc824bf6efd1d66ad8a3fc00a2cf013728d9f2d3375fc2fb79b6275",
+      "report": {
+        "detections": [
+          {
+            "symbology": "qr_code",
+            "content": {
+              "text": "https://qrcode-ai.com/en-US/barcode-scanner",
+              "raw": "aHR0cHM6Ly9xcmNvZGUtYWkuY29tL2VuLVVTL2JhcmNvZGUtc2Nhbm5lcg==",
+              "charset": "utf8"
+            },
+            "payload": {
+              "kind": "url",
+              "url": "https://qrcode-ai.com/en-US/barcode-scanner"
+            },
+            "corners": [
+              {
+                "x": 32,
+                "y": 32
+              },
+              {
+                "x": 304,
+                "y": 32
+              },
+              {
+                "x": 304,
+                "y": 304
+              },
+              {
+                "x": 32,
+                "y": 304
+              }
+            ],
+            "meta": {
+              "version": 4,
+              "ec_level": "m",
+              "mask": 7,
+              "modules": 33,
+              "inverted": false
+            },
+            "engines": [
+              "rxing",
+              "rqrr"
+            ],
+            "occurrences": [
+              {
+                "geometry": {
+                  "kind": "quad",
+                  "points": [
+                    {
+                      "x": 32,
+                      "y": 32
+                    },
+                    {
+                      "x": 296,
+                      "y": 32
+                    },
+                    {
+                      "x": 296,
+                      "y": 296
+                    },
+                    {
+                      "x": 32,
+                      "y": 296
+                    }
+                  ],
+                  "reader": "rxing"
+                }
+              }
+            ]
+          }
+        ],
+        "score": {
+          "value": 100,
+          "weights_run": 100,
+          "grade": "excellent",
+          "axes": [
+            {
+              "axis": "resolution",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "blur",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "contrast",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "perspective",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "rotation",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            },
+            {
+              "axis": "lighting",
+              "passed": 5,
+              "total": 5,
+              "failed_at": null
+            }
+          ],
+          "structural": {
+            "finder_integrity": [
+              1,
+              1,
+              1
+            ],
+            "quiet_zone_ok": true
+          },
+          "uec": {
+            "margin": 1,
+            "grade": "a",
+            "worst_block_errors": 0,
+            "worst_block_capacity": 18
+          },
+          "iso15415": {
+            "symbol_contrast": {
+              "value": 0.9254902,
+              "grade": "a"
+            },
+            "modulation": {
+              "value": 1,
+              "grade": "a"
+            },
+            "axial_nonuniformity": {
+              "value": 0,
+              "grade": "a"
+            },
+            "fixed_pattern_damage": {
+              "value": 1,
+              "grade": "a"
+            },
+            "unused_error_correction": {
+              "value": 1,
+              "grade": "a"
+            },
+            "overall": "a"
+          }
+        },
+        "hints": [],
+        "trace": {
+          "stages": [
+            {
+              "stage": "direct",
+              "transforms_tried": 1,
+              "ms": 5.7755,
+              "detections_found": 2
+            }
+          ],
+          "engine_panics": 0,
+          "total_ms": 5.809292,
+          "budget_exhausted": false,
+          "saturation": {
+            "reads": false,
+            "detections": false,
+            "occurrences": false
+          }
+        },
+        "versions": {
+          "scanner": "0.11.0",
+          "pipeline": 5,
+          "score_contract": 5
+        }
+      }
+    }
+  ]
+}
