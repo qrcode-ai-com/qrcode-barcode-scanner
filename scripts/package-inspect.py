@@ -21,6 +21,18 @@ scripts/build-wasm.sh (wasm-pack), maturin and `pub publish --dry-run`.
 pypi-live alone reads the network: one GET of PyPI's public JSON for the
 workspace version, no credential.
 
+Every archive is held to this release's package names. A crate, npm package,
+pinned platform package, addon, wheel, sdist, metadata name, Python module,
+SBOM, WASM file, build record or CLI release file that still uses a name
+retired at 0.11.0 (qrcode-ai-scanner…, qrcode_ai_scanner…, @supernovae-st/…)
+fails, and so does, with --release-set, a Flutter package not named
+qr_barcode_scanner. The main npm package's loader looks up, for each committed
+napi target, its addon file and platform package exactly once, and nothing
+else. An archive README carries at most its one previous-name sentence
+(PREVIOUS_NAMES), links the migration guide only from PyPI, and states no
+availability (pending publication, not yet published, coming soon).
+Directories kept their old names, so no check scans raw bytes for a name.
+
   package-inspect.py all [--no-build]          every target this host can run
   package-inspect.py crates [--verify]         the .crate of each published crate
   package-inspect.py node [--platform-dirs D]  the main npm tarball (+ platform packages)
@@ -46,7 +58,7 @@ matrix and one sdist) · --record FILE (archive: once nothing failed, one
 step can prove it holds the very bytes inspected; removed when anything
 failed; flutter records each published file instead).
 
-CLI release files (archive): qrcode-ai-scanner-cli-<version>-<triple>.tar.gz
+CLI release files (archive): qrcode-barcode-scanner-cli-<version>-<triple>.tar.gz
 (.zip for Windows), the -source.tar.gz git archive and the -SHA256SUMS over
 them. Each archive holds exactly one top directory of license copies, the
 generated SOURCE.md, THIRD-PARTY-LICENSES.txt and build-info.json, and qrscan,
@@ -122,10 +134,26 @@ LICENSE_COPIES = (
     "bindings/flutter/LICENSE",
 )
 
-PUBLISHED_CRATES = ("qrcode-ai-scanner", "qrcode-ai-scanner-cli")
-NODE_NAME = "@supernovae-st/qrcode-ai-scanner"
-WASM_NAME = "@supernovae-st/qrcode-ai-scanner-wasm"
-PYPI_NAME = "qrcode-ai-scanner"
+PUBLISHED_CRATES = ("qrcode-barcode-scanner", "qrcode-barcode-scanner-cli")
+# The directory each published crate packs from: the directories kept their
+# 0.10 names, so a crate's directory is never derived from its name.
+CRATE_DIRS = {"qrcode-barcode-scanner": "crates/qrcode-ai-scanner",
+              "qrcode-barcode-scanner-cli": "crates/qrcode-ai-scanner-cli"}
+NODE_NAME = "@qrcode-ai-com/qrcode-barcode-scanner"
+# napi.binaryName: each addon is <NODE_BINARY>.<platform suffix>.node.
+NODE_BINARY = "qrcode-barcode-scanner"
+WASM_NAME = "@qrcode-ai-com/qrcode-barcode-scanner-wasm"
+# The one WebAssembly module and its JavaScript glue (wasm-pack --out-name).
+WASM_STEM = "qrcode-barcode-scanner"
+WASM_MODULE = f"{WASM_STEM}_bg.wasm"
+PYPI_NAME = "qrcode-barcode-scanner"
+FLUTTER_NAME = "qr_barcode_scanner"
+# Names retired at 0.11.0, refused in every identity position: crate and npm
+# names, pins, addon and WASM file names, Python distribution, module and file
+# names, the CLI release files' prefix and the Flutter package name.
+RETIRED_STEM = "qrcode-ai-scanner"
+RETIRED_MODULE = "qrcode_ai_scanner"
+RETIRED_SCOPE = "@supernovae-st/"
 # Every file PyPI serves at one version, with its sha256 (a 404: no such
 # version). pypi-live reads it; twine's --skip-existing compares names only.
 PYPI_JSON = "https://pypi.org/pypi/{project}/{version}/json"
@@ -145,19 +173,13 @@ WASM_EXAMPLE_FILES = ("examples/README.md", "examples/camera.html", "examples/ca
 WASM_FILES = frozenset({
     "LICENSE", "README.md", "package.json",
     "LICENSE-APACHE-2.0", "THIRD-PARTY.md",
-    "qrcode-ai-scanner.js", "qrcode-ai-scanner.d.ts", "qrcode-ai-scanner_bg.wasm",
+    f"{WASM_STEM}.js", f"{WASM_STEM}.d.ts", WASM_MODULE,
     "report-types.d.ts",
     "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
     "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts",
     "auto.js", "auto.d.ts", "build-info.json",
     *WASM_EXAMPLE_FILES,
 })
-# 0.10.x exported its no-SIMD module under compatible/; from 0.11 these export
-# keys name the one portable module's own files, never a second file.
-WASM_LEGACY_ALIASES = {
-    "./compatible/qrcode-ai-scanner.js": "./qrcode-ai-scanner.js",
-    "./compatible/qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm",
-}
 # The keys wasm-pack 0.13.1 writes and scripts/patch-wasm-pkg.mjs renames or
 # adds; a wasm package.json may carry no other key. A `dependencies` or a
 # `publishConfig` is planted — nothing here writes one, and some would run or
@@ -195,8 +217,9 @@ CARGO_GENERATED = frozenset({".cargo_vcs_info.json", "Cargo.toml.orig", "Cargo.l
 # What maturin writes at the sdist root besides the PEP 639 license files.
 MATURIN_SDIST_ROOT = frozenset({"PKG-INFO", "pyproject.toml", "README.md"})
 # Explicit source copies at the relocated project root, never generated files.
-MATURIN_SDIST_TYPING = frozenset({"qrcode_ai_scanner.pyi", "py.typed"})
-# The sdist packs the binding crate and its path dependency side by side.
+MATURIN_SDIST_TYPING = frozenset({"qrcode_barcode_scanner.pyi", "py.typed"})
+# The sdist packs the binding crate and its path dependency side by side, each
+# under its directory's name (kept from 0.10), not its package name.
 SDIST_CRATES = {"qrcode-ai-scanner-py/": "crates/qrcode-ai-scanner-py",
                 "qrcode-ai-scanner/": "crates/qrcode-ai-scanner"}
 # Besides the PEP 639 license files, what maturin generates or rewrites in the
@@ -207,7 +230,9 @@ MATURIN_SDIST_GENERATED = MATURIN_SDIST_ROOT | {"qrcode-ai-scanner-py/Cargo.toml
 # The Python import package, and the __init__.py maturin writes for a pure-pyo3
 # module with no python-source dir (binding_generator/pyo3_binding.rs, verbatim;
 # no trailing newline). The .pyi stub and py.typed it emits are the checkout's.
-PY_MODULE = "qrcode_ai_scanner"
+PY_MODULE = "qrcode_barcode_scanner"
+# The SBOM maturin writes for the binding crate, named after its Cargo package.
+PY_SBOM = "sboms/qrcode-barcode-scanner-py.cyclonedx.json"
 MATURIN_INIT_PY = (f"from .{PY_MODULE} import *\n\n__doc__ = {PY_MODULE}.__doc__\n"
                    f'if hasattr({PY_MODULE}, "__all__"):\n    __all__ = {PY_MODULE}.__all__').encode()
 
@@ -232,7 +257,34 @@ WHEEL_PLATFORMS = (
 # What auditwheel grafts into a manylinux / musllinux wheel: the shared
 # libraries the extension links against, renamed with a hash of their bytes
 # (the musllinux wheel carries libgcc_s-<hash>.so.1).
-GRAFTED_LIB = re.compile(r"qrcode_ai_scanner\.libs/[^/]+-[0-9a-f]{8}\.so(\.\d+)*")
+GRAFTED_LIB = re.compile(r"qrcode_barcode_scanner\.libs/[^/]+-[0-9a-f]{8}\.so(\.\d+)*")
+
+# What an archive README may say about its package's previous name: at most the
+# one sentence of this table, true whenever it is read. A package missing from
+# it (a platform package, the Flutter package, the CLI release files) was never
+# published under another name and says nothing of one. Registries render their
+# own install lines and these files are frozen into archives before
+# publication, so a README states no availability either.
+PREVIOUS_NAMES = {
+    ("crate", "qrcode-barcode-scanner"): "Releases up to 0.10.1 were published as `qrcode-ai-scanner`.",
+    ("crate", "qrcode-barcode-scanner-cli"):
+        "Releases up to 0.10.1 were published as `qrcode-ai-scanner-cli`; both install `qrscan`.",
+    ("npm", NODE_NAME): "Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.",
+    ("npm", WASM_NAME): "Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner-wasm`.",
+    ("pypi", PYPI_NAME): "Releases up to 0.9.0 were published as `qrcode-ai-scanner`.",
+}
+# A sentence about a previous name, whatever its wording.
+PREVIOUS_NAME_CLAIM = re.compile(r"\b(?:published|released) (?:as|under)\b|\breleases? up to\b|\bformerly\b"
+                                 r"|\bpreviously (?:named|called|known|published)\b|\b(?:old|previous|former) name\b",
+                                 re.IGNORECASE)
+# Availability text. "pending" is refused where it states a publication, not as
+# the word for an unsettled promise ("a start() still pending rejects").
+PENDING_TEXT = re.compile(r"\bnot yet (?:published|released|available|on (?:npm|PyPI|crates\.io|pub\.dev))\b"
+                          r"|\bcoming soon\b|\bpending (?:publication|release|upload)\b"
+                          r"|\bpending on (?:npm|PyPI|crates\.io|pub\.dev)\b"
+                          r"|\b(?:publication|release|upload) (?:is |still )?pending\b", re.IGNORECASE)
+# The migration guide, which the PyPI README alone links (its prose steps need it).
+MIGRATION_GUIDE = "docs/guides/migrate-to-qrcode-barcode-scanner"
 
 PASS, FAIL, UNAVAILABLE, BLOCKED = "pass", "fail", "unavailable", "blocked"
 
@@ -524,6 +576,38 @@ def check_equal_file(art: Artifact, name: str, data, source: pathlib.Path) -> No
               "" if data == want else f"differs from {rel(source)}")
 
 
+def readme_sentences(text: str) -> list:
+    """The README's sentences, each on one line: paragraphs split at blank lines, then at a sentence end."""
+    found = []
+    for paragraph in re.split(r"\n[ \t]*\n", text):
+        flat = " ".join(paragraph.split())
+        found += [sentence for sentence in re.split(r"(?<=[.!?])\s+", flat) if sentence]
+    return found
+
+
+def check_readme(art: Artifact, data, key: tuple, where: str = "README.md", pending: bool = True) -> None:
+    """What an archive README says of names and availability: at most its one PREVIOUS_NAMES
+    sentence (none for a package missing from the table), the migration guide linked only from
+    PyPI, and, unless PENDING is False, no availability text."""
+    text = (data or b"").decode("utf-8", errors="replace")
+    want = PREVIOUS_NAMES.get(key)
+    claims = [sentence for sentence in readme_sentences(text) if PREVIOUS_NAME_CLAIM.search(sentence)]
+    art.check(f"{where} names a previous name only in its one sentence: {want}" if want else
+              f"{where} names no previous name (this package never had another)",
+              claims in ([], [want]) if want else not claims, " · ".join(claims))
+    if key != ("pypi", PYPI_NAME):
+        art.check(f"{where} links no migration guide (the PyPI README alone does)", MIGRATION_GUIDE not in text)
+    if pending:
+        hits = sorted({found.group(0) for found in PENDING_TEXT.finditer(text)})
+        art.check(f"{where} states no availability (pending publication, not yet published, coming soon)",
+                  not hits, ", ".join(hits))
+
+
+def retired_npm_name(name: str) -> bool:
+    """NAME is, or derives from, an npm name retired at 0.11.0."""
+    return name.startswith(RETIRED_SCOPE) or RETIRED_STEM in name
+
+
 # ---------------------------------------------------------------- crates
 
 
@@ -536,6 +620,10 @@ def inspect_crate(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     manifest = tomllib.loads(files.get("Cargo.toml", b"").decode() or "")
     package = manifest.get("package", {})
     name = package.get("name") or top.rsplit("-", 1)[0]
+    directory = CRATE_DIRS.get(name)
+    art.check(f"crate is {' or '.join(PUBLISHED_CRATES)} (never a retired name)", directory is not None, name)
+    art.check("file name is <name>-<version>.crate",
+              path.name == f"{package.get('name')}-{package.get('version')}.crate", path.name)
     art.check("archive root is <name>-<version>", top == f"{package.get('name')}-{package.get('version')}", top)
     art.check(f"version = {host.version} (workspace)", package.get("version") == host.version,
               f"Cargo.toml version {package.get('version')}")
@@ -545,14 +633,17 @@ def inspect_crate(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     entry = "src/main.rs" if name.endswith("-cli") else "src/lib.rs"
     art.check(f"{entry} present", entry in files)
     if name.endswith("-cli"):
-        dep = manifest.get("dependencies", {}).get("qrcode-ai-scanner", {})
+        dep = manifest.get("dependencies", {}).get("qrcode-barcode-scanner", {})
         art.check(f"core dependency pinned at {host.version}", dep.get("version") == host.version,
-                  f"qrcode-ai-scanner version {dep.get('version')!r}")
-    readme = ROOT / "crates" / name / "README.md"
-    if readme.is_file():
-        check_equal_file(art, "README.md", files.get("README.md"), readme)
+                  f"qrcode-barcode-scanner version {dep.get('version')!r}")
+    if directory is not None:
+        readme = ROOT / directory / "README.md"
+        if readme.is_file():
+            check_equal_file(art, "README.md", files.get("README.md"), readme)
+    check_readme(art, files.get("README.md"), ("crate", name))
     check_license(art, files.get("LICENSE"), "LICENSE")
-    check_tracked(art, files, {"": f"crates/{name}"}, CARGO_GENERATED)
+    if directory is not None:
+        check_tracked(art, files, {"": directory}, CARGO_GENERATED)
     check_stray(art, files)
     # Profiles never ride along from the workspace root: what `cargo install`
     # builds is whatever this manifest itself says.
@@ -625,6 +716,11 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     check_license(art, files.get("LICENSE"), "package/LICENSE")
     check_stray(art, files)
     scripts = pkg.get("scripts") or {}
+    # A platform package is the main name plus the suffix of a committed napi
+    # target: never -wasm, -mcp or any other word.
+    platforms = {f"{NODE_NAME}-{suffix}": suffix for suffix in napi_suffixes()}
+    art.check(f"package name is no retired name ({RETIRED_SCOPE}…, {RETIRED_STEM}…)", not retired_npm_name(name),
+              name)
     if name == NODE_NAME:
         check_exact_set(art, files, NODE_FILES, "main-package allowlist")
         native = files.get("native.js", b"").decode(errors="replace")
@@ -632,8 +728,15 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         art.check("loader enforces the package's own version (no literal)",
                   not literal and LOADER_RUNTIME_READ in native,
                   f"literal {literal.group(0)!r}" if literal else f"reads {LOADER_RUNTIME_READ}")
+        problems = loader_problems(native, platforms.values())
+        art.check(f"loader looks up each committed target's addon ({NODE_BINARY}.<suffix>.node), platform package "
+                  "and its package.json exactly once, and nothing else (no retired name, no WebAssembly or WASI)",
+                  not problems, "; ".join(problems[:12]))
+        binary_name = (pkg.get("napi") or {}).get("binaryName")
+        art.check(f"napi.binaryName is {NODE_BINARY}", binary_name == NODE_BINARY, f"{binary_name}")
         check_equal_file(art, "report-types.d.ts", files.get("report-types.d.ts"), CANON_TYPES)
         check_equal_file(art, "README.md", files.get("README.md"), NODE_DIR / "README.md")
+        check_readme(art, files.get("README.md"), ("npm", NODE_NAME))
         # Every file a consumer's `require` runs or reads is the committed one,
         # byte for byte: in publish-native the tree is the tag's fresh checkout.
         for source in ("index.js", "native.js", "index.d.ts", "native.d.ts"):
@@ -654,16 +757,17 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         if optional is not None or host.args.release_set:
             check_pins(art, optional or {}, pkg)
         return art
-    if name == WASM_NAME or name.startswith(NODE_NAME + "-"):
+    if name == WASM_NAME or name in platforms:
         # Generated manifests (wasm-pack, napi create-npm-dirs) carry no
         # scripts: any is planted, and some would run on a consumer's install.
         art.check("no lifecycle scripts (`scripts` absent)", not scripts,
                   f"scripts: {', '.join(sorted(scripts))}" if scripts else "")
+    # The exact WASM name is judged first: it starts like a platform name.
     if name == WASM_NAME:
         check_exact_set(art, files, WASM_FILES, "wasm-pack output + patch allowlist")
         check_wasm_manifest(art, pkg)
         check_equal_file(art, "report-types.d.ts", files.get("report-types.d.ts"), CANON_TYPES)
-        check_wasm_build(art, files, pkg.get("version"))
+        check_wasm_build(art, files, pkg.get("version"), name)
         for notice in ("LICENSE-APACHE-2.0", "THIRD-PARTY.md"):
             check_equal_file(art, notice, files.get(notice), ROOT / "crates/qrcode-ai-scanner" / notice)
         for source in ("auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
@@ -673,25 +777,61 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         for source in WASM_EXAMPLE_FILES:
             check_equal_file(art, source, files.get(source), WASM_DIR / source)
         check_example(art, files)
-        dts = files.get("qrcode-ai-scanner.d.ts", b"").decode()
+        dts = files.get(f"{WASM_STEM}.d.ts", b"").decode()
         retyped = all(
             re.search(rf"export function {fn}\([^)]*\): ScanReport;", dts) for fn in ("scan_image", "scan_frame")
         ) and re.search(r"export function capabilities\(\): Capabilities;", dts)
-        art.check("qrcode-ai-scanner.d.ts re-exports report-types and returns ScanReport / Capabilities",
+        art.check(f"{WASM_STEM}.d.ts re-exports report-types and returns ScanReport / Capabilities",
                   'export * from "./report-types"' in dts and bool(retyped))
         check_equal_file(art, "README.md", files.get("README.md"), WASM_DIR / "README.md")
-    elif name.startswith(NODE_NAME + "-"):
+        check_readme(art, files.get("README.md"), ("npm", WASM_NAME))
+        check_readme(art, files.get("examples/README.md"), ("npm", f"{WASM_NAME} examples"), "examples/README.md")
+    elif name in platforms:
         binaries = sorted(f for f in files if f.endswith(".node"))
         art.check("exactly one .node binary, and it is `main`",
                   len(binaries) == 1 and binaries[0] == pkg.get("main"), f"{binaries} main={pkg.get('main')}")
+        addon = f"{NODE_BINARY}.{platforms[name]}.node"
+        art.check(f"the addon is {addon} (napi.binaryName and this package's suffix)", binaries == [addon],
+                  ", ".join(binaries))
         expected = frozenset({"package.json", "LICENSE", *binaries, *(["README.md"] if "README.md" in files else [])})
         check_exact_set(art, files, expected, "platform-package set (package.json · README · LICENSE · binary)")
         art.check("os + cpu declared", bool(pkg.get("os")) and bool(pkg.get("cpu")),
                   f"os={pkg.get('os')} cpu={pkg.get('cpu')}")
         check_platform_manifest(art, pkg)
+        check_readme(art, files.get("README.md"), ("npm", name))
     else:
-        art.check("known package name", False, name)
+        art.check(f"known package name: {NODE_NAME}, {WASM_NAME} or a platform package {NODE_NAME}-<suffix> of a "
+                  f"committed napi target ({', '.join(platforms.values())})", False, name)
     return art
+
+
+# What the napi loader requires besides an addon: fs, its own manifest, and
+# child_process (it runs ldd to tell glibc from musl).
+LOADER_HELPERS = frozenset({"node:fs", "./package.json", "child_process"})
+
+
+def loader_problems(native: str, suffixes) -> list:
+    """How the main package's loader departs from one lookup per committed target. A smoke run
+    loads one branch only, so every branch is read from the text: for each of SUFFIXES exactly one
+    require() of its addon file, one of its platform package and one of that package's
+    package.json; no other lookup (napi's branches for targets never built stay under the same
+    names); no retired name; no WebAssembly or WASI fallback."""
+    problems = []
+    if RETIRED_SCOPE in native or re.search(r"qrcode[-_]ai[-_]scanner", native):
+        problems.append(f"names a retired package or file ({RETIRED_SCOPE} or {RETIRED_STEM})")
+    if re.search(r"wasi|wasm", native, re.IGNORECASE):
+        problems.append("has a WebAssembly or WASI lookup")
+    lookups = [found for found in re.findall(r"require\('([^']+)'\)", native) if found not in LOADER_HELPERS]
+    foreign = sorted({found for found in lookups if not found.startswith((f"./{NODE_BINARY}.", f"{NODE_NAME}-"))})
+    if foreign:
+        problems.append(f"looks up {', '.join(foreign)}")
+    for suffix in suffixes:
+        for specifier in (f"./{NODE_BINARY}.{suffix}.node", f"{NODE_NAME}-{suffix}",
+                          f"{NODE_NAME}-{suffix}/package.json"):
+            count = lookups.count(specifier)
+            if count != 1:
+                problems.append(f"{specifier} looked up {count} times")
+    return problems
 
 
 def check_platform_manifest(art: Artifact, pkg: dict) -> None:
@@ -738,15 +878,24 @@ def check_wasm_manifest(art: Artifact, pkg: dict) -> None:
     art.check("package.json holds only wasm-pack + patch-wasm-pkg keys (no dependencies or publishConfig)",
               not extra, f"unexpected: {', '.join(extra)}" if extra else "")
     exports = pkg.get("exports", {})
-    art.check("automatic loader and legacy entry exports are retained",
+    art.check("automatic loader and root entry exports are retained",
               exports.get("./auto") == {"types": "./auto.d.ts", "import": "./auto.js", "default": "./auto.js"}
-              and exports.get(".") == {"types": "./qrcode-ai-scanner.d.ts", "import": "./qrcode-ai-scanner.js", "default": "./qrcode-ai-scanner.js"}
+              and exports.get(".") == {"types": f"./{WASM_STEM}.d.ts", "import": f"./{WASM_STEM}.js",
+                                       "default": f"./{WASM_STEM}.js"}
               and exports.get("./*") == "./*")
-    art.check("one WASM export and its build record; legacy compatible/ paths alias the same files",
-              exports.get("./qrcode-ai-scanner_bg.wasm") == "./qrcode-ai-scanner_bg.wasm"
-              and exports.get("./build-info.json") == "./build-info.json"
-              and {key: value for key, value in exports.items() if "compatible" in key} == WASM_LEGACY_ALIASES,
-              json.dumps(sorted(exports)))
+    # The 0.10 compatible/ subpaths were removed (the loader option variant:
+    # 'compatible' selects the one module): no key may name them again.
+    compatible = sorted(key for key in exports if "compatible" in key)
+    art.check(f"one WASM export ({WASM_MODULE}) and its build record; no compatible/ export",
+              exports.get(f"./{WASM_MODULE}") == f"./{WASM_MODULE}"
+              and exports.get("./build-info.json") == "./build-info.json" and not compatible,
+              ", ".join(compatible) or json.dumps(sorted(exports)))
+    # wasm-pack's entry fields name the module's own files, never retired ones.
+    entries = {key: pkg.get(key) for key in ("main", "module", "types") if key in pkg}
+    wanted = {"main": f"{WASM_STEM}.js", "module": f"{WASM_STEM}.js", "types": f"{WASM_STEM}.d.ts"}
+    off = sorted(f"{key}={value!r}" for key, value in entries.items() if value != wanted[key])
+    art.check(f"main, module and types (where present) name {WASM_STEM}.js and {WASM_STEM}.d.ts",
+              bool(entries) and not off, ", ".join(off) or json.dumps(entries))
     art.check("camera capture, tracking and visual overlay exports are retained",
               all(exports.get(f"./{name}") == {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
                   for name in ("camera", "camera-overlay"))
@@ -791,7 +940,8 @@ def check_pins(art: Artifact, optional: dict, pkg: dict) -> None:
     version = pkg.get("version")
     targets = pkg.get("napi", {}).get("targets") or []
     want = {f"{NODE_NAME}-{napi_suffix(triple)}": version for triple in targets}
-    problems = [f"missing {dep}" for dep in sorted(set(want) - set(optional))]
+    problems = [f"{dep} is a retired name" for dep in sorted(optional) if retired_npm_name(dep)]
+    problems += [f"missing {dep}" for dep in sorted(set(want) - set(optional))]
     problems += [f"unexpected {dep}" for dep in sorted(set(optional) - set(want))]
     problems += [f"{dep} pinned at {optional[dep]}, not {version}" for dep in sorted(set(want) & set(optional))
                  if optional[dep] != version]
@@ -814,13 +964,14 @@ def check_pypi_release_set(host: Host) -> None:
     art = host.add(Artifact("PyPI release set", "pypi"))
     art.listing = names
     problems = []
+    problems += [f"{name} is a retired name" for name in names if name.startswith(RETIRED_MODULE)]
     sdists = [n for n in names if n.endswith(".tar.gz")]
-    if sdists != [f"qrcode_ai_scanner-{host.version}.tar.gz"]:
-        problems.append(f"want one sdist qrcode_ai_scanner-{host.version}.tar.gz, got {sdists or 'none'}")
+    if sdists != [f"{PY_MODULE}-{host.version}.tar.gz"]:
+        problems.append(f"want one sdist {PY_MODULE}-{host.version}.tar.gz, got {sdists or 'none'}")
     rows: dict = {label: [] for label, _pattern in WHEEL_PLATFORMS}
     for name in (n for n in names if n.endswith(".whl")):
-        if not name.startswith(f"qrcode_ai_scanner-{host.version}-"):
-            problems.append(f"{name} is not version {host.version}")
+        if not name.startswith(f"{PY_MODULE}-{host.version}-"):
+            problems.append(f"{name} is not {PY_MODULE} version {host.version}")
         platforms = {tag.rsplit("-", 1)[1] for tag in wheel_tags(name)}
         found = [label for label, pattern in WHEEL_PLATFORMS
                  if platforms and all(pattern.fullmatch(p) for p in platforms)]
@@ -863,7 +1014,8 @@ def check_npm_release_set(host: Host) -> None:
     # of a platform package) has no place in it.
     names = [a.package["name"] for a in npm if a.package["name"] != NODE_NAME]
     platforms = {a.package["name"]: a.package.get("version") for a in npm if a.package["name"] != NODE_NAME}
-    problems = [f"{name} appears {names.count(name)} times" for name in sorted(set(names)) if names.count(name) > 1]
+    problems = [f"{name} is a retired name" for name in sorted(set(names)) if retired_npm_name(name)]
+    problems += [f"{name} appears {names.count(name)} times" for name in sorted(set(names)) if names.count(name) > 1]
     problems += [f"no {dep}@{version} platform package" for dep, version in sorted(pins.items())
                  if platforms.get(dep) != version]
     problems += [f"{dep} is neither the main package nor pinned by it" for dep in sorted(set(platforms) - set(pins))]
@@ -915,8 +1067,8 @@ def emulated_platform_dir(host: Host) -> pathlib.Path:
     """
     import platform
     suffix = NAPI_SUFFIX.get((sys.platform, platform.machine()), "linux-x64-gnu")
-    binary = f"qrcode-ai-scanner.{suffix}.node"
     node_pkg = json.loads((NODE_DIR / "package.json").read_text())
+    binary = f"{node_pkg['napi']['binaryName']}.{suffix}.node"
     os_name, cpu = suffix.split("-")[:2]
     pdir = host.scratch / "emulated-platform"
     pdir.mkdir(parents=True, exist_ok=True)
@@ -1650,12 +1802,20 @@ def inspect_wheel(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     art.notes.extend(notes)
     art.package = {"filename": path.name}
     describe(art, path, files)
+    art.check(f"file name is {PY_MODULE}-{host.version}-<tags>.whl (never the retired {RETIRED_MODULE})",
+              path.name.startswith(f"{PY_MODULE}-{host.version}-"), path.name)
+    retired = sorted({n.split("/", 1)[0] for n in files if n.startswith(RETIRED_MODULE)})
+    art.check(f"no {RETIRED_MODULE} package, extension or library folder (a retired module name)", not retired,
+              ", ".join(retired))
     dist_info = sorted({n.split("/", 1)[0] for n in files if re.match(r"[^/]+\.dist-info/METADATA$", n)})
     if not art.check("one .dist-info/METADATA", len(dist_info) == 1, ", ".join(dist_info)):
         return art
     info = dist_info[0]
+    art.check(f"metadata folder is {PY_MODULE}-{host.version}.dist-info", info == f"{PY_MODULE}-{host.version}.dist-info",
+              info)
     meta = metadata(files[f"{info}/METADATA"])
     check_python_metadata(art, host, meta)
+    check_readme(art, meta.get_payload().encode(), ("pypi", PYPI_NAME), where="METADATA description")
     # The platform the next checks rely on is the one pip installs by (the
     # file name), and the WHEEL metadata must say the same.
     tags = {line.split(":", 1)[1].strip() for line in files.get(f"{info}/WHEEL", b"").decode().splitlines()
@@ -1665,43 +1825,43 @@ def inspect_wheel(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     # PEP 639: each License-File value names a file under .dist-info/licenses/.
     for value in meta.get_all("License-File") or ["LICENSE"]:
         check_license(art, files.get(f"{info}/licenses/{value}"), f"{info}/licenses/{value} (License-File {value})")
-    for typed in ("qrcode_ai_scanner/__init__.pyi", "qrcode_ai_scanner/py.typed"):
+    for typed in (f"{PY_MODULE}/__init__.pyi", f"{PY_MODULE}/py.typed"):
         art.check(f"{typed} present (type stubs)", typed in files)
     # The type stubs a consumer's type checker reads, and the import shim that
-    # runs on `import qrcode_ai_scanner`, are the checkout's: the stub and the
-    # marker byte for byte after CRLF normalisation (a Windows checkout writes
-    # the stub CRLF), the shim the fixed text maturin generates.
+    # runs on `import qrcode_barcode_scanner`, are the checkout's: the stub and
+    # the marker byte for byte after CRLF normalisation (a Windows checkout
+    # writes the stub CRLF), the shim the fixed text maturin generates.
     def _nl(data):
         return data.replace(b"\r\n", b"\n") if data is not None else None
-    for stub, source in (("qrcode_ai_scanner/__init__.pyi", PY_DIR / "qrcode_ai_scanner.pyi"),
-                         ("qrcode_ai_scanner/py.typed", PY_DIR / "py.typed")):
+    for stub, source in ((f"{PY_MODULE}/__init__.pyi", PY_DIR / f"{PY_MODULE}.pyi"),
+                         (f"{PY_MODULE}/py.typed", PY_DIR / "py.typed")):
         same = source.is_file() and _nl(files.get(stub)) == _nl(source.read_bytes())
         art.check(f"{stub} is {rel(source)}, byte for byte (CRLF-normalised)", same,
                   "" if same else f"differs from {rel(source)}" if stub in files else "absent")
-    shim = files.get("qrcode_ai_scanner/__init__.py") == MATURIN_INIT_PY
-    art.check("qrcode_ai_scanner/__init__.py is the import shim maturin generates", shim,
+    shim = files.get(f"{PY_MODULE}/__init__.py") == MATURIN_INIT_PY
+    art.check(f"{PY_MODULE}/__init__.py is the import shim maturin generates", shim,
               "" if shim else "differs from maturin's generated __init__.py")
-    modules = [n for n in files if re.match(r"qrcode_ai_scanner/qrcode_ai_scanner\.[^/]*(so|pyd)$", n)]
-    art.check("exactly one compiled extension module", len(modules) == 1, ", ".join(modules))
-    # auditwheel's grafts, and nothing else, under qrcode_ai_scanner.libs/: only
-    # in a Linux wheel it repaired, each named <name>-<8 hex>.so[.N] and listed
-    # in RECORD like every file maturin wrote.
+    modules = [n for n in files if re.match(rf"{PY_MODULE}/{PY_MODULE}\.[^/]*(so|pyd)$", n)]
+    art.check(f"exactly one compiled extension module ({PY_MODULE}/{PY_MODULE}.<tag>.so or .pyd)",
+              len(modules) == 1, ", ".join(modules))
+    # auditwheel's grafts, and nothing else, under qrcode_barcode_scanner.libs/:
+    # only in a Linux wheel it repaired, each named <name>-<8 hex>.so[.N] and
+    # listed in RECORD like every file maturin wrote.
     linux = bool(tags) and all(t.rsplit("-", 1)[1].startswith(("manylinux", "musllinux")) for t in tags)
     record = {row.split(",", 1)[0] for row in files.get(f"{info}/RECORD", b"").decode().splitlines()}
-    libs = sorted(n for n in files if n.startswith("qrcode_ai_scanner.libs/"))
+    libs = sorted(n for n in files if n.startswith(f"{PY_MODULE}.libs/"))
     bad = [f"{n}: not a manylinux or musllinux wheel" for n in libs if not linux]
     bad += [f"{n}: not <name>-<8 hex>.so[.N]" for n in libs if not GRAFTED_LIB.fullmatch(n)]
     bad += [f"{n}: not listed in RECORD" for n in libs if n not in record]
     if libs:
-        art.check("qrcode_ai_scanner.libs/ holds only auditwheel grafts (Linux wheel · <name>-<8 hex>.so[.N] · "
+        art.check(f"{PY_MODULE}.libs/ holds only auditwheel grafts (Linux wheel · <name>-<8 hex>.so[.N] · "
                   "in RECORD)", not bad, "; ".join(bad))
     # The whole wheel, exactly: the dist-info maturin writes, the license
     # files, the SBOM, and the package (init · stubs · marker · extension).
-    exact = {f"{info}/{n}" for n in ("METADATA", "WHEEL", "RECORD")} | {
+    exact = {f"{info}/{n}" for n in ("METADATA", "WHEEL", "RECORD", PY_SBOM)} | {
         f"{info}/licenses/{v}" for v in meta.get_all("License-File") or []} | {
-        f"qrcode_ai_scanner/{n}" for n in ("__init__.py", "__init__.pyi", "py.typed")}
-    patterns = (re.compile(rf"{re.escape(info)}/sboms/[^/]+\.cyclonedx\.json"),
-                re.compile(r"qrcode_ai_scanner/qrcode_ai_scanner(\.[^/]+)?\.(so|pyd)"))
+        f"{PY_MODULE}/{n}" for n in ("__init__.py", "__init__.pyi", "py.typed")}
+    patterns = (re.compile(rf"{PY_MODULE}/{PY_MODULE}(\.[^/]+)?\.(so|pyd)"),)
     extra = sorted(n for n in files if n not in exact and n not in libs and not any(p.fullmatch(n) for p in patterns))
     art.check("file set is exactly the wheel allowlist (dist-info · licenses · sbom · package · grafts)", not extra,
               f"unexpected: {', '.join(extra)}" if extra else "")
@@ -1716,14 +1876,23 @@ def inspect_sdist(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     art.package = {"filename": path.name}
     describe(art, path, files)
     check_members(art, special)
-    art.check(f"archive root is qrcode_ai_scanner-{host.version}", top == f"qrcode_ai_scanner-{host.version}", top)
+    art.check(f"file name is {PY_MODULE}-{host.version}.tar.gz (never the retired {RETIRED_MODULE})",
+              path.name == f"{PY_MODULE}-{host.version}.tar.gz", path.name)
+    art.check(f"archive root is {PY_MODULE}-{host.version}", top == f"{PY_MODULE}-{host.version}", top)
+    # The vendored crate directories keep their names (qrcode-ai-scanner/,
+    # qrcode-ai-scanner-py/): only a Python module or stub of the retired
+    # name is refused.
+    retired = sorted({n.split("/", 1)[0] for n in files if n.startswith(RETIRED_MODULE)})
+    art.check(f"no {RETIRED_MODULE} module or stub (a retired module name)", not retired, ", ".join(retired))
     meta = metadata(files["PKG-INFO"]) if "PKG-INFO" in files else None
     if meta is not None:
         check_python_metadata(art, host, meta)
+        check_readme(art, meta.get_payload().encode(), ("pypi", PYPI_NAME), where="PKG-INFO description")
     else:
         art.check("PKG-INFO present", False)
     for required in ("pyproject.toml", "README.md"):
         art.check(f"{required} present", required in files)
+    check_readme(art, files.get("README.md"), ("pypi", PYPI_NAME))
     # PEP 639: License-File values and the pyproject's license-files globs are
     # relative to the sdist root, where the rewritten pyproject.toml sits. A
     # copy only inside the binding crate directory does not satisfy them, and a
@@ -1744,7 +1913,7 @@ def inspect_sdist(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     check_license(art, files.get("qrcode-ai-scanner/LICENSE"), "qrcode-ai-scanner/LICENSE (vendored core)")
     # Maturin's pure-Rust wheel builder resolves stubs beside pyproject.toml,
     # which the sdist relocates above the vendored binding manifest.
-    for stub in ("qrcode_ai_scanner.pyi", "py.typed"):
+    for stub in (f"{PY_MODULE}.pyi", "py.typed"):
         check_equal_file(art, f"{stub} at the sdist project root", files.get(stub), PY_DIR / stub)
     check_tracked(art, files, SDIST_CRATES, MATURIN_SDIST_ROOT | MATURIN_SDIST_TYPING | licensed | {
         prefix + name for prefix in SDIST_CRATES for name in CARGO_GENERATED})
@@ -1800,7 +1969,7 @@ def pypi_live_files(host: Host):
     raises OSError or ValueError: what cannot be read cannot be compared."""
     url = PYPI_JSON.format(project=PYPI_NAME, version=host.version)
     request = urllib.request.Request(url, headers={"Accept": "application/json",
-                                                   "User-Agent": "qrcode-ai-scanner-ci (release gate)"})
+                                                   "User-Agent": "qrcode-barcode-scanner-ci (release gate)"})
     try:
         with host.opener(request, timeout=60) as response:
             payload = json.load(response)
@@ -1908,20 +2077,25 @@ def wasm_provenance():
     return module
 
 
-def check_wasm_build(art: Artifact, files: dict, version) -> None:
-    """One physical WASM, and it is the recorded, current build of this checkout."""
+def check_wasm_build(art: Artifact, files: dict, version, package) -> None:
+    """One physical WASM, and it is the recorded, current build of this checkout, recorded under
+    this package's name (PACKAGE) and this module's file name."""
     modules = sorted(name for name in files if name.endswith(".wasm"))
-    art.check("exactly one WASM binary (qrcode-ai-scanner_bg.wasm)", modules == ["qrcode-ai-scanner_bg.wasm"],
-              ", ".join(modules))
+    art.check(f"exactly one WASM binary ({WASM_MODULE})", modules == [WASM_MODULE], ", ".join(modules))
     try:
         info = json.loads(files.get("build-info.json", b""))
     except ValueError as error:
         art.check("build-info.json records this build", False, f"unreadable: {error}")
         return
-    wasm = files.get("qrcode-ai-scanner_bg.wasm", b"")
-    problems = wasm_provenance().check(info, wasm, version, ROOT)
-    art.check("WASM bytes, compiled inputs and feature envelope match build-info.json (no stale or modified build)",
-              not problems, " · ".join(problems))
+    if not isinstance(info, dict):
+        art.check("build-info.json records this build", False, f"not an object: {type(info).__name__}")
+        return
+    path = (info.get("wasm") or {}).get("path") if isinstance(info.get("wasm"), dict) else None
+    art.check(f"build-info.json wasm.path is {WASM_MODULE}", path == WASM_MODULE, f"{path!r}")
+    wasm = files.get(WASM_MODULE, b"")
+    problems = wasm_provenance().check(info, wasm, version, ROOT, package=package)
+    art.check("WASM bytes, compiled inputs and feature envelope match build-info.json, recorded under this "
+              "package's name (no stale, modified or renamed build)", not problems, " · ".join(problems))
     if not problems:
         art.notes.append(f"build-info: wasm sha256 {info['wasm']['sha256']} · inputs {info['inputs']['sha256']} "
                          f"· features {', '.join(info['wasm']['features']) or 'none'} · revision {info.get('source_revision')}")
@@ -1976,8 +2150,21 @@ def cmd_flutter(host: Host) -> None:
     pubspec = (package_root / "pubspec.yaml").read_text()
     found = re.search(r"^version:\s*(\S+)", pubspec, re.MULTILINE)
     version = found.group(1) if found else None
-    art = host.add(Artifact(f"pub qrcode_ai_scanner {version}", "pub"))
+    found = re.search(r"^name:\s*(\S+)", pubspec, re.MULTILINE)
+    name = found.group(1) if found else None
+    art = host.add(Artifact(f"pub {name} {version}", "pub"))
     art.check(f"pubspec version = {host.version} (workspace)", version == host.version, f"{version}")
+    # The pub name and the README's availability sentence change together
+    # with the Dart package itself; until a release set is inspected, the
+    # name and that sentence are reported, not refused.
+    if host.args.release_set:
+        art.check(f"pubspec name is {FLUTTER_NAME} (never the retired {RETIRED_MODULE})", name == FLUTTER_NAME,
+                  f"{name}")
+    else:
+        art.notes.append(f"pubspec name {name}: {FLUTTER_NAME} is required with --release-set")
+    readme = package_root / "README.md"
+    check_readme(art, readme.read_bytes() if readme.is_file() else None, ("pub", name),
+                 pending=host.args.release_set)
     binary = host.args.flutter or which("flutter") or which("dart")
     listing = []
     art.path = rel(package_root)
@@ -2077,7 +2264,7 @@ def _regex_version(path: str, pattern: str):
 SURFACES = (
     ("workspace", "Cargo.toml", lambda p: _toml_version(p, "workspace", "package", "version")),
     ("cli core pin", "crates/qrcode-ai-scanner-cli/Cargo.toml",
-     lambda p: _toml_version(p, "dependencies", "qrcode-ai-scanner", "version")),
+     lambda p: _toml_version(p, "dependencies", "qrcode-barcode-scanner", "version")),
     ("node package.json", "crates/qrcode-ai-scanner-node/package.json",
      lambda p: json.loads((ROOT / p).read_text()).get("version")),
     ("python crate", "crates/qrcode-ai-scanner-py/Cargo.toml", lambda p: _toml_version(p, "package", "version")),
@@ -2107,10 +2294,12 @@ def cmd_versions(host: Host) -> None:
 
 # Every cargo build root that compiles rxing into something we ship. Cargo
 # reads [profile] from the root manifest only, so each excluded crate must
-# restate the workspace's release profile itself.
+# restate the workspace's release profile itself. `-p` takes a Cargo package
+# name: the published CLI crate's, and the never-published node and wasm
+# binding crates', which kept theirs.
 PROFILE_ROOTS = (
     ("workspace · node + cli", ["--manifest-path", "Cargo.toml",
-                                "-p", "qrcode-ai-scanner-node", "-p", "qrcode-ai-scanner-cli"]),
+                                "-p", "qrcode-ai-scanner-node", "-p", "qrcode-barcode-scanner-cli"]),
     ("workspace · wasm32", ["--manifest-path", "Cargo.toml", "-p", "qrcode-ai-scanner-wasm",
                             "--target", "wasm32-unknown-unknown"]),
     ("python (maturin)", ["--manifest-path", "crates/qrcode-ai-scanner-py/Cargo.toml"]),
@@ -2150,16 +2339,16 @@ def cmd_profiles(host: Host) -> None:
     nightly = nightly_toolchain(host)
     roots = [(label, ["--locked", *selector]) for label, selector in PROFILE_ROOTS]
     try:
-        crate = host.target_dir() / "package" / f"qrcode-ai-scanner-cli-{host.version}.crate"
+        crate = host.target_dir() / "package" / f"qrcode-barcode-scanner-cli-{host.version}.crate"
         if crate.is_file():
             with tarfile.open(crate) as archive:
                 archive.extractall(host.scratch / "cli-crate", filter="data")
-            packaged_cli = host.scratch / "cli-crate" / f"qrcode-ai-scanner-cli-{host.version}"
+            packaged_cli = host.scratch / "cli-crate" / f"qrcode-barcode-scanner-cli-{host.version}"
             # The packaged lock pins the core as packaged from this tree, which
             # the registry does not hold until release: resolve fresh instead
             # (profiles apply by package name, whatever version resolves).
             (packaged_cli / "Cargo.lock").unlink(missing_ok=True)
-            roots.append(("cargo install qrcode-ai-scanner-cli (the packaged crate as its own root)",
+            roots.append(("cargo install qrcode-barcode-scanner-cli (the packaged crate as its own root)",
                           ["--manifest-path", str(packaged_cli / "Cargo.toml")]))
     except RuntimeError:
         pass
@@ -2198,7 +2387,10 @@ def cmd_profiles(host: Host) -> None:
 # per target, a git archive of the same commit (the corresponding source) and
 # one SHA256SUMS over those six. Each file is judged as given; nothing here
 # builds, signs or uploads.
-CLI_PACKAGE = "qrcode-ai-scanner-cli"
+CLI_PACKAGE = "qrcode-barcode-scanner-cli"
+# The CLI crate's name up to 0.10.1: a release file named after it is still
+# read as a CLI release file, so that it fails by name.
+CLI_RETIRED = "qrcode-ai-scanner-cli"
 CLI_TARGETS = {  # triple: archive extension
     "x86_64-unknown-linux-gnu": "tar.gz",
     "aarch64-unknown-linux-gnu": "tar.gz",
@@ -2207,9 +2399,9 @@ CLI_TARGETS = {  # triple: archive extension
     "x86_64-pc-windows-msvc": "zip",
 }
 CLI_KINDS = frozenset({"cli", "cli-source", "cli-sums"})
-CLI_ARCHIVE = re.compile(r"qrcode-ai-scanner-cli-(?P<version>[^-]+)-(?P<triple>.+?)\.(?P<ext>tar\.gz|zip)")
-CLI_SOURCE = re.compile(r"qrcode-ai-scanner-cli-(?P<version>.+)-source\.tar\.gz")
-CLI_SUMS = re.compile(r"qrcode-ai-scanner-cli-(?P<version>.+)-SHA256SUMS")
+CLI_ARCHIVE = re.compile(r"qrcode-barcode-scanner-cli-(?P<version>[^-]+)-(?P<triple>.+?)\.(?P<ext>tar\.gz|zip)")
+CLI_SOURCE = re.compile(r"qrcode-barcode-scanner-cli-(?P<version>.+)-source\.tar\.gz")
+CLI_SUMS = re.compile(r"qrcode-barcode-scanner-cli-(?P<version>.+)-SHA256SUMS")
 CLI_SUMS_LINE = re.compile(r"(?P<sha256>[0-9a-f]{64})  (?P<name>[^\s/\\]+)")
 FULL_COMMIT = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 # The members below each archive's one top directory, which is named like the
@@ -2253,14 +2445,19 @@ THIRD_PARTY_TEXT = re.compile(r"--- text (?P<sha256>[0-9a-f]{64}) (?P<size>\d+) 
 
 
 def cli_kind(name: str):
-    """The CLI release kind a file name claims (its grammar is judged later), or None."""
-    if not name.startswith(CLI_PACKAGE + "-"):
+    """The CLI release kind a file name claims (its grammar is judged later), or None. The retired
+    prefix claims a kind too: the CLI inspection then refuses the file by its name."""
+    if not name.startswith((CLI_PACKAGE + "-", CLI_RETIRED + "-")):
         return None
     if name.endswith("-SHA256SUMS"):
         return "cli-sums"
     if name.endswith("-source.tar.gz"):
         return "cli-source"
     return "cli" if name.endswith((".tar.gz", ".zip")) else None
+
+
+def check_cli_name(art: Artifact, name: str) -> None:
+    art.check(f"name does not start with the retired {CLI_RETIRED}-", not name.startswith(f"{CLI_RETIRED}-"), name)
 
 
 def cli_usage(args) -> str:
@@ -2800,6 +2997,7 @@ def inspect_cli(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     named = CLI_ARCHIVE.fullmatch(path.name)
     version, triple, ext = named.group("version", "triple", "ext") if named else (None, None, None)
     art.package = {"filename": path.name, "version": version, "triple": triple}
+    check_cli_name(art, path.name)
     art.check(f"name is {CLI_PACKAGE}-<version>-<triple>.tar.gz or .zip", named is not None, path.name)
     if named is None:
         return art
@@ -2845,6 +3043,7 @@ def inspect_cli(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     for member, source in CLI_COPIES.items():
         if member != "LICENSE":
             check_cli_copy(art, member, inner.get(member), ROOT / source)
+    check_readme(art, inner.get("README.md"), ("cli", CLI_PACKAGE))
     info = check_cli_build_info(host, art, inner.get("build-info.json"), triple, binary, inner.get(binary))
     source, toolchain = obj(info.get("source")), obj(info.get("toolchain"))
     owner, modes = cli_headers(entries, zipped, stem, binary, source.get("source_date_epoch"))
@@ -2876,6 +3075,7 @@ def inspect_cli_sums(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     describe(art, path, [])
     named = CLI_SUMS.fullmatch(path.name)
     want = f"{CLI_PACKAGE}-{host.version}-SHA256SUMS"
+    check_cli_name(art, path.name)
     art.check(f"name is {want}", path.name == want, path.name)
     data, problems, entries = path.read_bytes(), [], []
     if not data.isascii():
@@ -3039,6 +3239,7 @@ def inspect_cli_source(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     named = CLI_SOURCE.fullmatch(path.name)
     art.package = {"filename": path.name, "version": named.group("version") if named else None}
     want = f"{CLI_PACKAGE}-{host.version}-source.tar.gz"
+    check_cli_name(art, path.name)
     art.check(f"name is {want}", path.name == want, path.name)
     prefix = path.name.removesuffix(".tar.gz") + "/"
     try:
@@ -3198,7 +3399,7 @@ def _raw_tar(path: pathlib.Path, top: str, files: dict, segments) -> pathlib.Pat
 
 def _clean_crate(version: str) -> dict:
     core = ROOT / "crates" / "qrcode-ai-scanner"
-    manifest = f'[package]\nname = "qrcode-ai-scanner"\nversion = "{version}"\nlicense = "{SPDX}"\n'
+    manifest = f'[package]\nname = "qrcode-barcode-scanner"\nversion = "{version}"\nlicense = "{SPDX}"\n'
     return {
         "Cargo.toml": manifest.encode(), "Cargo.toml.orig": (core / "Cargo.toml").read_bytes(),
         ".cargo_vcs_info.json": b'{"git": {"sha1": "0"}, "path_in_vcs": "crates/qrcode-ai-scanner"}\n',
@@ -3207,31 +3408,34 @@ def _clean_crate(version: str) -> dict:
     }
 
 
-def _python_metadata(version: str) -> bytes:
+def _python_metadata(version: str, readme=None) -> bytes:
+    """Core metadata as maturin writes it: the fields, then the README as the description body."""
+    readme = (PY_DIR / "README.md").read_bytes() if readme is None else readme
     return (f"Metadata-Version: 2.4\nName: {PYPI_NAME}\nVersion: {version}\n"
-            f"License-Expression: {SPDX}\nLicense-File: LICENSE\n").encode()
+            f"License-Expression: {SPDX}\nLicense-File: LICENSE\n"
+            "Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM\n\n").encode() + readme
 
 
 def _clean_wheel(version: str, platform: str = "manylinux_2_17_x86_64", python: str = "cp38-abi3") -> dict:
     """A wheel's files as maturin writes them, tagged PYTHON-PLATFORM (dotted = several tags)."""
-    info = f"qrcode_ai_scanner-{version}.dist-info"
+    info = f"{PY_MODULE}-{version}.dist-info"
     tags = "".join(f"Tag: {python}-{tag}\n" for tag in platform.split("."))
     files = {
         f"{info}/METADATA": _python_metadata(version),
         f"{info}/WHEEL": f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\n{tags}".encode(),
         f"{info}/licenses/LICENSE": LICENSE.read_bytes(),
-        f"{info}/sboms/qrcode-ai-scanner-py.cyclonedx.json": b"{}\n",
-        "qrcode_ai_scanner/__init__.py": MATURIN_INIT_PY,
-        "qrcode_ai_scanner/__init__.pyi": (PY_DIR / "qrcode_ai_scanner.pyi").read_bytes(),
-        "qrcode_ai_scanner/py.typed": (PY_DIR / "py.typed").read_bytes(),
-        "qrcode_ai_scanner/qrcode_ai_scanner.abi3.so": b"\x7fELF",
+        f"{info}/{PY_SBOM}": b"{}\n",
+        f"{PY_MODULE}/__init__.py": MATURIN_INIT_PY,
+        f"{PY_MODULE}/__init__.pyi": (PY_DIR / f"{PY_MODULE}.pyi").read_bytes(),
+        f"{PY_MODULE}/py.typed": (PY_DIR / "py.typed").read_bytes(),
+        f"{PY_MODULE}/{PY_MODULE}.abi3.so": b"\x7fELF",
     }
     return _with_record(files, version)
 
 
 def _with_record(files: dict, version: str, *unlisted: str) -> dict:
     """FILES with a RECORD naming every entry but UNLISTED (no hashes: never verified)."""
-    record = f"qrcode_ai_scanner-{version}.dist-info/RECORD"
+    record = f"{PY_MODULE}-{version}.dist-info/RECORD"
     names = sorted(n for n in files if n != record and n not in unlisted)
     return files | {record: "".join(f"{n},,\n" for n in [*names, record]).encode()}
 
@@ -3244,7 +3448,7 @@ def _clean_sdist(version: str) -> dict:
     return {
         "PKG-INFO": _python_metadata(version), "pyproject.toml": (py / "pyproject.toml").read_bytes(),
         "README.md": (py / "README.md").read_bytes(), "LICENSE": LICENSE.read_bytes(),
-        "qrcode_ai_scanner.pyi": (py / "qrcode_ai_scanner.pyi").read_bytes(),
+        f"{PY_MODULE}.pyi": (py / f"{PY_MODULE}.pyi").read_bytes(),
         "py.typed": (py / "py.typed").read_bytes(),
         "qrcode-ai-scanner-py/Cargo.toml": (py / "Cargo.toml").read_bytes(),
         "qrcode-ai-scanner-py/src/lib.rs": (py / "src" / "lib.rs").read_bytes(),
@@ -3267,7 +3471,7 @@ def _npm_main(version: str, optional=None) -> dict:
 
 
 def _npm_platform(version: str, suffix: str) -> dict:
-    binary = f"qrcode-ai-scanner.{suffix}.node"
+    binary = f"{NODE_BINARY}.{suffix}.node"
     os_name, cpu = suffix.split("-")[:2]
     pkg = {"name": f"{NODE_NAME}-{suffix}", "version": version, "os": [os_name], "cpu": [cpu],
            "main": binary, "files": [binary], "license": SPDX, "repository": REPO_URL}
@@ -3278,28 +3482,29 @@ def _npm_platform(version: str, suffix: str) -> dict:
 def _npm_wasm(version: str) -> dict:
     """The wasm package as build-wasm.sh leaves pkg/: wasm-pack output, patched."""
     pkg = {"name": WASM_NAME, "type": "module", "version": version, "license": SPDX, "repository": REPO_URL,
-           "files": ["qrcode-ai-scanner_bg.wasm", "qrcode-ai-scanner.js", "qrcode-ai-scanner.d.ts",
-                     "report-types.d.ts", "LICENSE"],
-           "main": "qrcode-ai-scanner.js", "types": "qrcode-ai-scanner.d.ts",
-           "exports": {".": {"types": "./qrcode-ai-scanner.d.ts", "import": "./qrcode-ai-scanner.js", "default": "./qrcode-ai-scanner.js"},
+           "files": [WASM_MODULE, f"{WASM_STEM}.js", f"{WASM_STEM}.d.ts", "report-types.d.ts", "LICENSE"],
+           "main": f"{WASM_STEM}.js", "types": f"{WASM_STEM}.d.ts",
+           "exports": {".": {"types": f"./{WASM_STEM}.d.ts", "import": f"./{WASM_STEM}.js",
+                             "default": f"./{WASM_STEM}.js"},
                        **{f"./{name}": {"types": f"./{name}.d.ts", "import": f"./{name}.js", "default": f"./{name}.js"}
                           for name in ("auto", "camera", "camera-overlay", "destination")},
                        "./destination-node": {"types": "./destination-node.d.ts", "node": "./destination-node.js"},
                        "./destination-node.js": None,
                        "./report-types": {"types": "./report-types.d.ts"},
-                       "./qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm", **WASM_LEGACY_ALIASES,
+                       f"./{WASM_MODULE}": f"./{WASM_MODULE}",
                        "./build-info.json": "./build-info.json", "./*": "./*"}}
     wasm = b"\0asm\1\0\0\0"
-    info = {"schema": wasm_provenance().SCHEMA, "version": version, "inputs": wasm_provenance().inputs_digest(ROOT),
-            "wasm": {"sha256": hashlib.sha256(wasm).hexdigest(), "features": []}}
+    info = {"schema": wasm_provenance().SCHEMA, "package": WASM_NAME, "version": version,
+            "inputs": wasm_provenance().inputs_digest(ROOT),
+            "wasm": {"path": WASM_MODULE, "sha256": hashlib.sha256(wasm).hexdigest(), "features": []}}
     dts = ('export * from "./report-types";\n'
            "export function capabilities(): Capabilities;\n"
            "export function scan_frame(data: Uint8Array, width: number, height: number): ScanReport;\n"
            "export function scan_image(bytes: Uint8Array): ScanReport;\n")
     return {"package.json": json.dumps(pkg, indent=2).encode(), "README.md": (WASM_DIR / "README.md").read_bytes(),
-            "LICENSE": LICENSE.read_bytes(), "qrcode-ai-scanner.js": b"export {};\n",
+            "LICENSE": LICENSE.read_bytes(), f"{WASM_STEM}.js": b"export {};\n",
             **{notice: (ROOT / "crates/qrcode-ai-scanner" / notice).read_bytes() for notice in ("LICENSE-APACHE-2.0", "THIRD-PARTY.md")},
-            "qrcode-ai-scanner.d.ts": dts.encode(), "qrcode-ai-scanner_bg.wasm": wasm,
+            f"{WASM_STEM}.d.ts": dts.encode(), WASM_MODULE: wasm,
             "build-info.json": json.dumps(info).encode(),
             "report-types.d.ts": CANON_TYPES.read_bytes(),
             **{f"{name}.{ext}": (WASM_DIR / f"{name}.{ext}").read_bytes()
@@ -3371,16 +3576,15 @@ def self_test() -> int:
             return base / name / filename
 
         def crate(name: str, files: dict, members=None) -> pathlib.Path:
-            return _tar(place(name, f"qrcode-ai-scanner-{version}.crate"), f"qrcode-ai-scanner-{version}", files,
-                        members)
+            return _tar(place(name, f"qrcode-barcode-scanner-{version}.crate"), f"qrcode-barcode-scanner-{version}",
+                        files, members)
 
         def wheel(name: str, files: dict, platform: str = "manylinux_2_17_x86_64",
                   python: str = "cp38-abi3") -> pathlib.Path:
-            return _zip(place(name, f"qrcode_ai_scanner-{version}-{python}-{platform}.whl"), files)
+            return _zip(place(name, f"{PY_MODULE}-{version}-{python}-{platform}.whl"), files)
 
         def sdist(name: str, files: dict, members=None) -> pathlib.Path:
-            return _tar(place(name, f"qrcode_ai_scanner-{version}.tar.gz"), f"qrcode_ai_scanner-{version}", files,
-                        members)
+            return _tar(place(name, f"{PY_MODULE}-{version}.tar.gz"), f"{PY_MODULE}-{version}", files, members)
 
         def npm(name: str, files: dict, members=None) -> pathlib.Path:
             pkg = json.loads(files["package.json"])
@@ -3389,11 +3593,21 @@ def self_test() -> int:
 
         # The clean archives pass: every negative below fails for its plant.
         judge("clean crate", [crate("clean", _clean_crate(version))], PASS)
+        retired_crate = _clean_crate(version)
+        retired_crate["Cargo.toml"] = retired_crate["Cargo.toml"].replace(b'name = "qrcode-barcode-scanner"',
+                                                                          b'name = "qrcode-ai-scanner"')
+        judge("crate packaged under the 0.10 name",
+              [_tar(place("crate-retired", f"qrcode-ai-scanner-{version}.crate"), f"qrcode-ai-scanner-{version}",
+                    retired_crate)], FAIL, "never a retired name", "qrcode-ai-scanner")
+        judge("crate file named after the 0.10 name",
+              [_tar(place("crate-retired-file", f"qrcode-ai-scanner-{version}.crate"),
+                    f"qrcode-barcode-scanner-{version}", _clean_crate(version))], FAIL,
+              "file name is <name>-<version>.crate")
         cli_dir = ROOT / "crates/qrcode-ai-scanner-cli"
         cli_files = {
             "Cargo.toml": (
-                f'[package]\nname = "qrcode-ai-scanner-cli"\nversion = "{version}"\nlicense = "{SPDX}"\n'
-                f'[dependencies.qrcode-ai-scanner]\nversion = "{version}"\n'
+                f'[package]\nname = "qrcode-barcode-scanner-cli"\nversion = "{version}"\nlicense = "{SPDX}"\n'
+                f'[dependencies.qrcode-barcode-scanner]\nversion = "{version}"\n'
                 '[profile.release.package.rxing]\noverflow-checks = true\n'
             ).encode(),
             "Cargo.toml.orig": (cli_dir / "Cargo.toml").read_bytes(),
@@ -3402,15 +3616,15 @@ def self_test() -> int:
             "LICENSE": LICENSE.read_bytes(),
         }
         def cli_crate(label, files):
-            return _tar(place(label, f"qrcode-ai-scanner-cli-{version}.crate"),
-                        f"qrcode-ai-scanner-cli-{version}", files)
+            return _tar(place(label, f"qrcode-barcode-scanner-cli-{version}.crate"),
+                        f"qrcode-barcode-scanner-cli-{version}", files)
         judge("CLI overflow checks retained", [cli_crate("cli-guard", cli_files)], PASS)
         for label, replacement in [("absent", b""), ("false", b"overflow-checks = false\n")]:
             bad = cli_files | {"Cargo.toml": cli_files["Cargo.toml"].replace(b"overflow-checks = true\n", replacement)}
             judge(f"CLI overflow checks {label}", [cli_crate(f"cli-guard-{label}", bad)], FAIL, "overflow-checks")
         judge("clean wheel", [wheel("wheel", _clean_wheel(version))], PASS)
         judge("clean sdist", [sdist("sdist", _clean_sdist(version))], PASS)
-        for stub in ("qrcode_ai_scanner.pyi", "py.typed"):
+        for stub in (f"{PY_MODULE}.pyi", "py.typed"):
             missing = {k: v for k, v in _clean_sdist(version).items() if k != stub}
             judge(f"sdist root missing {stub}", [sdist(f"sdist-missing-{stub}", missing)], FAIL, stub)
             judge(f"sdist root changed {stub}",
@@ -3423,18 +3637,44 @@ def self_test() -> int:
                         "LICENSE-APACHE-2.0", "THIRD-PARTY.md", "build-info.json"):
             incomplete = {key: value for key, value in _npm_wasm(version).items() if key != missing}
             judge(f"wasm package missing {missing}", [npm("wasm-incomplete", incomplete)], FAIL, missing)
-        # One physical module, and the recorded current build: a second binary,
-        # changed bytes or a record of other inputs are each refused.
-        judge("wasm package + a second compiled module",
+        # One physical module, and the recorded current build: a second binary
+        # (the 0.10 compatible/ copy, under its old name), changed bytes or a
+        # record of other inputs are each refused.
+        judge("wasm package + the 0.10 compatible/ module",
               [npm("wasm-second", _npm_wasm(version) | {"compatible/qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0"})],
               FAIL, "exactly one WASM binary")
-        retargeted = json.loads(_npm_wasm(version)["package.json"])
-        retargeted["exports"]["./compatible/qrcode-ai-scanner_bg.wasm"] = "./compatible/qrcode-ai-scanner_bg.wasm"
-        judge("wasm package whose legacy compatible/ export names another file",
-              [npm("wasm-alias", _npm_wasm(version) | {"package.json": json.dumps(retargeted, indent=2).encode()})],
-              FAIL, "legacy compatible/ paths alias the same files")
+        for key in ("./compatible/qrcode-ai-scanner_bg.wasm", f"./compatible/{WASM_MODULE}", "./compatible/*"):
+            retargeted = json.loads(_npm_wasm(version)["package.json"])
+            retargeted["exports"][key] = key
+            judge(f"wasm package exporting {key}",
+                  [npm("wasm-alias", _npm_wasm(version) | {"package.json": json.dumps(retargeted, indent=2).encode()})],
+                  FAIL, "no compatible/ export", key)
+        # The whole package under the 0.10 file names (wasm-pack's default
+        # out-name): its module, glue, types, entry fields and build record.
+        renamed = {"qrcode-ai-scanner" + name.removeprefix(WASM_STEM) if name.startswith(WASM_STEM) else name: data
+                   for name, data in _npm_wasm(version).items()}
+        old_pkg = json.loads(json.dumps(json.loads(renamed["package.json"])).replace(WASM_STEM + ".",
+                                                                                     "qrcode-ai-scanner.")
+                             .replace(WASM_MODULE, "qrcode-ai-scanner_bg.wasm"))
+        old_info = json.loads(renamed["build-info.json"])
+        old_info["wasm"]["path"] = "qrcode-ai-scanner_bg.wasm"
+        judge("wasm package under the 0.10 file names",
+              [npm("wasm-old-files", renamed | {"package.json": json.dumps(old_pkg, indent=2).encode(),
+                                                "build-info.json": json.dumps(old_info).encode()})],
+              FAIL, f"exactly one WASM binary ({WASM_MODULE})", "main, module and types",
+              f"wasm.path is {WASM_MODULE}", "qrcode-ai-scanner.js")
+        for field, value, needle in (("package", f"{RETIRED_SCOPE}qrcode-ai-scanner-wasm", "build-info package"),
+                                     ("wasm.path", "qrcode-ai-scanner_bg.wasm", f"wasm.path is {WASM_MODULE}")):
+            planted = json.loads(_npm_wasm(version)["build-info.json"])
+            if field == "package":
+                planted["package"] = value
+            else:
+                planted["wasm"]["path"] = value
+            judge(f"wasm package whose build-info.json records {field} {value}",
+                  [npm("wasm-record", _npm_wasm(version) | {"build-info.json": json.dumps(planted).encode()})],
+                  FAIL, needle)
         judge("wasm package with modified WASM bytes",
-              [npm("wasm-modified", _npm_wasm(version) | {"qrcode-ai-scanner_bg.wasm": b"\0asm\1\0\0\0\0\x01\0"})],
+              [npm("wasm-modified", _npm_wasm(version) | {WASM_MODULE: b"\0asm\1\0\0\0\0\x01\0"})],
               FAIL, "modified WASM")
         stale = json.loads(_npm_wasm(version)["build-info.json"])
         stale["inputs"]["sha256"] = "0" * 64
@@ -3444,9 +3684,10 @@ def self_test() -> int:
         simd_module = bytes(json.loads("[" + re.search(r"SIMD_PROBE = new Uint8Array\(\[([0-9,]+)\]\)",
                                                          (WASM_DIR / "auto.js").read_text()).group(1) + "]"))
         simd_info = json.loads(_npm_wasm(version)["build-info.json"])
-        simd_info["wasm"] = {"sha256": hashlib.sha256(simd_module).hexdigest(), "features": ["simd128"]}
+        simd_info["wasm"] = {"path": WASM_MODULE, "sha256": hashlib.sha256(simd_module).hexdigest(),
+                             "features": ["simd128"]}
         judge("wasm package whose module needs SIMD",
-              [npm("wasm-simd", _npm_wasm(version) | {"qrcode-ai-scanner_bg.wasm": simd_module,
+              [npm("wasm-simd", _npm_wasm(version) | {WASM_MODULE: simd_module,
                                                      "build-info.json": json.dumps(simd_info).encode()})],
               FAIL, "outside the floor")
         # Tests, fixtures and replay tools sit beside the shipped modules and never ship.
@@ -3482,7 +3723,7 @@ def self_test() -> int:
                 ("a logical assignment", "examples/headless.js", "const BUDGET_MS = 0;",
                  "let BUDGET_MS;\nBUDGET_MS ??= 0;", (floor, "logical assignment ??=")),
                 ("a bare specifier", "examples/scanner.worker.js", "from '../auto.js'",
-                 "from '@supernovae-st/qrcode-ai-scanner-wasm/auto'", (loads, "is not a relative path")),
+                 f"from '{WASM_NAME}/auto'", (loads, "is not a relative path")),
                 ("a CDN import", "examples/scanner.worker.js", "from '../auto.js'",
                  "from 'https://cdn.example.com/auto.js'", (loads, "is not a relative path")),
                 ("an import outside the package", "examples/scanner.worker.js", "from '../auto.js'",
@@ -3556,7 +3797,7 @@ def self_test() -> int:
         camera_floor = "examples/camera.js stays inside the browser floor"
         camera_dom = "examples/camera.js parses no markup"
         ssr = f"{WASM_SSR_EXAMPLE} loads exactly ./camera, ./camera-overlay and ./destination"
-        ssr_camera = "await import('@supernovae-st/qrcode-ai-scanner-wasm/camera');"
+        ssr_camera = f"await import('{WASM_NAME}/camera');"
         label_line = "option.textContent = device.label || `Camera ${index + 1}`;"
         for label, name, old, new, needles in (
                 ("a logical assignment in the camera script", "examples/camera.js", "let chosenDevice = null;",
@@ -3579,11 +3820,14 @@ def self_test() -> int:
                  "window.isSecureContext === false", "location.protocol === 'http:'", (camera_dom, ": location")),
                 ("a static import in the server-rendering script", WASM_SSR_EXAMPLE,
                  f"const camera = {ssr_camera}",
-                 "import * as camera from '@supernovae-st/qrcode-ai-scanner-wasm/camera';", (ssr, ": import ")),
+                 f"import * as camera from '{WASM_NAME}/camera';", (ssr, ": import ")),
                 ("a Node module in the server-rendering script", WASM_SSR_EXAMPLE, ssr_camera,
                  f"{ssr_camera}\nawait import('node:http');", (ssr, "import() of ")),
                 ("a relative import in the server-rendering script", WASM_SSR_EXAMPLE,
-                 "'@supernovae-st/qrcode-ai-scanner-wasm/destination'", "'../destination.js'",
+                 f"'{WASM_NAME}/destination'", "'../destination.js'",
+                 (ssr, "import() of ")),
+                ("an import by the 0.10 package name in the server-rendering script", WASM_SSR_EXAMPLE,
+                 f"'{WASM_NAME}/destination'", f"'{RETIRED_SCOPE}qrcode-ai-scanner-wasm/destination'",
                  (ssr, "import() of ")),
                 ("a require() in the server-rendering script", WASM_SSR_EXAMPLE, "const reads = [];",
                  "const reads = [];\nconst destination = require('../destination.js');", (ssr, ": require()")),
@@ -3660,8 +3904,8 @@ def self_test() -> int:
                 failures.append(f"denylist: {planted!r} matches no STRAY pattern")
             judge(f"crate + {planted}", [crate(f"stray-{i}", _clean_crate(version) | {planted: b"x"})],
                   FAIL, planted)
-            judge(f"wheel + qrcode_ai_scanner/{planted}",
-                  [wheel(f"wheel-{i}", _clean_wheel(version) | {f"qrcode_ai_scanner/{planted}": b"x"})],
+            judge(f"wheel + {PY_MODULE}/{planted}",
+                  [wheel(f"wheel-{i}", _clean_wheel(version) | {f"{PY_MODULE}/{planted}": b"x"})],
                   FAIL, planted)
             judge(f"sdist + qrcode-ai-scanner-py/{planted}",
                   [sdist(f"sdist-{i}", _clean_sdist(version) | {f"qrcode-ai-scanner-py/{planted}": b"x"})],
@@ -3674,8 +3918,8 @@ def self_test() -> int:
         judge("crate + an untracked source file", [crate("untracked", _clean_crate(version) | {"src/scratch.rs": b""})],
               FAIL, "src/scratch.rs")
         judge("wheel + a file outside the wheel allowlist",
-              [wheel("wheel-extra", _clean_wheel(version) | {"qrcode_ai_scanner/notes.txt": b""})],
-              FAIL, "qrcode_ai_scanner/notes.txt")
+              [wheel("wheel-extra", _clean_wheel(version) | {f"{PY_MODULE}/notes.txt": b""})],
+              FAIL, f"{PY_MODULE}/notes.txt")
         judge("sdist + an untracked core file",
               [sdist("sdist-extra", _clean_sdist(version) | {"qrcode-ai-scanner/src/extra.rs": b""})],
               FAIL, "qrcode-ai-scanner/src/extra.rs")
@@ -3695,7 +3939,7 @@ def self_test() -> int:
         judge("crate + a symlink member", [crate("symlink", _clean_crate(version), {
             ".ssh/id_rsa": (tarfile.SYMTYPE, "/home/runner/.ssh/id_rsa")})], FAIL, ".ssh/id_rsa (symlink)")
         judge("crate + a hard-link member", [crate("hardlink", _clean_crate(version), {
-            "src/main.rs": (tarfile.LNKTYPE, "qrcode-ai-scanner-0.0.0/src/lib.rs")})], FAIL, "src/main.rs (hard link)")
+            "src/main.rs": (tarfile.LNKTYPE, "qrcode-barcode-scanner-0.0.0/src/lib.rs")})], FAIL, "src/main.rs (hard link)")
         judge("sdist + a symlink member", [sdist("sdist-symlink", _clean_sdist(version), {
             "qrcode-ai-scanner-py/src/data.rs": (tarfile.SYMTYPE, "../../../../etc/passwd")})], FAIL, "(symlink)")
         judge("platform package + a FIFO member", [npm("platform-fifo", _npm_platform(version, "linux-x64-gnu"), {
@@ -3707,8 +3951,8 @@ def self_test() -> int:
         # past a bad one, then keeps reading. A member hidden behind one, or
         # trailing bytes, or a duplicate name, must fail.
         def raw_crate(name: str, segments) -> pathlib.Path:
-            return _raw_tar(place(name, f"qrcode-ai-scanner-{version}.crate"), f"qrcode-ai-scanner-{version}",
-                            _clean_crate(version), segments)
+            return _raw_tar(place(name, f"qrcode-barcode-scanner-{version}.crate"),
+                            f"qrcode-barcode-scanner-{version}", _clean_crate(version), segments)
 
         def raw_npm(name: str, files: dict, segments, top: str = "package") -> pathlib.Path:
             pkg = json.loads(files["package.json"])
@@ -3751,7 +3995,7 @@ def self_test() -> int:
         # The AGPL text where PEP 639 says it is, byte for byte.
         judge("win wheel with a CRLF LICENSE",
               [wheel("wheel-crlf", _clean_wheel(version) | {
-                  f"qrcode_ai_scanner-{version}.dist-info/licenses/LICENSE": crlf})], FAIL, "LICENSE")
+                  f"{PY_MODULE}-{version}.dist-info/licenses/LICENSE": crlf})], FAIL, "LICENSE")
         no_root = {k: v for k, v in _clean_sdist(version).items() if k != "LICENSE"}
         judge("sdist with the AGPL text only under qrcode-ai-scanner-py/",
               [sdist("sdist-py-license-only", no_root)], FAIL, "License-File")
@@ -3764,15 +4008,15 @@ def self_test() -> int:
               FAIL, "license-files")
 
         # auditwheel grafts the shared libraries a Linux wheel links against
-        # into qrcode_ai_scanner.libs/ (musllinux: libgcc_s), named with a hash
-        # and listed in RECORD. Nothing else may sit there.
-        lib = "qrcode_ai_scanner.libs/libgcc_s-f685abf1.so.1"
+        # into qrcode_barcode_scanner.libs/ (musllinux: libgcc_s), named with a
+        # hash and listed in RECORD. Nothing else may sit there.
+        lib = f"{PY_MODULE}.libs/libgcc_s-f685abf1.so.1"
         musl = _clean_wheel(version, "musllinux_1_2_x86_64")
         judge("musllinux wheel + its grafted libgcc_s, listed in RECORD",
               [wheel("libs-musl", _with_record(musl | {lib: b"\x7fELF"}, version), "musllinux_1_2_x86_64")], PASS)
         judge("manylinux wheel + a grafted library, listed in RECORD",
               [wheel("libs-many", _with_record(_clean_wheel(version) | {
-                  "qrcode_ai_scanner.libs/libz-eb09ad1d.so.1.2.13": b"\x7fELF"}, version))], PASS)
+                  f"{PY_MODULE}.libs/libz-eb09ad1d.so.1.2.13": b"\x7fELF"}, version))], PASS)
         judge("musllinux wheel + a grafted library missing from RECORD",
               [wheel("libs-unrecorded", _with_record(musl | {lib: b"\x7fELF"}, version, lib),
                      "musllinux_1_2_x86_64")], FAIL, f"{lib}: not listed in RECORD")
@@ -3784,8 +4028,8 @@ def self_test() -> int:
         judge("Windows wheel + a .libs/ library",
               [wheel("libs-win", _with_record(win | {lib: b"MZ"}, version), "win_amd64")],
               FAIL, f"{lib}: not a manylinux or musllinux wheel")
-        for name in ("qrcode_ai_scanner.libs/libgcc_s-f685abf1.dylib", "qrcode_ai_scanner.libs/libgcc_s.so.1",
-                     "qrcode_ai_scanner.libs/hook-0123abcd.py", "qrcode_ai_scanner.libs/x/libz-eb09ad1d.so"):
+        for name in (f"{PY_MODULE}.libs/libgcc_s-f685abf1.dylib", f"{PY_MODULE}.libs/libgcc_s.so.1",
+                     f"{PY_MODULE}.libs/hook-0123abcd.py", f"{PY_MODULE}.libs/x/libz-eb09ad1d.so"):
             slug = re.sub(r"[^a-z0-9]+", "-", name.rsplit("/", 1)[-1])
             judge(f"musllinux wheel + {name}",
                   [wheel(f"libs-{slug}", _with_record(musl | {name: b"\x7fELF"}, version), "musllinux_1_2_x86_64")],
@@ -3797,20 +4041,20 @@ def self_test() -> int:
         # checkout's: a Windows-checkout CRLF stub still matches, an altered
         # one or a planted __init__.py does not.
         pyi_crlf = _clean_wheel(version)
-        pyi_crlf["qrcode_ai_scanner/__init__.pyi"] = pyi_crlf["qrcode_ai_scanner/__init__.pyi"].replace(b"\n", b"\r\n")
+        pyi_crlf[f"{PY_MODULE}/__init__.pyi"] = pyi_crlf[f"{PY_MODULE}/__init__.pyi"].replace(b"\n", b"\r\n")
         judge("wheel whose __init__.pyi is the checkout stub with CRLF line endings",
               [wheel("pyi-crlf", _with_record(pyi_crlf, version))], PASS)
         judge("wheel whose __init__.py runs code at import",
               [wheel("init-evil", _with_record(_clean_wheel(version) | {
-                  "qrcode_ai_scanner/__init__.py": MATURIN_INIT_PY + b"\nimport os; os.system('id')\n"}, version))],
+                  f"{PY_MODULE}/__init__.py": MATURIN_INIT_PY + b"\nimport os; os.system('id')\n"}, version))],
               FAIL, "maturin's generated __init__.py")
         judge("wheel whose __init__.pyi is not the checkout stub",
               [wheel("pyi-evil", _with_record(_clean_wheel(version) | {
-                  "qrcode_ai_scanner/__init__.pyi": b"# not the committed stub\n"}, version))],
-              FAIL, "qrcode_ai_scanner.pyi")
+                  f"{PY_MODULE}/__init__.pyi": b"# not the committed stub\n"}, version))],
+              FAIL, f"{PY_MODULE}.pyi")
         judge("wheel whose py.typed is not the checkout marker",
               [wheel("typed-evil", _with_record(_clean_wheel(version) | {
-                  "qrcode_ai_scanner/py.typed": b"partial\n"}, version))], FAIL, "py.typed")
+                  f"{PY_MODULE}/py.typed": b"partial\n"}, version))], FAIL, "py.typed")
         # The sdist's packed sources are the checkout's: pip compiles them where
         # no wheel fits.
         judge("sdist whose core src/lib.rs is not the checkout's",
@@ -3821,6 +4065,58 @@ def self_test() -> int:
               [sdist("sdist-pylib", _clean_sdist(version) | {
                   "qrcode-ai-scanner-py/src/lib.rs": b"// not the commit\n"})],
               FAIL, "qrcode-ai-scanner-py/src/lib.rs")
+        # Retired Python names: the distribution's file names, its metadata
+        # Name and its import package, each refused by name.
+        judge(f"wheel named {RETIRED_MODULE}-{version}",
+              [_zip(place("wheel-retired-name", f"{RETIRED_MODULE}-{version}-cp38-abi3-manylinux_2_17_x86_64.whl"),
+                    _clean_wheel(version))], FAIL, f"file name is {PY_MODULE}-{version}-<tags>.whl")
+        judge(f"sdist named {RETIRED_MODULE}-{version}",
+              [_tar(place("sdist-retired-name", f"{RETIRED_MODULE}-{version}.tar.gz"), f"{RETIRED_MODULE}-{version}",
+                    _clean_sdist(version))], FAIL, f"file name is {PY_MODULE}-{version}.tar.gz",
+              f"archive root is {PY_MODULE}-{version}")
+        retired_wheel = {name.replace(PY_MODULE, RETIRED_MODULE): data for name, data in _clean_wheel(version).items()
+                         if not name.endswith("/RECORD")}
+        judge(f"wheel holding the {RETIRED_MODULE} package, its extension and dist-info",
+              [wheel("wheel-retired-module", retired_wheel)], FAIL, f"no {RETIRED_MODULE} package",
+              f"metadata folder is {PY_MODULE}-{version}.dist-info")
+        for planted in (f"{RETIRED_MODULE}/__init__.py", f"{RETIRED_MODULE}/{RETIRED_MODULE}.abi3.so"):
+            judge(f"wheel + {planted}",
+                  [wheel("wheel-retired-plant", _with_record(_clean_wheel(version) | {planted: b"\x7fELF"}, version))],
+                  FAIL, f"no {RETIRED_MODULE} package", RETIRED_MODULE)
+        judge(f"sdist + {RETIRED_MODULE}.pyi at its root",
+              [sdist("sdist-retired-stub", _clean_sdist(version) | {f"{RETIRED_MODULE}.pyi": b""})],
+              FAIL, f"no {RETIRED_MODULE} module or stub")
+        retired_meta = _python_metadata(version).replace(f"Name: {PYPI_NAME}\n".encode(), b"Name: qrcode-ai-scanner\n")
+        info = f"{PY_MODULE}-{version}.dist-info"
+        judge("wheel whose METADATA says Name: qrcode-ai-scanner",
+              [wheel("wheel-retired-meta", _with_record(_clean_wheel(version) | {f"{info}/METADATA": retired_meta},
+                                                        version))], FAIL, f"Name = {PYPI_NAME}")
+        judge("sdist whose PKG-INFO says Name: qrcode-ai-scanner",
+              [sdist("sdist-retired-meta", _clean_sdist(version) | {"PKG-INFO": retired_meta})],
+              FAIL, f"Name = {PYPI_NAME}")
+        # The PyPI README's one previous-name sentence is the table's, release
+        # number included, and no archive README states availability.
+        pypi_readme = (PY_DIR / "README.md").read_bytes()
+        sentence = PREVIOUS_NAMES[("pypi", PYPI_NAME)].encode()
+        wrong = pypi_readme.replace(sentence, sentence.replace(b"0.9.0", b"0.10.1"))
+        if wrong == pypi_readme:
+            failures.append("PyPI README plant: its previous-name sentence is not in the README")
+        judge("wheel whose PyPI README says releases up to 0.10.1 were published under the old name",
+              [wheel("wheel-readme-0101", _with_record(_clean_wheel(version) | {
+                  f"{info}/METADATA": _python_metadata(version, wrong)}, version))],
+              FAIL, "METADATA description names a previous name only in its one sentence", "0.10.1")
+        judge("sdist whose README says releases up to 0.10.1 were published under the old name",
+              [sdist("sdist-readme-0101", _clean_sdist(version) | {"README.md": wrong, "PKG-INFO": _python_metadata(
+                  version, wrong)})], FAIL, "README.md names a previous name only in its one sentence", "0.10.1")
+        pending = b"\n\nNot yet published on PyPI: build it from source.\n"
+        judge("sdist whose README says not yet published",
+              [sdist("sdist-readme-pending", _clean_sdist(version) | {
+                  "README.md": pypi_readme + pending, "PKG-INFO": _python_metadata(version, pypi_readme + pending)})],
+              FAIL, "README.md states no availability", "Not yet published")
+        judge("wheel whose README says pending publication",
+              [wheel("wheel-readme-pending", _with_record(_clean_wheel(version) | {
+                  f"{info}/METADATA": _python_metadata(version, pypi_readme + b"\n\nPending publication.\n")},
+                  version))], FAIL, "METADATA description states no availability", "Pending publication")
 
         # PyPI receives exactly one wheel per row of python.yml's matrix and
         # the sdist: an artifact any job of the run added never rides along.
@@ -3842,8 +4138,8 @@ def self_test() -> int:
         # version must be the local one (twine's --skip-existing would skip it
         # by name), and PyPI may serve nothing else there. The one GET is
         # answered from a fixture; it must ask for this project at this version
-        # (spelled out here, not derived from PYPI_JSON).
-        url = f"https://pypi.org/pypi/qrcode-ai-scanner/{version}/json"
+        # (spelled out here, not derived from PYPI_JSON or PYPI_NAME).
+        url = f"https://pypi.org/pypi/qrcode-barcode-scanner/{version}/json"
         digests = {p.name: sha256(p.read_bytes()) for p in (*pypi, pypi_sdist)}
         win, sdist_name, release = pypi[-1].name, pypi_sdist.name, [*pypi, pypi_sdist]
 
@@ -3897,7 +4193,7 @@ def self_test() -> int:
                    answer({pypi[0].name: digests[pypi[0].name], pypi[1].name: digests[pypi[1].name],
                            pypi[2].name: "2" * 64}), FAIL, pypi[2].name)
         judge_live("pypi-live: a live file the local set does not hold", release,
-                   answer({f"qrcode_ai_scanner-{version}-py3-none-any.whl": "3" * 64}), FAIL, "py3-none-any")
+                   answer({f"{PY_MODULE}-{version}-py3-none-any.whl": "3" * 64}), FAIL, "py3-none-any")
         judge_live("pypi-live: an answer for another version", release, answer(digests, "0.0.1"), FAIL, "'0.0.1'")
         judge_live("pypi-live: an entry without a sha256", release, json.dumps({
             "info": {"version": version}, "urls": [{"filename": win, "digests": {"md5": "0" * 32}}]}).encode(),
@@ -3990,6 +4286,102 @@ def self_test() -> int:
         twin = _npm_platform(version, napi_suffixes()[0]) | {"README.md": b"# a second build\n"}
         judge("release set + a second copy of a platform package", [main, *platforms, npm("set-twin", twin)], FAIL,
               f"{NODE_NAME}-{napi_suffixes()[0]} appears 2 times", release_set=True)
+
+        # Retired npm names, each refused by name: a 0.10 tarball, a pin, an
+        # addon file, a loader lookup; and the packages beside the platform
+        # packages (-wasm, -mcp) are never read as one.
+        def renamed_npm(files: dict, name: str) -> dict:
+            return files | {"package.json": json.dumps(json.loads(files["package.json"]) | {"name": name}).encode()}
+
+        retired_platform = renamed_npm(_npm_platform(version, "darwin-arm64"),
+                                       f"{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64")
+        judge("release set + an @supernovae-st/ platform tarball",
+              [main, *platforms, npm("set-retired", retired_platform)], FAIL,
+              f"{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64 is a retired name", "package name is no retired name",
+              release_set=True)
+        judge("an @supernovae-st/ main package", [npm("retired-main", renamed_npm(
+            _npm_main(version, pins), f"{RETIRED_SCOPE}qrcode-ai-scanner"))], FAIL, "package name is no retired name",
+              "known package name")
+        retired_pins = {key.replace(NODE_NAME, f"{RETIRED_SCOPE}qrcode-ai-scanner"): value for key, value in pins.items()}
+        for label, optional in (("one pin", pins | {f"{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64": version}),
+                                ("every pin", retired_pins)):
+            judge(f"main pinning a 0.10 platform package ({label})",
+                  [npm(f"retired-pin-{label.replace(' ', '-')}", _npm_main(version, optional))], FAIL,
+                  f"{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64 is a retired name")
+        old_addon = "qrcode-ai-scanner.darwin-arm64.node"
+        old_platform = {key: value for key, value in _npm_platform(version, "darwin-arm64").items()
+                        if not key.endswith(".node")} | {old_addon: b"\x7fELF"}
+        old_manifest = json.loads(old_platform["package.json"]) | {"main": old_addon, "files": [old_addon]}
+        judge("platform package shipping the 0.10 addon file name",
+              [npm("retired-addon", old_platform | {"package.json": json.dumps(old_manifest).encode()})], FAIL,
+              f"the addon is {NODE_BINARY}.darwin-arm64.node", old_addon)
+        native = (NODE_DIR / "native.js").read_text()
+        retired_lookups = (
+            ("an @supernovae-st/ platform package", f"require('{NODE_NAME}-darwin-arm64')",
+             f"require('{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64')", "names a retired package or file"),
+            ("a qrcode-ai-scanner addon file", f"require('./{NODE_BINARY}.darwin-arm64.node')",
+             "require('./qrcode-ai-scanner.darwin-arm64.node')", "names a retired package or file"),
+            ("a WASI fallback", f"require('./{NODE_BINARY}.darwin-arm64.node')",
+             f"require('./{NODE_BINARY}.darwin-arm64.node') || require('{NODE_NAME}-wasm32-wasi')",
+             "has a WebAssembly or WASI lookup"))
+        for label, old, new, needle in retired_lookups:
+            if old not in native:
+                failures.append(f"loader plant {label}: {old!r} not found in native.js")
+                continue
+            judge(f"main whose native.js looks up {label}", [npm("retired-loader", _npm_main(version) | {
+                "native.js": native.replace(old, new, 1).encode()})], FAIL, needle)
+        missing_branch = native
+        for specifier in (f"./{NODE_BINARY}.linux-x64-musl.node", f"{NODE_NAME}-linux-x64-musl/package.json",
+                          f"{NODE_NAME}-linux-x64-musl"):
+            missing_branch = missing_branch.replace(f"require('{specifier}')", "undefined")
+        judge("main whose native.js lost the linux-x64-musl branch",
+              [npm("loader-missing", _npm_main(version) | {"native.js": missing_branch.encode()})], FAIL,
+              f"./{NODE_BINARY}.linux-x64-musl.node looked up 0 times", f"{NODE_NAME}-linux-x64-musl looked up 0 times")
+        mcp = renamed_npm(_npm_platform(version, "darwin-arm64"), f"{NODE_NAME}-mcp")
+        judge("an -mcp package shaped as a platform package", [npm("as-platform-mcp", mcp)], FAIL,
+              "known package name")
+        judge("release set + an -mcp package shaped as a platform package",
+              [main, *platforms, npm("set-mcp", mcp)], FAIL,
+              f"{NODE_NAME}-mcp is neither the main package nor pinned by it", release_set=True)
+        judge("main pinning an -mcp package", [npm("pin-mcp", _npm_main(version, pins | {f"{NODE_NAME}-mcp": version}))],
+              FAIL, f"unexpected {NODE_NAME}-mcp")
+        judge("a -wasm package shaped as a platform package (read as the Wasm package)",
+              [npm("as-platform-wasm", renamed_npm(_npm_platform(version, "darwin-arm64"), WASM_NAME))], FAIL,
+              f"exactly one WASM binary ({WASM_MODULE})")
+
+        # Archive READMEs: at most the table's one previous-name sentence (none
+        # for a package that never had another name), the migration guide
+        # linked from PyPI alone, and no availability text.
+        core_readme = _clean_crate(version)["README.md"]
+        guide = f"\nSee the [guide](https://example.com/{MIGRATION_GUIDE}.mdx).\n".encode()
+        for label, text, needle in (
+                ("says not yet published", core_readme + b"\nNot yet published on crates.io.\n",
+                 "README.md states no availability"),
+                ("says coming soon", core_readme + b"\nA 0.11 release is coming soon.\n",
+                 "README.md states no availability"),
+                ("links the migration guide", core_readme + guide, "README.md links no migration guide"),
+                ("names a previous name a second time", core_readme + b"\nThis crate was formerly qrcode-ai-scanner.\n",
+                 "README.md names a previous name only in its one sentence")):
+            judge(f"crate whose README {label}",
+                  [crate(f"readme-{re.sub(r'[^a-z0-9]+', '-', label)}", _clean_crate(version) | {"README.md": text})],
+                  FAIL, needle)
+        main_readme = _npm_main(version)["README.md"]
+        main_sentence = PREVIOUS_NAMES[("npm", NODE_NAME)].encode()
+        if main_sentence not in main_readme:
+            failures.append("npm main README plant: its previous-name sentence is not in the README")
+        judge("main package whose README gives another release for the previous name",
+              [npm("readme-main", _npm_main(version) | {
+                  "README.md": main_readme.replace(main_sentence, main_sentence.replace(b"0.10.1", b"0.10.0"))})],
+              FAIL, "README.md names a previous name only in its one sentence", "0.10.0")
+        platform_files = _npm_platform(version, "darwin-arm64")
+        judge("platform package whose README names a previous name",
+              [npm("readme-platform", platform_files | {"README.md": platform_files["README.md"] + (
+                  f"\nReleases up to 0.10.1 were published as `{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64`.\n"
+              ).encode()})], FAIL, "README.md names no previous name")
+        wasm_files = _npm_wasm(version)
+        judge("wasm package whose README states pending publication",
+              [npm("readme-wasm", wasm_files | {"README.md": wasm_files["README.md"] + b"\nPending publication on npm.\n"})],
+              FAIL, "README.md states no availability", "Pending publication")
 
         # --record: once nothing failed, one `<sha256>  <file>` line per archive
         # given, in sha256sum's format (what npm-publish checks each `npm
@@ -4218,11 +4610,23 @@ def flutter_self_test():
         snapshot[f"{staging.BINDING}/{name}"] = b'include: package:flutter_lints/flutter.yaml\n'
     snapshot[f"{staging.BINDING}/example/pubspec.lock"] = b"packages: {}\n"
     snapshot[f"{staging.BINDING}/rust/Cargo.toml"] += b'\n[profile.release.package.rxing]\noverflow-checks = true\n'
+    pubspec = f"{staging.BINDING}/pubspec.yaml"
+    snapshot[pubspec] = f"name: {FLUTTER_NAME}\n".encode() + snapshot[pubspec]
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     core[".cargo_vcs_info.json"] = json.dumps({"git": {"sha1": revision}, "path_in_vcs": staging.CORE}).encode()
-    packed = staging.archive_bytes({f"qrcode-ai-scanner-{version}/{name}": data for name, data in core.items()})
+    packed = staging.archive_bytes({f"qrcode-barcode-scanner-{version}/{name}": data for name, data in core.items()})
     clean, _ = staging.bundle(packed, snapshot, revision)
     names = sorted(name for name in clean if name not in (".pubignore", "example/pubspec.lock"))
+    # Candidates that differ from the clean one in their pub name or README:
+    # each is staged from its own snapshot, so only the name or the text differs.
+    variants = {}
+    for key, name, data in (
+            ("retired name", pubspec, snapshot[pubspec].replace(FLUTTER_NAME.encode(), RETIRED_MODULE.encode())),
+            ("pending README", f"{staging.BINDING}/README.md", b"readme\n\nNot yet published on pub.dev.\n"),
+            ("previous-name README", f"{staging.BINDING}/README.md",
+             f"readme\n\nReleases up to 0.10.1 were published as `{RETIRED_MODULE}`.\n".encode())):
+        variant = snapshot | {name: data}
+        variants[key] = (staging.bundle(packed, variant, revision)[0], variant)
 
     def tree(names):
         rows, seen = [], set()
@@ -4256,16 +4660,34 @@ def flutter_self_test():
         ("duplicate tree entry", clean, names, 0, "├── LICENSE (<1 KB)\n", FAIL),
         ("tree traversal", clean, names, 0, "├── ..\n│   └── outside (<1 KB)\n", FAIL),
     ]
+    # (…, the snapshot the candidate was staged from, --release-set, a needle of the failing checks)
+    scenarios = [(*row, snapshot, True, "") for row in scenarios]
+    retired, retired_snapshot = variants["retired name"]
+    pending, pending_snapshot = variants["pending README"]
+    previous, previous_snapshot = variants["previous-name README"]
+    scenarios += [
+        ("release set under the 0.10 pub name", retired, names, 0, "", FAIL, retired_snapshot, True,
+         f"pubspec name is {FLUTTER_NAME}"),
+        ("the 0.10 pub name before the release set", retired, names, 0, "", PASS, retired_snapshot, False, ""),
+        ("release set whose README says not yet published", pending, names, 0, "", FAIL, pending_snapshot, True,
+         "README.md states no availability"),
+        ("a README that says not yet published before the release set", pending, names, 0, "", PASS,
+         pending_snapshot, False, ""),
+        ("a README naming a previous name", previous, names, 0, "", FAIL, previous_snapshot, False,
+         "README.md names no previous name"),
+    ]
+    current = {"snapshot": snapshot}
     original_snapshot = staging.candidate_snapshot
-    staging.candidate_snapshot = lambda root, candidate: snapshot
+    staging.candidate_snapshot = lambda root, candidate: current["snapshot"]
     try:
         with tempfile.TemporaryDirectory(prefix="flutter-inspect-selftest-") as temporary:
-            for label, files, listing, status, suffix, expected in scenarios:
+            for label, files, listing, status, suffix, expected, staged_from, release_set, needle in scenarios:
                 count += 1
+                current["snapshot"] = staged_from
                 root = pathlib.Path(temporary) / str(count)
                 staging.write_tree(root, files)
                 host = Host(build_parser().parse_args(["flutter", "--package-root", str(root), "--flutter", "fake-pub",
-                                                       "--strict", "--release-set"]))
+                                                       "--strict", *(["--release-set"] if release_set else [])]))
                 commands = []
 
                 def run(label, command, cwd=ROOT, timeout=0):
@@ -4278,6 +4700,9 @@ def flutter_self_test():
                     actual = host.artifacts[0].status
                     if actual != expected or commands != [(["fake-pub", "pub", "publish", "--dry-run"], root.resolve())]:
                         failures.append(f"Flutter {label}: {actual}, expected {expected}; commands {commands}")
+                    failed = " · ".join(f"{c.name}: {c.detail}" for c in host.artifacts[0].checks if not c.ok)
+                    if needle and needle not in failed:
+                        failures.append(f"Flutter {label}: no failing check names {needle!r} (failing: {failed})")
                     if expected == PASS and len(host.recorded) != len(listing):
                         failures.append(f"Flutter {label}: incomplete same-byte record")
                     if expected == PASS:
@@ -4423,7 +4848,7 @@ def cli_self_test():
 
     linked = [dep(name, min(v for n, v in lock if n == name), expression)
               for name, expression in CLI_FIXTURE_LICENSES.items()]
-    linked += [dep(name, version, SPDX) for name in ("qrcode-ai-scanner", CLI_PACKAGE)]
+    linked += [dep(name, version, SPDX) for name in ("qrcode-barcode-scanner", CLI_PACKAGE)]
     build_only = next((n, v) for n, v in sorted(lock) if lock[(n, v)].get("source") and n not in CLI_FIXTURE_LICENSES)
     notice = b"<!DOCTYPE html>\n<html><body><p>Rust standard library notice (fixture)</p></body></html>\n"
 
@@ -4539,7 +4964,9 @@ def cli_self_test():
                               "COPYRIGHT-rust-std.html sha256", "build-info.json: schema", "build-info binary",
                               "build-info dependencies", "build-info links the anchors", "modes by policy",
                               "SOURCE.md states", "lists exactly build-info's linked registry crates",
-                              "deny.toml", "no text member holds", "no private or stray files"),
+                              "deny.toml", "no text member holds", "no private or stray files",
+                              "does not start with the retired", "README.md names no previous name",
+                              "README.md states no availability"),
                       "cli-source": ("pax global header", "file set is exactly the commit's tree",
                                      "each file's bytes = its git blob", "exec bit", "HEAD^{commit} = --commit"),
                       "cli-sums": ("sha256sum's text format", "one line per CLI archive", "--sums-sha256"),
@@ -4573,8 +5000,33 @@ def cli_self_test():
                     ("an archive for a triple outside the five", f"{CLI_PACKAGE}-{version}-x86_64-unknown-linux-musl"
                                                                  ".tar.gz", "target is one of"),
                     ("a Linux archive as .zip", f"{stem(gnu)}.zip", "zip for the Windows target"),
-                    ("an archive name without a target", f"{CLI_PACKAGE}-{version}.tar.gz", "name is")):
+                    ("an archive name without a target", f"{CLI_PACKAGE}-{version}.tar.gz", "name is"),
+                    ("an archive under the 0.10 crate name", f"{CLI_RETIRED}-{version}-{gnu}.tar.gz",
+                     f"does not start with the retired {CLI_RETIRED}-")):
                 judge(label, [put(slug(label), filename, clean_gnu)], FAIL, needle)
+            judge("a source archive under the 0.10 crate name",
+                  [put("retired-source", f"{CLI_RETIRED}-{version}-source.tar.gz", source.read_bytes())], FAIL,
+                  f"does not start with the retired {CLI_RETIRED}-", options=tree)
+            retired_sums = put("retired-sums", f"{CLI_RETIRED}-{version}-SHA256SUMS",
+                               sums("retired-sums-lines", [archives[gnu]]).read_bytes())
+            judge("a SHA256SUMS under the 0.10 crate name", [archives[gnu], retired_sums], FAIL,
+                  f"does not start with the retired {CLI_RETIRED}-")
+            # The archive README: never another name (the CLI archives never had
+            # one) and no availability text. The fixture README changes, so the
+            # copy check agrees and only the README rules fail.
+            clean_readme = readme.read_bytes()
+            for label, text, needle in (
+                    ("a README saying not yet published", b"# qrscan\n\nNot yet published on crates.io.\n",
+                     "README.md states no availability"),
+                    ("a README naming a previous name",
+                     f"# qrscan\n\nReleases up to 0.10.1 were published as `{CLI_RETIRED}`.\n".encode(),
+                     "README.md names no previous name")):
+                readme.write_bytes(text)
+                try:
+                    judge(label, [put(slug(label), f"{stem(gnu)}.tar.gz", archive_bytes(gnu, inner(gnu)))], FAIL,
+                          needle)
+                finally:
+                    readme.write_bytes(clean_readme)
             judge("the Windows archive as .tar.gz", [put("win-tgz", f"{stem(win)}.tar.gz", _gzip(_ustar(_cli_rows(
                 stem(win), inner(win), "qrscan.exe"))))], FAIL, "zip for the Windows target")
 
@@ -5017,11 +5469,11 @@ def cli_self_test():
                         "2 std notices across the archives")
             release_set("no source archive", list(archives.values()), "no source archive")
             judge("release set: no SHA256SUMS", release, FAIL, "no SHA256SUMS", options=("--release-set", *tree))
-            crate = _tar(put("crate", "placeholder", b"").with_name(f"qrcode-ai-scanner-{version}.crate"),
-                         f"qrcode-ai-scanner-{version}", _clean_crate(version))
+            crate = _tar(put("crate", "placeholder", b"").with_name(f"qrcode-barcode-scanner-{version}.crate"),
+                         f"qrcode-barcode-scanner-{version}", _clean_crate(version))
             release_set("a crate beside the CLI files", [*release, crate], "is not a CLI release asset")
             wheel = _zip(put("wheel", "placeholder", b"").with_name(
-                f"qrcode_ai_scanner-{version}-cp38-abi3-manylinux_2_17_x86_64.whl"), _clean_wheel(version))
+                f"{PY_MODULE}-{version}-cp38-abi3-manylinux_2_17_x86_64.whl"), _clean_wheel(version))
             judge("release set: a wheel beside the CLI files", [*full, wheel], FAIL,
                   f"wheel {wheel.name} is not a CLI release asset", options=("--release-set", *tree))
 
@@ -5123,7 +5575,9 @@ def build_parser() -> argparse.ArgumentParser:
                              "package pins every napi target at this version and every pin has its platform "
                              "package; Python: one wheel per row of python.yml's matrix and one sdist; CLI: the "
                              "five archives, the source archive and SHA256SUMS. flutter: the "
-                             "complete portable candidate and real pub validator (required in every Flutter inspection)")
+                             "complete portable candidate and real pub validator (required in every Flutter inspection), "
+                             f"and with --release-set the pubspec name {FLUTTER_NAME} and a README that states no "
+                             "availability")
     parser.add_argument("--commit", help="archive: the full commit id the CLI release files were built from "
                                          "(required with them)")
     parser.add_argument("--sums-sha256", help="archive: the sha256 the CLI SHA256SUMS file must have")
