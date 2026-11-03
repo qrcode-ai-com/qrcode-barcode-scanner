@@ -11,11 +11,20 @@ description of the live site: what the site runs depends on the package
 version it ships, and the `NOT_JUDGED` status needs reports that carry
 `trace.budget_exhausted` (score contract 5 and later).
 
+<Note>
+The samples on this page import `@qrcode-ai-com/qrcode-barcode-scanner-wasm`,
+whose 0.11.0 release is **pending publication** on npm. Until npm serves it,
+0.10.1 installs under the package's previous name,
+`@supernovae-st/qrcode-ai-scanner-wasm`, which has the same `/auto` entry:
+import it and exclude it from pre-bundling under that name. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ## The verify handler
 
 ```ts
 import { ScanStatus } from "@/types/scan";
-import { loadScanner } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
+import { loadScanner } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto";
 
 const onVerify = async () => {
   const canvas = previewRef.value?.canvas;
@@ -135,4 +144,5 @@ exact bytes you ship**: re-scan the exported file, not the preview.
 </Warning>
 
 Don't forget the Vite exclude
-(`optimizeDeps.exclude: ["@supernovae-st/qrcode-ai-scanner-wasm"]`).
+(`optimizeDeps.exclude: ["@qrcode-ai-com/qrcode-barcode-scanner-wasm"]`), with
+the name of the package you installed.

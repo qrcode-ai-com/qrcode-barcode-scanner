@@ -1,10 +1,20 @@
 ---
-title: "Browser — @supernovae-st/qrcode-ai-scanner-wasm"
+title: "Browser — @qrcode-ai-com/qrcode-barcode-scanner-wasm"
 description: "One portable WASM for verify flows and live camera, with checked loading."
 ---
 
+<Note>
+The `@qrcode-ai-com/qrcode-barcode-scanner-wasm` package is **pending
+publication** on npm, and the samples on this page target its 0.11.0 release.
+Until npm serves it, the line below installs 0.10.1 under the package's
+previous name, `@supernovae-st/qrcode-ai-scanner-wasm`, imported under that
+name too. 0.10.1 has no `/camera`, `/camera-overlay`, `/destination` or
+`/destination-node` entry and ships no examples. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-npm i @supernovae-st/qrcode-ai-scanner-wasm
+npm i @supernovae-st/qrcode-ai-scanner-wasm@0.10.1
 ```
 
 `wasm-pack` web target: the `.wasm` resolves via `import.meta.url`.
@@ -13,7 +23,7 @@ Typed returns (`ScanReport`) ship in the package.
 ## Automatic initialization
 
 ```ts
-import { loadScanner } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
+import { loadScanner } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto";
 const scanner = await loadScanner();
 const report = scanner.scan_image(bytes, "full");
 const loadedVariant = scanner.variant; // "portable"
@@ -40,17 +50,18 @@ The loader requires mutable globals, bulk memory, sign extension, nontrapping
 conversions, multivalue and reference types, and the module uses no SIMD. That
 baseline does not promise compatibility with every WASM-capable browser. The
 package's `build-info.json` records the module's hash, the features its code
-uses, the compiled inputs and the build recipe. `variant: "compatible"` and the
-0.10 `compatible/` export paths name this same module; `"simd"` is no longer a
-variant and rejects with `invalid_options`. The package README documents the
-baseline probe, the build and the factory options. Physical devices, real
-Safari and historical browser floors need their own acceptance evidence.
+uses, the compiled inputs and the build recipe. `variant: "compatible"` selects
+this same module. The 0.10 `compatible/` export paths were removed: import the
+package root instead. `"simd"` is no longer a variant and rejects with
+`invalid_options`. The package README documents the baseline probe, the build
+and the factory options. Physical devices, real Safari and historical browser
+floors need their own acceptance evidence.
 
 ## Direct API
 
 ```ts
 import init, { capabilities, scan_image, scan_frame, version }
-  from "@supernovae-st/qrcode-ai-scanner-wasm";
+  from "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 
 await init(); // once — fetches + instantiates the .wasm
 
@@ -109,9 +120,9 @@ pixels of each frame and never creates a decoder of its own.
 
 ```ts
 import { createCameraScanner, createDetectionTracker }
-  from "@supernovae-st/qrcode-ai-scanner-wasm/camera";
+  from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera";
 import { createCameraOverlay }
-  from "@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay";
+  from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay";
 
 // The container holds the video and is positioned (position: relative, for example).
 const overlay = createCameraOverlay({
@@ -526,7 +537,7 @@ and offers no check. To let users check a destination, pass a verifier from
 
 ```ts
 import { createDestinationVerifier, createEndpointTransport }
-  from "@supernovae-st/qrcode-ai-scanner-wasm/destination";
+  from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination";
 
 const verifier = createDestinationVerifier({
   transport: createEndpointTransport({ endpoint: "/api/destination", label: "App server" }),
@@ -614,7 +625,7 @@ import {
   createDestinationSelection,
   createDestinationVerifier,
   createEndpointTransport,
-} from "@supernovae-st/qrcode-ai-scanner-wasm/destination";
+} from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination";
 
 // Create once, in client code; creation has no side effects.
 const verifier = createDestinationVerifier({
@@ -832,7 +843,7 @@ WebAssembly there and does not run under `--jitless`.
 
 ```ts
 import { createDestinationEndpoint, createNodeTransport }
-  from "@supernovae-st/qrcode-ai-scanner-wasm/destination-node";
+  from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination-node";
 
 const handler = createDestinationEndpoint({
   transport: createNodeTransport(), // one per process
@@ -861,7 +872,7 @@ authentication, rate limits, NAT64 prefixes and denied ranges.
     | `maxHops` | 10 | cap on followed redirects, 0 to 20 |
     | `allowedPorts` | `[80, 443]` | network mode only; WHATWG Fetch bad ports are always refused |
     | `maxConcurrent` | 2 | 1 to 16 attempts, 1 to 3 when `lookup` is `dns.lookup`; at most 32 attempts across the module; beyond either, `resolver_busy` |
-    | `userAgent` | `qrcode-ai-scanner-destination-bot/1` | printable ASCII, 1 to 256 characters |
+    | `userAgent` | `qrcode-barcode-scanner-destination-bot/1` | printable ASCII, 1 to 256 characters |
     | `lookup` | the per-attempt cancelable resolver | a `dns.lookup`-compatible function; in fixture mode, names resolve only through it |
     | `dnsServers` | system configuration | network mode with the default resolver only: `"a.b.c.d[:port]"` or `"[v6][:port]"` |
     | `translationPrefixes` | none | NAT64 prefixes, `"<prefix>/<length>"` with an RFC 6052 length: 32, 40, 48, 56, 64 or 96 |
@@ -929,7 +940,7 @@ localhost that sends `.js` files with a JavaScript type, for example from a
 project that installed the package:
 
 ```bash
-python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@supernovae-st/qrcode-ai-scanner-wasm
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm
 ```
 
 Then open `http://127.0.0.1:8000/examples/headless.html` or
@@ -939,7 +950,7 @@ browser; from another device, such as a phone, serve the folder over `https`.
 Run the server-rendering example with Node:
 
 ```bash
-node node_modules/@supernovae-st/qrcode-ai-scanner-wasm/examples/ssr.mjs
+node node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/examples/ssr.mjs
 ```
 
 [`examples/README.md`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md),
@@ -1009,10 +1020,11 @@ runtime at every call.
 <AccordionGroup>
   <Accordion title="Vite / Nuxt">
     Exclude from dependency pre-bundling — esbuild breaks the
-    `import.meta.url` wasm resolution:
+    `import.meta.url` wasm resolution. Name the package you installed
+    (`@supernovae-st/qrcode-ai-scanner-wasm` for 0.10.1):
 
     ```ts
-    vite: { optimizeDeps: { exclude: ["@supernovae-st/qrcode-ai-scanner-wasm"] } }
+    vite: { optimizeDeps: { exclude: ["@qrcode-ai-com/qrcode-barcode-scanner-wasm"] } }
     ```
   </Accordion>
   <Accordion title="Lazy loading">

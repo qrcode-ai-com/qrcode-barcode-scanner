@@ -75,7 +75,7 @@ applies these rules to every hop before anything is sent for it:
 | Addresses | `public` addresses only, plus NAT64 `translation` addresses whose embedded IPv4 is public. Unspecified, loopback, private, shared, link-local (169.254.169.254 included), unique-local, site-local, multicast, broadcast, documentation, benchmarking, discard, reserved, IPv4-mapped and compatible, Teredo and 6to4 addresses, 168.63.129.16 and every `deniedRanges` entry are refused (`classifyAddress`) |
 | Names | `localhost`, `*.local`, `home.arpa`, `*.internal`, `*.invalid`, `*.onion`, `*.alt`, single-label and malformed names are refused before any lookup (`classifyHost`) |
 | Limits | `min(request.maxHops, maxHops)` redirects and one deadline for the whole chain; `maxConcurrent` attempts per transport and 32 per module, beyond which `resolver_busy` |
-| Request | `GET` with `Host`, `User-Agent: qrcode-ai-scanner-destination-bot/1` by default, a fixed `Accept` and `Connection: close`; no cookies, `Referer`, `Origin` or `Authorization`; `Set-Cookie` ignored |
+| Request | `GET` with `Host`, `User-Agent: qrcode-barcode-scanner-destination-bot/1` by default, a fixed `Accept` and `Connection: close`; no cookies, `Referer`, `Origin` or `Authorization`; `Set-Cookie` ignored |
 | Response | Status and `Location` only, headers capped at 16384 bytes, strict HTTP parser. Results never report addresses, header values or where a name resolved |
 
 - **Rebinding and full answers.** Every hop resolves its name again. The
