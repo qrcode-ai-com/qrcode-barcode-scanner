@@ -21,9 +21,10 @@ package is published under the `qrcode-barcode-scanner` family: the crates
 `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` (which installs
 `qrscan`), the npm packages `@qrcode-ai-com/qrcode-barcode-scanner`, its six
 platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, and
-`qrcode-barcode-scanner` on PyPI (imported as `qrcode_barcode_scanner`).
-Nothing from 0.11.0 on is published under a former name, and there are no alias
-or wrapper packages. The Flutter package is not yet published: it ships on
+`qrcode-barcode-scanner` on PyPI (imported as `qrcode_barcode_scanner`). No
+registry serves these names yet: they are pending publication. Nothing from
+0.11.0 on is published under a former name, and there are no alias or wrapper
+packages. The Flutter package is not yet published: it ships on
 pub.dev only as `qr_barcode_scanner`, never as `qrcode_ai_scanner`. Until a
 registry serves a new name, documents present that name as pending publication
 and give no copyable install line for it: they install the 0.10.1 release
@@ -39,12 +40,14 @@ license.
 These spellings are retained in 0.11 and are not install names: the repository
 directories (`crates/qrcode-ai-scanner*`, `bindings/kotlin/qrcodeaiscanner`,
 `bindings/swift/Sources/QrcodeAiScanner`); the never-published Cargo packages
-`qrcode-ai-scanner-node`, `qrcode-ai-scanner-wasm`, `qrcode-ai-scanner-uniffi`
-and `qrcode-ai-scanner-fuzz`, which `-p` still selects by these names; the
-UniFFI library `qrcode_ai_scanner_uniffi`, the Kotlin package
-`uniffi.qrcode_ai_scanner_uniffi`, the Gradle module `:qrcodeaiscanner`, the
-Swift `QrcodeAiScanner` package with its `QrcodeAiScannerFFI` binary target, and
-the Android namespaces of the Kotlin and Flutter bindings; and the platform
+`qrcode-ai-scanner-node` and `qrcode-ai-scanner-wasm` (root workspace members,
+which `-p` still selects by these names) and `qrcode-ai-scanner-uniffi` and
+`qrcode-ai-scanner-fuzz` (outside the root workspace, addressed with
+`--manifest-path`); the UniFFI library `qrcode_ai_scanner_uniffi`, the Kotlin
+package `uniffi.qrcode_ai_scanner_uniffi`, the Gradle module `:qrcodeaiscanner`,
+the Kotlin build's root project name `qrcode-ai-scanner-kotlin`, the Swift
+`QrcodeAiScanner` package with its `QrcodeAiScannerFFI` binary target, and the
+Android namespaces of the Kotlin and Flutter bindings; and the platform
 identifiers of the Flutter example app. Do not rename them as a side effect of
 other work.
 
@@ -62,14 +65,14 @@ transport the caller supplies.
 
 | Path | Artifact | Registry |
 |---|---|---|
-| `crates/qrcode-ai-scanner` | `qrcode-barcode-scanner`, the core library | crates.io |
-| `crates/qrcode-ai-scanner-cli` | `qrcode-barcode-scanner-cli`, the `qrscan` binary | crates.io |
-| `crates/qrcode-ai-scanner-node` | `@qrcode-ai-com/qrcode-barcode-scanner` (napi) and its six platform packages | npm |
-| `crates/qrcode-ai-scanner-wasm` | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | npm |
-| `crates/qrcode-ai-scanner-py` | `qrcode-barcode-scanner` (PyO3, workspace-excluded) | PyPI |
+| `crates/qrcode-ai-scanner` | `qrcode-barcode-scanner`, the core library, pending publication | crates.io |
+| `crates/qrcode-ai-scanner-cli` | `qrcode-barcode-scanner-cli`, the `qrscan` binary, pending publication | crates.io |
+| `crates/qrcode-ai-scanner-node` | `@qrcode-ai-com/qrcode-barcode-scanner` (napi) and its six platform packages, pending publication | npm |
+| `crates/qrcode-ai-scanner-wasm` | `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, pending publication | npm |
+| `crates/qrcode-ai-scanner-py` | `qrcode-barcode-scanner` (PyO3, workspace-excluded), pending publication | PyPI |
 | `bindings/flutter` | Flutter plugin (FRB + cargokit), not yet published | pub.dev |
 | `bindings/kotlin` | com.github.qrcode-ai-com:qrcode-barcode-scanner, not yet qualified | JitPack |
-| `bindings/swift` | `QrcodeAiScanner` (xcframework, tag-pinned) | SwiftPM |
+| `bindings/swift` | `QrcodeAiScanner` (xcframework), built from source: SwiftPM cannot add it by repository URL | SwiftPM (local package) |
 
 **Downstream, this crate is "the judge"**: the generator's e2e floors,
 the qrt templates layer and the 306-template factory all score through
