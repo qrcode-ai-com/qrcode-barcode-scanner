@@ -692,7 +692,8 @@ mod fresh_scan {
 
     /// Every JSON pointer at which `golden` and `emitted` differ, with both
     /// values; a key or an element only one side has is `absent` on the
-    /// other.
+    /// other. Leaves compare as JSON text: `serde_json`'s number equality
+    /// holds `-0.0` equal to `0.0`, which the printed reports tell apart.
     fn differences(
         pointer: &str,
         golden: Option<&Value>,
@@ -716,18 +717,32 @@ mod fresh_scan {
                     differences(&child, left.get(i), right.get(i), out);
                 }
             }
-            _ if golden != emitted => out.push(format!(
-                "{pointer}: golden {} · emitted {}",
-                shown(golden),
-                shown(emitted)
-            )),
-            _ => {}
+            _ => {
+                let (left, right) = (shown(golden), shown(emitted));
+                if left != right {
+                    out.push(format!("{pointer}: golden {left} · emitted {right}"));
+                }
+            }
         }
     }
 
     /// A value as JSON text, or `absent`.
     fn shown(value: Option<&Value>) -> String {
         value.map_or_else(|| "absent".to_owned(), Value::to_string)
+    }
+
+    /// The comparison tells a negative zero from zero, as the printed
+    /// reports do, and finds nothing between equal values.
+    #[test]
+    fn a_negative_zero_differs_from_zero() {
+        let read = |text: &str| -> Value { serde_json::from_str(text).unwrap() };
+        let (negative, zero) = (read(r#"{"v":-0.0}"#), read(r#"{"v":0.0}"#));
+        let mut out = Vec::new();
+        differences("", Some(&negative), Some(&zero), &mut out);
+        assert_eq!(out, ["/v: golden -0.0 · emitted 0.0"]);
+        out.clear();
+        differences("", Some(&zero), Some(&read(r#"{"v":0.0}"#)), &mut out);
+        assert!(out.is_empty(), "{out:?}");
     }
 
     /// Scans `golden`'s fixture as its command line did and compares the
