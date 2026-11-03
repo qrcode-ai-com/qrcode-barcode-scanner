@@ -129,21 +129,25 @@ if (mode === "native") {
 } else {
   assert.equal(typeof globalThis.window, "undefined", "this is a Node SSR import");
   qr = await import(pathToFileURL(imported));
-  // One WebAssembly module, named after the package; the 0.10 compatible/
-  // paths are gone from the exports and resolve to nothing.
+  // One WebAssembly module, named after the package. The 0.10 compatible/
+  // paths are gone: no export key, no folder, and none of their module or
+  // glue files resolves, under the 0.10 file names or the current ones.
   const wasmModules = readdirSync(packageRoot, { recursive: true }).filter((file) => file.endsWith(".wasm"));
   assert.deepEqual(wasmModules, ["qrcode-barcode-scanner_bg.wasm"], "one WebAssembly module, under the package's name");
   const compatibleExports = Object.keys(installed.exports).filter((key) => key.includes("compatible"));
   assert.deepEqual(compatibleExports, [], "no compatible/ export");
+  const compatibleFolder = existsSync(join(packageRoot, "compatible"));
+  assert.equal(compatibleFolder, false, "no compatible/ folder is installed");
   const compatibleRefused = {};
-  for (const subpath of ["compatible/qrcode-barcode-scanner_bg.wasm", "compatible/qrcode-ai-scanner_bg.wasm"]) {
+  for (const subpath of ["compatible/qrcode-ai-scanner_bg.wasm", "compatible/qrcode-ai-scanner.js",
+    "compatible/qrcode-barcode-scanner_bg.wasm", "compatible/qrcode-barcode-scanner.js"]) {
     assert.throws(() => require.resolve(`${name}/${subpath}`), (error) => {
       compatibleRefused[subpath] = error.code ?? error.message;
-      return true;
+      return ["MODULE_NOT_FOUND", "ERR_PACKAGE_PATH_NOT_EXPORTED"].includes(error.code);
     }, `${name}/${subpath} must resolve to nothing`);
   }
   identityChecks = { retired_scope_installed: false, wasm_modules: wasmModules, compatible_exports: compatibleExports,
-    compatible_refused: compatibleRefused };
+    compatible_folder: compatibleFolder, compatible_refused: compatibleRefused };
   const wasm = join(packageRoot, "qrcode-barcode-scanner_bg.wasm");
   qr.initSync({ module: readFileSync(wasm) });
   loaded = [wasm];
