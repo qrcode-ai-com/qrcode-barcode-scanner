@@ -196,8 +196,10 @@ manifest only and reports the gate as NOT VERIFIED, never as a pass.
 - rqrr rejects FNC1 symbols (mode 0x5/0x9) — rxing is the GS1 engine; the
   scanner re-derives the grid rqrr detected to read its declarations.
 - The goldens (`spec/examples/`) carry this build's `versions`, and
-  `spec_golden` pins them: a marker or version bump regenerates the whole
-  set from its committed fixtures (`qrscan <fixture> --profile full
+  `spec_golden` compares each with a fresh scan of its fixture: a behavior
+  change regenerates the goldens it moves (`golden_equals_a_fresh_scan::<name>`
+  names each one), and a marker or version bump regenerates the whole set,
+  from the committed fixtures (`qrscan <fixture> --profile full
   --budget-ms 0`, the table in `spec/README.md` § Examples); review every
   diff.
 - `cargo test --workspace --lib` style commands: prefer

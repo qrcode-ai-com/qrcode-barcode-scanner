@@ -42,9 +42,11 @@ formatting to owned files when editing, then verify it with the check above.
 ## The wire contract lives in `spec/`
 
 `spec/` is the **normative** `ScanReport` contract (wire format + JSON Schema +
-golden examples), validated in CI against the real types. If your change alters
-the output shape, update `spec/` and regenerate the golden examples in the same
-PR — CI will fail otherwise.
+golden examples), validated in CI against the real types and against a fresh
+scan of each golden's fixture. If your change alters a report (its shape or any
+value), update `spec/` and regenerate the affected golden examples in the same
+PR, with the command lines in `spec/README.md` § Examples — CI will fail
+otherwise.
 
 ## Pull requests
 
