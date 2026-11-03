@@ -1,7 +1,7 @@
 # Scanner playground
 
 A local, browser playground that exercises **every feature** of
-`@supernovae-st/qrcode-ai-scanner-wasm` in a real **Vite** bundler context —
+`@qrcode-ai-com/qrcode-barcode-scanner-wasm` in a real **Vite** bundler context —
 the same bundler Nuxt uses, so it de-risks the landing integration without
 touching the consumer repo.
 

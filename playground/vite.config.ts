@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 // Nuxt/Vite consumers hit; documented in docs/guides/nuxt-verify).
 export default defineConfig({
   optimizeDeps: {
-    exclude: ['@supernovae-st/qrcode-ai-scanner-wasm'],
+    exclude: ['@qrcode-ai-com/qrcode-barcode-scanner-wasm'],
   },
   server: {
     // allow serving the wasm asset from the linked package (outside playground/)
