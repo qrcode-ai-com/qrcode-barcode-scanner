@@ -100,11 +100,12 @@ as 0.
 
 ## Camera capture and visual selection
 
-From 0.11.0 the additive `/camera` and `/camera-overlay` entries provide capture,
-tracking and measured corner selection without a framework dependency. Imports
-do not request camera access. Keep decoding in a module worker: initialize
-`/auto`, call `scan_frame(rgba, width, height, "frame", 100)` and return its report
-through a promise-based adapter.
+From 0.11.0 the `/camera` and `/camera-overlay` entries add a camera capture
+controller, a tracker of measured positions and a framework-free overlay with an
+exact readout of the selected code. Importing either entry requests no camera,
+touches no DOM and starts no timer, so both import safely during server
+rendering. Decoding stays in your module worker: the controller hands it the RGBA
+pixels of each frame and never creates a decoder of its own.
 
 ```ts
 import { createCameraScanner, createDetectionTracker }
@@ -112,42 +113,471 @@ import { createCameraScanner, createDetectionTracker }
 import { createCameraOverlay }
   from "@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay";
 
-// The positioned container contains a centered object-fit video element.
-const tracker = createDetectionTracker({ holdMs: 700, smoothing: 0.35 });
-const overlay = createCameraOverlay({ video, container });
+// The container holds the video and is positioned (position: relative, for example).
+const overlay = createCameraOverlay({
+  video,
+  container,
+  mount: { rail: railSlot, readout: readoutSlot }, // recommended: below the video
+});
+const tracker = createDetectionTracker({
+  onChange: (snapshot) => overlay.update(snapshot), // every snapshot, in order
+  onError: reportUiError,
+});
+let worker = await startWorker(); // loads /auto once; each request calls scan_frame
 const camera = createCameraScanner({
   video,
-  scanFrame: scanFrameInWorker,
-  onResult(report, frame) {
-    overlay.update(tracker.update(report.detections, frame));
+  tracker, // updated before onResult, reset whenever a capture session ends
+  scanFrame: (rgba, width, height, { signal, frame }) => {
+    // Copy pixels only when a thumbnail is due, before the buffer is transferred.
+    if (overlay.wantsFrameImage()) {
+      overlay.setFrameImage(new ImageData(new Uint8ClampedArray(rgba), width, height), frame);
+    }
+    return worker.scan(rgba, width, height, { signal });
   },
-  onError(error) { showCameraError(error); },
+  recover: async (_cause, { signal }) => {
+    worker.terminate();
+    worker = await startWorker({ signal });
+  },
+  onState: (change) => showCameraState(change),
+  onError: (error) => showCameraError(error.code),
 });
 
-// Call from the camera button; HTTPS or localhost is required.
+// From the camera button: the camera needs a secure context (HTTPS or localhost).
 await camera.start();
-// On component removal:
+
+// On unmount, in any order:
 camera.stop();
-tracker.clear();
+tracker.destroy();
 overlay.destroy();
 ```
 
-The capture loop samples new video frames, caps the long edge to 1280 pixels by
-default and serializes worker requests, including after stop/restart. Smaller
-frames can lose narrow barcodes; the limit is configurable. Stop invalidates
-late permission answers and results, stops tracks and cancels scheduled frames.
-Page hiding/departure and ended tracks also stop capture. The worker adapter
-must bound hung decodes and reject failed requests; scanner budgets are
-cooperative rather than hard worker timeouts.
+`startWorker()` and `worker.scan()` are yours. The worker loads `/auto` once and
+answers each request with `scan_frame(rgba, width, height)`, which uses the
+`frame` profile; `worker.scan()` returns a promise of that `ScanReport`.
+Transfer `rgba.buffer` to the worker rather than copying it. The package's
+`examples/scanner.worker.js` is such a worker, and `examples/camera.js` wires
+these parts in a page (see [Examples](#examples)).
 
-The tracker preserves exact engine content identities and smooths only measured
-corners. It never invents a rectangle for a scan line. Feed every completed
-report, including empty detections, to expire held targets. The visual helper
-supports contain/cover/fill, optional mirroring and keyboard selection. It uses
-text nodes for decoded content and opens HTTP(S) links only on explicit clicks.
-Customize `--qr-scanner-highlight`, `--qr-scanner-surface`,
-`--qr-scanner-text` and the `labels` option for your product. Physical camera
-acceptance remains a separate check from synthetic video tests.
+**Aztec codes.** The engine reads an Aztec code only when the code lies over
+the center of the image it scans, in every profile, so an Aztec code off to
+one side of a camera frame goes unread: ask users to center it.
+
+### Capture
+
+`createCameraScanner(options)` opens the camera on `start()`. Its `state` is
+`idle`, `starting`, `running`, `recovering`, `stopped` or `failed`, and `onState`
+receives every transition with its `reason`, as well as every change of `muted`
+or `stalled`.
+
+- **Frames.** Capture follows `requestVideoFrameCallback` where the browser has
+  it, and otherwise a timer that skips a capture whose sampled pixels have not
+  changed; `frame.source` says which. The long edge of the scanned frame is
+  capped at `maxDimension` (1280 by default): a smaller cap is faster but can
+  lose narrow barcodes. The next frame is requested `intervalMs` (100) after each
+  result, and one decode is in flight at a time, across stops and restarts.
+- **Timeout and recovery.** A decode that takes longer than `decodeTimeoutMs`
+  (5000) aborts `context.signal`, the only abort the controller makes. Your
+  adapter must never settle while its decoder still works on the frame: on
+  abort, terminate the worker, then reject. With `recover`, the state becomes
+  `recovering` until your replacement decoder is ready, at most `maxRecoveries`
+  (2) times per session, each within `recoverTimeoutMs` (20000). Without it, a
+  timeout fails the session with `decode_timeout`.
+- **Errors.** A failed session sends one `CameraScannerError` to `onError`, and a
+  `start()` still pending rejects with that same error. Its `code` is listed
+  below and its `cause` keeps the native error.
+- **Stalls and mutes.** `stalled` turns true when no new frame arrives for
+  `stallMs` (2000) while the camera runs unmuted, and a muted track pauses
+  capture. Neither invents a frame: the tracker's deadlines remove the outlines
+  while the decoded results stay.
+- **Session ends.** `stop()`, a hidden page, `pagehide` and an ended track
+  release the camera and end the session, and late permission answers and
+  results are discarded. Call `start()` again once the page is visible.
+- **Switching cameras.** `setConstraints(constraints)` ends the session,
+  releases the current device, then opens the new constraints; before the first
+  start it only stores them. The default is
+  `{ facingMode: { ideal: "environment" } }`.
+- **One decoder.** Load one scanner in one module worker and keep it for every
+  frame and every image you scan: image scanning and the camera then share one
+  WASM module and one initialization. The controller replaces that decoder
+  only through `recover`.
+
+| `code` | When |
+| --- | --- |
+| `unsupported` | no `navigator.mediaDevices.getUserMedia`, outside a secure context for example |
+| `permission_denied` | `getUserMedia` rejected with `NotAllowedError` or `SecurityError` |
+| `device_not_found` | `NotFoundError` |
+| `device_busy` | `NotReadableError` or `AbortError` |
+| `constraints_unsatisfied` | `OverconstrainedError`, or a `TypeError` from `getUserMedia` |
+| `start_failed` | any other `getUserMedia` rejection |
+| `play_failed` | `video.play()` rejected |
+| `canvas_unavailable` | no 2D canvas context, or its pixels could not be read |
+| `stream_ended` | the camera track ended |
+| `decode_failed`, `decode_timeout`, `recover_failed` | `scanFrame` rejected or timed out, or `recover` failed |
+| `callback_failed` | `onResult` or `tracker.update` threw (the session fails), or `onState` or the tracker's reset threw (reported only) |
+
+### Tracking
+
+`createDetectionTracker(options)` follows each measured copy of a code from
+frame to frame. Passed to the controller as `tracker`, it receives every report
+with the frame's `observedAt`, `epoch` and `sequence`, and a reset whenever a
+capture session ends.
+
+- **Identities.** A spatial track follows one measured copy, so two printed
+  copies of one content are two tracks. A read without a measured position
+  becomes a content track (`basis: "content"`), which claims no position. A
+  track keeps its `id` and its display `slot` for life, and the decoded results
+  (`snapshot.results`, one per content) are kept apart from the tracks.
+- **Proof of absence.** A `ScanReport` proves a code gone only when its trace
+  shows no budget cut and no read or detection saturation
+  (`trace.budget_exhausted`, `trace.saturation.reads` and
+  `trace.saturation.detections` all `false`). One copy of a code that is still
+  read counts as gone only when `trace.saturation.occurrences` is `false` too. A
+  bare array of detections proves nothing unless you pass `{ complete: true }`.
+  To filter a report, pass `{ ...report, detections: kept }` and choose `kept`
+  by content, never by position.
+- **Time.** Outlines and identities expire by time, not by counting reports:
+  with `onChange`, one timer wakes the tracker at its next deadline, so outlines
+  leave when the evidence stops. `observedAt` is in milliseconds on the
+  tracker's clock (`performance.now()` by default), as is a camera frame's
+  `captureTime`; its `mediaTime` is in seconds on the media timeline.
+  `geometry.age` and `snapshot.frameAge` give the display age.
+- **Snapshots.** `update()`, `snapshot()`, `advance()`, `reset()` and
+  `clear()` each return a new `TrackerSnapshot` object: tracks in slot order,
+  results, the events of that call (`entered`, `held`, `lost`, `expired` and
+  others), saturation flags and `nextDeadline`. Its `detection` fields are the
+  engine's objects, by reference. `snapshot()` reads the state without
+  changing it. `onChange` receives the snapshot of every `update()`, `reset()`
+  and `clear()`, of an `advance()` or a timer wake that applied a transition,
+  and of a successful `forget(id)`, which returns `true` (`false` for an
+  unknown id). `destroy()` cancels the timer.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `smoothing` | `0.35` | weight of each new measurement against the previous estimate; `{ kind: "none" }` turns smoothing off |
+| `staleMs` | `1200` | geometry older than this is withheld, and tracked or held tracks become lost |
+| `reacquireMs` | `2000` | how long an identity survives without new evidence; at least `staleMs` |
+| `maxMisses` | `1` | consecutive complete misses shown as held before a track is lost |
+| `retainMs` | `Infinity` | how long a result without a live track is kept; at least `reacquireMs` |
+| `maxResults` | `32` | results kept; at least 16 |
+
+`holdMs`, which earlier 0.11 development builds accepted, now throws a TypeError
+that names `staleMs` and `reacquireMs`.
+
+**Slow devices.** A frame keeps its geometry only when its result arrives less
+than `staleMs` after the frame's `observedAt`. A later result still updates the
+decoded results, and a content with no live track shows as a content track, but
+it moves no outline: the spatial tracks of that code age, turn lost and lose
+their outlines until faster frames return. If capture, transfer and decoding
+can take that long where your page runs, raise `staleMs`, and `reacquireMs`
+with it, since it must stay at least `staleMs`. The cost: when the evidence
+stops (a stalled camera, a hung decoder, reports cut by their budget), an
+outline stays at its last measured position for up to `staleMs`.
+
+### Overlay
+
+`createCameraOverlay({ video, container })` draws from tracker snapshots: one
+rounded four-corner outline for each valid measured quad, a line for a scan
+line and dots for partial points. It never invents a rectangle, and draws
+nothing for a content track, a lost track or geometry the tracker withheld. Each
+track keeps a number (`slot + 1`) and a color (`TRACK_COLORS[slot % 8]`) for
+life, and a code measured entirely outside the visible area gets a numbered
+badge at the edge of the view, with a chevron pointing toward the code
+(`markers.edgeHints: false` removes it).
+
+- **Updates.** Deliver every `onChange` snapshot, in order. A snapshot older
+  than the last one applied is ignored and counted in `inspect().ignored`; an
+  array or any other value throws a TypeError; after `destroy()`, an update
+  does nothing.
+- **Selection.** The scene, the rail and the readout share one selected code. It
+  is chosen automatically until the user picks one, by a tap, the rail or a
+  digit key, or until you call `select(id)`. `select(null)` returns to automatic
+  choice, and `select()` returns `false` for an unknown id. `onSelect(track,
+  result)` fires once the DOM is consistent, and `overlay.detection` is the
+  readout's subject.
+- **Effects.** Dimming and blur, and a color wash that is off by default
+  (`effects`), leave sharp cutouts only around quads that were precise in two
+  consecutive frames, and never dim or blur a marked code that the focus mode
+  covers. They switch on after `dwellMs` (500) of continuous eligibility, and
+  only once `cooldownMs` (1000, doubled under reduced motion) has passed since
+  they last switched off; they switch off at once. `focus` is `"auto"` (every
+  code until the user picks one, then the selected one), `"all"`, `"selected"`
+  or `"off"`. Effects are presentation only: the overlay never writes to the
+  video or to the capture canvas, so the decoder reads the same pixels.
+- **Readout.** The exact symbology label (19 symbologies), its family, the
+  payload kind and the complete decoded text, with invisible characters shown
+  as named chips; the ECI, FNC1 and the exact bytes in Details; GS1 fields and
+  issues verbatim; for an `http:` or `https:` URL, the encoded URL exactly as
+  decoded with an Open button; and a destination slot for the URL of a `url`,
+  `gs1_digital_link` or `me_card` payload.
+- **Helpers.** `describeDetection`, `segmentText`, `symbologyFamily`,
+  `parseObjectPosition`, `overlayMediaRect`, `projectOverlayPoint`,
+  `projectOverlayGeometry`, `quadOutline` and `quadRegion` are pure functions,
+  and `DEFAULT_LABELS`, `TRACK_COLORS` and `CAMERA_OVERLAY_CSS` are constants.
+  `setOptions()` validates every setting before it applies any, `layout()`
+  re-reads the video's layout, `inspect()` returns a frozen diagnostic,
+  `clear()` empties the selection and the scene until the next update, and
+  `destroy()` removes every node, listener, observer and timer.
+
+### Layout
+
+The overlay covers the video's content box inside `container`, which must
+contain the video and be positioned. It reads the video's computed `object-fit`
+(`contain`, `cover`, `fill`, `none` or `scale-down`) and `object-position`
+(keywords, percentages, pixels, edge offsets such as `right 10px bottom 20px`,
+and `calc()` of a percentage and pixels), and detects a horizontal mirror such
+as `transform: scaleX(-1)`. The `fit`, `position` and `mirror` options override
+what it reads.
+
+- `overlay.alignment`, also `data-alignment` on the overlay root, is `aligned`
+  or the first problem found, in this order: `no-frame`, `no-size`,
+  `unsupported-transform`, `object-view-box`, `unsupported-fit`,
+  `unsupported-position`, `no-media`, `frame-mismatch`. Anything but `aligned`
+  hides the markers and effects rather than drawing them in the wrong place; the
+  rail and the readout stay.
+- The container and its ancestors may carry a positive uniform scale and a
+  translation, nothing else. Between the container and the video, only a
+  translation or a horizontal mirror is allowed. A rotation, a skew or any other
+  flip gives `unsupported-transform`.
+- Size changes, class and style changes on the video and the container, and a
+  new capture session re-read the layout. After a stylesheet-only change
+  elsewhere, call `layout()`.
+- Keep `opacity`, `filter`, `mask`, `clip-path` and `mix-blend-mode` off the
+  overlay root (`[data-qr-camera-overlay]`): each would cut the blur off from
+  the video behind it.
+- The rail and the readout render inside the video in a `regular`, `compact` or
+  `minimal` arrangement chosen from its size, or wherever you `mount` them.
+  Mounting both below the video keeps every code visible and tappable. `rail` is
+  `"auto"` (shown for several codes, or when nothing is selected), `"multiple"`,
+  `"always"` or `"never"`. With `rail: "never"` and `readout: false` the overlay
+  renders no keyboard chooser: provide your own control that calls `select()`.
+
+### Theming
+
+The overlay reads these custom properties with fallbacks and never declares
+them, so a value set on any ancestor applies.
+
+| Property | Fallback | Use |
+| --- | --- | --- |
+| `--qr-scanner-color-0` to `--qr-scanner-color-7` | the matching `TRACK_COLORS` entry | the color of each track whose `slot % 8` is that index |
+| `--qr-scanner-color-0-text` to `--qr-scanner-color-7-text` | `--qr-scanner-action-text` | the number drawn on that color; keep a contrast of at least 4.5:1 |
+| `--qr-scanner-action-text` | `#000` | the default number color |
+| `--qr-scanner-highlight` | `#F5F7FA` | the color of every track with `colors: "mono"` |
+| `--qr-scanner-casing` | `rgb(0 0 0/55%)` | the casing under strokes, dots and badges |
+| `--qr-scanner-surface`, `--qr-scanner-text` | `Canvas`, `CanvasText` | the rail and the readout; override both together |
+| `--qr-scanner-focus` | `CanvasText` | the focus ring |
+
+`scheme` (`"dark"` by default, `"light"` or `"inherit"`) sets the `color-scheme`
+that `Canvas` and `CanvasText` follow on the overlay and its mounted parts. The
+overlay injects one `<style>` element per document or shadow root it renders
+into. Under a strict `style-src`, pass the policy's nonce as `styleNonce`, or
+pass `styles: "none"` and serve `CAMERA_OVERLAY_CSS` in your own stylesheet;
+per-element values go through the CSSOM, never a `style` attribute. The
+overlay's selectors use `:where()`, so a consumer rule with a single class does
+not override them: theme through the properties above, or use a more specific
+selector.
+
+### Accessibility
+
+- The rail is a toolbar holding one radio group. Tab reaches it once; the arrow
+  keys (mirrored in right-to-left text), Home and End move the focus; Enter or
+  Space selects. Entries are named like `Code 1, QR Code`, and entries 1 to 9
+  carry `aria-keyshortcuts`: a digit selects that code while the focus is in the
+  rail or the readout. Screen readers in browse mode may take the digits, so the
+  radios and the Previous and Next buttons remain the main path.
+- Escape closes the full readout card. Otherwise it returns to automatic
+  selection when the user had picked a code or passed one over, and in every
+  other case it is left to the page, a host dialog for example. The overlay adds
+  no document-level key listener.
+- A visually hidden `role="status"` region announces the selection, the loss
+  and return of the selected code, the number of codes and the outcome of each
+  action. A held state is never announced. With `announceContent: "none"` (the
+  default) no announcement contains decoded content; `"preview"` adds its first
+  48 code points.
+- `lang` (`"en"` by default) is set on the overlay and its parts; decoded
+  content and URLs carry `lang=""`.
+- Reduced motion (`prefers-reduced-motion`, or `motion: "reduce"`) removes the
+  animations and doubles the effect cooldown. Where the browser reports
+  `prefers-reduced-transparency`, blur and glow are off; where it does not,
+  `effects: { blur: 0 }` is the reduced-effects setting. Forced colors remove
+  the dimming, wash, blur and glow.
+- Buttons and rail entries measure at least 44 by 44 CSS pixels, and the
+  selected entry carries a border and a check mark: color is never the only
+  cue.
+
+### Labels
+
+`labels` overrides `DEFAULT_LABELS`, the frozen English defaults, key by key at
+every depth: a string or a function replaces the default, and any key you leave
+out keeps it. Set `lang` to the language of your labels. This object translates
+every label into French except the symbology names, which stay as they are:
+
+<Accordion title="French labels">
+
+```js
+const LABELS_FR = {
+  targets: "Codes détectés", choose: "Choisir un code détecté",
+  target: (_track, slot) => `Code ${slot + 1}`, earlier: "Précédents",
+  readout: "Contenu décodé", none: "Aucun code sélectionné",
+  position: (name, index, count) => `${name} · ${index} sur ${count}`,
+  previous: "Code précédent", next: "Code suivant", more: "Plus", less: "Moins",
+  states: { inView: "Dans le champ", readNow: "Lu maintenant", lost: "Perdu",
+    notRecent: "Pas lu récemment" },
+  stillReadAs: (targets) => `Toujours lu comme ${targets.join(", ")}`,
+  sameContentAs: (targets) => `Même contenu que ${targets.join(", ")}`,
+  geometry: { segment: "Ligne de lecture seulement", partial: "Position partielle",
+    none: "Position non mesurée", offscreen: "Hors de la zone visible" },
+  families: { matrix: "Code matriciel 2D", stacked: "Code empilé 2D", linear: "Code-barres 1D" },
+  kinds: { url: "URL", wifi: "Wi-Fi", email: "E-mail", sms: "SMS", tel: "Numéro de téléphone",
+    v_card: "Contact (vCard)", text: "Texte", geo: "Position", gs1: "Chaîne d’éléments GS1",
+    gs1_digital_link: "GS1 Digital Link", me_card: "Contact (MeCard)",
+    crypto: "Paiement crypto", v_event: "Événement (vEvent)" },
+  fields: { url: "URL", ssid: "Nom du réseau", security: "Sécurité", password: "Mot de passe",
+    hidden: "Réseau masqué", to: "Destinataire", subject: "Objet", body: "Message",
+    number: "Numéro", lat: "Latitude", lon: "Longitude", name: "Nom", tel: "Téléphone",
+    email: "E-mail", scheme: "Schéma", address: "Adresse", amount: "Montant", gtin: "GTIN" },
+  parsedFields: "Champs analysés", yes: "Oui", no: "Non", unknown: "Inconnu",
+  incomplete: "Aucune lecture textuelle vérifiée. Les octets exacts sont dans Détails.",
+  incompleteEci: "Aucune lecture textuelle vérifiée : un ECI est déclaré mais non localisé. "
+    + "Les octets exacts sont dans Détails.",
+  charset: "Jeu de caractères", bytes: "Octets", eci: "ECI",
+  eciUnlocated: "Déclaré, non localisé",
+  eciAt: (designator, start) => `ECI ${designator} à l’octet ${start}`,
+  fnc1: "FNC1", fnc1Positions: { first: "Première position", second: "Deuxième position" },
+  character: (name, codePoint) =>
+    `${name} (U+${codePoint.toString(16).toUpperCase().padStart(4, "0")})`,
+  copy: "Copier", copyBytes: "Copier les octets", copied: "Copié",
+  copyFailed: "Échec de la copie",
+  details: "Détails", open: "Ouvrir le lien", encodedUrl: "URL encodée", host: "Hôte",
+  conformant: "Conforme aux règles GS1 vérifiées", issues: "Problèmes GS1",
+  saturated: "Plus de codes visibles que le suivi n’en accepte",
+  saturatedOccurrences: "Des copies du même contenu peuvent être fusionnées ou manquantes",
+  count: (live) => (live === 0 ? "Aucun code détecté"
+    : live === 1 ? "1 code détecté" : `${live} codes détectés`),
+  announce: (entry) => (entry.target === null ? "Aucun code sélectionné"
+    : [entry.target, entry.symbology, entry.kind, entry.state, entry.preview]
+      .filter(Boolean).join(", ")),
+  destination: {
+    heading: "Destination", requestUrl: "URL demandée",
+    sources: { me_card: "Site web du contact", gs1_digital_link: "GS1 Digital Link" },
+    ineligible: {
+      lossy_text: "Texte décodé avec pertes : non vérifiable",
+      not_http: "Pas une adresse http(s) : non vérifiable",
+      control_or_space: "URL avec espace ou caractère invisible : non vérifiable",
+      invalid_url: "URL illisible : non vérifiable",
+      credentials: "URL avec identifiants : jamais envoyée", too_long: "URL trop longue" },
+    unverified: "Destination non vérifiée", queued: "En attente (aucune requête envoyée)",
+    resolving: "Vérification en cours…", observed: "Destination observée",
+    example: "Résultat d’exemple (simulé)", failed: "Échec de la vérification",
+    canceled: "Vérification arrêtée", unavailable: "Vérification impossible",
+    providerError: "Vérifications de destination indisponibles",
+    reasons: {
+      timeout: "Délai dépassé", too_many_redirects: "Trop de redirections",
+      redirect_loop: "Boucle de redirection", invalid_location: "Redirection invalide",
+      blocked_scheme: "Redirection hors HTTP(S) refusée",
+      blocked_credentials: "Redirection avec identifiants refusée",
+      blocked_address: "Adresse non publique refusée", blocked_port: "Port refusé",
+      left_fixture: "A quitté la fixture locale",
+      name_unusable: "Nom inutilisable (introuvable ou non public)",
+      dns_error: "Nom introuvable", connection_error: "Connexion impossible",
+      tls_error: "Erreur TLS", invalid_response: "Réponse HTTP invalide",
+      transport_unsupported: "Transport indisponible ici",
+      out_of_scope: "Hors du périmètre de ce mode",
+      opaque_network_error: "Le navigateur ne donne pas de détail (CORS, réseau ou politique)",
+      opaque_response: "Réponse opaque pour le navigateur",
+      mixed_content: "Page HTTPS, URL HTTP : bloquée",
+      endpoint_unreachable: "Résolveur injoignable",
+      endpoint_http_error: "Erreur HTTP du résolveur",
+      endpoint_invalid_response: "Réponse du résolveur invalide",
+      endpoint_timeout: "Le résolveur n’a pas répondu à temps",
+      resolver_busy: "Résolveur occupé",
+      transport_error: "Erreur interne du transport",
+      invalid_observation: "Observation invalide rejetée",
+      transport_unresponsive: "Le transport n’a pas répondu",
+      no_transport: "Vérification désactivée", queue_full: "Trop de vérifications en attente",
+      canceled: "Vérification annulée", aborted: "Vérification interrompue" },
+    httpStatus: (status) => `HTTP ${status}`, redirects: "Redirections",
+    hops: (followed, oneNotFollowed) =>
+      `${followed} suivie(s)${oneNotFollowed ? ", 1 non suivie" : ""}`,
+    hopsUnknown: (atLeastOne) => (atLeastOne ? "inconnues (au moins une)" : "inconnues"),
+    refusedScheme: (scheme) => `schéma ${scheme} refusé`,
+    invalidLocation: "En-tête Location invalide ou masqué", detail: "Détail",
+    observedAt: (time, durationMs) => `Observée à ${time} · ${durationMs} ms`,
+    exampleAt: (time, durationMs) =>
+      `Exemple préparé à ${time} · latence simulée ${durationMs} ms`,
+    endedAt: (time) => `Terminée à ${time}`,
+    provenance: { fixture: "Fixture locale", simulated: "Simulé" },
+    request: { none: "Aucune requête envoyée", maybe: "Une requête a pu être envoyée",
+      response: "Le navigateur a obtenu une réponse", sent: "Une requête a été envoyée" },
+    check: "Vérifier la destination", checkAgain: "Vérifier à nouveau",
+    cancel: "Annuler la vérification",
+  },
+};
+createCameraOverlay({ video, container, lang: "fr", labels: LABELS_FR });
+```
+
+</Accordion>
+
+### Destinations
+
+The readout shows a destination slot for the URL of a `url`, `gs1_digital_link`
+or `me_card` payload. Without `destinations` it reads "Destination not checked"
+and offers no check. To let users check a destination, pass a verifier from
+[`/destination`](#url-destination-checks):
+
+```ts
+import { createDestinationVerifier, createEndpointTransport }
+  from "@supernovae-st/qrcode-ai-scanner-wasm/destination";
+
+const verifier = createDestinationVerifier({
+  transport: createEndpointTransport({ endpoint: "/api/destination", label: "App server" }),
+});
+const overlay = createCameraOverlay({ video, container, destinations: verifier });
+```
+
+- A check starts only when the user presses Check destination. The overlay then
+  calls `resolve(candidate)` with no signal, since attempts are shared, and
+  Cancel check calls `cancel(candidate)`. Nothing is checked on scan, and
+  nothing is opened. A check is a real request through your transport, with
+  whatever effect the destination attaches to it (see
+  [URL destination checks](#url-destination-checks)).
+- A resolved result reads "Destination observed" with the transport's label
+  beside it, or "Example result (simulated)" with a Simulated badge for a
+  prepared transport. Either is an observation of one request chain, never a
+  safety verdict, and every URL in it renders as text.
+- `destroy()` unsubscribes from the verifier but cancels no attempt, since
+  other views may share it: cancel through the verifier, or destroy it.
+- A verifier that throws, after `verifier.destroy()` for example, reaches
+  `onError` once; the slot then reads "Destination checks unavailable" until
+  `setOptions()` passes `destinations` again.
+- To render your own destination row instead, pass `destinationSlot: false` and
+  feed a `createDestinationSelection(verifier)` binder from the overlay: call
+  `selection.select(overlay.detection)` in `onSelect`.
+
+### Copy and Open
+
+- Copy writes the exact decoded text with `navigator.clipboard.writeText()`. It
+  is hidden when `actions.copy` is false or the Clipboard API is missing. Some
+  platforms cut a text clipboard at U+0000 or rewrite line endings, so Details
+  also offers Copy bytes, which copies the exact bytes as uppercase hexadecimal.
+- Open appears only for an `http:` or `https:` URL, and a click calls
+  `window.open(href, "_blank", "noopener,noreferrer")`; nothing opens by
+  itself. `href` is the URL parser's serialization of the encoded URL, which
+  the readout shows exactly as decoded.
+- `onAction(action)` runs before every open, copy, check and cancel, and
+  `action.preventDefault()` skips the overlay's own call, for a host that
+  handles the action itself.
+
+### Thumbnails
+
+With `thumbnails: true`, or `{ size, refreshMs }`, rail entries show a crop of
+each code from the frame the decoder read. The overlay never reads the video
+for them: in `scanFrame`, before the buffer is transferred, ask
+`overlay.wantsFrameImage()`, and only when it returns `true` pass a copy to
+`overlay.setFrameImage(image, frame)`, as the wiring above does. Pass an
+`ImageData` or `createImageBitmap(canvas)`, never a canvas, which could be
+redrawn before its update. The overlay asks for at most one copy per
+`refreshMs` (1000 by default) and only while a crop is due; it crops quads
+only, never enlarges a crop, and closes every `ImageBitmap` it receives.
 
 ## URL destination checks
 
@@ -480,6 +910,95 @@ authentication, rate limits, NAT64 prefixes and denied ranges.
   </Accordion>
 </AccordionGroup>
 
+## Examples
+
+The package ships runnable examples in `examples/`. The pages load the
+package's own files by relative path (`../auto.js`), with no bundler, framework
+or download.
+
+| File | What it shows |
+| --- | --- |
+| `examples/headless.html`, `examples/headless.js` | Scans an image you choose or drop, in a module worker on your device: the image is never uploaded and decoded links stay text. The page names the package version, the SHA-256 of its WASM module and the version the loaded module reports. |
+| `examples/camera.html`, `examples/camera.js` | Wires `createCameraScanner`, `createDetectionTracker` and `createCameraOverlay` as an application would: the camera opens only when you press its button, every tracker snapshot reaches `overlay.update(snapshot)`, a frame is copied only when `overlay.wantsFrameImage()` asks, and a hung frame replaces the worker through `recover`. Open is turned off, and destination checks stay off until you turn them on. |
+| `examples/scanner.worker.js` | The module worker both pages use: it owns one scanner and answers `load`, `scan_image` and `scan_frame` requests by `id`. |
+| `examples/ssr.mjs` | Imports `/camera`, `/camera-overlay` and `/destination` in Node, with each DOM, camera and network global it lists replaced by a trap, and prints what a server can compute with them. |
+
+Module scripts and module workers do not run from a `file://` page. Serve the
+package folder, the one that holds `package.json`, with a static server on
+localhost that sends `.js` files with a JavaScript type, for example from a
+project that installed the package:
+
+```bash
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@supernovae-st/qrcode-ai-scanner-wasm
+```
+
+Then open `http://127.0.0.1:8000/examples/headless.html` or
+`http://127.0.0.1:8000/examples/camera.html`. The camera page needs a secure
+context: `localhost` and `127.0.0.1` count as one on the machine that runs the
+browser; from another device, such as a phone, serve the folder over `https`.
+Run the server-rendering example with Node:
+
+```bash
+node node_modules/@supernovae-st/qrcode-ai-scanner-wasm/examples/ssr.mjs
+```
+
+[`examples/README.md`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md),
+also in the installed package, describes each example and the worker's
+messages.
+
+### Content Security Policy
+
+Both example pages scan with no violation reported when a server sends
+`default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src blob: data:`,
+plus a `style-src` hash of the image page's one inline `<style>` element, as a
+`Content-Security-Policy` header with every file of the package folder.
+[`examples/README.md`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
+gives that exact policy, why each source is needed, and how the package's
+browser job found it in Playwright's Chromium and Firefox. For a policy of your
+own:
+
+- **WebAssembly.** Compiling the module needs `'wasm-unsafe-eval'` in
+  `script-src` in the policy of the context that compiles it; otherwise the
+  browser refuses to compile it. A module worker loaded from its own URL takes
+  its policy from the headers of that script's response: a page's `meta`
+  policy, such as the one each example page carries, does not reach it.
+- **Loader.** `/auto` imports the package's own module and fetches only its
+  `.wasm` file, next to it unless you pass `wasmUrl`, so `connect-src`, or
+  `default-src` when `connect-src` is absent, must allow that origin.
+- **Overlay.** The overlay injects one `<style>` element, which needs
+  `styleNonce` or `styles: "none"` with `CAMERA_OVERLAY_CSS` in your own
+  stylesheet (see [Theming](#theming)), and sets every other value through the
+  CSSOM.
+- **Destinations.** A destination check requests only what its transport
+  targets. Through `createFetchTransport()`, the page's `connect-src` must
+  allow the link's origin, for example `connect-src 'self' https:`; otherwise
+  the browser blocks the check before sending it, and the readout shows it as
+  unavailable.
+
+### SIMD, bundlers and server rendering
+
+- **SIMD.** The package ships one module, which uses no SIMD, so a browser with
+  WebAssembly SIMD disabled loads the same bytes; `scannerCapabilities().simd`
+  is a diagnostic only. The package's browser job runs both example pages from
+  the installed package in Playwright's Chromium and Firefox, and in CI also
+  in a Chromium started with WebAssembly SIMD disabled. Those runs say nothing
+  about Safari, iOS or Android.
+- **Bundlers.** The examples need no bundler. In a bundled application, import
+  the entries by name (`/auto`, `/camera`, `/camera-overlay`, `/destination`):
+  the loader finds its `.wasm` through `import.meta.url`, and the package's CI
+  builds a fresh Vite application with a module worker from the installed
+  package. The settings each bundler needs are below, and
+  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
+  shows the example pages' imports by package name.
+- **Server rendering.** Importing `/auto`, `/camera`, `/camera-overlay` and
+  `/destination` during server rendering compiles no WebAssembly, fetches
+  nothing and touches no DOM; the package's CI imports them in Node with
+  `WebAssembly` undefined and checks that `fetch` is never called, and
+  `examples/ssr.mjs` shows the camera, overlay and destination helpers a server
+  can call. Load the scanner in the browser or a worker, and start the camera
+  in the browser: where WebAssembly is missing, `loadScanner()` rejects with
+  `wasm_unavailable`.
+
 ## Bundler configuration
 
 `/destination-node` has only a `node` export condition (no `import`, `default`
@@ -511,8 +1030,10 @@ runtime at every call.
     ```
   </Accordion>
   <Accordion title="Camera loop">
-    Use `scan_frame` (no PNG roundtrip) at `frame` profile; throttle to
-    ~5 fps — decoding every frame buys nothing.
+    Use `createCameraScanner` rather than a loop of your own: it requests the
+    next frame `intervalMs` (100 ms by default) after each result and keeps one
+    decode in flight, so a slow decode lowers the frame rate instead of queueing
+    frames. Decode with `scan_frame` (no PNG roundtrip) and the `frame` profile.
   </Accordion>
 </AccordionGroup>
 

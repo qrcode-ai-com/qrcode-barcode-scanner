@@ -125,12 +125,39 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   means what was left out is unknown, not absent. Both new keys are absent from
   older reports; the JSON Schema, TypeScript, Dart and type-parity gate cover
   them.
-- The browser package's `/camera` entry exports a measured-geometry tracker,
-  normalized video projection and a camera capture controller. It supports
-  frame callbacks, serialized worker decoding, cancellation of late permission
-  answers and results, track revocation and cleanup on page departure. Geometry
-  stays absent when the reader only measured a scan line. Consumers own their
-  visual treatment and explicit actions on decoded content.
+- **Camera capture and tracking** (`/camera`, browser package).
+  `createDetectionTracker()` follows each measured copy of a code from frame to
+  frame: a spatial track per occurrence, with content, occurrence and track
+  identities kept apart, and a content track for a read without a position,
+  which claims none. Association is deterministic and one-to-one, and
+  ambiguity is explicit: a contested track expires with reason `ambiguous` and
+  names its successors, and a read without a position that could belong to
+  several tracks of one content is reported as `unresolved`, naming them,
+  instead of being given to one. Geometry is withheld after `staleMs` and
+  identities expire after `reacquireMs`, by time, through one deadline timer. A
+  `ScanReport` proves a code absent only through its trace (no budget cut, no
+  read or detection saturation, and for one copy of a code still read, no
+  occurrence saturation); a bare array of detections never does unless the
+  caller passes `{ complete: true }`. Decoded results are kept apart from
+  tracks. `update()`, `snapshot()`, `advance()`, `reset()` and `clear()` each
+  return a new `TrackerSnapshot` object, whose detections are the engine's
+  objects, by reference; a successful `forget(id)` returns `true` and sends its
+  snapshot to `onChange`.
+  `projectVideoGeometry()` maps a track's geometry into a centered `contain`,
+  `cover` or `fill` view and reports `inView`. `createCameraScanner()` captures
+  through `requestVideoFrameCallback` where it exists, with its timestamps,
+  keeps one decode in flight across sessions, reports its states and a
+  `stalled` flag, fails with a `CameraScannerError` code that keeps the native
+  cause, aborts a decode after `decodeTimeoutMs` and replaces a hung decoder
+  through the optional `recover`, switches devices with `setConstraints()`,
+  and, given `tracker`, updates it before `onResult` and resets it whenever a
+  session ends. `stop()`, a hidden page and `pagehide` release the camera and
+  discard late permission answers and results; importing the module requests
+  no camera.
+  Since earlier 0.11 development builds: `holdMs` is removed (passing it throws
+  a TypeError naming `staleMs` and `reacquireMs`), a frame's `timestamp` is now
+  `observedAt`, `update()` returns a snapshot and takes `{ now, complete }`, and
+  a bare array no longer proves absence.
 - WASM `scan_frame` takes `scan_image`'s other options after `budget_ms`
   (positional #6 to #12): `max_dimension`, `max_pixels`, `score_skip_axes`,
   `score_skip_checks`, `alpha_background`, `alpha_palette` and `score_preset`,
@@ -147,9 +174,36 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `spec/01-report.md` § Capabilities. CI also builds the core with one
   engine (rqrr only, rxing only), as a dependency without default features
   gets it, lints each build and runs its capabilities tests.
-- `/camera-overlay` provides framework-free corner brackets, stable keyboard
-  target selection and an explicit HTTP(S) payload action, with host theming,
-  contain/cover/fill geometry, mirroring and complete teardown.
+- **Camera overlay and readout** (`/camera-overlay`, browser package, no
+  framework). `createCameraOverlay()` draws from tracker snapshots: one rounded
+  four-corner outline per valid measured quad, a line for a scan line and
+  points for partial evidence, never an invented rectangle. Dimming and blur
+  of the rest of the view keep sharp cutouts over precise quads; they switch
+  on after `dwellMs` of steady eligibility and stay off for at least
+  `cooldownMs` after switching off, and `focus: 'off'` disables them. It
+  follows the video's `object-fit` (`contain`, `cover`, `fill`, `none`,
+  `scale-down`), `object-position` and mirroring, with explicit alignment
+  states that hide the markers rather than misplace them. It adds stable
+  per-track colors and numbers, an accessible rail (one radio group, keyboard
+  and digit shortcuts, a status announcer that leaves decoded content out by
+  default) and an exact readout: 19 symbology labels, the family, the payload
+  kind, the complete content with invisible characters shown by name, ECI,
+  FNC1 and the exact bytes, GS1 fields, and the encoded URL with an Open
+  button and a destination slot that starts unchecked and checks only through
+  a `/destination` verifier the application passes, from a user action.
+  Labels (`DEFAULT_LABELS`), colors (`--qr-scanner-*` properties) and the
+  stylesheet (`styleNonce`, or `styles: 'none'` with `CAMERA_OVERLAY_CSS`) are
+  replaceable. Optional thumbnails crop the scanned frame, and the page copies
+  a frame only when `wantsFrameImage()` asks. Pure helpers are exported:
+  `describeDetection`, `segmentText`, `symbologyFamily`, `parseObjectPosition`,
+  `overlayMediaRect`, `projectOverlayPoint`, `projectOverlayGeometry`,
+  `quadOutline` and `quadRegion`. Since earlier 0.11 development builds:
+  `update(snapshot)` takes one tracker snapshot instead of tracks and a frame,
+  ignores one older than the last applied and does nothing after `destroy()`;
+  default names are `Code N` for every symbology; the readout replaces the
+  pill, and Open is a button; `select()` returns a boolean; and
+  `--qr-scanner-highlight` colors only `colors: 'mono'`, each track otherwise
+  taking its own color.
 - **URL destination checks** (optional, JavaScript only). The browser
   package's `/destination` entry (no imports; browsers, module workers, Node
   and SSR) decides with `destinationCandidate()` whether the `url` of a `url`,
@@ -189,6 +243,31 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   description names the optional checks. Decoding, the Rust core and the WASM
   module make no network calls. Usage and operator duties: `docs/api/wasm.mdx`
   and `docs/concepts/security.mdx`.
+- **Examples in the browser package** (`examples/`, with their README). They
+  run from the installed package folder, with no bundler or download: the
+  pages through a static server on localhost, `ssr.mjs` with Node.
+  `headless.html` and `headless.js` scan an image the user chooses or drops in
+  a module worker on the device, show every decoded value as text and never
+  open a link, name the package version, the WASM module's SHA-256 and the
+  loaded module's version, and tell a complete result, a list cut by a
+  capacity, a valid empty result, and input, configuration and loading errors
+  apart. `camera.html` and `camera.js` wire the camera controller, the tracker
+  and the overlay as an application would: the camera opens only when the user
+  asks, a frame is copied only when the overlay wants a thumbnail, a hung frame
+  replaces the worker, Open is off, and destination checks stay off until the
+  user turns them on. `ssr.mjs` imports the camera, overlay and destination
+  modules in Node, with each DOM, camera and network global it lists replaced
+  by a trap. `scanner.worker.js`, which each page starts as its own module
+  worker, owns one scanner and answers `load`, `scan_image` and `scan_frame`
+  requests by `id`, so one page can serve image scanning and camera frames
+  from one WASM module and one initialization. The packed browser job checks that sharing on its own test
+  page: an image scan and camera frames make one `.wasm` request and one
+  instantiation, and only a `recover` instantiates again. It also runs both
+  example pages from the installed archive in Playwright's Chromium and
+  Firefox, and in CI in a Chromium with WebAssembly SIMD disabled too; finds,
+  from a broader policy, the Content-Security-Policy that `examples/README.md`
+  documents and runs both pages under it; runs `ssr.mjs`; and builds that
+  README's bundler forms with Vite.
 - **Installed-package truth set**: `fixtures/consumer-truth.json`, 35 inputs
   with their exact contents as a multiset, primary, occurrence geometry and
   score/null association under the full profile with no budget: every
@@ -346,6 +425,18 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `bindings/swift/release.sh` prints the draft-first steps instead of
   `gh release create`. The owner creates that draft before pushing the tag
   and publishes it once (RELEASING.md § 5 to § 7).
+
+### Known limitations
+
+- An Aztec code is read only when it lies over the center of the image the
+  engine scans. Drawn alone on a white 1280×720 frame, the 138 px symbol of
+  `fixtures/symbology/aztec.png` is read centered, or with the frame's center
+  8 px inside one of its edges, and missed, in every profile and with no
+  budget cut, with that center 16 px beyond one of its corners along each axis
+  or 32 px past one of its edges, or with the code in a corner of the frame;
+  `scan_image` and `scan_frame` agree. The published 0.9.0 browser package
+  misses the same placements: this is not new, but a camera frame that holds
+  several codes rarely centers one, so ask users to center an Aztec code.
 
 ## 0.10.1 — 2026-10-20
 

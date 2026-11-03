@@ -130,42 +130,239 @@ Same versioned `ScanReport` contract as the native package — detections,
 
 ## Camera and visual selection (0.11.0)
 
-`/camera` exports `createCameraScanner`, `createDetectionTracker` and
-`projectVideoPoint`. `/camera-overlay` exports `createCameraOverlay`: measured
-corner brackets, stable keyboard selection and an explicit HTTP(S) payload
-action, without a UI framework dependency. No permission prompt or network
-request occurs on helper import.
+`/camera` captures camera frames and follows the codes found in them:
+`createCameraScanner`, `createDetectionTracker`, `projectVideoGeometry`,
+`projectVideoPoint`, `contentKey`, `sameContent`, `TRACKER_LIMITS` and
+`CameraScannerError`. `/camera-overlay` draws the tracked codes over the video
+and shows the selected one exactly: `createCameraOverlay`, its pure helpers,
+`DEFAULT_LABELS`, `TRACK_COLORS` and `CAMERA_OVERLAY_CSS`. Neither needs a UI
+framework. Importing either requests no camera, touches no DOM and starts no
+timer, so both import safely during server rendering. Decoding stays in your
+module worker: the controller hands it the RGBA pixels of each frame and never
+creates a decoder of its own.
 
 ```ts
-import { createDetectionTracker, createCameraScanner }
+import { createCameraScanner, createDetectionTracker }
   from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
 import { createCameraOverlay }
   from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
 
-const tracker = createDetectionTracker();
-// container contains video and has position:relative; object-position:center.
-const overlay = createCameraOverlay({ video, container });
-const camera = createCameraScanner({ video, scanFrame: scanFrameInWorker,
-  onResult(report, frame) {
-    overlay.update(tracker.update(report.detections, frame));
-  }, onError: showCameraError });
-await camera.start(); // call from the camera button
-// Component teardown: camera.stop(); tracker.clear(); overlay.destroy();
+// The container holds the video and is positioned (position: relative, for example).
+const overlay = createCameraOverlay({
+  video,
+  container,
+  mount: { rail: railSlot, readout: readoutSlot }, // recommended: below the video
+});
+const tracker = createDetectionTracker({
+  onChange: (snapshot) => overlay.update(snapshot), // every snapshot, in order
+  onError: reportUiError,
+});
+let worker = await startWorker(); // loads /auto once; each request calls scan_frame
+const camera = createCameraScanner({
+  video,
+  tracker, // updated before onResult, reset whenever a capture session ends
+  scanFrame: (rgba, width, height, { signal, frame }) => {
+    // Copy pixels only when a thumbnail is due, before the buffer is transferred.
+    if (overlay.wantsFrameImage()) {
+      overlay.setFrameImage(new ImageData(new Uint8ClampedArray(rgba), width, height), frame);
+    }
+    return worker.scan(rgba, width, height, { signal });
+  },
+  recover: async (_cause, { signal }) => {
+    worker.terminate();
+    worker = await startWorker({ signal });
+  },
+  onState: (change) => showCameraState(change),
+  onError: (error) => showCameraError(error.code),
+});
+
+// From the camera button: the camera needs a secure context (HTTPS or localhost).
+await camera.start();
+
+// On unmount, in any order:
+camera.stop();
+tracker.destroy();
+overlay.destroy();
 ```
 
-Provide a worker adapter returning a `ScanReport` promise. It calls `scan_frame`
-with the transferred RGBA buffer, dimensions and frame budget. Give it a timeout
-for hung requests. The capture helper serializes requests across restarts,
-invalidates late permission/results, releases tracks on stop/hide/departure and
-reports ended streams. The default capture limit is 1280 pixels on the long
-edge; increase it for narrow barcodes when device performance permits.
+`startWorker()` and `worker.scan()` are yours. The worker loads `/auto` once and
+answers each request with `scan_frame(rgba, width, height)`, which uses the
+`frame` profile; `worker.scan()` returns a promise of that `ScanReport`.
+Transfer `rgba.buffer` to the worker rather than copying it. The package's
+`examples/scanner.worker.js` is such a worker, and `examples/camera.js` wires
+these parts in a page (see Examples below). Keep one loaded scanner for every
+frame and every image you scan: image scanning and the camera then share one
+WASM module and one initialization.
 
-Feed empty results as well as detections into the tracker to expire holds.
-Missing or degenerate geometry stays absent. The overlay supports centered
-contain/cover/fill, explicit mirroring, reduced motion and localized `labels`.
-Theme it through `--qr-scanner-highlight`, `--qr-scanner-surface` and
-`--qr-scanner-text`. The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/wasm.mdx)
-describes lifecycle and integration; synthetic browser checks do not qualify a
+**Aztec codes.** The engine reads an Aztec code only when the code lies over
+the center of the image it scans, in every profile, so an Aztec code off to
+one side of a camera frame goes unread: ask users to center it.
+
+**Capture.** `start()` opens the camera. `state` is `idle`, `starting`,
+`running`, `recovering`, `stopped` or `failed`, and `onState` receives every
+transition with its `reason` and every change of `muted` or `stalled`. Frames
+follow `requestVideoFrameCallback` where the browser has it, otherwise a timer
+that skips a capture whose sampled pixels have not changed. The scanned frame's
+long edge is capped at `maxDimension` (1280 by default; a smaller cap is faster
+but can lose narrow barcodes), the next frame is requested `intervalMs` (100)
+after each result, and one decode is in flight at a time, across stops and
+restarts. A decode slower than `decodeTimeoutMs` (5000) aborts
+`context.signal`, the only abort the controller makes: your adapter must then
+terminate its worker before it rejects, and never settle while the decoder
+still works. With `recover`, the state becomes `recovering` until your
+replacement decoder is ready, at most `maxRecoveries` (2) times per session,
+each within `recoverTimeoutMs` (20000); without it, a timeout fails the
+session. `stop()`, a hidden page, `pagehide` and an ended track release the
+camera and discard late permission answers and results; call `start()` again
+once the page is visible. `setConstraints()` switches cameras; the default
+constraints are `{ facingMode: { ideal: 'environment' } }`.
+
+A failed session sends one `CameraScannerError` to `onError`, and a `start()`
+still pending rejects with that same error. Its `cause` keeps the native error,
+and its `code` is `unsupported` (no `getUserMedia`, outside a secure context for
+example), `permission_denied`, `device_not_found`, `device_busy`,
+`constraints_unsatisfied`, `start_failed`, `play_failed`, `canvas_unavailable`,
+`stream_ended`, `decode_failed`, `decode_timeout`, `recover_failed` or
+`callback_failed` (a throw from `onResult` or `tracker.update` fails the
+session; one from `onState` or the tracker's reset is only reported).
+
+**Tracking.** `createDetectionTracker()` follows each measured copy of a code
+from frame to frame: two printed copies of one content are two spatial tracks,
+and a read without a measured position becomes a content track, which claims no
+position. A track keeps its `id` and its display `slot` for life, and decoded
+results (`snapshot.results`, one per content) are kept apart from the tracks. A
+`ScanReport` proves a code gone only when its trace shows no budget cut and no
+read or detection saturation, and one copy of a code still read gone only when
+its occurrences are not saturated either; a bare array of detections proves
+nothing unless you pass `{ complete: true }`. To filter a report, pass
+`{ ...report, detections: kept }` and choose `kept` by content, never by
+position. Outlines and identities expire by time, not by counting reports.
+`update()`, `snapshot()`, `advance()`, `reset()` and `clear()` each return a new
+`TrackerSnapshot` object, whose `detection` fields are the engine's objects, by
+reference; a successful `forget(id)` returns `true` and sends its snapshot to
+`onChange`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `smoothing` | `0.35` | weight of each new measurement; `{ kind: 'none' }` turns smoothing off |
+| `staleMs` | `1200` | geometry older than this is withheld, and tracked or held tracks become lost |
+| `reacquireMs` | `2000` | how long an identity survives without new evidence; at least `staleMs` |
+| `maxMisses` | `1` | consecutive complete misses shown as held before a track is lost |
+| `retainMs` | `Infinity` | how long a result without a live track is kept; at least `reacquireMs` |
+| `maxResults` | `32` | results kept; at least 16 |
+
+`holdMs`, which earlier 0.11 development builds accepted, now throws a TypeError
+that names `staleMs` and `reacquireMs`.
+
+**Slow devices.** A frame keeps its geometry only when its result arrives less
+than `staleMs` after the frame's `observedAt`. A later result still updates the
+decoded results, but it moves no outline: the spatial tracks of that code age,
+turn lost and lose their outlines until faster frames return. If capture,
+transfer and decoding can take that long where your page runs, raise `staleMs`,
+and `reacquireMs` with it, since it must stay at least `staleMs`. The cost: when
+the evidence stops (a stalled camera, a hung decoder, reports cut by their
+budget), an outline stays at its last measured position for up to `staleMs`.
+
+**Overlay.** `createCameraOverlay({ video, container })` draws from tracker
+snapshots: one rounded four-corner outline for each valid measured quad, a line
+for a scan line and dots for partial points. It never invents a rectangle, and
+draws nothing for a content track, a lost track or geometry the tracker
+withheld. Each track keeps a number (`slot + 1`) and a color
+(`TRACK_COLORS[slot % 8]`) for life, and a code measured entirely outside the
+visible area gets a numbered badge at the edge of the view. Deliver every
+`onChange` snapshot, in order: an older snapshot is ignored, an array throws a
+TypeError, and after `destroy()` an update does nothing. The scene, the rail
+and the readout share one selected code, chosen automatically until the user
+picks one or you call `select(id)`; `select(null)` returns to automatic choice,
+and `select()` returns `false` for an unknown id. Dimming and blur, and a color
+wash that is off by default (`effects`), leave sharp cutouts only around quads
+that were precise in two consecutive frames, and never dim or blur a marked code
+that the focus mode covers. They switch on after `dwellMs` of steady
+eligibility, and `focus: 'off'` disables them. They never touch the video or the
+capture canvas, so the decoder reads the same pixels. The readout shows the
+exact symbology label, its family, the payload kind and the complete decoded
+text, with invisible characters shown as named chips; the ECI, FNC1 and the
+exact bytes in Details; GS1 fields and issues verbatim; and, for an `http:` or
+`https:` URL, the encoded URL exactly as decoded with an Open link button.
+
+**Layout.** The overlay covers the video's content box inside `container`,
+which must contain the video and be positioned. It follows the video's computed
+`object-fit` (`contain`, `cover`, `fill`, `none` or `scale-down`),
+`object-position` and a horizontal mirror such as `transform: scaleX(-1)`; the
+`fit`, `position` and `mirror` options override what it reads.
+`overlay.alignment`, also `data-alignment` on the overlay root, is `aligned` or
+the first problem found: `no-frame`, `no-size`, `unsupported-transform`,
+`object-view-box`, `unsupported-fit`, `unsupported-position`, `no-media` or
+`frame-mismatch`. Anything but `aligned` hides the markers and effects rather
+than drawing them in the wrong place; the rail and the readout stay. The
+container and its ancestors may carry a positive uniform scale and a
+translation, and between the container and the video only a translation or a
+horizontal mirror is allowed. Call `layout()` after a stylesheet-only change
+elsewhere, and keep `opacity`, `filter`, `mask`, `clip-path` and
+`mix-blend-mode` off the overlay root (`[data-qr-camera-overlay]`). The rail
+and the readout render inside the video in a `regular`, `compact` or `minimal`
+arrangement, or wherever you `mount` them; mounting both below the video keeps
+every code visible and tappable. `rail` is `'auto'`, `'multiple'`, `'always'`
+or `'never'`; with `rail: 'never'` and `readout: false`, provide your own
+control that calls `select()`.
+
+**Theming.** The overlay reads these custom properties and never declares them:
+`--qr-scanner-color-0` to `--qr-scanner-color-7` (the track colors, by
+`slot % 8`), `--qr-scanner-color-0-text` to `--qr-scanner-color-7-text` and
+`--qr-scanner-action-text` (the numbers drawn on them; keep a contrast of at
+least 4.5:1), `--qr-scanner-highlight` (every track with `colors: 'mono'`),
+`--qr-scanner-casing`, `--qr-scanner-surface` and `--qr-scanner-text` (the rail
+and the readout; override both together) and `--qr-scanner-focus`. `scheme`
+(`'dark'` by default) sets the overlay's `color-scheme`. The overlay injects one
+`<style>` element per document or shadow root; under a strict `style-src`, pass
+the policy's nonce as `styleNonce`, or pass `styles: 'none'` and serve
+`CAMERA_OVERLAY_CSS` in your own stylesheet. Per-element values go through the
+CSSOM, never a `style` attribute.
+
+**Accessibility.** The rail is a toolbar holding one radio group: Tab reaches it
+once, the arrow keys, Home and End move the focus, Enter or Space selects, and a
+digit selects codes 1 to 9 while the focus is in the rail or the readout. Escape
+closes the full readout card. A visually hidden status region announces the
+selection, the loss and return of the selected code and the outcome of each
+action, never decoded content unless you set `announceContent: 'preview'`.
+Reduced motion removes the animations, and forced colors remove the dimming,
+wash, blur and glow. Buttons and rail entries measure at least 44 by 44 CSS
+pixels, and the selected entry carries a check mark: color is never the only
+cue.
+
+**Labels.** `labels` overrides `DEFAULT_LABELS`, the frozen English defaults,
+key by key at every depth; a key you leave out keeps its default. Set `lang` to
+the language of your labels. The browser API guide gives a French set of every
+label except the symbology names, which stay as they are.
+
+**Destinations.** The readout shows a destination slot for the URL of a `url`,
+`gs1_digital_link` or `me_card` payload. Without `destinations` it reads
+"Destination not checked" and offers no check. To let users check one, pass a
+verifier from `/destination` (next section) as `destinations`: a check starts
+only when the user presses Check destination, and nothing is checked on scan or
+opened. A result is an observation of one request chain, never a safety
+verdict, and every URL in it renders as text. `destroy()` unsubscribes from the
+verifier but cancels no attempt. To render your own destination row instead,
+pass `destinationSlot: false` and, in `onSelect`, call
+`selection.select(overlay.detection)` on a `createDestinationSelection(verifier)`
+binder.
+
+**Copy and Open.** Copy writes the exact decoded text with
+`navigator.clipboard.writeText()`, and Details also offers Copy bytes, the exact
+bytes as uppercase hexadecimal, for platforms that cut a text clipboard at
+U+0000 or rewrite line endings. Open appears only for an `http:` or `https:`
+URL, and a click calls `window.open(href, '_blank', 'noopener,noreferrer')`;
+nothing opens by itself. `onAction(action)` runs before each open, copy, check
+and cancel, and `action.preventDefault()` skips the overlay's own call.
+
+**Thumbnails.** With `thumbnails: true`, rail entries show a crop of each code
+from the frame the decoder read. The overlay never reads the video for them: in
+`scanFrame`, ask `overlay.wantsFrameImage()`, and only when it returns `true`
+pass a copy to `overlay.setFrameImage(image, frame)`, as the wiring above does.
+Pass an `ImageData` or an `ImageBitmap`, never a canvas.
+
+The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/wasm.mdx)
+covers each part in full. Checks in automated browsers do not qualify a
 physical camera or every mobile browser.
 
 ## URL destination checks (0.11.0, optional)
@@ -333,6 +530,100 @@ running a modified version of it, this resolver included, as a service that
 users reach over a network brings the AGPL's source obligations (section 13).
 [LICENSING.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 describes the licensing options. This is a licensing note, not legal advice.
+
+## Examples
+
+The package ships runnable examples in `examples/`. The pages load the
+package's own files by relative path (`../auto.js`), with no bundler, framework
+or download.
+
+- `examples/headless.html`, with `headless.js`, scans an image you choose or
+  drop. The image is decoded in a module worker on your device and never
+  uploaded, and decoded links are shown as text, never opened. The page names
+  the package version, the SHA-256 of its WASM module and the version the
+  loaded module reports.
+- `examples/camera.html`, with `camera.js`, wires `createCameraScanner`,
+  `createDetectionTracker` and `createCameraOverlay` as an application would.
+  The camera opens only when you press its button, every tracker snapshot
+  reaches `overlay.update(snapshot)`, a frame is copied only when
+  `overlay.wantsFrameImage()` asks, and a hung frame replaces the worker
+  through `recover`. Open is turned off, and destination checks stay off until
+  you turn them on.
+- `examples/scanner.worker.js` is the module worker both pages use: it owns one
+  scanner and answers `load`, `scan_image` and `scan_frame` requests by `id`.
+- `examples/ssr.mjs` imports `/camera`, `/camera-overlay` and `/destination` in
+  Node, with each DOM, camera and network global it lists replaced by a trap,
+  and prints what a server can compute with them.
+
+Module scripts and module workers do not run from a `file://` page. Serve the
+package folder, the one that holds `package.json`, with a static server on
+localhost that sends `.js` files with a JavaScript type, for example from a
+project that installed the package:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@supernovae-st/qrcode-ai-scanner-wasm
+```
+
+Then open `http://127.0.0.1:8000/examples/headless.html` or
+`http://127.0.0.1:8000/examples/camera.html`. The camera page needs a secure
+context: `localhost` and `127.0.0.1` count as one on the machine that runs the
+browser; from another device, such as a phone, serve the folder over `https`.
+Run the server-rendering example with
+`node node_modules/@supernovae-st/qrcode-ai-scanner-wasm/examples/ssr.mjs`.
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md),
+also in the installed package, describes each example and the worker's
+messages.
+
+### Content Security Policy
+
+Both example pages scan with no violation reported when a server sends
+`default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src blob: data:`,
+plus a `style-src` hash of the image page's one inline `<style>` element, as a
+`Content-Security-Policy` header with every file of the package folder.
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
+gives that exact policy, why each source is needed, and how the package's
+browser job found it in Playwright's Chromium and Firefox. For a policy of your
+own:
+
+- Compiling the WebAssembly module needs `'wasm-unsafe-eval'` in `script-src`
+  in the policy of the context that compiles it; otherwise the browser refuses
+  to compile it. A module worker loaded from its own URL takes its policy from
+  the headers of that script's response: a page's `meta` policy, such as the
+  one each example page carries, does not reach it.
+- `/auto` imports the package's own module and fetches only its `.wasm` file,
+  next to it unless you pass `wasmUrl`, so `connect-src`, or `default-src`
+  when `connect-src` is absent, must allow that origin.
+- The overlay injects one `<style>` element, which needs `styleNonce` or
+  `styles: 'none'` with `CAMERA_OVERLAY_CSS` in your own stylesheet, and sets
+  every other value through the CSSOM.
+- A destination check requests only what its transport targets. Through
+  `createFetchTransport()`, the page's `connect-src` must allow the link's
+  origin, for example `connect-src 'self' https:`; otherwise the browser
+  blocks the check before sending it, and the readout shows it as unavailable.
+
+### SIMD, bundlers and server rendering
+
+- **SIMD.** The package ships one module, which uses no SIMD, so a browser with
+  WebAssembly SIMD disabled loads the same bytes; `scannerCapabilities().simd`
+  is a diagnostic only. The package's browser job runs both example pages from
+  the installed package in Playwright's Chromium and Firefox, and in CI also
+  in a Chromium started with WebAssembly SIMD disabled. Those runs say nothing
+  about Safari, iOS or Android.
+- **Bundlers.** The examples need no bundler. In a bundled application, import
+  the entries by name (`/auto`, `/camera`, `/camera-overlay`, `/destination`):
+  the loader finds its `.wasm` through `import.meta.url`, and the package's CI
+  builds a fresh Vite application with a module worker from the installed
+  package. The browser API guide lists the bundler settings, and
+  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
+  shows the example pages' imports by package name.
+- **Server rendering.** Importing `/auto`, `/camera`, `/camera-overlay` and
+  `/destination` during server rendering compiles no WebAssembly, fetches
+  nothing and touches no DOM; the package's CI imports them in Node with
+  `WebAssembly` undefined and checks that `fetch` is never called, and
+  `examples/ssr.mjs` shows the camera, overlay and destination helpers a server
+  can call. Load the scanner in the browser or a worker, and start the camera
+  in the browser: where WebAssembly is missing, `loadScanner()` rejects with
+  `wasm_unavailable`.
 
 License: AGPL-3.0-or-later · © SuperNovae Studio · part of
 [qrcode-ai.com](https://qrcode-ai.com).
