@@ -644,6 +644,8 @@ fn main() -> ExitCode {
     {
         cli.profile.into()
     } else {
+        // The core crate's `spec_golden` test mirrors this branch in its
+        // `cli_profile` to rescan the goldens: change both together.
         let mut config = ScanProfile::from(cli.profile).config();
         if let Some(ms) = cli.budget_ms {
             config.budget_ms = (ms > 0).then_some(u64::from(ms));

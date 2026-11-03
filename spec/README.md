@@ -30,10 +30,11 @@ Each golden is the CLI's JSON for one committed fixture, scanned unbounded
 on the full profile from the repository root:
 `qrscan <fixture> --profile full --budget-ms 0 > spec/examples/<golden>`.
 Timings (`ms`, `total_ms`) are whatever the producing run measured; every
-other field is reproducible. Goldens carry the `versions` of the build that
-produced them, so a marker or version bump regenerates the set (a
-development build's markers can differ from the last release's — 01-report
-§ Machine-readable mirrors). The generated fixtures come from
+other field is reproducible on the platform that produced the golden (across
+platforms, see 04-score.md § Determinism). Goldens carry the `versions` of
+the build that produced them, so a marker or version bump regenerates the
+set (a development build's markers can differ from the last release's —
+01-report § Machine-readable mirrors). The generated fixtures come from
 `cargo run -p xtask -- gen-fixtures`.
 
 | Golden | Fixture | Shows |
@@ -67,15 +68,21 @@ The spec cannot silently drift from the code:
    spec breaks the build. It also holds every golden to the build: a final
    report (`trace.budget_exhausted: false`), this build's `versions`, no two
    detections that denote one content, and a row of the table above naming
-   its fixture. It then scans each fixture again, with the configuration
-   `qrscan` builds from the golden's command line, in a build with both
-   engines like the CLI's: the report must equal the golden in every field
-   except the measured timings (`trace.total_ms` and each stage's `ms`), so
-   a behavior change that leaves a golden unregenerated fails
-   `golden_equals_a_fresh_scan::<name>`, which lists every differing JSON
-   pointer with both values. The test's list of command lines names every
-   golden once, with the fixture of its row above, and that row shows any
-   `--alpha-palette` argument the line adds.
+   its fixture. It then scans each fixture again, in a build with both
+   engines like the CLI's, with the configuration `qrscan` builds from the
+   golden's command line. The test does not run `qrscan`: its `cli_profile`
+   mirrors how the CLI builds a custom profile from its options, so a change
+   there must change `cli_profile` too. The report must equal the golden in
+   every field except the measured timings (`trace.total_ms` and each
+   stage's `ms`), so a behavior change that leaves a golden unregenerated
+   fails `golden_equals_a_fresh_scan::<name>`, which lists every differing
+   JSON pointer with both values. CI runs this comparison on Linux, macOS
+   and Windows, while the determinism contract holds per platform
+   (04-score.md § Determinism): a result that one platform's math library
+   moves, such as a stress cell on a knee, fails it on that platform. The
+   test's list of command lines names every golden once, with the fixture
+   of its row above, and that row shows any `--alpha-palette` argument the
+   line adds.
 2. The TypeScript mirror (`bindings/report-types.d.ts`) ships inside both
    npm packages and is synced by `scripts/sync-report-types.mjs`.
 3. The wire names (`snake_case` tags, profile names, error codes) are

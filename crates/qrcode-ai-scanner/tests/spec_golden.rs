@@ -637,7 +637,9 @@ mod fresh_scan {
     /// The profile `qrscan` builds (its `main`) for `--profile full
     /// --budget-ms 0` and the given `--alpha-palette` argument. Any
     /// `--budget-ms` takes its custom branch, which starts from the preset's
-    /// configuration and sets each option below.
+    /// configuration and sets each option below. This mirrors that branch
+    /// rather than running `qrscan`, so a change to the branch must change
+    /// this function too.
     fn cli_profile(alpha_palette: Option<&str>) -> ScanProfile {
         let mut config = ScanProfile::Full.config();
         // `--budget-ms 0` is unbounded
