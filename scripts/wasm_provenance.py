@@ -558,18 +558,19 @@ def write(pkg: pathlib.Path, rustflags: str, wasm_opt_flags: str, inputs_before:
     return info
 
 
-def check(info: dict, wasm: bytes, version, root: pathlib.Path = ROOT, *, package=None) -> list:
+def check(info: dict, wasm: bytes, version, root: pathlib.Path = ROOT, *, package) -> list:
     """Every reason these bytes are not the recorded, current build.
 
-    `version` and `package` are the package.json values the record must carry
-    (None skips that comparison): a record written under another package name,
-    a previous one included, does not describe this package."""
+    `version` is the package.json version the record must carry (None skips
+    that comparison). `package` is the package.json name: every caller gives
+    it and it is always compared, since a record written under another
+    package name, a previous one included, does not describe this package."""
     problems = []
     if info.get("schema") != SCHEMA:
         problems.append(f"build-info schema {info.get('schema')!r} (expected {SCHEMA})")
     if version is not None and info.get("version") != version:
         problems.append(f"build-info version {info.get('version')!r} differs from the package {version!r}")
-    if package is not None and info.get("package") != package:
+    if info.get("package") != package:
         problems.append(f"build-info package {info.get('package')!r} differs from the package {package!r}")
     recorded = (info.get("wasm") or {}).get("sha256")
     actual = hashlib.sha256(wasm).hexdigest()
@@ -672,37 +673,45 @@ def self_test() -> int:
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(f"# {entry}\n")
-        info = {"schema": SCHEMA, "version": "1.2.3", "inputs": inputs_digest(root),
-                "wasm": {"sha256": hashlib.sha256(mvp).hexdigest(), "features": []}}
-        expect("recorded build verifies", check(info, mvp, "1.2.3", root) == [])
-        expect("modified WASM refused", any("modified WASM" in p for p in check(info, mvp + b"\0", "1.2.3", root)))
-        expect("other version refused", any("version" in p for p in check(info, mvp, "1.2.4", root)))
-        # The record names its package: a record written under another name, the package's
-        # previous name included, is refused, given directly or read from a package folder.
+        # The record names its package and every check compares it: a record written under
+        # another name, the package's previous name included, is refused, given directly or
+        # read from a package folder, and no caller can leave the name out.
         package, previous = "@qrcode-ai-com/qrcode-barcode-scanner-wasm", "@supernovae-st/qrcode-ai-scanner-wasm"
-        named = {**info, "package": package}
+        info = {"schema": SCHEMA, "package": package, "version": "1.2.3", "inputs": inputs_digest(root),
+                "wasm": {"sha256": hashlib.sha256(mvp).hexdigest(), "features": []}}
+
+        def judge(record, wasm=mvp, version="1.2.3"):
+            return check(record, wasm, version, root, package=package)
 
         def renamed(problems):
             return any("build-info package" in p for p in problems)
 
-        expect("recorded package verifies", check(named, mvp, "1.2.3", root, package=package) == [])
-        expect("previous package name refused",
-               renamed(check({**named, "package": previous}, mvp, "1.2.3", root, package=package)))
-        expect("record without a package refused", renamed(check(info, mvp, "1.2.3", root, package=package)))
+        expect("recorded build verifies", judge(info) == [])
+        expect("modified WASM refused", any("modified WASM" in p for p in judge(info, mvp + b"\0")))
+        expect("other version refused", any("version" in p for p in judge(info, version="1.2.4")))
+        expect("previous package name refused", renamed(judge({**info, "package": previous})))
+        expect("record without a package refused",
+               renamed(judge({key: value for key, value in info.items() if key != "package"})))
+        try:
+            check(info, mvp, "1.2.3", root)
+        except TypeError as error:
+            expect("check() requires the package name", "'package'" in str(error))
+        else:
+            expect("check() requires the package name", False)
         folder = root / "pkg"
         folder.mkdir()
         (folder / WASM_NAME).write_bytes(mvp)
         (folder / "package.json").write_text(json.dumps({"name": package, "version": "1.2.3"}))
-        (folder / "build-info.json").write_text(json.dumps(named))
+        (folder / "build-info.json").write_text(json.dumps(info))
         expect("package folder with its own build-info.json verifies", verify(folder, root) == [])
-        (folder / "build-info.json").write_text(json.dumps({**named, "package": previous}))
+        (folder / "build-info.json").write_text(json.dumps({**info, "package": previous}))
         expect("planted build-info.json naming the previous package refused", renamed(verify(folder, root)))
         (root / "crates/qrcode-ai-scanner/src/nested/m.rs").write_text("// m changed\n")
-        expect("stale inputs refused", any("stale build" in p for p in check(info, mvp, "1.2.3", root)))
+        expect("stale inputs refused", any("stale build" in p for p in judge(info)))
         (root / "crates/qrcode-ai-scanner/src/nested/m.rs").write_text("// m\n")
-        expect("restored inputs verify again", check(info, mvp, "1.2.3", root) == [])
+        expect("restored inputs verify again", judge(info) == [])
         (root / "crates/qrcode-ai-scanner-wasm/src/new.rs").write_text("// added\n")
-        expect("an added input file is stale", any("stale build" in p for p in check(info, mvp, "1.2.3", root)))
+        expect("an added input file is stale", any("stale build" in p for p in judge(info)))
     print(f"wasm_provenance self-test: {'ok' if not failures else 'FAILED: ' + '; '.join(failures)}")
     return 1 if failures else 0
 
