@@ -59,6 +59,10 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ### Fixed
 
+- The perspective warp's sine and cosine, the glare model's exponential and
+  one distance in the ISO 15415 grading are computed in f64 and rounded once
+  to f32. Computed in f32, they could differ between platform math libraries
+  and move a stress axis or a score.
 - The native Node addon for Windows (`win32-x64-msvc`) links the C runtime
   statically, as `node.exe` does, so it imports no Visual C++ runtime DLL.
   0.10.0's addon imported `VCRUNTIME140.dll`, which a Windows install without
