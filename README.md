@@ -69,36 +69,43 @@ other formats do not receive invented QR scores. See the
 
 ## Install
 
-> **Repository name and package names are different.** The source repository is
-> `qrcode-ai-com/qrcode-barcode-scanner`, transferred from
-> `supernovae-st/qrcode-barcode-scanner`, whose addresses redirect. Existing
-> releases still use the `qrcode-ai-scanner` names below. The transfer and the
-> earlier rename do not create a new release, rename a package or change its
-> license.
+> **New package names from 0.11.0, pending publication.** From 0.11.0 the
+> packages carry the `qrcode-barcode-scanner` family names of the table below;
+> no registry serves them yet. Releases up to 0.10.x keep their
+> `qrcode-ai-scanner` names and stay installable, unchanged. Nothing from 0.11.0
+> on is published under a former name, and there are no alias or wrapper
+> packages: the [migration guide](docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+> maps each name. The source repository is `qrcode-ai-com/qrcode-barcode-scanner`,
+> transferred from `supernovae-st/qrcode-barcode-scanner`, whose addresses
+> redirect.
 
-The retained release references are **0.10.1 for Rust, CLI, Node and WASM**,
-and **0.9.0 for Python**. Use each registry page to check the version you install
-and its [`ScanReport`](spec/) contract.
+Until a registry serves 0.11.0, the install lines below give the release it
+serves now: **0.10.1** under the former names for Rust, the CLI, Node and the
+browser. PyPI's last release under the former name, `qrcode-ai-scanner`, is
+**0.9.0** (it never received 0.10.x), so Python builds from source until
+`qrcode-barcode-scanner` is on PyPI. Check each registry page for the version
+you install and its [`ScanReport`](spec/) contract.
 
-| Runtime | Package and installation |
-| --- | --- |
-| **Rust library** | [`qrcode-ai-scanner`](https://crates.io/crates/qrcode-ai-scanner) · [API reference](https://docs.rs/qrcode-ai-scanner)<br>`cargo add qrcode-ai-scanner` |
-| **Command line** | [`qrcode-ai-scanner-cli`](https://crates.io/crates/qrcode-ai-scanner-cli)<br>`cargo install qrcode-ai-scanner-cli` |
-| **Node.js** | [`@supernovae-st/qrcode-ai-scanner`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner)<br>`npm i @supernovae-st/qrcode-ai-scanner` |
-| **Browser · WASM** | [`@supernovae-st/qrcode-ai-scanner-wasm`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner-wasm)<br>`npm i @supernovae-st/qrcode-ai-scanner-wasm` |
-| **Python** | [`qrcode-ai-scanner`](https://pypi.org/project/qrcode-ai-scanner/)<br>`pip install qrcode-ai-scanner` |
+| Runtime | From 0.11.0 (pending publication) | Install now |
+| --- | --- | --- |
+| **Rust library** | `qrcode-barcode-scanner` | [`qrcode-ai-scanner`](https://crates.io/crates/qrcode-ai-scanner) 0.10.1 · [API reference](https://docs.rs/qrcode-ai-scanner)<br>`cargo add qrcode-ai-scanner@0.10.1` |
+| **Command line** | `qrcode-barcode-scanner-cli` | [`qrcode-ai-scanner-cli`](https://crates.io/crates/qrcode-ai-scanner-cli) 0.10.1<br>`cargo install qrcode-ai-scanner-cli@0.10.1` |
+| **Node.js** | `@qrcode-ai-com/qrcode-barcode-scanner` | [`@supernovae-st/qrcode-ai-scanner`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner) 0.10.1<br>`npm i @supernovae-st/qrcode-ai-scanner@0.10.1` |
+| **Browser · WASM** | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | [`@supernovae-st/qrcode-ai-scanner-wasm`](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner-wasm) 0.10.1<br>`npm i @supernovae-st/qrcode-ai-scanner-wasm@0.10.1` |
+| **Python** | `qrcode-barcode-scanner` | from source, as the [Python guide](docs/api/python.mdx) shows |
 
-Browser integrations load the one portable module (no SIMD) with checked
-initialization via `@supernovae-st/qrcode-ai-scanner-wasm/auto`.
+Browser integrations get checked initialization from the package's `/auto`
+export (`@supernovae-st/qrcode-ai-scanner-wasm/auto` in 0.10.1). From 0.11.0 the
+browser package ships one portable module, without SIMD.
 
 Per-runtime guides in [`docs/`](docs/) · code examples in [Quick start](#quick-start).
 
-**📱 Mobile + cross-platform:** Kotlin/Android, Swift/iOS (UniFFI → SwiftPM)
-and Flutter/Dart (flutter_rust_bridge → pub.dev) have source bindings.
-Their 0.10.0 remote packages and complete native consumer journeys are not yet
-qualified; a source tag does not prove availability on JitPack or another registry.
-Consult each binding's README for its implementation and current install path:
-[`bindings/kotlin/`](bindings/kotlin/), [`bindings/swift/`](bindings/swift/), and
+**📱 Mobile + cross-platform:** the Kotlin/Android and Swift/iOS bindings
+(UniFFI) and the Flutter/Dart binding (flutter_rust_bridge) build from source.
+No JitPack build of the Kotlin binding is qualified yet, SwiftPM cannot add the
+Swift package by repository URL, and the Flutter package is not yet published
+on pub.dev. Each binding's README gives its build steps:
+[`bindings/kotlin/`](bindings/kotlin/), [`bindings/swift/`](bindings/swift/) and
 [`bindings/flutter/`](bindings/flutter/).
 
 **🐳 Containers and agents:** retained CLI 0.10.0 distributions are listed on
@@ -226,13 +233,17 @@ roundtrip entirely: `ImageInput::rgba8(&frame, w, h)`.
 ### CLI
 
 ```bash
-cargo install qrcode-ai-scanner-cli
+cargo install qrcode-ai-scanner-cli@0.10.1
 qrscan image.png              # full ScanReport JSON
 qrscan image.png --pretty     # human summary
 qrscan image.png -s           # score only
 qrscan image.png -s --budget-ms 0   # unbounded: reproducible, never cut
 # exit codes: 0 found · 1 none · 2 invalid input/usage · 3 (-s) not judged within the budget
 ```
+
+From 0.11.0, `qrscan` ships in the `qrcode-barcode-scanner-cli` crate, pending
+publication. Both crates install the same `qrscan` command: uninstall
+`qrcode-ai-scanner-cli` before installing the new one.
 
 ## Corpus results
 
@@ -357,14 +368,17 @@ Start with the [runtime guide](docs/guides/choosing-a-surface.mdx),
 
 Source manifests share the workspace version (`Cargo.toml`). Published versions
 can differ by registry; a source version does not establish a successful release.
+The table names what the manifests publish from 0.11.0, pending publication.
+The crate directories and the never-published `-node` and `-wasm` Cargo packages
+keep their earlier spelling.
 
 | Crate / package | Published to |
 |---|---|
-| [`qrcode-ai-scanner`](crates/qrcode-ai-scanner) (core lib) | crates.io |
-| [`qrcode-ai-scanner-cli`](crates/qrcode-ai-scanner-cli) (`qrscan`) | crates.io |
-| [`qrcode-ai-scanner-node`](crates/qrcode-ai-scanner-node) (`@supernovae-st/qrcode-ai-scanner`, napi async) | npm |
-| [`qrcode-ai-scanner-wasm`](crates/qrcode-ai-scanner-wasm) (`@supernovae-st/qrcode-ai-scanner-wasm`, one portable WASM) | npm |
-| [`qrcode-ai-scanner-py`](crates/qrcode-ai-scanner-py) (`qrcode-ai-scanner` on PyPI, PyO3 abi3) | PyPI |
+| [`qrcode-barcode-scanner`](crates/qrcode-ai-scanner) (core lib) | crates.io |
+| [`qrcode-barcode-scanner-cli`](crates/qrcode-ai-scanner-cli) (`qrscan`) | crates.io |
+| [`qrcode-ai-scanner-node`](crates/qrcode-ai-scanner-node) (`@qrcode-ai-com/qrcode-barcode-scanner`, napi async) | npm |
+| [`qrcode-ai-scanner-wasm`](crates/qrcode-ai-scanner-wasm) (`@qrcode-ai-com/qrcode-barcode-scanner-wasm`, one portable WASM) | npm |
+| [`qrcode-barcode-scanner-py`](crates/qrcode-ai-scanner-py) (`qrcode-barcode-scanner` on PyPI, PyO3 abi3) | PyPI |
 
 ## Contributing & security
 
