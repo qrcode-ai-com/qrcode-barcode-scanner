@@ -6,6 +6,53 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ## 0.11.0 — 2026-10-31
 
+### Package names
+
+- From 0.11.0 the packages carry the QR Code & Barcode Scanner family names,
+  one per registry. Each new name is versioned from its first release under
+  that name, 0.11.0:
+  - Rust library: `qrcode-ai-scanner` becomes `qrcode-barcode-scanner` on
+    crates.io, imported as `qrcode_barcode_scanner`.
+  - Command line: `qrcode-ai-scanner-cli` becomes `qrcode-barcode-scanner-cli`
+    on crates.io. Both crates install the `qrscan` command, so uninstall the
+    former one first.
+  - Node: `@supernovae-st/qrcode-ai-scanner` and its six platform packages
+    become `@qrcode-ai-com/qrcode-barcode-scanner` and
+    `@qrcode-ai-com/qrcode-barcode-scanner-<suffix>` on npm, with the same six
+    suffixes. The addon file is `qrcode-barcode-scanner.<suffix>.node`.
+  - Browser: `@supernovae-st/qrcode-ai-scanner-wasm` becomes
+    `@qrcode-ai-com/qrcode-barcode-scanner-wasm` on npm. Its module files are
+    `qrcode-barcode-scanner.js`, `qrcode-barcode-scanner.d.ts` and
+    `qrcode-barcode-scanner_bg.wasm`, and the `compatible/` paths are gone
+    (browser upgrade note, under Changed).
+  - Python: `qrcode-ai-scanner`, last released as 0.9.0, becomes
+    `qrcode-barcode-scanner` on PyPI, imported as `qrcode_barcode_scanner`.
+  - The `qrscan` archives, new on the GitHub release, are named
+    `qrcode-barcode-scanner-cli-0.11.0-*` (under Added).
+- Nothing from 0.11.0 on is published under a former name, and there are no
+  alias or wrapper packages. Releases up to 0.10.x stay installable under
+  their former names and are not modified.
+- The rename itself changes no wire value: the JSON report and its
+  `versions`, the schema `$id`, the `[QRS-xxx]` codes, the exit codes, the
+  `qrscan` flags, the option names and values and the binding function names
+  stay as they were.
+- The Kotlin binding's Maven coordinate follows the repository: group
+  `com.github.qrcode-ai-com`, artifact `qrcode-barcode-scanner`. The UniFFI,
+  Kotlin, Swift and Android module names, the repository directories and the
+  never-published Cargo packages keep their earlier spelling. The Flutter
+  package's pub.dev name and first release are recorded in
+  `bindings/flutter/CHANGELOG.md` when it is published there.
+- The MCP adapter, the agent skill and the container images keep their
+  published names and versions; their next releases take names from the new
+  family. No 0.11 image goes to Docker Hub.
+- The first version under each new npm name is uploaded by the repository
+  owner from the tag run's inspected tarballs, as RELEASING.md describes, so
+  npm 0.11.0 carries no npm provenance; later versions are published by CI
+  with provenance.
+- The migration guide maps each former name to its new one and gives the steps
+  for each runtime:
+  <https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx>
+
 ### Fixed
 
 - The native Node addon for Windows (`win32-x64-msvc`) links the C runtime
@@ -304,14 +351,14 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   package's scope: encoded images through `scan`/`scanSync`, no raw-frame or
   camera interface, a load failure distinct from `[QRS-xxx]` rejections.
 - **Prebuilt `qrscan` archives** on the GitHub release:
-  `qrcode-ai-scanner-cli-0.11.0-<target>.tar.gz` for
+  `qrcode-barcode-scanner-cli-0.11.0-<target>.tar.gz` for
   `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` (glibc 2.28 or
   later), `x86_64-apple-darwin` (macOS 10.15 or later) and
   `aarch64-apple-darwin` (macOS 11.0 or later), and
-  `qrcode-ai-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip` (C runtime linked
-  statically), beside `qrcode-ai-scanner-cli-0.11.0-source.tar.gz`, their
-  corresponding source as a `git archive` of the tagged commit, and
-  `qrcode-ai-scanner-cli-0.11.0-SHA256SUMS`. Each archive holds `qrscan`,
+  `qrcode-barcode-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip` (C runtime
+  linked statically), beside `qrcode-barcode-scanner-cli-0.11.0-source.tar.gz`,
+  their corresponding source as a `git archive` of the tagged commit, and
+  `qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS`. Each archive holds `qrscan`,
   `LICENSE`, `LICENSING.md`, the third-party notices and license texts,
   `SOURCE.md`, `build-info.json` and a README (`distribution/cli/README.md`).
   The binaries are not code-signed or notarized: there is no Apple Developer
@@ -356,9 +403,11 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `qrcode-ai-com/qrcode-barcode-scanner` (the `supernovae-st` addresses
   redirect): Cargo `repository`, npm `repository.url` (npm provenance requires
   it to match the building repository), Python project URLs, the pubspec,
-  podspec and POM. Package names, the JitPack coordinate and the OCI image
-  names are unchanged. RELEASING.md records that each registry's trusted
-  publisher must be re-bound to the new repository before its first upload.
+  podspec and POM. The packages themselves take new names and the JitPack
+  coordinate follows the repository (Package names, above). RELEASING.md
+  records that each new name gets a trusted publisher of its own once its
+  first version exists, and that the publishers of the former names are never
+  re-bound to this repository.
 - The native Node package's advertised floor (`engines.node >= 18`) is
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.
@@ -416,9 +465,10 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - **Upgrade note (browser).** `scanner.variant` is `"portable"`.
   `{variant: "compatible"}` loads that same module; `{variant: "simd"}` rejects
   with `invalid_options`, and `simd_unavailable` is no longer a code. The
-  `compatible/qrcode-ai-scanner.js` and `compatible/qrcode-ai-scanner_bg.wasm`
-  export paths resolve to the root files; the `compatible/` directory is no
-  longer shipped. The root import loads the portable module.
+  `compatible/*` export paths of 0.10.x (`compatible/qrcode-ai-scanner.js` and
+  `compatible/qrcode-ai-scanner_bg.wasm`) were removed, together with the
+  `compatible/` directory: import the package root, which loads the portable
+  module, and `{variant: "compatible"}` still selects it.
 - `mobile › ios-release` no longer creates the GitHub release: it uploads the
   xcframework zip and `checksum.txt` only into the owner's draft, the one
   release that carries the tag and targets the tagged commit, and
