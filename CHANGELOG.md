@@ -39,8 +39,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - The Kotlin binding's Maven coordinate follows the repository: group
   `com.github.qrcode-ai-com`, artifact `qrcode-barcode-scanner`. The UniFFI,
   Kotlin, Swift and Android module names, the repository directories and the
-  never-published Cargo packages keep their earlier spelling. The Flutter
-  package's pub.dev name and first release are recorded in
+  never-published Cargo packages `qrcode-ai-scanner-node`,
+  `qrcode-ai-scanner-wasm`, `qrcode-ai-scanner-uniffi` and
+  `qrcode-ai-scanner-fuzz` keep their earlier spelling. The Python binding's
+  Cargo package becomes `qrcode-barcode-scanner-py`; it names the CycloneDX
+  SBOM file and its root component in each wheel. The Flutter package's
+  pub.dev name and first release are recorded in
   `bindings/flutter/CHANGELOG.md` when it is published there.
 - The MCP adapter, the agent skill and the container images keep their
   published names and versions; their next releases take names from the new
@@ -403,11 +407,13 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `qrcode-ai-com/qrcode-barcode-scanner` (the `supernovae-st` addresses
   redirect): Cargo `repository`, npm `repository.url` (npm provenance requires
   it to match the building repository), Python project URLs, the pubspec,
-  podspec and POM. The packages themselves take new names and the JitPack
-  coordinate follows the repository (Package names, above). RELEASING.md
-  records that each new name gets a trusted publisher of its own once its
-  first version exists, and that the publishers of the former names are never
-  re-bound to this repository.
+  podspec and POM. The crates.io, npm and PyPI packages take new names and the
+  JitPack coordinate follows the repository (Package names, above); the
+  Flutter package is not yet published. RELEASING.md records that each new
+  name gets a trusted publisher of its own (on crates.io and npm once its
+  first version exists, on PyPI as a pending publisher before the first
+  upload), and that the publishers of the former names are never re-bound to
+  this repository.
 - The native Node package's advertised floor (`engines.node >= 18`) is
   executed: its packed consumers run on Node 18, 20, 22 and 24 for every
   release target, musl included, and for linux-x64-gnu on every pull request.
