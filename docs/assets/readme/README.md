@@ -8,6 +8,7 @@ report. It does not measure real-time tracking, frame rate or scan latency.
 
 | Asset | Content |
 | --- | --- |
+| [hero.png](hero.png) | Editorial illustration made from the clean QR, artistic QR and Code 128 fixtures. The perspective cards are a composition, not measured scan geometry or a camera UI. |
 | [gallery.png](gallery.png) | Twelve fixture examples: clean/artistic QR, Micro QR, rMQR, Data Matrix, GS1 Data Matrix, centered Aztec, PDF417, Code 128, EAN-13, Code 39 and UPC-A. Each source fixture decoded as its labelled format. |
 | [payloads.png](payloads.png) | Public QR fixtures carrying Wi-Fi, MECARD, SMS and GS1 Digital Link content. Showing a decoded payload does not execute it. |
 | [mixed-codes.png](mixed-codes.png) | Actual full-profile results for QR `https://qrc-ai.com/76xMa` beside Code 128 `STOCK-4827`. |
@@ -22,7 +23,9 @@ report. It does not measure real-time tracking, frame rate or scan latency.
 The QR outlines use the engine's measured quadrilaterals. The Code 128 is drawn
 as the measured **segment**, with its two endpoints; it is not expanded into an
 invented rectangular extent. The two identical QR copies remain two
-occurrences of one decoded content. Colors and selection controls are
+occurrences of one decoded content. The replay dims and blurs the scene outside
+a selected measured QR quadrilateral. A barcode remains a segment, without an
+invented rectangular focus mask. Colors and selection controls are
 illustrative presentation, not object recognition or a new scanner capability.
 
 ## Provenance
@@ -69,5 +72,5 @@ python3 scripts/readme-media.py \
 The generator verifies the WASM hash against the package's `build-info.json`,
 checks the expected formats, requires both mixed-scene contents and the three
 physical occurrences, and preserves the actual report geometry. Public output
-contains no local filesystem paths. Fonts fall back to system Arial/DejaVu;
+contains no local filesystem paths. Display type uses Onest when installed, with SF Pro body type and a system mono. Fonts fall back to Arial/DejaVu;
 pixel-identical rendering across operating systems is not promised.
