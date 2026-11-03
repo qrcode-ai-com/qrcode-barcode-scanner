@@ -28,9 +28,9 @@ for (const name of TRAPPED) {
   });
 }
 
-const camera = await import('@supernovae-st/qrcode-ai-scanner-wasm/camera');
-const overlay = await import('@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay');
-const destination = await import('@supernovae-st/qrcode-ai-scanner-wasm/destination');
+const camera = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera');
+const overlay = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay');
+const destination = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination');
 const lines = ['Imported ./camera, ./camera-overlay and ./destination.'];
 
 // Eligibility, as a server would decide whether to render a Check destination control. A check

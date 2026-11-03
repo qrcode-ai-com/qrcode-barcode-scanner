@@ -112,7 +112,7 @@ Module scripts and module workers do not run from a `file://` page. Serve the pa
 open a page under it. For example, from a project that installed the package:
 
 ```sh
-python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@supernovae-st/qrcode-ai-scanner-wasm
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm
 ```
 
 then open <http://127.0.0.1:8000/examples/headless.html> or
@@ -128,11 +128,11 @@ such as a phone, serve the folder over `https`. Without a secure context the cam
 so when you press **Start the camera**.
 
 Each page requests only files of the package folder. The image page: `examples/headless.html`,
-`examples/headless.js`, `examples/scanner.worker.js`, `auto.js`, `qrcode-ai-scanner.js`,
-`qrcode-ai-scanner_bg.wasm`, `package.json` and `build-info.json`. The camera page:
+`examples/headless.js`, `examples/scanner.worker.js`, `auto.js`, `qrcode-barcode-scanner.js`,
+`qrcode-barcode-scanner_bg.wasm`, `package.json` and `build-info.json`. The camera page:
 `examples/camera.html`, `examples/camera.js`, `camera.js`, `camera-overlay.js`,
-`destination.js`, `examples/scanner.worker.js`, `auto.js`, `qrcode-ai-scanner.js`,
-`qrcode-ai-scanner_bg.wasm`, `package.json` and `build-info.json`; and, only for a destination
+`destination.js`, `examples/scanner.worker.js`, `auto.js`, `qrcode-barcode-scanner.js`,
+`qrcode-barcode-scanner_bg.wasm`, `package.json` and `build-info.json`; and, only for a destination
 check you start, the link's URL and every redirect the browser follows from it.
 
 Each page also carries a Content-Security-Policy of its own, in a `meta` element. The image
@@ -263,13 +263,13 @@ folder. In an application built by a bundler that resolves package `exports` and
 by package name. Your page's module:
 
 ```js
-import init, { scan_image } from '@supernovae-st/qrcode-ai-scanner-wasm';
+import init, { scan_image } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm';
 import { createCameraScanner, createDetectionTracker }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
 import { CAMERA_OVERLAY_CSS, createCameraOverlay }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay';
 import { createDestinationVerifier, createFetchTransport }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/destination';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination';
 
 const worker = new Worker(new URL('./scanner.worker.js', import.meta.url), { type: 'module' });
 ```
@@ -280,12 +280,12 @@ module as `scanner.worker.js`, with its import of `'../auto.js'` replaced by:
 
 ```js
 import { createScannerLoader, scannerCapabilities }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 ```
 
 Vite builds the worker as a separate module and emits the `.wasm` file that `/auto` asks for
 as an asset. Under Vite's dev server, also exclude the package from dependency pre-bundling,
-`optimizeDeps: { exclude: ['@supernovae-st/qrcode-ai-scanner-wasm'] }`: the package's modules
+`optimizeDeps: { exclude: ['@qrcode-ai-com/qrcode-barcode-scanner-wasm'] }`: the package's modules
 find the `.wasm` file next to themselves, through `import.meta.url`, and a pre-bundled copy of
 them is not next to it. The package's browser run builds exactly these two blocks with
 `vite build`, from the installed package, and checks that each package name resolves to the
@@ -303,7 +303,7 @@ can use. Other globals stay as Node defines them. Run it with Node from the proj
 installed the package:
 
 ```sh
-node node_modules/@supernovae-st/qrcode-ai-scanner-wasm/examples/ssr.mjs
+node node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/examples/ssr.mjs
 ```
 
 It prints exactly:

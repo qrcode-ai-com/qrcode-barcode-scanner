@@ -1,7 +1,7 @@
 // Camera witnesses on the installed package. The page drives createCameraScanner over a
 // canvas.captureStream() video through one worker, as an application would, and returns plain
 // records; the runner judges them against the fixtures. Nothing here asserts an expected value.
-import { createCameraScanner, createDetectionTracker } from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+import { createCameraScanner, createDetectionTracker } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
 
 const pngBitmap = bytes => createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
 

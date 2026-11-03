@@ -28,7 +28,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-WASM_NAME = "qrcode-ai-scanner_bg.wasm"
+WASM_NAME = "qrcode-barcode-scanner_bg.wasm"
 SCHEMA = 1
 # What compiles into the browser module: the WASM crate, its one path
 # dependency (the core, library sources only), the workspace manifest and lock
@@ -558,13 +558,19 @@ def write(pkg: pathlib.Path, rustflags: str, wasm_opt_flags: str, inputs_before:
     return info
 
 
-def check(info: dict, wasm: bytes, version, root: pathlib.Path = ROOT) -> list:
-    """Every reason these bytes are not the recorded, current build."""
+def check(info: dict, wasm: bytes, version, root: pathlib.Path = ROOT, *, package=None) -> list:
+    """Every reason these bytes are not the recorded, current build.
+
+    `version` and `package` are the package.json values the record must carry
+    (None skips that comparison): a record written under another package name,
+    a previous one included, does not describe this package."""
     problems = []
     if info.get("schema") != SCHEMA:
         problems.append(f"build-info schema {info.get('schema')!r} (expected {SCHEMA})")
     if version is not None and info.get("version") != version:
         problems.append(f"build-info version {info.get('version')!r} differs from the package {version!r}")
+    if package is not None and info.get("package") != package:
+        problems.append(f"build-info package {info.get('package')!r} differs from the package {package!r}")
     recorded = (info.get("wasm") or {}).get("sha256")
     actual = hashlib.sha256(wasm).hexdigest()
     if recorded != actual:
@@ -595,8 +601,8 @@ def verify(pkg: pathlib.Path, root: pathlib.Path = ROOT) -> list:
         info = json.loads((pkg / "build-info.json").read_text())
     except (OSError, ValueError) as error:
         return [f"build-info.json unreadable: {error}"]
-    version = json.loads((pkg / "package.json").read_text()).get("version")
-    return check(info, (pkg / WASM_NAME).read_bytes(), version, root)
+    manifest = json.loads((pkg / "package.json").read_text())
+    return check(info, (pkg / WASM_NAME).read_bytes(), manifest.get("version"), root, package=manifest.get("name"))
 
 
 # --------------------------------------------------------------- self-test
@@ -671,6 +677,26 @@ def self_test() -> int:
         expect("recorded build verifies", check(info, mvp, "1.2.3", root) == [])
         expect("modified WASM refused", any("modified WASM" in p for p in check(info, mvp + b"\0", "1.2.3", root)))
         expect("other version refused", any("version" in p for p in check(info, mvp, "1.2.4", root)))
+        # The record names its package: a record written under another name, the package's
+        # previous name included, is refused, given directly or read from a package folder.
+        package, previous = "@qrcode-ai-com/qrcode-barcode-scanner-wasm", "@supernovae-st/qrcode-ai-scanner-wasm"
+        named = {**info, "package": package}
+
+        def renamed(problems):
+            return any("build-info package" in p for p in problems)
+
+        expect("recorded package verifies", check(named, mvp, "1.2.3", root, package=package) == [])
+        expect("previous package name refused",
+               renamed(check({**named, "package": previous}, mvp, "1.2.3", root, package=package)))
+        expect("record without a package refused", renamed(check(info, mvp, "1.2.3", root, package=package)))
+        folder = root / "pkg"
+        folder.mkdir()
+        (folder / WASM_NAME).write_bytes(mvp)
+        (folder / "package.json").write_text(json.dumps({"name": package, "version": "1.2.3"}))
+        (folder / "build-info.json").write_text(json.dumps(named))
+        expect("package folder with its own build-info.json verifies", verify(folder, root) == [])
+        (folder / "build-info.json").write_text(json.dumps({**named, "package": previous}))
+        expect("planted build-info.json naming the previous package refused", renamed(verify(folder, root)))
         (root / "crates/qrcode-ai-scanner/src/nested/m.rs").write_text("// m changed\n")
         expect("stale inputs refused", any("stale build" in p for p in check(info, mvp, "1.2.3", root)))
         (root / "crates/qrcode-ai-scanner/src/nested/m.rs").write_text("// m\n")

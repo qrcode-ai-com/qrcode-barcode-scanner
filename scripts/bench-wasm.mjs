@@ -22,11 +22,14 @@
 //     `ok <raw> <gzip-9> <brotli-11> <glue bytes>` of the packed .wasm,
 //     compressed with Node zlib (gzip level 9, brotli quality 11).
 //
-// <package-dir> holds the glue named by package.json `main` (default
-// `qrcode-ai-scanner.js`) and its `_bg.wasm` — the published npm layout.
+// <package-dir> holds the glue named by package.json `main` and its
+// `_bg.wasm` — the published npm layout. Without a `main`, the glue is
+// named after the folder's one `*_bg.wasm` (`qrcode-barcode-scanner.js`
+// beside `qrcode-barcode-scanner_bg.wasm`); a 0.10.x package and the
+// current one carry `main`, each with its own module name.
 // Every command leaves within about 50 ms once its parent changes, even
 // inside a synchronous scan (bench-node.mjs exitWithParent).
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
@@ -37,11 +40,18 @@ const SIGNATURE = ["bytes", "profile", "max_dimension", "max_pixels", "budget_ms
 
 function locate(dir) {
   const manifest = resolve(dir, "package.json");
-  const main = existsSync(manifest)
-    ? (JSON.parse(readFileSync(manifest, "utf8")).main ?? "qrcode-ai-scanner.js")
-    : "qrcode-ai-scanner.js";
-  const glue = resolve(dir, main);
+  const main = existsSync(manifest) ? JSON.parse(readFileSync(manifest, "utf8")).main : undefined;
+  const glue = resolve(dir, main ?? soleGlue(dir));
   return { glue, wasm: glue.replace(/\.js$/, "_bg.wasm") };
+}
+
+/** The glue beside the folder's one `*_bg.wasm`, for a package without `main`. */
+function soleGlue(dir) {
+  const modules = readdirSync(dir).filter((name) => name.endsWith("_bg.wasm"));
+  if (modules.length !== 1) {
+    throw new Error(`${dir}: no package.json main, and ${modules.length} *_bg.wasm files instead of one`);
+  }
+  return modules[0].replace(/_bg\.wasm$/, ".js");
 }
 
 async function load(dir) {

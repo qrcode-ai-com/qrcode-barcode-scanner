@@ -39,7 +39,7 @@ const NETWORK_LABEL = 'Server resolver (Node)';
 const FIXTURE_INFO = { kind: 'node', label: FIXTURE_LABEL };
 const NETWORK_INFO = { kind: 'node', label: NETWORK_LABEL };
 const NETWORK = { transport: NETWORK_INFO, provenance: 'network' };
-const USER_AGENT = 'qrcode-ai-scanner-destination-bot/1';
+const USER_AGENT = 'qrcode-barcode-scanner-destination-bot/1';
 const ACCEPT = 'text/html,application/xhtml+xml,*/*;q=0.8';
 const FOUR_HEADERS = ['accept', 'connection', 'host', 'user-agent'];
 const LOOKUP_OPTIONS = { all: true, family: 0, hints: 0 };

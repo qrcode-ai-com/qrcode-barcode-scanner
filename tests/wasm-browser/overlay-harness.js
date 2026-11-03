@@ -4,10 +4,10 @@
 // runner. The effects witness drives the shipped camera controller instead. The page returns
 // plain records; the runner judges them against fixtures/consumer-truth.json. Nothing here
 // asserts an expected value. Importing this module opens no camera and starts no worker.
-import { createCameraScanner, createDetectionTracker } from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+import { createCameraScanner, createDetectionTracker } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
 import {
   createCameraOverlay, projectOverlayGeometry, quadOutline,
-} from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+} from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay';
 
 // The scene clock starts here; a step's `at` is relative to it.
 const START = 10_000;

@@ -1,14 +1,14 @@
-# @supernovae-st/qrcode-ai-scanner-wasm
+# @qrcode-ai-com/qrcode-barcode-scanner-wasm
 
 One portable browser WASM build of the
-[qrcode-ai-scanner](https://crates.io/crates/qrcode-ai-scanner) engine —
+[qrcode-barcode-scanner](https://crates.io/crates/qrcode-barcode-scanner) engine —
 QR decoding + scannability scoring for artistic / AI-generated QR codes.
 Decoding is fully client-side; optional destination checks use only the transport you supply.
 
 ## Automatic loading, including module workers
 
 ```js
-import { loadScanner } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
+import { loadScanner } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto";
 
 const scanner = await loadScanner();
 const report = scanner.scan_image(pngBytes, "full");
@@ -36,7 +36,7 @@ reloads, or blind fallbacks after a network/compiler error. For an explicit
 user-initiated retry, create one fresh loader:
 
 ```js
-import { createScannerLoader } from "@supernovae-st/qrcode-ai-scanner-wasm/auto";
+import { createScannerLoader } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto";
 const retry = createScannerLoader();
 const scanner = await retry();
 ```
@@ -46,8 +46,8 @@ cannot process package URLs. Keep that override on the same exact package
 version. Standard Vite/module-worker use needs no URL override. `variant`
 accepts `"auto"`, `"portable"` and `"compatible"`, the 0.10 name of this same
 no-SIMD feature set; any other value, `"simd"` included, rejects with
-`invalid_options`. The 0.10 export paths `compatible/qrcode-ai-scanner.js` and
-`compatible/qrcode-ai-scanner_bg.wasm` resolve to the same portable files.
+`invalid_options`. The 0.10 `compatible/` export paths were removed: import the
+package root instead, and `variant: "compatible"` still selects this module.
 
 `ScannerInitError` carries a stable `code`, selected `variant`, optional HTTP
 `status`, and original `cause`. Codes distinguish `wasm_unavailable`,
@@ -98,7 +98,7 @@ Safari, mobile devices, arbitrary CSP rules, or a consumer's deployed binary.
 ## Direct entry
 
 ```js
-import init, { capabilities, scan_image, scan_frame } from "@supernovae-st/qrcode-ai-scanner-wasm";
+import init, { capabilities, scan_image, scan_frame } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 
 await init(); // loads the wasm module once
 
@@ -143,9 +143,9 @@ creates a decoder of its own.
 
 ```ts
 import { createCameraScanner, createDetectionTracker }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
 import { createCameraOverlay }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay';
 
 // The container holds the video and is positioned (position: relative, for example).
 const overlay = createCameraOverlay({
@@ -417,7 +417,7 @@ and every observation it returns is validated before it is stored.
 
 ```js
 import { createDestinationVerifier, createEndpointTransport, destinationCandidate }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/destination';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination';
 
 // In client code: a '/path' endpoint resolves against the page's location, so
 // creating it on a server, during server rendering included, throws a TypeError.
@@ -481,7 +481,7 @@ claims more than its transport's ceiling is stored as `unavailable` with
   user action.
 - Results depend on the observer: IP address, region, language, user agent and
   time can change a route. By default the Node resolver identifies itself as
-  `qrcode-ai-scanner-destination-bot/1` (its `userAgent` option), and some
+  `qrcode-barcode-scanner-destination-bot/1` (its `userAgent` option), and some
   services answer bots differently from browsers.
 - The fetch transport can read a response only when the destination allows
   CORS, which most sites do not. The result is then `unavailable` with
@@ -511,7 +511,7 @@ ignored, certificate checks always on. `createDestinationEndpoint()` serves
 
 ```js
 import { createDestinationEndpoint, createNodeTransport }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/destination-node';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination-node';
 
 const handler = createDestinationEndpoint({
   transport: createNodeTransport(), // one per process
@@ -561,7 +561,7 @@ localhost that sends `.js` files with a JavaScript type, for example from a
 project that installed the package:
 
 ```sh
-python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@supernovae-st/qrcode-ai-scanner-wasm
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm
 ```
 
 Then open `http://127.0.0.1:8000/examples/headless.html` or
@@ -569,7 +569,7 @@ Then open `http://127.0.0.1:8000/examples/headless.html` or
 context: `localhost` and `127.0.0.1` count as one on the machine that runs the
 browser; from another device, such as a phone, serve the folder over `https`.
 Run the server-rendering example with
-`node node_modules/@supernovae-st/qrcode-ai-scanner-wasm/examples/ssr.mjs`.
+`node node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/examples/ssr.mjs`.
 [examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md),
 also in the installed package, describes each example and the worker's
 messages.
@@ -624,6 +624,8 @@ own:
   can call. Load the scanner in the browser or a worker, and start the camera
   in the browser: where WebAssembly is missing, `loadScanner()` rejects with
   `wasm_unavailable`.
+
+Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner-wasm`.
 
 License: AGPL-3.0-or-later · © SuperNovae Studio · part of
 [qrcode-ai.com](https://qrcode-ai.com).

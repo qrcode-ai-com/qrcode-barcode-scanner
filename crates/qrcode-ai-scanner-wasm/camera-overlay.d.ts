@@ -1,4 +1,4 @@
-// camera-overlay.d.ts · @supernovae-st/qrcode-ai-scanner-wasm/camera-overlay (0.11.0)
+// camera-overlay.d.ts · @qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay (0.11.0)
 import type { Detection, Fnc1Position, Payload, Point, Symbology } from './report-types';
 import type {
   Clock, ResultId, Track, TrackGeometry, TrackGeometryKind, TrackId, TrackedResult,

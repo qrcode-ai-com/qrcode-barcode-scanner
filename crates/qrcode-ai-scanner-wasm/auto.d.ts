@@ -4,7 +4,7 @@ export type ScannerInitCode = 'invalid_options' | 'wasm_unavailable' | 'wasm_fea
   | 'loader_import_failed' | 'asset_network_failed' | 'asset_http_failed'
   | 'asset_read_failed' | 'binary_invalid' | 'wasm_validation_failed' | 'wasm_compile_failed'
   | 'wasm_instantiate_failed';
-export type LoadedScanner = typeof import('./qrcode-ai-scanner.js') & { readonly variant: ScannerVariant };
+export type LoadedScanner = typeof import('./qrcode-barcode-scanner.js') & { readonly variant: ScannerVariant };
 export interface ScannerLoaderOptions {
   /** 'compatible' is the pre-0.11 name of the same no-SIMD feature set; any other value is `invalid_options`. */
   variant?: 'auto' | 'portable' | 'compatible';

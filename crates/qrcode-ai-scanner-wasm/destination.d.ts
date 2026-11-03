@@ -1,4 +1,4 @@
-// destination.d.ts · @supernovae-st/qrcode-ai-scanner-wasm/destination (0.11.0)
+// destination.d.ts · @qrcode-ai-com/qrcode-barcode-scanner-wasm/destination (0.11.0)
 // Optional URL destination checks. No runtime imports; no network, DOM or timer work at
 // import. Nothing is requested until resolve() runs with a transport the application supplied.
 // Every URL a result reports is observation text: render it as text, never as a link,

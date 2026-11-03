@@ -1,7 +1,7 @@
 // scan_frame on the installed package for the overlay witnesses. The budget is passed as given:
 // 0 is unbounded, null is the profile's own default. The reply carries the SHA-256 of the bytes
 // this worker received, taken before the engine reads them: the exact detector input.
-import { createScannerLoader } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import { createScannerLoader } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 
 const load = createScannerLoader();
 const hex = buffer => Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join('');

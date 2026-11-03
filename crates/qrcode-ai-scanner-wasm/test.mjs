@@ -8,9 +8,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { assertOptionDomains, pngSize } from "../../scripts/option-domains.mjs";
-const { initSync, capabilities, scan_image, scan_frame, version } = await import("./pkg/qrcode-ai-scanner.js");
+const { initSync, capabilities, scan_image, scan_frame, version } = await import("./pkg/qrcode-barcode-scanner.js");
 
-initSync({ module: readFileSync(new URL("./pkg/qrcode-ai-scanner_bg.wasm", import.meta.url)) });
+initSync({ module: readFileSync(new URL("./pkg/qrcode-barcode-scanner_bg.wasm", import.meta.url)) });
 
 const here = (rel) => new URL(rel, import.meta.url);
 const pkg = JSON.parse(readFileSync(here("./pkg/package.json"), "utf8"));

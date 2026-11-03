@@ -33,14 +33,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const PACKAGE_NAME = '@supernovae-st/qrcode-ai-scanner-wasm';
+const PACKAGE_NAME = '@qrcode-ai-com/qrcode-barcode-scanner-wasm';
 const PACKAGE_DIR = resolve(process.env.QRSCAN_DESTINATION_PACKAGE
   ?? fileURLToPath(new URL('./', import.meta.url)));
 const IN_CI = process.env.CI === 'true';
 const REPORT_PATH = process.argv[2] ?? null;
 const FIXTURE_LABEL = 'Local fixture (this browser)';
 const NODE_LABEL = 'Local fixture (Node resolver)';
-const BOT_AGENT = 'qrcode-ai-scanner-destination-bot/1';
+const BOT_AGENT = 'qrcode-barcode-scanner-destination-bot/1';
 const UNOBSERVED = 'Intermediate redirects not observed';
 const NETWORK_ERROR = 'Browser network error without detail';
 const EXPORTS = [
@@ -95,7 +95,7 @@ const viteModule = await import(process.env.QRSCAN_VITE_MODULE ?? 'vite');
 const vite = typeof viteModule.build === 'function' ? viteModule : viteModule.default;
 const { startFixture, startFixturePair } = await import(
   new URL('./destination-fixtures.mjs', import.meta.url).href);
-const SCANNER_FILES = ['auto.js', 'qrcode-ai-scanner.js', 'qrcode-ai-scanner_bg.wasm'];
+const SCANNER_FILES = ['auto.js', 'qrcode-barcode-scanner.js', 'qrcode-barcode-scanner_bg.wasm'];
 const hasScanner = SCANNER_FILES.every(file => existsSync(join(PACKAGE_DIR, file)));
 
 const report = {
@@ -962,7 +962,7 @@ watchdog.unref();
 // The real path: Vite names HTML entries relative to its root, and macOS links /var to
 // /private/var, so a linked temp folder fails the build.
 const workRoot = realpathSync(mkdtempSync(join(tmpdir(), 'qrscan-destination-browser-')));
-const packageLink = join(workRoot, 'node_modules', '@supernovae-st', 'qrcode-ai-scanner-wasm');
+const packageLink = join(workRoot, 'node_modules', ...PACKAGE_NAME.split('/'));
 let linked = false;
 let preview = null;
 subscribe('net.client.socket', recordSocket);

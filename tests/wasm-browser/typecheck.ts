@@ -1,10 +1,10 @@
-import type { ScanReport } from '@supernovae-st/qrcode-ai-scanner-wasm';
-import { loadScanner, createScannerLoader, ScannerInitError, type ScannerVariant } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import type { ScanReport } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm';
+import { loadScanner, createScannerLoader, ScannerInitError, type ScannerVariant } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 import {
   CameraScannerError, TRACKER_LIMITS, contentKey, createCameraScanner, createDetectionTracker, projectVideoGeometry,
   projectVideoPoint, sameContent, type CameraFrame, type CameraScanner, type CameraScannerErrorCode,
   type CameraStateChange, type ScanFrameContext, type Track, type TrackerFrame, type TrackerSnapshot,
-} from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
+} from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
 // Every name camera-overlay.d.ts exports, in its order: the runner compares this list with the
 // installed declarations and checks that the code below uses each one.
 import {
@@ -19,7 +19,7 @@ import {
   type OverlayThumbnails, type OverlayActions, type OverlayAction, type FrameImage,
   type FrameImageFrame, type CameraOverlaySettings, type CameraOverlayOptions,
   type OverlayTargetInspection, type OverlayInspection, type CameraOverlay, createCameraOverlay,
-} from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+} from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay';
 // Every name destination.d.ts exports, in its order: the runner compares this list with the
 // installed declarations, so each one compiles here through the package's exports map.
 import {
@@ -52,7 +52,7 @@ import {
   createEndpointTransport, type PreparedDestinationResult, type PreparedDestinationEntry,
   type PreparedTransportOptions, createPreparedTransport, type DestinationWireRequest,
   type DestinationWireResponse, type DestinationWireError,
-} from '@supernovae-st/qrcode-ai-scanner-wasm/destination';
+} from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination';
 const scanner = await loadScanner();
 const variant: ScannerVariant = scanner.variant;
 const report: ScanReport = scanner.scan_image(new Uint8Array(), 'full');

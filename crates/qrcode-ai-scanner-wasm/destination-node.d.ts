@@ -1,4 +1,4 @@
-// destination-node.d.ts · @supernovae-st/qrcode-ai-scanner-wasm/destination-node (0.11.0)
+// destination-node.d.ts · @qrcode-ai-com/qrcode-barcode-scanner-wasm/destination-node (0.11.0)
 // Node-only. Runtime imports: node:http, node:https, node:dns and ./destination.js.
 // Importing creates no socket, lookup, resolver, agent, server or timer.
 import type { DestinationTimers, DestinationTransport } from './destination.js';
@@ -30,7 +30,7 @@ export interface NodeTransportOptions {
   readonly allowedPorts?: readonly number[];
   /** Concurrent resolutions of this transport. Default 2, 1..16; 1..3 when lookup is dns.lookup. */
   readonly maxConcurrent?: number;
-  /** Default 'qrcode-ai-scanner-destination-bot/1'; printable ASCII, 1..256 characters. */
+  /** Default 'qrcode-barcode-scanner-destination-bot/1'; printable ASCII, 1..256 characters. */
   readonly userAgent?: string;
   /** Replaces the default cancelable resolver. In fixture mode names resolve only through it. */
   readonly lookup?: DestinationLookup;

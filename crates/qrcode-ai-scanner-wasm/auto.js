@@ -48,9 +48,9 @@ export function createScannerLoader({ variant = 'auto', wasmUrl } = {}) {
     // A literal URL/import lets Vite and similar bundlers retain and rewrite the
     // one asset; nothing is fetched before this call.
     let mod;
-    try { mod = await import('./qrcode-ai-scanner.js'); }
+    try { mod = await import('./qrcode-barcode-scanner.js'); }
     catch (cause) { throw new ScannerInitError('loader_import_failed', selected, cause); }
-    const url = wasmUrl ?? new URL('./qrcode-ai-scanner_bg.wasm', import.meta.url);
+    const url = wasmUrl ?? new URL('./qrcode-barcode-scanner_bg.wasm', import.meta.url);
     let response;
     try { response = await fetch(url); }
     catch (cause) { throw new ScannerInitError('asset_network_failed', selected, cause); }

@@ -1,4 +1,4 @@
-// destination-node.js · @supernovae-st/qrcode-ai-scanner-wasm/destination-node (0.11.0)
+// destination-node.js · @qrcode-ai-com/qrcode-barcode-scanner-wasm/destination-node (0.11.0)
 // Node-only reference resolver and same-origin endpoint handler. Importing creates no socket,
 // lookup, resolver, agent, server or timer: the Node facilities below are used only while a
 // function runs. Every URL a result reports is observation text: render it as text, never as a
@@ -16,7 +16,7 @@ import {
 
 const NETWORK_LABEL = 'Server resolver (Node)';
 const FIXTURE_LABEL = 'Local fixture (Node resolver)';
-const DEFAULT_USER_AGENT = 'qrcode-ai-scanner-destination-bot/1';
+const DEFAULT_USER_AGENT = 'qrcode-barcode-scanner-destination-bot/1';
 const ACCEPT = 'text/html,application/xhtml+xml,*/*;q=0.8';
 const MAX_URL_LENGTH = 16384;
 const MAX_HOPS_LIMIT = 20;

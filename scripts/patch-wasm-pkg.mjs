@@ -16,7 +16,7 @@ const COPIED_FILES = ["auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camer
 const EXAMPLE_FILES = ["headless.html", "headless.js", "camera.html", "camera.js", "scanner.worker.js", "ssr.mjs",
   "README.md"].map((file) => `examples/${file}`);
 
-pkg.name = "@supernovae-st/qrcode-ai-scanner-wasm";
+pkg.name = "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 pkg.description =
   "QR and barcode decoding + scannability scoring — one portable browser WASM with camera, tracking and overlay modules, plus optional URL destination checks";
 pkg.license = "AGPL-3.0-or-later";
@@ -29,10 +29,10 @@ pkg.keywords = ["qrcode", "qr", "scanner", "wasm", "browser", "artistic-qr", "ai
 // file to the publish allowlist or the tarball ships broken TS types
 // One physical WASM: build-info.json links its bytes to the compiled inputs,
 // recipe and tools (scripts/wasm_provenance.py writes it after this patch).
-pkg.files = ["qrcode-ai-scanner.js", "qrcode-ai-scanner.d.ts", "qrcode-ai-scanner_bg.wasm", "build-info.json",
+pkg.files = ["qrcode-barcode-scanner.js", "qrcode-barcode-scanner.d.ts", "qrcode-barcode-scanner_bg.wasm", "build-info.json",
   ...COPIED_FILES, ...EXAMPLE_FILES, "report-types.d.ts", "LICENSE", "LICENSE-APACHE-2.0", "THIRD-PARTY.md"];
 pkg.exports = {
-  ".": { types: "./qrcode-ai-scanner.d.ts", import: "./qrcode-ai-scanner.js", default: "./qrcode-ai-scanner.js" },
+  ".": { types: "./qrcode-barcode-scanner.d.ts", import: "./qrcode-barcode-scanner.js", default: "./qrcode-barcode-scanner.js" },
   "./auto": { types: "./auto.d.ts", import: "./auto.js", default: "./auto.js" },
   "./camera": { types: "./camera.d.ts", import: "./camera.js", default: "./camera.js" },
   "./camera-overlay": { types: "./camera-overlay.d.ts", import: "./camera-overlay.js", default: "./camera-overlay.js" },
@@ -45,11 +45,9 @@ pkg.exports = {
   "./destination-node": { types: "./destination-node.d.ts", node: "./destination-node.js" },
   "./destination-node.js": null,
   "./report-types": { types: "./report-types.d.ts" },
-  "./qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm",
-  // 0.10.x published its no-SIMD module under compatible/. That feature set is
-  // now the only module, so both legacy paths name the same physical files.
-  "./compatible/qrcode-ai-scanner.js": "./qrcode-ai-scanner.js",
-  "./compatible/qrcode-ai-scanner_bg.wasm": "./qrcode-ai-scanner_bg.wasm",
+  "./qrcode-barcode-scanner_bg.wasm": "./qrcode-barcode-scanner_bg.wasm",
+  // The 0.10.x compatible/ export paths were removed: the no-SIMD module they named is now the one
+  // root module, which the loader option variant: 'compatible' still selects.
   "./build-info.json": "./build-info.json",
   "./package.json": "./package.json",
   "./*": "./*",

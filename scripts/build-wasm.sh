@@ -46,23 +46,24 @@ started=$(date +%s)
 inputs=$(python3 "$root/scripts/wasm_provenance.py" digest)
 rm -rf pkg
 RUSTFLAGS="-C target-feature=-simd128,-relaxed-simd" wasm-pack build \
-  --target web --release --out-name qrcode-ai-scanner -- --locked
-wasm-opt pkg/qrcode-ai-scanner_bg.wasm \
+  --target web --release --out-name qrcode-barcode-scanner -- --locked
+wasm-opt pkg/qrcode-barcode-scanner_bg.wasm \
   -O3 --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
   --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
-  -o pkg/qrcode-ai-scanner_bg.wasm.opt
-mv pkg/qrcode-ai-scanner_bg.wasm.opt pkg/qrcode-ai-scanner_bg.wasm
+  -o pkg/qrcode-barcode-scanner_bg.wasm.opt
+mv pkg/qrcode-barcode-scanner_bg.wasm.opt pkg/qrcode-barcode-scanner_bg.wasm
 # This validation rejects any instruction or type outside the floor (SIMD
 # included), even if a dependency or the optimizer emitted one. build-info then
 # reads the module's own code for the features it actually needs, and the
 # browser acceptance disables SIMD in the real runtime rather than mocking it.
-wasm-opt pkg/qrcode-ai-scanner_bg.wasm \
+wasm-opt pkg/qrcode-barcode-scanner_bg.wasm \
   --mvp-features --enable-mutable-globals --enable-nontrapping-float-to-int \
   --enable-bulk-memory --enable-sign-ext --enable-reference-types --enable-multivalue --disable-simd \
   -o /dev/null
 
 node "$root/scripts/patch-wasm-pkg.mjs"
-(cd "$root" && node scripts/sync-report-types.mjs)
+# --require-wasm: a pkg/ without its declarations fails here instead of shipping untyped scans.
+(cd "$root" && node scripts/sync-report-types.mjs --require-wasm)
 # Written once, from these freshly built and validated bytes, and only if the
 # compiled inputs did not change while they were being built.
 python3 "$root/scripts/wasm_provenance.py" write pkg \
@@ -83,6 +84,6 @@ node destination-node.test.mjs
 # need a real browser: scripts/packed-wasm-browser.mjs runs both against the
 # packed archive (the wasm-browser CI job).
 
-raw=$(wc -c <pkg/qrcode-ai-scanner_bg.wasm)
-gz=$(gzip -9 -c pkg/qrcode-ai-scanner_bg.wasm | wc -c)
+raw=$(wc -c <pkg/qrcode-barcode-scanner_bg.wasm)
+gz=$(gzip -9 -c pkg/qrcode-barcode-scanner_bg.wasm | wc -c)
 echo "wasm size: raw ${raw} bytes · gzip ${gz} bytes"

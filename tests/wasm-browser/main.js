@@ -1,4 +1,4 @@
-import { createScannerLoader, scannerCapabilities } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import { createScannerLoader, scannerCapabilities } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 import { createCameraHarness } from './camera-harness.js';
 // Imports ./camera-overlay at page load: the runner checks that this asks for no camera.
 import { createOverlayHarness } from './overlay-harness.js';

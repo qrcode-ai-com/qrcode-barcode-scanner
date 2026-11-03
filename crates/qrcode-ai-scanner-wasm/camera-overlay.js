@@ -1,4 +1,4 @@
-// camera-overlay.js · @supernovae-st/qrcode-ai-scanner-wasm/camera-overlay (0.11.0)
+// camera-overlay.js · @qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay (0.11.0)
 // Framework-free spatial overlay and exact readout drawn from tracker snapshots. Nothing runs
 // at import beyond constant definitions: no DOM, network, timer or global access. Decoded
 // content is always rendered as text; nothing is fetched or opened without a user action.

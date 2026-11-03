@@ -1,6 +1,6 @@
 // First import: it wraps WebAssembly before the scanner modules below are evaluated.
 import { wasmLog } from './wasm-count.js';
-import { createScannerLoader, scannerCapabilities } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import { createScannerLoader, scannerCapabilities } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 let load;
 // Resource timing of the .wasm fetches this worker made (the loader fetches in the worker).
 const wasmResources = () => performance.getEntriesByType('resource')

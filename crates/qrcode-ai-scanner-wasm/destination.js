@@ -1,4 +1,4 @@
-// destination.js · @supernovae-st/qrcode-ai-scanner-wasm/destination (0.11.0)
+// destination.js · @qrcode-ai-com/qrcode-barcode-scanner-wasm/destination (0.11.0)
 // Optional URL destination checks. No imports, and no network, DOM or timer work at import:
 // globals are read only when a function runs. Nothing is requested until resolve() runs with a
 // transport the application supplied. Every URL a result reports is observation text: render

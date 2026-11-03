@@ -19,9 +19,9 @@
 <script type="importmap">
 {
   "imports": {
-    "@supernovae-st/qrcode-ai-scanner-wasm/auto": "../pkg/auto.js",
-    "@supernovae-st/qrcode-ai-scanner-wasm/camera": "../pkg/camera.js",
-    "@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay": "../pkg/camera-overlay.js"
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto": "../pkg/auto.js",
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera": "../pkg/camera.js",
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay": "../pkg/camera-overlay.js"
   }
 }
 </script>
@@ -53,10 +53,10 @@
   <p id="status" role="status" aria-live="polite">Idle. Nothing is recorded before Start.</p>
 </main>
 <script type="module">
-import { loadScanner } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
+import { loadScanner } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto';
 import { createCameraScanner, createDetectionTracker }
-  from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
-import { createCameraOverlay } from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+  from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera';
+import { createCameraOverlay } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay';
 import { createRecorder } from './recorder.js';
 
 const $ = id => document.getElementById(id);

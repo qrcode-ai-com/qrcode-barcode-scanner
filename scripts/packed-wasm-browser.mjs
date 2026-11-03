@@ -126,7 +126,7 @@ if (process.env.QRSCAN_INSTALL_BROWSERS === '1') {
 }
 phase('installed files');
 const vite = await import(pathToFileURL(require.resolve('vite')));
-const installed = join(consumer, 'node_modules/@supernovae-st/qrcode-ai-scanner-wasm');
+const installed = join(consumer, 'node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm');
 const manifest = JSON.parse(readFileSync(join(installed, 'package.json')));
 Object.assign(receipt.artifact, { name: manifest.name, version: manifest.version });
 // One physical WASM, and it is the recorded build: build-info.json names the
@@ -134,7 +134,7 @@ Object.assign(receipt.artifact, { name: manifest.name, version: manifest.version
 const listFiles = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
   entry.isDirectory() ? listFiles(join(dir, entry.name)).map(name => `${entry.name}/${name}`) : [entry.name]);
 const wasmFiles = listFiles(installed).filter(name => name.endsWith('.wasm'));
-assert.deepEqual(wasmFiles, ['qrcode-ai-scanner_bg.wasm'], 'the installed package holds exactly one WASM binary');
+assert.deepEqual(wasmFiles, ['qrcode-barcode-scanner_bg.wasm'], 'the installed package holds exactly one WASM binary');
 const buildInfo = JSON.parse(readFileSync(join(installed, 'build-info.json')));
 receipt.buildInfo = { source_revision: buildInfo.source_revision, inputs: buildInfo.inputs.sha256, wasm: buildInfo.wasm,
   toolchain: buildInfo.toolchain };
@@ -144,13 +144,21 @@ assert.equal(buildInfo.version, manifest.version);
 assert.deepEqual(buildInfo.wasm.features.filter(feature => !['bulk-memory', 'mutable-globals', 'multivalue',
   'nontrapping-fptoint', 'reference-types', 'sign-ext'].includes(feature)), [], 'recorded features stay inside the floor');
 passed.push(`Installed package holds one WASM (${installedWasmSha256}) matching build-info.json`);
-// The 0.10.x compatible/ export paths resolve to that same module's own files.
-for (const [legacy, file] of [['compatible/qrcode-ai-scanner_bg.wasm', 'qrcode-ai-scanner_bg.wasm'],
-  ['compatible/qrcode-ai-scanner.js', 'qrcode-ai-scanner.js']]) {
-  assert.equal(realpathSync(require.resolve(`@supernovae-st/qrcode-ai-scanner-wasm/${legacy}`)),
-    realpathSync(join(installed, file)), `${legacy} resolves to the one portable ${file}`);
+// The 0.10.x compatible/ export paths were removed: no export key names them, no compatible/
+// folder ships, and none of their files resolves, under the 0.10.x file names or the current
+// ones. The same resolution finds the root module's WASM, so a refusal is not a missing package.
+// The loader option variant: 'compatible' selects that one root module instead.
+assert.equal(realpathSync(require.resolve('@qrcode-ai-com/qrcode-barcode-scanner-wasm/qrcode-barcode-scanner_bg.wasm')),
+  realpathSync(join(installed, wasmFiles[0])), 'the root WASM export resolves to the one installed WASM');
+assert.deepEqual(Object.keys(manifest.exports).filter(key => key.startsWith('./compatible')), [],
+  'package.json exports no compatible/ path');
+assert.equal(existsSync(join(installed, 'compatible')), false, 'the installed package has no compatible/ folder');
+for (const legacy of ['compatible/qrcode-ai-scanner_bg.wasm', 'compatible/qrcode-ai-scanner.js',
+  'compatible/qrcode-barcode-scanner_bg.wasm', 'compatible/qrcode-barcode-scanner.js']) {
+  assert.throws(() => require.resolve(`@qrcode-ai-com/qrcode-barcode-scanner-wasm/${legacy}`),
+    error => ['MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED'].includes(error.code), `${legacy} does not resolve`);
 }
-passed.push('Legacy compatible/ export paths resolve to the one portable module');
+passed.push('The removed 0.10.x compatible/ export paths resolve to nothing: no export key, folder or file');
 const fixtures = [
   ['clean', 'fixtures/clean/OK_68ms_100_4e875a2c.png', 'clean-url'],
   ['artistic', 'fixtures/artistic/blob-style-monkey-logo.webp', 'artistic-blob'],
@@ -184,10 +192,10 @@ const ssr = runNode(['--input-type=module', '-e', `
   globalThis.WebAssembly = undefined;
   let fetchCalls = 0;
   globalThis.fetch = () => { fetchCalls += 1; throw Error('unexpected SSR fetch'); };
-  const mod = await import('@supernovae-st/qrcode-ai-scanner-wasm/auto');
-  const camera = await import('@supernovae-st/qrcode-ai-scanner-wasm/camera');
-  const overlay = await import('@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay');
-  const destination = await import('@supernovae-st/qrcode-ai-scanner-wasm/destination');
+  const mod = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto');
+  const camera = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera');
+  const overlay = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay');
+  const destination = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination');
   assert.equal(typeof camera.createCameraScanner, 'function');
   assert.equal(typeof overlay.createCameraOverlay, 'function');
   assert.deepEqual(mod.scannerCapabilities(), {wasm:false,simd:false,baseline:false});
@@ -216,7 +224,7 @@ const resolverSsr = runNode(['--input-type=module', '-e', `
   import assert from 'node:assert/strict';
   let fetchCalls = 0;
   globalThis.fetch = () => { fetchCalls += 1; throw Error('unexpected SSR fetch'); };
-  const resolver = await import('@supernovae-st/qrcode-ai-scanner-wasm/destination-node');
+  const resolver = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/destination-node');
   assert.deepEqual(Object.entries(resolver).map(([name, value]) => [name, typeof value]),
     [['createDestinationEndpoint', 'function'], ['createNodeTransport', 'function']]);
   assert.equal(fetchCalls, 0, 'fetch is never called');
@@ -231,7 +239,7 @@ const overlaySsr = JSON.parse(runNode(['--input-type=module', '-e', `
   globalThis.WebAssembly = undefined;
   let fetchCalls = 0;
   globalThis.fetch = () => { fetchCalls += 1; throw Error('unexpected SSR fetch'); };
-  const overlay = await import('@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay');
+  const overlay = await import('@qrcode-ai-com/qrcode-barcode-scanner-wasm/camera-overlay');
   const exports = Object.keys(overlay).sort().map(name => [name, typeof overlay[name] === 'function' ? 'function' : 'value']);
   console.log(JSON.stringify({ exports, fetchCalls }));
 `], { label: 'SSR import of ./camera-overlay' }));
@@ -300,7 +308,7 @@ assert.deepEqual(ssrNetwork, { sockets: 0, lookups: 0 }, 'examples/ssr.mjs opens
 assert.deepEqual(readmeBlocks('Server rendering', 'text'), [`${SSR_EXAMPLE_LINES.join('\n')}\n`],
   'examples/README.md shows exactly the lines examples/ssr.mjs prints');
 passed.push(`examples/ssr.mjs, run with Node from the installed package folder, imports ./camera, ./camera-overlay and ./destination by name, prints exactly the expected lines its README section shows (none of the ${trappedNames.length} DOM, camera and network globals it traps was read; other globals are not trapped), and opens no socket and looks up no name`);
-const cameraPackage = join(consumer, 'node_modules/@supernovae-st/qrcode-ai-scanner-wasm');
+const cameraPackage = join(consumer, 'node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm');
 const cameraModule = { ...process.env, QRSCAN_CAMERA_MODULE: pathToFileURL(join(cameraPackage, 'camera.js')).href };
 phase('camera suite');
 runNode([join(root, 'crates/qrcode-ai-scanner-wasm/camera.test.mjs')], { env: cameraModule });
@@ -481,7 +489,7 @@ const shippedWorker = readFileSync(join(installed, 'examples', 'scanner.worker.j
 const relativeAuto = /^import \{[^}]*\} from '\.\.\/auto\.js';\n/gm;
 assert.equal(shippedWorker.match(relativeAuto)?.length, 1, 'examples/scanner.worker.js imports ../auto.js in one statement');
 writeFileSync(join(formsDir, 'scanner.worker.js'), shippedWorker.replace(relativeAuto, bundlerBlocks[1]));
-const FORM_TARGETS = { [manifest.name]: 'qrcode-ai-scanner.js', [`${manifest.name}/camera`]: 'camera.js',
+const FORM_TARGETS = { [manifest.name]: 'qrcode-barcode-scanner.js', [`${manifest.name}/camera`]: 'camera.js',
   [`${manifest.name}/camera-overlay`]: 'camera-overlay.js', [`${manifest.name}/destination`]: 'destination.js',
   [`${manifest.name}/auto`]: 'auto.js' };
 const formResolutions = new Map();
@@ -512,7 +520,7 @@ const builtWasm = builtFiles.filter(file => file.fileName.endsWith('.wasm'));
 receipt.bundlerForms = { resolved: Object.fromEntries([...formResolutions].sort()), entry: readmeChunk?.fileName ?? null,
   worker: readmeWorker.map(file => file.fileName), wasm: builtWasm.map(file => ({ file: file.fileName, sha256: sha(file.source) })) };
 assert.deepEqual(receipt.bundlerForms.resolved, {
-  [`app.js ${manifest.name}`]: 'qrcode-ai-scanner.js', [`app.js ${manifest.name}/camera`]: 'camera.js',
+  [`app.js ${manifest.name}`]: 'qrcode-barcode-scanner.js', [`app.js ${manifest.name}/camera`]: 'camera.js',
   [`app.js ${manifest.name}/camera-overlay`]: 'camera-overlay.js', [`app.js ${manifest.name}/destination`]: 'destination.js',
   [`scanner.worker.js ${manifest.name}/auto`]: 'auto.js' }, 'each package name of the README forms resolves to the installed file');
 assert.equal(readmeWorker.length, 1, 'the build emits the README worker as a module of its own');
@@ -901,10 +909,10 @@ const pickFile = async (page, sample, serial) => {
   await page.setInputFiles('#file', { name: sample.file, mimeType: 'image/png', buffer: sample.bytes });
   return settledView(page, serial);
 };
-const wasmPath = '/qrcode-ai-scanner_bg.wasm';
+const wasmPath = '/qrcode-barcode-scanner_bg.wasm';
 // Each file the page needs, served once with a static server's type, and nothing else.
 const EXAMPLE_LOADS = ['/examples/headless.html', '/examples/headless.js', '/examples/scanner.worker.js', '/package.json',
-  '/build-info.json', '/auto.js', '/qrcode-ai-scanner.js', wasmPath]
+  '/build-info.json', '/auto.js', '/qrcode-barcode-scanner.js', wasmPath]
   .map(path => `${path} 200 ${STATIC_TYPES[extname(path)]}`).sort();
 receipt.example = { files: EXAMPLE_FILES.map(file => `examples/${file}`), loads: EXAMPLE_LOADS,
   cases: Object.fromEntries(Object.entries(exampleCases).map(([id, { file, rows }]) => [id, { file, rows }])),
@@ -1483,7 +1491,7 @@ const cspSearch = async (browser, name, site) => {
 };
 // Each file the camera page needs, served once with a static server's type, and nothing else.
 const CAMERA_LOADS = ['/examples/camera.html', '/examples/camera.js', '/camera.js', '/camera-overlay.js', '/destination.js',
-  '/examples/scanner.worker.js', '/auto.js', '/qrcode-ai-scanner.js', wasmPath, '/package.json', '/build-info.json']
+  '/examples/scanner.worker.js', '/auto.js', '/qrcode-barcode-scanner.js', wasmPath, '/package.json', '/build-info.json']
   .map(path => `${path} 200 ${STATIC_TYPES[extname(path)]}`).sort();
 receipt.example.cameraLoads = CAMERA_LOADS;
 // The control code's quad as the overlay should draw it: drawn at (140, 0) in the 640x360 frame,
