@@ -23,10 +23,12 @@
 //     compressed with Node zlib (gzip level 9, brotli quality 11).
 //
 // <package-dir> holds the glue named by package.json `main` and its
-// `_bg.wasm` — the published npm layout. Without a `main`, the glue is
-// named after the folder's one `*_bg.wasm` (`qrcode-barcode-scanner.js`
-// beside `qrcode-barcode-scanner_bg.wasm`); a 0.10.x package and the
-// current one carry `main`, each with its own module name.
+// `_bg.wasm` — the published npm layout, which the current pkg/ follows
+// (`main` is `qrcode-barcode-scanner.js`). The v0.10.1 base is that
+// release's portable module folder, pkg/compatible, which has no
+// package.json (its build recipe deletes it): there the glue is the `.js`
+// named after the folder's one `*_bg.wasm`, so this fallback is what
+// loads the base.
 // Every command leaves within about 50 ms once its parent changes, even
 // inside a synchronous scan (bench-node.mjs exitWithParent).
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
