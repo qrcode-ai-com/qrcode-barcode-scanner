@@ -139,8 +139,8 @@ for (const [golden, width, height, detection, kind, first, precise] of [
     { x: 59.853554, y: 180.14645 }])], { symbology: 'data_matrix' }),
   'quad', [0.249390, 0.249390], true],
   ['ean13-retail-gtin.json', 320, 140, code('OTUwNjAwMDEzNDM1Mg==',
-    [segment({ x: 21.5, y: 70 }, { x: 297.5, y: 70 })], { symbology: 'ean13' }),
-  'segment', [0.0671875, 0.5], false],
+    [segment({ x: 21.5, y: 70.5 }, { x: 297.5, y: 70.5 })], { symbology: 'ean13' }),
+  'segment', [0.0671875, 70.5 / 140], false],
   ['micro-qr.json', 210, 210, code('SEVMTE80Mg==', [quad(sq(30, 30, 150))],
     { symbology: 'micro_qr_code' }), 'quad', [0.142857, 0.142857], undefined],
   ['clean-url.json', 1024, 1024, code('aHR0cHM6Ly9xcmMtYWkuY29tLzc2eE1h', [quad([
@@ -155,7 +155,7 @@ for (const [golden, width, height, detection, kind, first, precise] of [
   near(geometry.measured[0].x, first[0]);
   near(geometry.measured[0].y, first[1]);
   assert.deepEqual(geometry.points, geometry.measured, golden);
-  if (kind === 'segment') assert.deepEqual(geometry.measured[1], { x: 0.9296875, y: 0.5 });
+  if (kind === 'segment') assert.deepEqual(geometry.measured[1], { x: 0.9296875, y: 70.5 / 140 });
   if (precise !== undefined) assert.equal(geometry.precise, precise, golden);
   assert.deepEqual(feed(tracker, report(), frameAt(100, width, height)).events,
     [{ type: 'held', trackId: 'track-1', at: 100, reason: 'missed' }], golden);
