@@ -443,7 +443,8 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   Flutter Rust lock moves tokio 1.34.0 to 1.38.2 (GHSA-rr8g-9fpq-6wmg), the
   packed Python consumer suite pins Pillow 13.0.0 with every wheel hashed
   (it needs Python 3.11, the consumer matrix's floor), and the browser test
-  host and playground resolve vite 6.4.4, postcss 8.5.31 and source-map-js 1.2.2.
+  host and playground resolve vite 6.4.5 (GHSA-8g5g-mxqh-grgj), postcss 8.5.31
+  and source-map-js 1.2.2.
   The MCP adapter's test graph moves fast-uri to 3.1.9, qs to 6.16.1 and
   body-parser to 2.4.0 (GHSA-27r3-jxmh-p828); its production tree is unchanged.
 - The MCP adapter's packed gate compares the schema it ships with the schema
