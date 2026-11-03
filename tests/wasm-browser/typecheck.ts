@@ -5,7 +5,21 @@ import {
   projectVideoPoint, sameContent, type CameraFrame, type CameraScanner, type CameraScannerErrorCode,
   type CameraStateChange, type ScanFrameContext, type Track, type TrackerFrame, type TrackerSnapshot,
 } from '@supernovae-st/qrcode-ai-scanner-wasm/camera';
-import { createCameraOverlay } from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
+// Every name camera-overlay.d.ts exports, in its order: the runner compares this list with the
+// installed declarations and checks that the code below uses each one.
+import {
+  type OverlayFit, type ObjectPositionAxis, type ObjectPosition, parseObjectPosition, type OverlayView,
+  type MediaRect, overlayMediaRect, projectOverlayPoint, type OverlayGeometry, projectOverlayGeometry,
+  type OutlineOptions, type QuadOutline, quadOutline, quadRegion, type SymbologyFamily, symbologyFamily,
+  type TextSegment, segmentText, type EncodedUrl, type ReadoutField, type ReadoutEci,
+  type DetectionReadout, describeDetection, type OverlayDestinations, type OverlayDestinationReason,
+  type OverlayAnnouncement, type OverlayDestinationLabels, type OverlayLabels, type LabelOverrides,
+  type OverlayLabelOverrides, DEFAULT_LABELS, TRACK_COLORS, CAMERA_OVERLAY_CSS, type OverlayFocus,
+  type OverlayRail, type OverlayAlignment, type OverlayEffects, type OverlayMarkers,
+  type OverlayThumbnails, type OverlayActions, type OverlayAction, type FrameImage,
+  type FrameImageFrame, type CameraOverlaySettings, type CameraOverlayOptions,
+  type OverlayTargetInspection, type OverlayInspection, type CameraOverlay, createCameraOverlay,
+} from '@supernovae-st/qrcode-ai-scanner-wasm/camera-overlay';
 // Every name destination.d.ts exports, in its order: the runner compares this list with the
 // installed declarations, so each one compiles here through the package's exports map.
 import {
@@ -260,4 +274,85 @@ void [controller.state, controller.epoch, controller.decoderGeneration, controll
   void [init, reader, sentence, hopsLimit, fromPayload, requested, source, range, specialUse,
     fetchOptions, info, kinds, provenance, base, resolutionText, snapshotBase, snapshotText, reasons,
     view, wireRequest, wireResponse, wireError, unnamedLabel, unlabeled];
+}
+
+// Overlay, as camera-overlay.d.ts declares it: its projection, outline and readout helpers, its
+// labels and constants, and createCameraOverlay with everyOverlayOption, which names every option
+// at every depth it spells as an object (the runner lists any option it leaves out).
+{
+  const axis: ObjectPositionAxis = { fraction: 1, offset: -10 };
+  const position: ObjectPosition = parseObjectPosition('right 10px center')
+    ?? { x: axis, y: { fraction: 0.5, offset: 0 } };
+  const fit: OverlayFit = 'cover';
+  const view: OverlayView = { mediaWidth: 1280, mediaHeight: 720, viewWidth: 640, viewHeight: 480, fit,
+    position, mirror: true };
+  const rect: MediaRect = overlayMediaRect(view);
+  const centre = projectOverlayPoint({ x: 0.5, y: 0.5 }, view);
+  const projected: OverlayGeometry | null = track?.geometry
+    ? projectOverlayGeometry(track.geometry, view, { minArea: 16 }) : null;
+  const corners = [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 90, y: 90 }, { x: 10, y: 90 }];
+  const outlineOptions: OutlineOptions = { offset: 5.5, arm: 0.27, minArm: 6, maxArm: 23, radius: 4.2,
+    miterLimit: 4 };
+  const outline: QuadOutline = quadOutline(corners, outlineOptions);
+  const cutout: string = quadRegion(corners, { margin: 9, radius: 6, miterLimit: 4 });
+  const family: SymbologyFamily | null = symbologyFamily(detection.symbology);
+  const segments: readonly TextSegment[] = segmentText(detection.content.text);
+  const overrides: OverlayLabelOverrides = { states: { readNow: 'Read just now' },
+    count: live => `${live} codes`, destination: { reasons: { timeout: 'No answer in time' } } };
+  const sameOverrides: LabelOverrides<OverlayLabels> = overrides;
+  const readout: DetectionReadout = describeDetection(detection, sameOverrides);
+  const encoded: EncodedUrl | null = readout.url;
+  const field: ReadoutField | undefined = readout.fields[0];
+  const eci: ReadoutEci | undefined = readout.eci?.[0];
+  const labels: Readonly<OverlayLabels> = DEFAULT_LABELS;
+  const destinationLabels: OverlayDestinationLabels = labels.destination;
+  const announcement: OverlayAnnouncement = { target: null, symbology: null, kind: null, state: null,
+    preview: null };
+  const palette: readonly string[] = TRACK_COLORS;
+  const css: string = CAMERA_OVERLAY_CSS;
+  const verifier = createDestinationVerifier({ transport: createFetchTransport({ scope: 'network' }) });
+  const destinations: OverlayDestinations = verifier;
+  const reason: OverlayDestinationReason = 'timeout';
+  const everyOverlayOption: CameraOverlayOptions = {
+    video, container: document.createElement('div'),
+    mount: { rail: document.createElement('div'), readout: document.createElement('div') },
+    styles: 'none', styleNonce: 'overlay-style',
+    clock: { now: () => performance.now(), setTimeout: (callback, ms) => setTimeout(callback, ms),
+      clearTimeout: handle => clearTimeout(handle as ReturnType<typeof setTimeout>) },
+    onSelect: (selected, result) => void [selected?.id, result?.id],
+    onAction: (action: OverlayAction) => { if (action.type === 'open') action.preventDefault(); },
+    onError: failure => console.error(failure),
+    fit: 'auto', position: 'right 10px center', mirror: 'auto', scene: true,
+    focus: 'all' satisfies OverlayFocus,
+    effects: { dim: 0.85, blur: 24, wash: 0.25, glow: 1, dwellMs: 300, cooldownMs: 400 } satisfies OverlayEffects,
+    markers: { offset: 5.5, arm: 0.27, minArm: 6, maxArm: 23, radius: 4.2, miterLimit: 4, cutoutMargin: 9,
+      cutoutRadius: 6, hitSlop: 12, segment: 'line', partial: 'points', edgeHints: true } satisfies OverlayMarkers,
+    colors: 'track', motion: 'reduce', rail: 'always' satisfies OverlayRail, retained: true, readout: true,
+    actions: { open: true, copy: true, check: true } satisfies OverlayActions,
+    thumbnails: { size: 48, refreshMs: 1000 } satisfies OverlayThumbnails,
+    destinations, destinationSlot: true, announceContent: 'preview', labels: overrides, lang: 'en',
+    scheme: 'dark',
+  };
+  const settings: CameraOverlaySettings = { focus: 'selected', rail: 'never', thumbnails: false };
+  const configured: CameraOverlay = createCameraOverlay(everyOverlayOption);
+  configured.setOptions(settings);
+  configured.update(tracker.update(report.detections, frame));
+  // @ts-expect-error update takes the tracker's snapshot, never an array of detections
+  configured.update([]);
+  const imageFrame: FrameImageFrame = { width: 640, height: 480, observedAt: performance.now(), epoch: 1,
+    sequence: 1 };
+  const image: FrameImage = new ImageData(640, 480);
+  if (configured.wantsFrameImage()) configured.setFrameImage(image, imageFrame);
+  const inspection: OverlayInspection = configured.inspect();
+  const inspected: OverlayTargetInspection | undefined = inspection.targets[0];
+  const alignment: OverlayAlignment = configured.alignment;
+  const chosen: [Track | null, boolean] = [configured.selected, configured.select(null)];
+  configured.clear();
+  configured.layout();
+  void [rect, centre, projected, outline, cutout, family, segments, encoded, field, eci,
+    destinationLabels, labels.announce(announcement), labels.count(2), palette, css, reason, inspected,
+    alignment, chosen, configured.selectedResult, configured.detection, configured.selectionMode,
+    configured.destroyed];
+  configured.destroy();
+  verifier.destroy();
 }

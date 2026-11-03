@@ -10,9 +10,11 @@ const pkg = JSON.parse(readFileSync(path, "utf8"));
 // in the publish allowlist (scripts/package-inspect.py holds the tarball to these exact bytes).
 const COPIED_FILES = ["auto.js", "auto.d.ts", "camera.js", "camera.d.ts", "camera-overlay.js", "camera-overlay.d.ts",
   "destination.js", "destination.d.ts", "destination-node.js", "destination-node.d.ts"];
-// The image example ships inside the package, so the installed folder runs it under any static
-// server: each file is listed one by one (never the folder), and copied verbatim like the modules.
-const EXAMPLE_FILES = ["headless.html", "headless.js", "scanner.worker.js", "README.md"].map((file) => `examples/${file}`);
+// The examples ship inside the package, so the installed folder runs them: the image and camera
+// pages under any static server, their shared worker, and the server-rendering script under Node.
+// Each file is listed one by one (never the folder), and copied verbatim like the modules.
+const EXAMPLE_FILES = ["headless.html", "headless.js", "camera.html", "camera.js", "scanner.worker.js", "ssr.mjs",
+  "README.md"].map((file) => `examples/${file}`);
 
 pkg.name = "@supernovae-st/qrcode-ai-scanner-wasm";
 pkg.description =

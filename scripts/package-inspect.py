@@ -136,11 +136,12 @@ NODE_FILES = frozenset({
     "LICENSE", "README.md", "package.json",
     "index.js", "index.d.ts", "native.js", "native.d.ts", "report-types.d.ts",
 })
-# The image example ships inside the wasm package, so the installed folder runs it under any
-# static server. scripts/patch-wasm-pkg.mjs lists each file (never the folder) and copies it
+# The examples ship inside the wasm package, so the installed folder runs them: the image and
+# camera pages under any static server, their shared worker, and the server-rendering script
+# under Node. scripts/patch-wasm-pkg.mjs lists each file (never the folder) and copies it
 # verbatim; nothing else may sit under examples/.
-WASM_EXAMPLE_FILES = ("examples/README.md", "examples/headless.html", "examples/headless.js",
-                      "examples/scanner.worker.js")
+WASM_EXAMPLE_FILES = ("examples/README.md", "examples/camera.html", "examples/camera.js", "examples/headless.html",
+                      "examples/headless.js", "examples/scanner.worker.js", "examples/ssr.mjs")
 WASM_FILES = frozenset({
     "LICENSE", "README.md", "package.json",
     "LICENSE-APACHE-2.0", "THIRD-PARTY.md",
@@ -1446,18 +1447,26 @@ def check_destination_modules(art: Artifact, files: dict) -> None:
         art.check(check, not problems, "; ".join(shown))
 
 
-# The example's page and scripts run with no bundler in front of them: a bare specifier never
+# The example pages and scripts run with no bundler in front of them: a bare specifier never
 # resolves there, and an absolute URL leaves the package folder. So each load read here names a
 # file the package ships, by a relative path (or is a data: URL): an import, a
 # `new URL('…', import.meta.url)`, the literal first argument of a call that loads it (fetch,
-# importScripts, sendBeacon, Worker, SharedWorker, WebSocket, EventSource), and the page's src
+# importScripts, sendBeacon, Worker, SharedWorker, WebSocket, EventSource), and the pages' src
 # attributes and link hrefs. A first argument held in a variable is read where its value is
 # made, if in one of these forms. The scripts keep to the destination core's browser floor.
-# Known forms only, like the floor. The page's Content-Security-Policy refuses every other
-# request the page makes; it does not govern the module worker, which takes its policy from its
-# own response, so a request the worker makes in another form is seen only by a run in a
-# browser, on the paths that run drives.
-WASM_EXAMPLE_SCRIPTS = ("examples/headless.js", "examples/scanner.worker.js")
+# Known forms only, like the floor. Each page's Content-Security-Policy refuses the requests it
+# does not allow (the camera page's allows other http(s) hosts for the destination checks a user
+# starts, which go through ../destination.js); it does not govern the module worker, which takes
+# its policy from its own response, so a request the worker makes in another form is seen only by
+# a run in a browser, on the paths that run drives.
+WASM_EXAMPLE_SCRIPTS = ("examples/headless.js", "examples/camera.js", "examples/scanner.worker.js")
+WASM_EXAMPLE_PAGES = ("examples/headless.html", "examples/camera.html")
+# The server-rendering example runs under Node from the installed folder, where the package
+# resolves its own name. After its traps are set, it loads exactly these subpaths, in this order,
+# each with one import() of a literal, and no other module: no static import (that would run
+# before the traps), require() or node: module.
+WASM_SSR_EXAMPLE = "examples/ssr.mjs"
+WASM_SSR_IMPORTS = tuple(f"{WASM_NAME}/{name}" for name in ("camera", "camera-overlay", "destination"))
 IMPORT_META_URL = (("name", "import"), ("punct", "."), ("name", "meta"), ("punct", "."), ("name", "url"))
 EXAMPLE_LOAD_CALLS = frozenset({"fetch", "importScripts", "sendBeacon", "Worker", "SharedWorker", "WebSocket",
                                 "EventSource"})
@@ -1565,8 +1574,34 @@ def example_load_problems(name: str, source: str, shipped) -> list:
     return problems
 
 
+def ssr_example_problems(source: str) -> list:
+    """How the modules the server-rendering example loads differ from WASM_SSR_IMPORTS."""
+    try:
+        tokens = js_tokens(source)
+        loaded = js_imports(tokens)
+    except ValueError as error:
+        return [f"not readable as JavaScript: {error}"]
+    problems = [f"line {line}: {form}" + (f" {module!r}" if module else "")
+                for form, module, line in loaded if form != "import()"]
+    literals = []
+    for k, (kind, value, line) in enumerate(tokens):
+        if kind != "name" or value != "import" or not _is(_at(tokens, k + 1), "("):
+            continue
+        if _is(_at(tokens, k - 1), ".", "?."):
+            continue
+        arguments = _call_arguments(tokens, k + 1)
+        literal = _quoted(arguments[0][0]) if len(arguments) == 1 and len(arguments[0]) == 1 else None
+        if literal is None:
+            problems.append(f"line {line}: an import() that names no literal module")
+        else:
+            literals.append(literal)
+    if literals != list(WASM_SSR_IMPORTS):
+        problems.append(f"import() of {', '.join(literals) or 'nothing'}; expected {', '.join(WASM_SSR_IMPORTS)}")
+    return problems
+
+
 def check_example(art: Artifact, files: dict) -> None:
-    """The image example, read statically as it ships. A file the reader cannot read fails."""
+    """The examples, read statically as they ship. A file the reader cannot read fails."""
     for name in WASM_EXAMPLE_SCRIPTS:
         data = files.get(name)
         problems = ([f"no {name} in the archive"] if data is None
@@ -1579,7 +1614,7 @@ def check_example(art: Artifact, files: dict) -> None:
         art.check(f"{name} parses no markup, makes no link and navigates nowhere (no innerHTML, href, location, "
                   "open(), setAttribute() of a URL or script attribute, or similar)", not problems, "; ".join(problems[:12]))
     problems = []
-    for name in ("examples/headless.html", *WASM_EXAMPLE_SCRIPTS):
+    for name in (*WASM_EXAMPLE_PAGES, *WASM_EXAMPLE_SCRIPTS):
         data = files.get(name)
         problems += ([f"no {name} in the archive"] if data is None
                      else example_load_problems(name, data.decode("utf-8", errors="replace"), files))
@@ -1588,6 +1623,12 @@ def check_example(art: Artifact, files: dict) -> None:
               "new URL(…, import.meta.url), the literal first argument of fetch, importScripts, sendBeacon, Worker, "
               "SharedWorker, WebSocket and EventSource, the page's src attributes and link hrefs)", not problems,
               "; ".join(shown))
+    data = files.get(WASM_SSR_EXAMPLE)
+    problems = ([f"no {WASM_SSR_EXAMPLE} in the archive"] if data is None
+                else ssr_example_problems(data.decode("utf-8", errors="replace")))
+    art.check(f"{WASM_SSR_EXAMPLE} loads exactly ./camera, ./camera-overlay and ./destination by the package's name, "
+              "in that order, each with one import() of a literal, and no other module", not problems,
+              "; ".join(problems[:12]))
 
 
 def metadata(data: bytes):
@@ -3420,7 +3461,7 @@ def self_test() -> int:
             altered[name] += b"\n// altered\n"
             judge(f"wasm package with an altered {name}", [npm(f"wasm-altered-{name}", altered)], FAIL,
                   f"{name} is crates/qrcode-ai-scanner-wasm/{name} verbatim")
-        # The image example: every file ships, each the crate's, and nothing else sits under examples/.
+        # The examples: every file ships, each the crate's, and nothing else sits under examples/.
         for name in WASM_EXAMPLE_FILES:
             label = re.sub(r"[^a-z0-9]+", "-", name)
             incomplete = {key: value for key, value in _npm_wasm(version).items() if key != name}
@@ -3502,6 +3543,53 @@ def self_test() -> int:
                 ("a computed attribute set", "examples/headless.js", shown,
                  "const link = element('a', 'value', text);\n  link.setAttribute(text.slice(0, 4), text);\n"
                  "  item.appendChild(link);", (dom, "of a computed attribute"))):
+            planted = _npm_wasm(version)
+            source = planted[name].decode()
+            if old not in source:
+                failures.append(f"example plant {label}: {old!r} not found in {name}")
+                continue
+            planted[name] = source.replace(old, new, 1).encode()
+            judge(f"wasm package whose example has {label}",
+                  [npm(f"wasm-example-{re.sub(r'[^a-z0-9]+', '-', label)}", planted)], FAIL, *needles)
+        # The camera page and script are read like the image example's, and the server-rendering
+        # script loads exactly the three browser subpaths by the package's name.
+        camera_floor = "examples/camera.js stays inside the browser floor"
+        camera_dom = "examples/camera.js parses no markup"
+        ssr = f"{WASM_SSR_EXAMPLE} loads exactly ./camera, ./camera-overlay and ./destination"
+        ssr_camera = "await import('@supernovae-st/qrcode-ai-scanner-wasm/camera');"
+        label_line = "option.textContent = device.label || `Camera ${index + 1}`;"
+        for label, name, old, new, needles in (
+                ("a logical assignment in the camera script", "examples/camera.js", "let chosenDevice = null;",
+                 "let chosenDevice;\nchosenDevice ??= null;", (camera_floor, "logical assignment ??=")),
+                ("a camera script import from a CDN", "examples/camera.js", "from '../camera.js'",
+                 "from 'https://cdn.example.com/camera.js'", (loads, "is not a relative path")),
+                ("a camera script import outside the package", "examples/camera.js", "from '../destination.js'",
+                 "from '../../destination.js'", (loads, "names no file the package ships")),
+                ("a CDN script in the camera page", "examples/camera.html",
+                 '<script type="module" src="./camera.js">',
+                 '<script src="https://cdn.example.com/scanner.js"></script>\n<script type="module" src="./camera.js">',
+                 (loads, "is not a relative path")),
+                ("a camera label written as markup", "examples/camera.js", label_line,
+                 "option.innerHTML = device.label;", (camera_dom, ": innerHTML")),
+                ("a decoded link opened by the camera page", "examples/camera.js",
+                 "const camera = createCameraScanner({",
+                 "overlay.setOptions({ onSelect: (track) => track && window.open(track.content.text) });\n"
+                 "const camera = createCameraScanner({", (camera_dom, ": open()")),
+                ("a camera page that reads its location", "examples/camera.js",
+                 "window.isSecureContext === false", "location.protocol === 'http:'", (camera_dom, ": location")),
+                ("a static import in the server-rendering script", WASM_SSR_EXAMPLE,
+                 f"const camera = {ssr_camera}",
+                 "import * as camera from '@supernovae-st/qrcode-ai-scanner-wasm/camera';", (ssr, ": import ")),
+                ("a Node module in the server-rendering script", WASM_SSR_EXAMPLE, ssr_camera,
+                 f"{ssr_camera}\nawait import('node:http');", (ssr, "import() of ")),
+                ("a relative import in the server-rendering script", WASM_SSR_EXAMPLE,
+                 "'@supernovae-st/qrcode-ai-scanner-wasm/destination'", "'../destination.js'",
+                 (ssr, "import() of ")),
+                ("a require() in the server-rendering script", WASM_SSR_EXAMPLE, "const reads = [];",
+                 "const reads = [];\nconst destination = require('../destination.js');", (ssr, ": require()")),
+                ("a Node built-in reached by getBuiltinModule() in the server-rendering script", WASM_SSR_EXAMPLE,
+                 "const reads = [];", "const reads = [];\nconst http = process.getBuiltinModule('node:http');",
+                 (ssr, ": getBuiltinModule()"))):
             planted = _npm_wasm(version)
             source = planted[name].decode()
             if old not in source:

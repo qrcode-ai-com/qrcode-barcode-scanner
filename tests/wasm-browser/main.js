@@ -1,5 +1,7 @@
 import { createScannerLoader, scannerCapabilities } from '@supernovae-st/qrcode-ai-scanner-wasm/auto';
 import { createCameraHarness } from './camera-harness.js';
+// Imports ./camera-overlay at page load: the runner checks that this asks for no camera.
+import { createOverlayHarness } from './overlay-harness.js';
 const workers = [];
 // Every instantiation any worker of this page reported, in arrival order; a terminated
 // worker's count stays here.
@@ -23,6 +25,7 @@ window.harness = {
   scannerCapabilities, startWorker,
   instantiations: () => instantiations.map(entry => ({ ...entry })),
   camera: createCameraHarness({ startWorker, instantiations: () => instantiations.length }),
+  overlay: createOverlayHarness(),
   async mainLoad(variant = 'auto') {
     const load = createScannerLoader({ variant });
     const a = load(), b = load();
