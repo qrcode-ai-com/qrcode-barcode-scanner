@@ -27,10 +27,14 @@ SBOM, WASM file, build record or CLI release file that still uses a name
 retired at 0.11.0 (qrcode-ai-scanner…, qrcode_ai_scanner…, @supernovae-st/…)
 fails, and so does, with --release-set, a Flutter package not named
 qr_barcode_scanner. The main npm package's loader looks up, for each committed
-napi target, its addon file and platform package exactly once, and nothing
-else. An archive README carries at most its one previous-name sentence
+napi target, its addon file, its platform package and that package's
+package.json exactly once; its other lookups are napi's helpers (node:fs,
+child_process, its own package.json) and branches for targets never built,
+under the same names, and none names a retired package, WebAssembly or WASI.
+An archive README carries at most its one previous-name sentence
 (PREVIOUS_NAMES), links the migration guide only from PyPI, and states no
-availability (pending publication, not yet published, coming soon).
+availability (pending publication, not yet published, coming soon); the
+Flutter README is held to that last rule only with --release-set.
 Directories kept their old names, so no check scans raw bytes for a name.
 
   package-inspect.py all [--no-build]          every target this host can run
@@ -149,8 +153,9 @@ WASM_MODULE = f"{WASM_STEM}_bg.wasm"
 PYPI_NAME = "qrcode-barcode-scanner"
 FLUTTER_NAME = "qr_barcode_scanner"
 # Names retired at 0.11.0, refused in every identity position: crate and npm
-# names, pins, addon and WASM file names, Python distribution, module and file
-# names, the CLI release files' prefix and the Flutter package name.
+# names, pins, addon and WASM file names, Python distribution, module, file and
+# SBOM names, the CLI release files' prefix and, with --release-set, the
+# Flutter package name.
 RETIRED_STEM = "qrcode-ai-scanner"
 RETIRED_MODULE = "qrcode_ai_scanner"
 RETIRED_SCOPE = "@supernovae-st/"
@@ -231,8 +236,11 @@ MATURIN_SDIST_GENERATED = MATURIN_SDIST_ROOT | {"qrcode-ai-scanner-py/Cargo.toml
 # module with no python-source dir (binding_generator/pyo3_binding.rs, verbatim;
 # no trailing newline). The .pyi stub and py.typed it emits are the checkout's.
 PY_MODULE = "qrcode_barcode_scanner"
-# The SBOM maturin writes for the binding crate, named after its Cargo package.
-PY_SBOM = "sboms/qrcode-barcode-scanner-py.cyclonedx.json"
+# The Rust SBOM maturin writes into every wheel (CycloneDX, through
+# cargo-cyclonedx): its file and its root component are both named after the
+# binding's Cargo package, which 0.10 called qrcode-ai-scanner-py.
+PY_SBOM_ROOT = "qrcode-barcode-scanner-py"
+PY_SBOM = f"sboms/{PY_SBOM_ROOT}.cyclonedx.json"
 MATURIN_INIT_PY = (f"from .{PY_MODULE} import *\n\n__doc__ = {PY_MODULE}.__doc__\n"
                    f'if hasattr({PY_MODULE}, "__all__"):\n    __all__ = {PY_MODULE}.__all__').encode()
 
@@ -260,11 +268,12 @@ WHEEL_PLATFORMS = (
 GRAFTED_LIB = re.compile(r"qrcode_barcode_scanner\.libs/[^/]+-[0-9a-f]{8}\.so(\.\d+)*")
 
 # What an archive README may say about its package's previous name: at most the
-# one sentence of this table, true whenever it is read. A package missing from
-# it (a platform package, the Flutter package, the CLI release files) was never
-# published under another name and says nothing of one. Registries render their
-# own install lines and these files are frozen into archives before
-# publication, so a README states no availability either.
+# one sentence of this table, true whenever it is read. A package or file
+# missing from it names none: the platform packages (napi writes their README),
+# the WASM examples README, and the Flutter package and the CLI release files,
+# which were never published under another name. Registries render their own
+# install lines and these files are frozen into archives before publication,
+# so a README states no availability either.
 PREVIOUS_NAMES = {
     ("crate", "qrcode-barcode-scanner"): "Releases up to 0.10.1 were published as `qrcode-ai-scanner`.",
     ("crate", "qrcode-barcode-scanner-cli"):
@@ -273,10 +282,13 @@ PREVIOUS_NAMES = {
     ("npm", WASM_NAME): "Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner-wasm`.",
     ("pypi", PYPI_NAME): "Releases up to 0.9.0 were published as `qrcode-ai-scanner`.",
 }
-# A sentence about a previous name, whatever its wording.
-PREVIOUS_NAME_CLAIM = re.compile(r"\b(?:published|released) (?:as|under)\b|\breleases? up to\b|\bformerly\b"
-                                 r"|\bpreviously (?:named|called|known|published)\b|\b(?:old|previous|former) name\b",
-                                 re.IGNORECASE)
+# A sentence about a previous name, in its usual phrasings: published, released
+# or shipped as or under; releases up to; formerly; previously named, called,
+# known or published; renamed; used to be; an old, previous, former, earlier or
+# prior name.
+PREVIOUS_NAME_CLAIM = re.compile(r"\b(?:published|released|shipped) (?:as|under)\b|\breleases? up to\b|\bformerly\b"
+                                 r"|\bpreviously (?:named|called|known|published)\b|\brenamed\b|\bused to be\b"
+                                 r"|\b(?:old|previous|former|earlier|prior) names?\b", re.IGNORECASE)
 # Availability text. "pending" is refused where it states a publication, not as
 # the word for an unsettled promise ("a start() still pending rejects").
 PENDING_TEXT = re.compile(r"\bnot yet (?:published|released|available|on (?:npm|PyPI|crates\.io|pub\.dev))\b"
@@ -585,6 +597,11 @@ def readme_sentences(text: str) -> list:
     return found
 
 
+def availability_claims(data) -> list:
+    """The availability phrases (PENDING_TEXT) of a README's bytes, each once."""
+    return sorted({found.group(0) for found in PENDING_TEXT.finditer((data or b"").decode("utf-8", errors="replace"))})
+
+
 def check_readme(art: Artifact, data, key: tuple, where: str = "README.md", pending: bool = True) -> None:
     """What an archive README says of names and availability: at most its one PREVIOUS_NAMES
     sentence (none for a package missing from the table), the migration guide linked only from
@@ -593,12 +610,12 @@ def check_readme(art: Artifact, data, key: tuple, where: str = "README.md", pend
     want = PREVIOUS_NAMES.get(key)
     claims = [sentence for sentence in readme_sentences(text) if PREVIOUS_NAME_CLAIM.search(sentence)]
     art.check(f"{where} names a previous name only in its one sentence: {want}" if want else
-              f"{where} names no previous name (this package never had another)",
+              f"{where} names no previous name (the table lists no sentence for it)",
               claims in ([], [want]) if want else not claims, " · ".join(claims))
     if key != ("pypi", PYPI_NAME):
         art.check(f"{where} links no migration guide (the PyPI README alone does)", MIGRATION_GUIDE not in text)
     if pending:
-        hits = sorted({found.group(0) for found in PENDING_TEXT.finditer(text)})
+        hits = availability_claims(data)
         art.check(f"{where} states no availability (pending publication, not yet published, coming soon)",
                   not hits, ", ".join(hits))
 
@@ -730,8 +747,8 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
                   f"literal {literal.group(0)!r}" if literal else f"reads {LOADER_RUNTIME_READ}")
         problems = loader_problems(native, platforms.values())
         art.check(f"loader looks up each committed target's addon ({NODE_BINARY}.<suffix>.node), platform package "
-                  "and its package.json exactly once, and nothing else (no retired name, no WebAssembly or WASI)",
-                  not problems, "; ".join(problems[:12]))
+                  "and its package.json exactly once, and besides napi's helpers only those names (no retired name, "
+                  "no WebAssembly or WASI)", not problems, "; ".join(problems[:12]))
         binary_name = (pkg.get("napi") or {}).get("binaryName")
         art.check(f"napi.binaryName is {NODE_BINARY}", binary_name == NODE_BINARY, f"{binary_name}")
         check_equal_file(art, "report-types.d.ts", files.get("report-types.d.ts"), CANON_TYPES)
@@ -1787,6 +1804,22 @@ def metadata(data: bytes):
     return email.parser.BytesParser().parsebytes(data)
 
 
+def cyclonedx_root(data) -> tuple:
+    """(name, version) of a CycloneDX SBOM's root component (metadata.component), and why
+    there is none: DATA absent, not JSON or not a CycloneDX document with a root component."""
+    if data is None:
+        return None, "absent"
+    try:
+        bom = json.loads(data)
+    except ValueError as error:
+        return None, f"not JSON: {error}"
+    meta = bom.get("metadata") if isinstance(bom, dict) else None
+    component = meta.get("component") if isinstance(meta, dict) else None
+    if not isinstance(component, dict) or bom.get("bomFormat") != "CycloneDX":
+        return None, "not a CycloneDX document with a root component (metadata.component)"
+    return (component.get("name"), component.get("version")), ""
+
+
 def check_python_metadata(art: Artifact, host: Host, meta) -> None:
     art.check(f"Name = {PYPI_NAME}", meta.get("Name") == PYPI_NAME, f"{meta.get('Name')}")
     art.check(f"Version = {host.version} (workspace)", meta.get("Version") == host.version, f"{meta.get('Version')}")
@@ -1856,6 +1889,11 @@ def inspect_wheel(host: Host, path: pathlib.Path, notes=()) -> Artifact:
     if libs:
         art.check(f"{PY_MODULE}.libs/ holds only auditwheel grafts (Linux wheel · <name>-<8 hex>.so[.N] · "
                   "in RECORD)", not bad, "; ".join(bad))
+    # The Rust SBOM is the binding package's own: present under its name (the
+    # file set below admits no other) and rooted at that package and version.
+    root, why = cyclonedx_root(files.get(f"{info}/{PY_SBOM}"))
+    art.check(f"SBOM {PY_SBOM} present, root component {PY_SBOM_ROOT} {host.version}",
+              root == (PY_SBOM_ROOT, host.version), why or f"root component {root[0]} {root[1]}")
     # The whole wheel, exactly: the dist-info maturin writes, the license
     # files, the SBOM, and the package (init · stubs · marker · extension).
     exact = {f"{info}/{n}" for n in ("METADATA", "WHEEL", "RECORD", PY_SBOM)} | {
@@ -2156,15 +2194,18 @@ def cmd_flutter(host: Host) -> None:
     art.check(f"pubspec version = {host.version} (workspace)", version == host.version, f"{version}")
     # The pub name and the README's availability sentence change together
     # with the Dart package itself; until a release set is inspected, the
-    # name and that sentence are reported, not refused.
+    # name and that sentence are reported as notes, not refused.
+    readme = package_root / "README.md"
+    readme_data = readme.read_bytes() if readme.is_file() else None
     if host.args.release_set:
         art.check(f"pubspec name is {FLUTTER_NAME} (never the retired {RETIRED_MODULE})", name == FLUTTER_NAME,
                   f"{name}")
     else:
         art.notes.append(f"pubspec name {name}: {FLUTTER_NAME} is required with --release-set")
-    readme = package_root / "README.md"
-    check_readme(art, readme.read_bytes() if readme.is_file() else None, ("pub", name),
-                 pending=host.args.release_set)
+        hits = availability_claims(readme_data)
+        if hits:
+            art.notes.append(f"README.md states availability ({', '.join(hits)}): refused with --release-set")
+    check_readme(art, readme_data, ("pub", name), pending=host.args.release_set)
     binary = host.args.flutter or which("flutter") or which("dart")
     listing = []
     art.path = rel(package_root)
@@ -3416,6 +3457,12 @@ def _python_metadata(version: str, readme=None) -> bytes:
             "Description-Content-Type: text/markdown; charset=UTF-8; variant=GFM\n\n").encode() + readme
 
 
+def _sbom(version: str, root: str = PY_SBOM_ROOT) -> bytes:
+    """maturin's Rust SBOM, cut down to what the inspector reads: its format and root component."""
+    return json.dumps({"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "metadata": {
+        "component": {"type": "library", "name": root, "version": version}}}).encode()
+
+
 def _clean_wheel(version: str, platform: str = "manylinux_2_17_x86_64", python: str = "cp38-abi3") -> dict:
     """A wheel's files as maturin writes them, tagged PYTHON-PLATFORM (dotted = several tags)."""
     info = f"{PY_MODULE}-{version}.dist-info"
@@ -3424,7 +3471,7 @@ def _clean_wheel(version: str, platform: str = "manylinux_2_17_x86_64", python: 
         f"{info}/METADATA": _python_metadata(version),
         f"{info}/WHEEL": f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\n{tags}".encode(),
         f"{info}/licenses/LICENSE": LICENSE.read_bytes(),
-        f"{info}/{PY_SBOM}": b"{}\n",
+        f"{info}/{PY_SBOM}": _sbom(version),
         f"{PY_MODULE}/__init__.py": MATURIN_INIT_PY,
         f"{PY_MODULE}/__init__.pyi": (PY_DIR / f"{PY_MODULE}.pyi").read_bytes(),
         f"{PY_MODULE}/py.typed": (PY_DIR / "py.typed").read_bytes(),
@@ -3649,8 +3696,8 @@ def self_test() -> int:
             judge(f"wasm package exporting {key}",
                   [npm("wasm-alias", _npm_wasm(version) | {"package.json": json.dumps(retargeted, indent=2).encode()})],
                   FAIL, "no compatible/ export", key)
-        # The whole package under the 0.10 file names (wasm-pack's default
-        # out-name): its module, glue, types, entry fields and build record.
+        # The whole package under the 0.10 file names (the --out-name the 0.10
+        # build passed): its module, glue, types, entry fields and build record.
         renamed = {"qrcode-ai-scanner" + name.removeprefix(WASM_STEM) if name.startswith(WASM_STEM) else name: data
                    for name, data in _npm_wasm(version).items()}
         old_pkg = json.loads(json.dumps(json.loads(renamed["package.json"])).replace(WASM_STEM + ".",
@@ -4094,6 +4141,24 @@ def self_test() -> int:
         judge("sdist whose PKG-INFO says Name: qrcode-ai-scanner",
               [sdist("sdist-retired-meta", _clean_sdist(version) | {"PKG-INFO": retired_meta})],
               FAIL, f"Name = {PYPI_NAME}")
+        # The Rust SBOM, named after the binding's Cargo package: the 0.10
+        # file name, no SBOM, and a root component of another package or
+        # version are each refused.
+        sbom, retired_root = f"{info}/{PY_SBOM}", f"{RETIRED_STEM}-py"
+        no_sbom = {name: data for name, data in _clean_wheel(version).items() if name != sbom}
+        judge(f"wheel whose SBOM is the 0.10 sboms/{retired_root}.cyclonedx.json",
+              [wheel("wheel-retired-sbom", _with_record(no_sbom | {
+                  f"{info}/sboms/{retired_root}.cyclonedx.json": _sbom(version, retired_root)}, version))],
+              FAIL, "file set is exactly the wheel allowlist", f"{retired_root}.cyclonedx.json",
+              f"SBOM {PY_SBOM} present")
+        judge("wheel with no SBOM", [wheel("wheel-no-sbom", _with_record(no_sbom, version))], FAIL,
+              f"SBOM {PY_SBOM} present", "absent")
+        for label, planted, needle in ((f"rooted at {retired_root}", _sbom(version, retired_root), retired_root),
+                                       ("rooted at 0.10.1", _sbom("0.10.1"), "0.10.1"),
+                                       ("not a CycloneDX document", b"{}\n", "not a CycloneDX document")):
+            judge(f"wheel whose SBOM is {label}",
+                  [wheel("wheel-sbom-root", _with_record(_clean_wheel(version) | {sbom: planted}, version))],
+                  FAIL, f"root component {PY_SBOM_ROOT} {version}", needle)
         # The PyPI README's one previous-name sentence is the table's, release
         # number included, and no archive README states availability.
         pypi_readme = (PY_DIR / "README.md").read_bytes()
@@ -4302,6 +4367,9 @@ def self_test() -> int:
         judge("an @supernovae-st/ main package", [npm("retired-main", renamed_npm(
             _npm_main(version, pins), f"{RETIRED_SCOPE}qrcode-ai-scanner"))], FAIL, "package name is no retired name",
               "known package name")
+        judge("an @supernovae-st/ wasm package", [npm("retired-wasm", renamed_npm(
+            _npm_wasm(version), f"{RETIRED_SCOPE}qrcode-ai-scanner-wasm"))], FAIL, "package name is no retired name",
+              "known package name")
         retired_pins = {key.replace(NODE_NAME, f"{RETIRED_SCOPE}qrcode-ai-scanner"): value for key, value in pins.items()}
         for label, optional in (("one pin", pins | {f"{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64": version}),
                                 ("every pin", retired_pins)):
@@ -4350,10 +4418,12 @@ def self_test() -> int:
               f"exactly one WASM binary ({WASM_MODULE})")
 
         # Archive READMEs: at most the table's one previous-name sentence (none
-        # for a package that never had another name), the migration guide
-        # linked from PyPI alone, and no availability text.
+        # for a package or file the table omits), the migration guide linked
+        # from PyPI alone, and no availability text. A second previous-name
+        # sentence is refused in each of its usual phrasings.
         core_readme = _clean_crate(version)["README.md"]
         guide = f"\nSee the [guide](https://example.com/{MIGRATION_GUIDE}.mdx).\n".encode()
+        second = "README.md names a previous name only in its one sentence"
         for label, text, needle in (
                 ("says not yet published", core_readme + b"\nNot yet published on crates.io.\n",
                  "README.md states no availability"),
@@ -4361,7 +4431,14 @@ def self_test() -> int:
                  "README.md states no availability"),
                 ("links the migration guide", core_readme + guide, "README.md links no migration guide"),
                 ("names a previous name a second time", core_readme + b"\nThis crate was formerly qrcode-ai-scanner.\n",
-                 "README.md names a previous name only in its one sentence")):
+                 second),
+                ("says it was renamed", core_readme + b"\nThis crate was renamed from qrcode-ai-scanner.\n", second),
+                ("says what it used to be called",
+                 core_readme + b"\nIt used to be called qrcode-ai-scanner.\n", second),
+                ("says what earlier versions shipped as",
+                 core_readme + b"\nEarlier versions shipped as qrcode-ai-scanner.\n", second),
+                ("mentions its earlier name",
+                 core_readme + b"\nOlder releases stay installable under its earlier name.\n", second)):
             judge(f"crate whose README {label}",
                   [crate(f"readme-{re.sub(r'[^a-z0-9]+', '-', label)}", _clean_crate(version) | {"README.md": text})],
                   FAIL, needle)
@@ -4660,7 +4737,8 @@ def flutter_self_test():
         ("duplicate tree entry", clean, names, 0, "├── LICENSE (<1 KB)\n", FAIL),
         ("tree traversal", clean, names, 0, "├── ..\n│   └── outside (<1 KB)\n", FAIL),
     ]
-    # (…, the snapshot the candidate was staged from, --release-set, a needle of the failing checks)
+    # (…, the snapshot the candidate was staged from, --release-set, a needle of
+    # the failing checks, or of the notes of a candidate that passes)
     scenarios = [(*row, snapshot, True, "") for row in scenarios]
     retired, retired_snapshot = variants["retired name"]
     pending, pending_snapshot = variants["pending README"]
@@ -4668,11 +4746,12 @@ def flutter_self_test():
     scenarios += [
         ("release set under the 0.10 pub name", retired, names, 0, "", FAIL, retired_snapshot, True,
          f"pubspec name is {FLUTTER_NAME}"),
-        ("the 0.10 pub name before the release set", retired, names, 0, "", PASS, retired_snapshot, False, ""),
+        ("the 0.10 pub name before the release set", retired, names, 0, "", PASS, retired_snapshot, False,
+         f"pubspec name {RETIRED_MODULE}: {FLUTTER_NAME} is required with --release-set"),
         ("release set whose README says not yet published", pending, names, 0, "", FAIL, pending_snapshot, True,
          "README.md states no availability"),
         ("a README that says not yet published before the release set", pending, names, 0, "", PASS,
-         pending_snapshot, False, ""),
+         pending_snapshot, False, "README.md states availability (Not yet published): refused with --release-set"),
         ("a README naming a previous name", previous, names, 0, "", FAIL, previous_snapshot, False,
          "README.md names no previous name"),
     ]
@@ -4701,8 +4780,11 @@ def flutter_self_test():
                     if actual != expected or commands != [(["fake-pub", "pub", "publish", "--dry-run"], root.resolve())]:
                         failures.append(f"Flutter {label}: {actual}, expected {expected}; commands {commands}")
                     failed = " · ".join(f"{c.name}: {c.detail}" for c in host.artifacts[0].checks if not c.ok)
-                    if needle and needle not in failed:
+                    notes = " · ".join(host.artifacts[0].notes)
+                    if needle and expected == FAIL and needle not in failed:
                         failures.append(f"Flutter {label}: no failing check names {needle!r} (failing: {failed})")
+                    if needle and expected == PASS and needle not in notes:
+                        failures.append(f"Flutter {label}: no note names {needle!r} (notes: {notes})")
                     if expected == PASS and len(host.recorded) != len(listing):
                         failures.append(f"Flutter {label}: incomplete same-byte record")
                     if expected == PASS:
