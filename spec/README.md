@@ -66,7 +66,16 @@ The spec cannot silently drift from the code:
    against `scan-report.schema.json` — a contract change that forgets the
    spec breaks the build. It also holds every golden to the build: a final
    report (`trace.budget_exhausted: false`), this build's `versions`, no two
-   detections that denote one content, and a row below naming its fixture.
+   detections that denote one content, and a row of the table above naming
+   its fixture. It then scans each fixture again, with the configuration
+   `qrscan` builds from the golden's command line, in a build with both
+   engines like the CLI's: the report must equal the golden in every field
+   except the measured timings (`trace.total_ms` and each stage's `ms`), so
+   a behavior change that leaves a golden unregenerated fails
+   `golden_equals_a_fresh_scan::<name>`, which lists every differing JSON
+   pointer with both values. The test's list of command lines names every
+   golden once, with the fixture of its row above, and that row shows any
+   `--alpha-palette` argument the line adds.
 2. The TypeScript mirror (`bindings/report-types.d.ts`) ships inside both
    npm packages and is synced by `scripts/sync-report-types.mjs`.
 3. The wire names (`snake_case` tags, profile names, error codes) are

@@ -8,7 +8,9 @@
 # (observed at load ≈ 100: it fails at ~4.1 s in a full parallel run, passes
 # serially). The others are the suite's heaviest CPU consumers, which starve
 # any budget running beside them: the artistic score pins (deep-ladder decode
-# + full stress score), the threaded-determinism pin (four budget-free
+# + full stress score; the artistic golden's reproduction in spec_golden runs
+# the same scan, while the other golden reproductions are lighter and run
+# outside the group), the threaded-determinism pin (four budget-free
 # full-ladder scans at once, every non-PDF417 symbology fixture included),
 # the score sweeps (one judgment per work quota
 # of three symbols · one scan per budget step) and the budget-flag sweeps
@@ -26,7 +28,7 @@
 wall-clock = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'test(artistic_image_that_decodes_must_not_score_zero) + test(blob_style_template_decodes_and_scores) + test(legacy_artistic_image_decodes_within_full_ladder) + test(concurrent_scans_yield_byte_identical_reports) + test(work_quota_cuts_are_absent_never_partial) + test(budget_cuts_never_ship_a_partial_judgment) + test(a_present_score_is_budget_independent) + test(flag_false_means_final) + test(unbounded_scans_never_set_the_flag)'
+filter = 'test(artistic_image_that_decodes_must_not_score_zero) + test(blob_style_template_decodes_and_scores) + test(/^golden_equals_a_fresh_scan::artistic_blob$/) + test(legacy_artistic_image_decodes_within_full_ladder) + test(concurrent_scans_yield_byte_identical_reports) + test(work_quota_cuts_are_absent_never_partial) + test(budget_cuts_never_ship_a_partial_judgment) + test(a_present_score_is_budget_independent) + test(flag_false_means_final) + test(unbounded_scans_never_set_the_flag)'
 test-group = 'wall-clock'
 threads-required = "num-cpus"
 
