@@ -2248,10 +2248,10 @@ pub(crate) mod tests {
         for number in PAUSES {
             signal(pid, number);
             seen.push((number, "harness stopped", stopped_within(pid, true)));
-            seen.push((number, "child stopped", state(victim).starts_with('T')));
+            seen.push((number, "child stopped", stopped_within(victim, true)));
             signal(pid, RESUME);
             seen.push((number, "harness continued", stopped_within(pid, false)));
-            seen.push((number, "child continued", !state(victim).starts_with('T')));
+            seen.push((number, "child continued", stopped_within(victim, false)));
         }
         signal(pid, RESUME);
         signal(pid, 15);
