@@ -20,6 +20,7 @@ pkg.name = "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 pkg.description =
   "QR and barcode decoding + scannability scoring — one portable browser WASM with camera, tracking and overlay modules, plus optional URL destination checks";
 pkg.license = "AGPL-3.0-or-later";
+pkg.homepage = "https://qrcode-ai.com/";
 pkg.repository = {
   type: "git",
   url: "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",

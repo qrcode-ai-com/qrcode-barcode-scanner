@@ -190,7 +190,7 @@ WASM_FILES = frozenset({
 # `publishConfig` is planted — nothing here writes one, and some would run or
 # redirect on a consumer's install.
 WASM_MANIFEST_KEYS = frozenset({
-    "name", "type", "collaborators", "description", "version", "license", "repository",
+    "name", "type", "collaborators", "description", "version", "license", "homepage", "repository",
     "files", "main", "types", "sideEffects", "keywords", "module", "exports",
 })
 # What `napi create-npm-dirs` (@napi-rs/cli 3.7.3) picks from the main manifest

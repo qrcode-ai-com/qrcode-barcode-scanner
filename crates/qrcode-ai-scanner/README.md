@@ -35,4 +35,8 @@ via `ImageInput::rgba8`. Full docs: the
 
 Releases up to 0.10.1 were published as `qrcode-ai-scanner`.
 
+Part of [QR Code AI](https://qrcode-ai.com/). Scan online with the
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) or the
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+
 License: AGPL-3.0-or-later · © SuperNovae Studio.

@@ -44,14 +44,18 @@ if report["detections"]:
   `eci`, never by `text`.
 
 The returned `dict` is the same `ScanReport` documented in the
-[spec](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec).
+[spec](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec).
 
 Releases up to 0.9.0 were published as `qrcode-ai-scanner`.
 
 To migrate, uninstall the previous distribution, install this one and import
 `qrcode_barcode_scanner` instead: the rename itself changes no function name and no
 report field. The
-[migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+[migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
 covers every runtime.
+
+Part of [QR Code AI](https://qrcode-ai.com/). Scan online with the
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) or the
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 
 License: AGPL-3.0-or-later · © SuperNovae Studio.

@@ -49,5 +49,8 @@ Browser? Use
 
 Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.
 
-License: AGPL-3.0-or-later · © SuperNovae Studio · part of
-[qrcode-ai.com](https://qrcode-ai.com).
+Part of [QR Code AI](https://qrcode-ai.com/). Scan online with the
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) or the
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+
+License: AGPL-3.0-or-later · © SuperNovae Studio.

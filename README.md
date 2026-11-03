@@ -380,6 +380,12 @@ keep their earlier spelling.
 | [`qrcode-ai-scanner-wasm`](crates/qrcode-ai-scanner-wasm) (`@qrcode-ai-com/qrcode-barcode-scanner-wasm`, one portable WASM) | npm |
 | [`qrcode-barcode-scanner-py`](crates/qrcode-ai-scanner-py) (`qrcode-barcode-scanner` on PyPI, PyO3 abi3) | PyPI |
 
+## QR Code AI
+
+This scanner is part of [QR Code AI](https://qrcode-ai.com/). Scan online with the
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) or the
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+
 ## Contributing & security
 
 Develop this scanner in

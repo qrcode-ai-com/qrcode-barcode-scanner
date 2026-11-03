@@ -361,7 +361,7 @@ from the frame the decoder read. The overlay never reads the video for them: in
 pass a copy to `overlay.setFrameImage(image, frame)`, as the wiring above does.
 Pass an `ImageData` or an `ImageBitmap`, never a canvas.
 
-The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/wasm.mdx)
+The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/wasm.mdx)
 covers each part in full. Checks in automated browsers do not qualify a
 physical camera or every mobile browser.
 
@@ -524,11 +524,11 @@ const handler = createDestinationEndpoint({
 The endpoint lets callers make your server send requests, even with that
 policy. Authenticate callers, limit their rate, keep URLs out of logs, and add
 your network's NAT64 prefix and denied ranges; the
-[security guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/concepts/security.mdx)
+[security guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/concepts/security.mdx)
 lists the policy and the operator's duties. The package is AGPL-3.0-or-later:
 running a modified version of it, this resolver included, as a service that
 users reach over a network brings the AGPL's source obligations (section 13).
-[LICENSING.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[LICENSING.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md)
 describes the licensing options. This is a licensing note, not legal advice.
 
 ## Examples
@@ -570,7 +570,7 @@ context: `localhost` and `127.0.0.1` count as one on the machine that runs the
 browser; from another device, such as a phone, serve the folder over `https`.
 Run the server-rendering example with
 `node node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/examples/ssr.mjs`.
-[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md),
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md),
 also in the installed package, describes each example and the worker's
 messages.
 
@@ -580,7 +580,7 @@ Both example pages scan with no violation reported when a server sends
 `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src blob: data:`,
 plus a `style-src` hash of the image page's one inline `<style>` element, as a
 `Content-Security-Policy` header with every file of the package folder.
-[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
 gives that exact policy, why each source is needed, and how the package's
 browser job found it in Playwright's Chromium and Firefox. For a policy of your
 own:
@@ -614,7 +614,7 @@ own:
   the loader finds its `.wasm` through `import.meta.url`, and the package's CI
   builds a fresh Vite application with a module worker from the installed
   package. The browser API guide lists the bundler settings, and
-  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
+  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
   shows the example pages' imports by package name.
 - **Server rendering.** Importing `/auto`, `/camera`, `/camera-overlay` and
   `/destination` during server rendering compiles no WebAssembly, fetches
@@ -627,5 +627,8 @@ own:
 
 Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner-wasm`.
 
-License: AGPL-3.0-or-later · © SuperNovae Studio · part of
-[qrcode-ai.com](https://qrcode-ai.com).
+Part of [QR Code AI](https://qrcode-ai.com/). Scan online with the
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) or the
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+
+License: AGPL-3.0-or-later · © SuperNovae Studio.

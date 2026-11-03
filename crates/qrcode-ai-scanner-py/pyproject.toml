@@ -28,8 +28,9 @@ dynamic = ["version"]
 test = ["pytest", "jsonschema", "pillow"]
 
 [project.urls]
+Homepage = "https://qrcode-ai.com/"
 Repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
-Documentation = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/docs"
+Documentation = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/docs"
 
 [tool.maturin]
 module-name = "qrcode_barcode_scanner"
