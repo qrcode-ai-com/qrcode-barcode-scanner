@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { identitiesDigest, identity, judge, load as loadTruth, stage, TRUTH } from "./consumer-truth.mjs";
 import { nativeCancellation, nativeLoadPhase, wasmLoaderPhases } from "./loader-phases.mjs";
@@ -19,7 +19,7 @@ assert.ok(["native", "wasm"].includes(mode) && archivesArg && fixtureArg && expe
   "usage: packed-node-consumer.mjs native|wasm ARCHIVES FIXTURE VERSION [NAPI_SUFFIX]");
 const archives = resolve(archivesArg);
 const digest = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
-const name = `@supernovae-st/qrcode-ai-scanner${mode === "wasm" ? "-wasm" : ""}`;
+const name = `@qrcode-ai-com/qrcode-barcode-scanner${mode === "wasm" ? "-wasm" : ""}`;
 const files = readdirSync(archives, { recursive: true }).filter((file) => file.endsWith(".tgz"));
 const packages = files.map((file) => {
   const path = join(archives, file);
@@ -61,7 +61,16 @@ const require = createRequire(join(consumer, "probe.cjs"));
 const imported = realpathSync(require.resolve(name));
 const packageRoot = realpathSync(join(consumer, "node_modules", ...name.split("/")));
 assert.ok(relative(packageRoot, imported) && !relative(packageRoot, imported).startsWith(".."), imported);
-assert.equal(JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version, expectedVersion);
+const installed = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+assert.equal(installed.version, expectedVersion);
+// Nothing was installed under the scope the packages left at 0.11.0.
+assert.equal(existsSync(join(consumer, "node_modules", "@supernovae-st")), false,
+  "no package of the retired @supernovae-st scope is installed");
+// A loaded module's path inside the consumer (the temporary directory's own
+// random name is no evidence), or its file name outside it.
+const consumerRoot = realpathSync(consumer);
+const shown = (file) => (relative(consumerRoot, file).startsWith("..") ? basename(file) : relative(consumerRoot, file));
+let identityChecks = null;
 const bytes = readFileSync(fixture);
 const text = "https://qrcode-ai.com/c/v5q";
 const axes = ["resolution", "blur", "contrast", "perspective", "rotation", "lighting"];
@@ -74,8 +83,18 @@ if (mode === "native") {
   full = await qr.scan(bytes, { profile: "full", budgetMs: 0 });
   loaded = Object.keys(require.cache).filter((file) => file.endsWith(".node"));
   assert.equal(loaded.length, 1, "exactly one native binary loaded");
+  // The addon is named after the installed main package's napi.binaryName,
+  // its own unscoped name, so an addon under an earlier name never loads.
+  const { binaryName } = installed.napi;
+  assert.equal(binaryName, name.slice(name.indexOf("/") + 1), "napi.binaryName is the main package's unscoped name");
+  const addon = `${binaryName}.${suffix}.node`;
+  assert.equal(basename(loaded[0]), addon, "the loaded addon's file name");
   assert.equal(realpathSync(loaded[0]), realpathSync(join(consumer, "node_modules", ...selected[1].manifest.name.split("/"),
-    `qrcode-ai-scanner.${suffix}.node`)));
+    addon)));
+  // Neither a WebAssembly module nor a WASI binding stands in for the addon.
+  const standIns = Object.keys(require.cache).map(shown).filter((file) => /\.wasm$|wasi/i.test(file));
+  assert.deepEqual(standIns, [], "no WebAssembly or WASI module is loaded");
+  identityChecks = { retired_scope_installed: false, addon, wasm_or_wasi_loaded: standIns };
   const untimed = ({ trace, ...rest }) => ({ ...rest,
     trace: { ...trace, total_ms: 0, stages: trace.stages.map((stage) => ({ ...stage, ms: 0 })) } });
   assert.deepEqual(untimed(scan(bytes, "full")), untimed(full));
@@ -110,7 +129,22 @@ if (mode === "native") {
 } else {
   assert.equal(typeof globalThis.window, "undefined", "this is a Node SSR import");
   qr = await import(pathToFileURL(imported));
-  const wasm = join(packageRoot, "qrcode-ai-scanner_bg.wasm");
+  // One WebAssembly module, named after the package; the 0.10 compatible/
+  // paths are gone from the exports and resolve to nothing.
+  const wasmModules = readdirSync(packageRoot, { recursive: true }).filter((file) => file.endsWith(".wasm"));
+  assert.deepEqual(wasmModules, ["qrcode-barcode-scanner_bg.wasm"], "one WebAssembly module, under the package's name");
+  const compatibleExports = Object.keys(installed.exports).filter((key) => key.includes("compatible"));
+  assert.deepEqual(compatibleExports, [], "no compatible/ export");
+  const compatibleRefused = {};
+  for (const subpath of ["compatible/qrcode-barcode-scanner_bg.wasm", "compatible/qrcode-ai-scanner_bg.wasm"]) {
+    assert.throws(() => require.resolve(`${name}/${subpath}`), (error) => {
+      compatibleRefused[subpath] = error.code ?? error.message;
+      return true;
+    }, `${name}/${subpath} must resolve to nothing`);
+  }
+  identityChecks = { retired_scope_installed: false, wasm_modules: wasmModules, compatible_exports: compatibleExports,
+    compatible_refused: compatibleRefused };
+  const wasm = join(packageRoot, "qrcode-barcode-scanner_bg.wasm");
   qr.initSync({ module: readFileSync(wasm) });
   loaded = [wasm];
   scan = (input, profile) => qr.scan_image(input, profile, undefined, undefined, 0);
@@ -231,6 +265,7 @@ const receipt = { verdict: "PASS", mode, node: process.version, platform: proces
     identities_sha256: identitiesDigest(identities) },
   installed_tarballs: selected.map(({ path, sha256 }) => ({ path, sha256 })),
   platform_version_mismatch_refused: mode === "native" ? true : null,
+  identity: identityChecks,
   loader_phases: loaderPhases,
   destination_subpaths: destinationSubpaths,
   loaded: loaded.map((path) => ({ path, sha256: digest(path) })) };
