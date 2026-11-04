@@ -390,7 +390,7 @@ class Host:
                 f"$ (cd {rel(cwd)} && {shlex.join(str(c) for c in cmd)})\n"
                 f"exit {proc.returncode}\n--- stdout\n{proc.stdout}\n--- stderr\n{proc.stderr}"
             )
-            (self.out / "logs" / f"{safe}.log").write_text(body)
+            (self.out / "logs" / f"{safe}.log").write_text(body, encoding="utf-8")
         return proc
 
     def cargo_cmd(self, *args: str) -> list:
@@ -590,6 +590,7 @@ def check_equal_file(art: Artifact, name: str, data, source: pathlib.Path) -> No
 
 def readme_sentences(text: str) -> list:
     """The README's sentences, each on one line: paragraphs split at blank lines, then at a sentence end."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     found = []
     for paragraph in re.split(r"\n[ \t]*\n", text):
         flat = " ".join(paragraph.split())
@@ -4422,6 +4423,25 @@ def self_test() -> int:
         # from PyPI alone, and no availability text. A second previous-name
         # sentence is refused in each of its usual phrasings.
         core_readme = _clean_crate(version)["README.md"]
+        # Windows checkouts retain CRLF inside Cargo archives. Paragraph
+        # boundaries must not merge the CLI command block with its one
+        # permitted historical-name sentence.
+        for name, directory in CRATE_DIRS.items():
+            original = (ROOT / directory / "README.md").read_bytes()
+            lf = original.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            for ending in (b"\n", b"\r\n", b"\r"):
+                text = lf.replace(b"\n", ending)
+                art = Artifact(f"{name} README {ending!r}", "crate")
+                check_readme(art, text, ("crate", name))
+                ran += 1
+                if art.status != PASS or art.checks[0].detail != PREVIOUS_NAMES[("crate", name)]:
+                    failures.append(f"{art.name}: expected exactly the permitted historical-name sentence")
+                extra = text + ending * 2 + b"This crate was formerly qrcode-ai-scanner-cli." + ending
+                art = Artifact(f"{name} duplicate claim {ending!r}", "crate")
+                check_readme(art, extra, ("crate", name))
+                ran += 1
+                if art.status != FAIL or art.checks[0].ok or "formerly" not in art.checks[0].detail:
+                    failures.append(f"{art.name}: expected a rejected second historical-name sentence")
         guide = f"\nSee the [guide](https://example.com/{MIGRATION_GUIDE}.mdx).\n".encode()
         second = "README.md names a previous name only in its one sentence"
         for label, text, needle in (
@@ -4484,6 +4504,33 @@ def self_test() -> int:
         ran += 1
         if _run_main(["versions", "--record", str(base / "versions.sha256")]) != 2:
             failures.append("--record with versions: not refused as a usage error (exit 2)")
+
+        # A failed check must return the inspection verdict and retain its
+        # complete UTF-8 diagnostics even under the legacy Windows locale.
+        invalid = crate("report-encoding", _clean_crate(version) | {"LICENSE": b"MIT\n"})
+        for quiet in (False, True):
+            output = base / f"report-encoding-{quiet}"
+            summary = base / f"report-summary-{quiet}.md"
+            record = base / f"report-record-{quiet}.sha256"
+            record.write_text("stale\n", encoding="utf-8")
+            env = dict(os.environ, PYTHONIOENCODING="cp1252", PYTHONUTF8="0", GITHUB_STEP_SUMMARY=str(summary))
+            proc = subprocess.run([sys.executable, str(ROOT / "scripts/package-inspect.py"), "archive",
+                                   str(invalid), "--strict", "--out", str(output), "--record", str(record),
+                                   *(["--quiet"] if quiet else [])], cwd=ROOT, env=env, capture_output=True)
+            ran += 1
+            try:
+                report = json.loads((output / "package-inspect.json").read_text(encoding="utf-8"))
+                rendered = (output / "package-inspect.md").read_text(encoding="utf-8")
+                failed = [c["name"] for a in report for c in a["checks"] if not c["ok"]]
+                ok = (proc.returncode == 1 and b"UnicodeEncodeError" not in proc.stderr
+                      and report[0]["status"] == FAIL
+                      and failed == ["LICENSE is the AGPL text, byte-identical to the root LICENSE"]
+                      and summary.read_text(encoding="utf-8") == rendered and not record.exists()
+                      and "FAIL" in proc.stdout.decode("utf-8") and "FAIL" in proc.stderr.decode("utf-8"))
+            except (OSError, ValueError, KeyError, IndexError):
+                ok = False
+            if not ok:
+                failures.append(f"cp1252 report (quiet={quiet}): expected exit 1, exact license failure and UTF-8 receipts")
 
     flutter_count, flutter_failures = flutter_self_test()
     ran += flutter_count
@@ -5694,19 +5741,11 @@ def main(argv=None) -> int:
         shutil.rmtree(host.scratch, ignore_errors=True)
 
     report = markdown(host, args.target)
-    if args.quiet:
-        print("\n".join(line for line in report.splitlines()[:6 + len(host.artifacts)] if line.startswith("|")))
-        for art in host.artifacts:
-            failed = [c for c in art.checks if not c.ok]
-            if failed or art.reason:
-                print(f"{art.name} — {art.status.upper()}{': ' + art.reason if art.reason else ''}")
-                print("\n".join(f"  ✗ {c.name}: {c.detail}" for c in failed))
-    else:
-        print(report)
+    # Persist the evidence before presentation, including a failing verdict.
     if host.out:
-        (host.out / "package-inspect.md").write_text(report)
+        (host.out / "package-inspect.md").write_text(report, encoding="utf-8")
         (host.out / "package-inspect.json").write_text(json.dumps(
-            [dataclasses.asdict(a) | {"status": a.status} for a in host.artifacts], indent=2) + "\n")
+            [dataclasses.asdict(a) | {"status": a.status} for a in host.artifacts], indent=2) + "\n", encoding="utf-8")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as sink:
@@ -5720,7 +5759,16 @@ def main(argv=None) -> int:
         if bad or any(art.status != PASS for art in host.artifacts):
             record.unlink(missing_ok=True)
         else:
-            record.write_text("".join(f"{digest}  {name}\n" for digest, name in host.recorded))
+            record.write_text("".join(f"{digest}  {name}\n" for digest, name in host.recorded), encoding="utf-8")
+    if args.quiet:
+        print("\n".join(line for line in report.splitlines()[:6 + len(host.artifacts)] if line.startswith("|")))
+        for art in host.artifacts:
+            failed = [c for c in art.checks if not c.ok]
+            if failed or art.reason:
+                print(f"{art.name} — {art.status.upper()}{': ' + art.reason if art.reason else ''}")
+                print("\n".join(f"  ✗ {c.name}: {c.detail}" for c in failed))
+    else:
+        print(report)
     annotate = "::error title=package-inspect::" if os.environ.get("GITHUB_ACTIONS") else "package-inspect: "
     for art in bad:
         print(f"{annotate}{art.name}: {art.status.upper()} "
@@ -5729,4 +5777,7 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     sys.exit(main())

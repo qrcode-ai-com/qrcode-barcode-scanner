@@ -63,7 +63,17 @@ jobs:
       # its own archive, then the archives read back: LICENSE · README ·
       # version · the cli's core pin · no stray files.
       - name: package + inspect the two .crate files
-        run: python3 scripts/package-inspect.py crates --verify --strict --quiet
+        shell: bash
+        run: python3 scripts/package-inspect.py crates --verify --strict --quiet --out "$RUNNER_TEMP/rust-package-inspection"
+      - name: retain package inspection diagnostics, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: rust-package-inspection-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/rust-package-inspection
+            target/package/*.crate
+          if-no-files-found: warn
       - name: install inspected archives outside the checkout and run consumers
         id: consumer
         shell: bash
