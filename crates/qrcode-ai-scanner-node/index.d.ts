@@ -94,7 +94,7 @@ export interface ScanOptions {
   scorePreset?: "design" | "capture";
 }
 
-/** Async scan on the libuv pool — never blocks the event loop. */
+/** Runs the Rust scan on the libuv worker pool. */
 export function scan(image: Buffer | Uint8Array, options?: ScanOptions): Promise<ScanReport>;
 /** Blocking scan — scripts only. */
 export function scanSync(image: Buffer | Uint8Array, options?: Omit<ScanOptions, "signal">): ScanReport;
