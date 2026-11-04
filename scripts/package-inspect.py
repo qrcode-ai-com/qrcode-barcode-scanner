@@ -816,6 +816,7 @@ def inspect_npm(host: Host, path: pathlib.Path, notes=()) -> Artifact:
         art.check("os + cpu declared", bool(pkg.get("os")) and bool(pkg.get("cpu")),
                   f"os={pkg.get('os')} cpu={pkg.get('cpu')}")
         check_platform_manifest(art, pkg)
+        check_equal_file(art, "README.md", files.get("README.md"), ROOT / "distribution/npm/README.md")
         check_readme(art, files.get("README.md"), ("npm", name))
     else:
         art.check(f"known package name: {NODE_NAME}, {WASM_NAME} or a platform package {NODE_NAME}-<suffix> of a "
@@ -1102,7 +1103,7 @@ def emulated_platform_dir(host: Host) -> pathlib.Path:
         "repository": node_pkg.get("repository"),
         "os": [os_name],
     }, indent=2))
-    (pdir / "README.md").write_text(f"# `{NODE_NAME}-{suffix}`\n")
+    shutil.copyfile(ROOT / "distribution/npm/README.md", pdir / "README.md")
     shutil.copyfile(NODE_DIR / "LICENSE", pdir / "LICENSE")
     built = NODE_DIR / binary
     if built.is_file():
@@ -3523,7 +3524,7 @@ def _npm_platform(version: str, suffix: str) -> dict:
     os_name, cpu = suffix.split("-")[:2]
     pkg = {"name": f"{NODE_NAME}-{suffix}", "version": version, "os": [os_name], "cpu": [cpu],
            "main": binary, "files": [binary], "license": SPDX, "repository": REPO_URL}
-    return {"package.json": json.dumps(pkg).encode(), "README.md": f"# `{NODE_NAME}-{suffix}`\n".encode(),
+    return {"package.json": json.dumps(pkg).encode(), "README.md": (ROOT / "distribution/npm/README.md").read_bytes(),
             "LICENSE": LICENSE.read_bytes(), binary: b"\x7fELF"}
 
 
@@ -4471,6 +4472,9 @@ def self_test() -> int:
                   "README.md": main_readme.replace(main_sentence, main_sentence.replace(b"0.10.1", b"0.10.0"))})],
               FAIL, "README.md names a previous name only in its one sentence", "0.10.0")
         platform_files = _npm_platform(version, "darwin-arm64")
+        judge("platform package whose README omits the product links",
+              [npm("readme-platform-links", platform_files | {"README.md": b"# Native addon\n"})], FAIL,
+              "README.md is distribution/npm/README.md verbatim")
         judge("platform package whose README names a previous name",
               [npm("readme-platform", platform_files | {"README.md": platform_files["README.md"] + (
                   f"\nReleases up to 0.10.1 were published as `{RETIRED_SCOPE}qrcode-ai-scanner-darwin-arm64`.\n"

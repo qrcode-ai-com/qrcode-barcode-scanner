@@ -270,3 +270,9 @@ providing the corresponding source.
 Releases and their notes are listed at
 <https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases>, and the
 changes of each version in `CHANGELOG.md` of the source.
+
+## QR Code AI
+
+- [QR Code AI](https://qrcode-ai.com/)
+- [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
+- [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
