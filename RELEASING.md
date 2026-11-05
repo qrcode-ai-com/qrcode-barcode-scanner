@@ -929,9 +929,33 @@ review a new 0.11 frozen BOM and publisher contract before creating its independ
 OCI tag. The engine `v0.11.0` tag and release assets remain immutable. The 0.10
 recipe/BOM/publisher and historical Docker Hub consumer below stay unchanged.
 
-## Docker publishing — a separate qualified distribution tag
+The frozen [0.11 BOM](distribution/docker/v0.11/release-0.11.0.json) names native
+producer run `42063666939`, checked-out packaging revision
+`1c015523547226f14cc7abc1931bb074786c32dc`, official AMD64 artifact `13432955505`
+and ARM64 artifact `13430944709`, their verified ZIP digests, config IDs, raw
+layers and binary hashes. Its two native consumers execute 35 truth inputs,
+39 profile runs and 49 CLI commands each, including the mixed regressions in
+fast/frame/full. Engine source remains `176ac96ef16ee330dbfc6ada10327d0b4e23a8b2`.
 
-`oci-publish.yml` publishes the already-tested 0.10.0 CLI images to
+The active `oci-publish.yml` now consumes that exact 0.11 BOM through
+`distribution/docker/v0.11/publish.py`. Its default branch dispatch **inspect**
+runs only read-only native inspectors. The publisher is still gated by the
+independent exact `oci-v0.11.0` tag, `container` environment and a fresh in-job
+reinspection before ephemeral `github.token` authentication. It never rebuilds
+or installs the scanner and needs no permanent registry secret or new OIDC grant.
+The registry index and architecture aliases must be absent or match the frozen
+config and raw layers; a mismatch refuses all known writes. The publisher does
+not update `latest`, Docker Hub, engine tags or CLI release assets. After actual
+upload, make this named GHCR package public and dispatch **public-pull** on the
+same OCI tag; both native anonymous consumers must succeed before public delivery
+is claimed. Retain those receipts separately from producer and inspector results.
+Producer artifacts have 14-day retention: complete this activation while those
+exact artifacts are available; expiry is not authority to substitute a rebuild.
+
+## Docker publishing — historical 0.10 distribution
+
+The historical 0.10 publisher (`distribution/docker/publish.py`, retained for
+its frozen release and Docker Hub consumer) publishes the already-tested 0.10.0 CLI images to
 `ghcr.io/supernovae-st/qrcode-ai-scanner` without rebuilding them. Its separate
 `oci-v0.10.0` tag does not trigger the engine's `v*` publishers or move the
 immutable engine tag. The public frozen BOM in

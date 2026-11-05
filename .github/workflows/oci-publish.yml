@@ -1,6 +1,6 @@
 name: oci-publish
 
-# A separate distribution tag preserves the immutable v0.10.0 engine release.
+# A separate distribution tag preserves the immutable v0.11.0 engine release.
 # Existing, already-executed images are downloaded by artifact ID and checked;
 # no rebuild, unlocked installer, permanent credential or inline interpolation.
 on:
@@ -25,10 +25,10 @@ jobs:
         include:
           - runner: ubuntu-24.04
             architecture: amd64
-            artifact_id: "11903554096"
+            artifact_id: "13432955505"
           - runner: ubuntu-24.04-arm
             architecture: arm64
-            artifact_id: "11904033809"
+            artifact_id: "13430944709"
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -41,8 +41,8 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ matrix.artifact_id }}
-          run-id: "38583785567"
-          repository: supernovae-st/qrcode-barcode-scanner
+          run-id: "42063666939"
+          repository: qrcode-ai-com/qrcode-barcode-scanner
           digest-mismatch: error
           github-token: ${{ github.token }}
           path: qualified/${{ matrix.architecture }}
@@ -51,9 +51,9 @@ jobs:
           ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
-          python3 distribution/docker/publish.py inspect --artifacts "$PWD/qualified" --architecture "$ARCHITECTURE" --load --native
-          python3 distribution/docker/verify.py qrscan:qualified fixtures/clean/gen_v5_q.png --expected-platform "linux/$ARCHITECTURE" --receipt "inspected/$ARCHITECTURE.json"
-          python3 distribution/docker/publish.py record-consumer --architecture "$ARCHITECTURE" --receipt "inspected/$ARCHITECTURE.json"
+          python3 distribution/docker/v0.11/publish.py inspect --artifacts "$PWD/qualified" --architecture "$ARCHITECTURE" --load --native
+          python3 distribution/docker/v0.11/verify.py qrscan:qualified fixtures/clean/gen_v5_q.png --expected-platform "linux/$ARCHITECTURE" --packaging-revision 1c015523547226f14cc7abc1931bb074786c32dc --native --receipt "inspected/$ARCHITECTURE.json"
+          python3 distribution/docker/v0.11/publish.py record-consumer --architecture "$ARCHITECTURE" --receipt "inspected/$ARCHITECTURE.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qrscan-oci-inspected-${{ matrix.architecture }}
@@ -78,28 +78,28 @@ jobs:
         with:
           persist-credentials: false
       - name: gate the independent OCI tag against the frozen BOM
-        run: python3 distribution/docker/publish.py gate --ref "$GITHUB_REF"
+        run: python3 distribution/docker/v0.11/publish.py gate --ref "$GITHUB_REF"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: "11903554096"
-          run-id: "38583785567"
-          repository: supernovae-st/qrcode-barcode-scanner
+          artifact-ids: "13432955505"
+          run-id: "42063666939"
+          repository: qrcode-ai-com/qrcode-barcode-scanner
           digest-mismatch: error
           github-token: ${{ github.token }}
           path: qualified/amd64
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: "11904033809"
-          run-id: "38583785567"
-          repository: supernovae-st/qrcode-barcode-scanner
+          artifact-ids: "13430944709"
+          run-id: "42063666939"
+          repository: qrcode-ai-com/qrcode-barcode-scanner
           digest-mismatch: error
           github-token: ${{ github.token }}
           path: qualified/arm64
       - name: re-inspect both downloaded images before registry authentication
         run: |
           set -euo pipefail
-          python3 distribution/docker/publish.py inspect --artifacts "$PWD/qualified" --architecture amd64
-          python3 distribution/docker/publish.py inspect --artifacts "$PWD/qualified" --architecture arm64
+          python3 distribution/docker/v0.11/publish.py inspect --artifacts "$PWD/qualified" --architecture amd64
+          python3 distribution/docker/v0.11/publish.py inspect --artifacts "$PWD/qualified" --architecture arm64
       - name: authenticate with this job's repository token
         env:
           GHCR_TOKEN: ${{ github.token }}
@@ -113,7 +113,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ github.token }}
           DOCKER_CONFIG: ${{ runner.temp }}/qrscan-publish-docker
-        run: python3 distribution/docker/publish.py publish --artifacts "$PWD/qualified" --receipt published/registry.json
+        run: python3 distribution/docker/v0.11/publish.py publish --artifacts "$PWD/qualified" --receipt published/registry.json
       - name: discard the ephemeral Docker credential
         if: always()
         env:
@@ -153,7 +153,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$DOCKER_CONFIG"
           chmod 700 "$DOCKER_CONFIG"
-          python3 distribution/docker/publish.py public-pull --architecture "$ARCHITECTURE" --receipt "public/$ARCHITECTURE.json"
+          python3 distribution/docker/v0.11/publish.py public-pull --architecture "$ARCHITECTURE" --receipt "public/$ARCHITECTURE.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qrscan-oci-public-${{ matrix.architecture }}
