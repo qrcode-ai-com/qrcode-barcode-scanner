@@ -7,8 +7,8 @@ version = "0.11.0"
 edition = "2024"
 rust-version = "1.88"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/supernovae-st/qrcode-barcode-scanner"
-description = "Kotlin/Android + Swift/iOS bindings for qrcode-ai-scanner via UniFFI."
+repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+description = "Kotlin/Android + Swift/iOS bindings for qrcode-barcode-scanner via UniFFI."
 publish = false
 
 [lib]
@@ -22,7 +22,7 @@ uniffi = { version = "0.31", features = ["cli"] }
 serde_json = "1"
 thiserror = "2"
 # alias to dodge the name clash with this crate's lib name, same as the py crate.
-scanner-core = { package = "qrcode-ai-scanner", path = "../qrcode-ai-scanner", features = ["serde"] }
+scanner-core = { package = "qrcode-barcode-scanner", path = "../qrcode-ai-scanner", features = ["serde"] }
 
 [build-dependencies]
 uniffi = { version = "0.31", features = ["build"] }

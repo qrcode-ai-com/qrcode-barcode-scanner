@@ -2,17 +2,17 @@
 # workspace tooling. Versions are spelled out here because excluded crates cannot
 # inherit `workspace = true`.
 [package]
-name = "qrcode-ai-scanner-py"
+name = "qrcode-barcode-scanner-py"
 version = "0.11.0"
 edition = "2024"
 rust-version = "1.88"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/supernovae-st/qrcode-barcode-scanner"
-description = "Python bindings for qrcode-ai-scanner — QR decoding + scannability scoring for artistic / AI-generated QR codes."
+repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+description = "Python bindings for qrcode-barcode-scanner — QR decoding + scannability scoring for artistic / AI-generated QR codes."
 publish = false
 
 [lib]
-name = "qrcode_ai_scanner"
+name = "qrcode_barcode_scanner"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -21,8 +21,8 @@ pyo3 = { version = "0.29", features = ["extension-module", "abi3-py38"] }
 pythonize = "0.29"
 serde_json = "1"
 # aliased to avoid a name clash with this crate's lib name (the Python module
-# is `qrcode_ai_scanner`, which must equal `[lib] name`).
-scanner-core = { package = "qrcode-ai-scanner", path = "../qrcode-ai-scanner", features = ["serde"] }
+# is `qrcode_barcode_scanner`, which must equal `[lib] name`).
+scanner-core = { package = "qrcode-barcode-scanner", path = "../qrcode-ai-scanner", features = ["serde"] }
 
 # Workspace-excluded, so maturin builds this crate as its own cargo root and
 # the workspace [profile.release] never applies (cargo reads profiles from the

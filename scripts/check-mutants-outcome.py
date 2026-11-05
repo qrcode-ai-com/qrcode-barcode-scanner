@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mutation verdict over sharded cargo-mutants runs — the honest ratchet.
 
-deep-checks.yml shards cargo-mutants 85 ways. The shards used to run under
+deep-checks.yml shards cargo-mutants 128 ways. The shards used to run under
 `continue-on-error`, so weekly run 37262272113 (2026-10-05) concluded success
 over 77 missed and 5 timed-out mutants, with 12 of 16 shards exiting 2 or 3 —
 and a baseline failure (exit 4) would have read green too. This gate reads
@@ -854,21 +854,21 @@ def self_test() -> int:
                 f"{core}/rescue/mod.rs:494:38: replace == with != in fuzz_api::parse_bitstream",
                 f"{core}/rescue/mod.rs:499:45: replace % with / in fuzz_api::parse_bitstream",
                 f"{core}/lib.rs:86:17: delete ! in fuzzing::correct_block",
-                f"{core}/engine/locate.rs:310:9: replace {black} -> Option<bool> with None",
-                f"{core}/engine/locate.rs:310:9: replace {black} -> Option<bool> with Some(true)",
-                f"{core}/engine/locate.rs:310:9: replace {black} -> Option<bool> with Some(false)",
-                f"{core}/ladder.rs:1025:49: replace * with / in Run<'_>::rescue_stage",
-                f"{core}/ladder.rs:1205:49: replace * with / in Run<'_>::stage",
+                f"{core}/engine/locate.rs:315:9: replace {black} -> Option<bool> with None",
+                f"{core}/engine/locate.rs:315:9: replace {black} -> Option<bool> with Some(true)",
+                f"{core}/engine/locate.rs:315:9: replace {black} -> Option<bool> with Some(false)",
+                f"{core}/ladder.rs:1155:49: replace * with / in Run<'_>::rescue_stage",
+                f"{core}/ladder.rs:1338:49: replace * with / in Run<'_>::stage",
             ]
             outside = [
                 f"{core}/rescue/bitstream.rs:299:32: replace + with * in parse",
                 f"{core}/rescue/mod.rs:120:9: replace == with != in rescue_candidates",
                 f"{core}/payload.rs:40:5: replace classify -> Payload with Default::default()",
-                f"{core}/engine/locate.rs:291:9: replace {black} -> Option<bool> with None",
-                f"{core}/engine/locate.rs:305:24: replace < with <= in {black}",
-                f"{core}/ladder.rs:1025:49: replace * with + in Run<'_>::rescue_stage",
-                f"{core}/ladder.rs:1205:49: replace * with + in Run<'_>::stage",
-                f"{core}/ladder.rs:1463:59: replace * with / in Run<'_>::finish",
+                f"{core}/engine/locate.rs:295:9: replace {black} -> Option<bool> with None",
+                f"{core}/engine/locate.rs:310:24: replace < with <= in {black}",
+                f"{core}/ladder.rs:1155:49: replace * with + in Run<'_>::rescue_stage",
+                f"{core}/ladder.rs:1338:49: replace * with + in Run<'_>::stage",
+                f"{core}/ladder.rs:1709:59: replace * with / in Run<'_>::finish",
             ]
             kept = [n for n in excluded if versioned.matching(mutant_key({"name": n})) is None]
             dropped = [n for n in outside if versioned.matching(mutant_key({"name": n})) is not None]

@@ -2,7 +2,10 @@
 //! lighting transforms for the scoring stress axes.
 //!
 //! All deterministic f32 math, built on the shared perspective primitives
-//! ([`Homography`], [`sample_bilinear`]) in `crate::matrix::sampler`.
+//! ([`Homography`], [`sample_bilinear`]) in `crate::matrix::sampler`. The
+//! sine, cosine and exponential are evaluated in f64 and rounded once to
+//! f32, so the platform's single-precision math library does not decide
+//! them.
 
 use crate::input::LumaImage;
 use crate::matrix::sampler::{Homography, sample_bilinear};
@@ -56,7 +59,7 @@ pub(crate) fn perspective_tilt(img: &LumaImage, angle_deg: f32) -> LumaImage {
         reason = "dimensions bounded by Limits::max_dimension"
     )]
     let (w, h) = (img.width() as f32 - 1.0, img.height() as f32 - 1.0);
-    let inset = w * (angle_deg.to_radians().sin() * 0.5);
+    let inset = w * (sin_cos_degrees(angle_deg).0 * 0.5);
     let quad = [(inset, 0.0), (w - inset, 0.0), (w, h), (0.0, h)];
     // unit→quad ∘ pixel→unit = source-rect → trapezoid forward map
     let Some(unit_to_quad) = Homography::unit_square_to_quad(quad) else {
@@ -83,7 +86,7 @@ pub(crate) fn rotate(img: &LumaImage, angle_deg: f32) -> LumaImage {
     )]
     {
         let (w, h) = (img.width() as f32, img.height() as f32);
-        let (sin, cos) = angle_deg.to_radians().sin_cos();
+        let (sin, cos) = sin_cos_degrees(angle_deg);
         // Bounding box in f64 with a snap-epsilon before ceil: cardinal
         // angles are not exact in floating trig (f32 cos 90° ≈ −4.4e-8,
         // f64 sin 180° ≈ 1.2e-16) and would bump a pure shape swap one
@@ -111,6 +114,25 @@ pub(crate) fn rotate(img: &LumaImage, angle_deg: f32) -> LumaImage {
         ]);
         warp_into(img, &fwd, out_w, out_h)
     }
+}
+
+/// The sine and cosine of `angle_deg`, as the stress warps use them: each
+/// evaluated in f64 at the angle's f32 radians and rounded once to f32.
+///
+/// A single-precision `sinf`/`cosf` may return the farther f32 neighbour of
+/// a value near a rounding midpoint, and which one it returns differs
+/// between math libraries (Apple's `sinf` rounds sin 22° up). A stress cell
+/// would then warp differently between platforms and move the published
+/// score. The f64 result is far closer to the true value than any stress
+/// angle's value lies to an f32 midpoint, so it rounds to the same f32 with
+/// every faithful f64 math library.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the one rounding of the f64 evaluation to f32"
+)]
+fn sin_cos_degrees(angle_deg: f32) -> (f32, f32) {
+    let (sin, cos) = f64::from(angle_deg.to_radians()).sin_cos();
+    (sin as f32, cos as f32)
 }
 
 /// Matrix product `a ∘ b` (apply `b` first).
@@ -166,7 +188,10 @@ pub(crate) fn glare_blob(img: &LumaImage, cx: f32, cy: f32, radius: f32) -> Luma
             let x = (i as u32 % w) as f32;
             let y = (i as u32 / w) as f32;
             let d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy);
-            let boost = 255.0 * (-d2 / (radius * radius)).exp();
+            // exp in f64, rounded once to f32, as `sin_cos_degrees` does:
+            // a single-precision `expf` may round a value near an f32
+            // midpoint either way, depending on the platform's math library
+            let boost = 255.0 * (f64::from(-d2 / (radius * radius)).exp() as f32);
             (f32::from(px) + boost).clamp(0.0, 255.0) as u8
         })
         .collect();
@@ -509,5 +534,47 @@ mod tests {
         // The true top edge only spans x∈[≈14.3,15.7]; (20,0) is far background.
         //   44:34 `-`→`+`  sends the top-right corner to w+inset≈44 → (20,0) black.
         assert!(px(20, 0) > 128, "far top background: {}", px(20, 0));
+    }
+
+    #[test]
+    fn stress_angle_sines_and_cosines_are_correctly_rounded() {
+        // Every perspective and rotation cell of `score::run_axes` and each
+        // bisection midpoint below a cell, with the correctly rounded f32
+        // sine and cosine of the angle's f32 radians, checked against a
+        // 70-digit evaluation. The closest of these values lies 0.0101 ulp
+        // from an f32 rounding midpoint (cos 25°), so a single-precision
+        // libm may return the other neighbour; every platform must produce
+        // these exact bits, or its stress cells warp differently. The angle
+        // goes through `black_box`: a constant argument lets the compiler
+        // fold the call at build time, which would test the compiler's
+        // arithmetic instead of the math library the scanner calls at run
+        // time.
+        let pinned: [(f32, u32, u32); 17] = [
+            (5.0, 0x3db2_7eb5, 0x3f7f_069e),
+            (10.0, 0x3e31_d0d4, 0x3f7c_1c5c),
+            (14.0, 0x3e77_ba60, 0x3f78_654d),
+            (15.0, 0x3e84_83ee, 0x3f77_46ea),
+            (18.0, 0x3e9e_377a, 0x3f73_7871),
+            (20.0, 0x3eaf_1d43, 0x3f70_8fb2),
+            (22.0, 0x3ebf_cc6f, 0x3f6d_5bec),
+            (25.0, 0x3ed8_616c, 0x3f68_03c9),
+            (26.0, 0x3ee0_722f, 0x3f66_175e),
+            (30.0, 0x3f00_0000, 0x3f5d_b3d7),
+            (34.0, 0x3f0f_2744, 0x3f54_3bcf),
+            (35.0, 0x3f12_d5e8, 0x3f51_b3f3),
+            (38.0, 0x3f1d_9bfe, 0x3f49_bb13),
+            (40.0, 0x3f24_8dba, 0x3f44_1b7d),
+            (42.0, 0x3f2b_4c25, 0x3f3e_3ebd),
+            (45.0, 0x3f35_04f3, 0x3f35_04f3),
+            (50.0, 0x3f44_1b7d, 0x3f24_8dbb),
+        ];
+        for (angle, sin, cos) in pinned {
+            let (s, c) = sin_cos_degrees(std::hint::black_box(angle));
+            assert_eq!(
+                (s.to_bits(), c.to_bits()),
+                (sin, cos),
+                "{angle}°: sin {s} · cos {c}"
+            );
+        }
     }
 }

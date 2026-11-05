@@ -7,8 +7,8 @@
 
 | Crate | Role |
 |---|---|
-| `qrcode-ai-scanner` | the core library — pure, sync, deterministic |
-| `qrcode-ai-scanner-cli` | `qrscan` binary (JSON default · exit codes 0/1/2/3) |
+| `qrcode-barcode-scanner` | the core library — pure, sync, deterministic |
+| `qrcode-barcode-scanner-cli` | `qrscan` binary (JSON default · exit codes 0/1/2/3) |
 | `qrcode-ai-scanner-node` | napi bindings (phase B) |
 | `qrcode-ai-scanner-wasm` | browser wasm (phase C) |
 | `xtask` | repo automation: gen-fixtures · corpus-report · baseline |
@@ -18,14 +18,20 @@ skips them by design — see the root `Cargo.toml` comment):
 
 | Crate / tree | Role |
 |---|---|
-| `qrcode-ai-scanner-py` | PyO3/maturin wheel (PyPI) |
+| `qrcode-barcode-scanner-py` | PyO3/maturin wheel `qrcode-barcode-scanner` (PyPI) |
 | `qrcode-ai-scanner-uniffi` | UniFFI wrapper behind Kotlin (JitPack) + Swift (SwiftPM) |
 | `bindings/flutter/rust` | flutter_rust_bridge crate inside the pub.dev package |
+
+Crate names here are Cargo package names. The directories under `crates/` keep
+their earlier `qrcode-ai-scanner*` names, and so do the packages that are never
+published (`qrcode-ai-scanner-node`, `qrcode-ai-scanner-wasm`,
+`qrcode-ai-scanner-uniffi`).
 
 ## Core invariants
 
 1. **No QR found is `Ok`** with empty `detections` — `Err` only for real
-   faults (`QRS-001..004` invalid input, `QRS-005` cancellation).
+   faults (`QRS-001..004` invalid input, `QRS-005` cancellation,
+   `QRS-006` an option outside its domain, checked before the input).
 2. **Deterministic**: same bytes + same config + same versions ⇒ the same
    report bit-for-bit (trace wall-clock fields excepted) for an unbounded
    scan, or whenever `trace.budget_exhausted` is `false`; a budget cut is
@@ -110,6 +116,7 @@ parses the streams itself (`rescue::bitstream`, the one segment parser).
 | QRS-003 | pixel count exceeds `Limits::max_pixels` |
 | QRS-004 | raw buffer length mismatch |
 | QRS-005 | cooperative cancellation |
+| QRS-006 | an option outside its domain (spec/02 § Option domains), checked before the input |
 
 Codes are never reused or renumbered (pinned by tests).
 

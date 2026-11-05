@@ -18,7 +18,7 @@ plugins {
 // This field is the drift point the architecture plan §3 closes with
 // `xtask sync-version` (regex/line edit of `version = "..."` below).
 version = "0.11.0"
-group = "com.github.supernovae-st"
+group = "com.github.qrcode-ai-com"
 
 android {
     namespace = "studio.supernovae.qrcodeaiscanner"
@@ -64,12 +64,12 @@ dependencies {
 // jitpack.yml). `maven-publish` lets JitPack publish the AAR + POM.
 // Consumer (per uniffi plan §4.3):
 //   repositories { maven { url = uri("https://jitpack.io") } }
-//   implementation("com.github.supernovae-st:qrcode-ai-scanner:vX.Y.Z")
+//   JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:vX.Y.Z
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.github.supernovae-st"
-            artifactId = "qrcode-ai-scanner"
+            groupId = "com.github.qrcode-ai-com"
+            artifactId = "qrcode-barcode-scanner"
             version = project.version.toString()
 
             afterEvaluate {
@@ -77,9 +77,9 @@ publishing {
             }
 
             pom {
-                name.set("qrcode-ai-scanner (Kotlin/Android)")
-                description.set("Kotlin/Android bindings for qrcode-ai-scanner via UniFFI.")
-                url.set("https://github.com/supernovae-st/qrcode-barcode-scanner")
+                name.set("qrcode-barcode-scanner (Kotlin/Android)")
+                description.set("Kotlin/Android bindings for qrcode-barcode-scanner via UniFFI.")
+                url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
                 licenses {
                     // Dual-licensed: AGPL-3.0-or-later OR commercial (LICENSING.md).
                     // The manifest SPDX stays AGPL-3.0-or-later per operator decision.

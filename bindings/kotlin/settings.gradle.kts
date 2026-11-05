@@ -1,4 +1,4 @@
-// Android Gradle project for the qrcode-ai-scanner Kotlin/Android binding.
+// Android Gradle project for the qrcode-barcode-scanner Kotlin/Android binding.
 //
 // Layout follows the binding-repo architecture plan (bindings/<lang>/): this is
 // the foreign-package-manager shell. The compiled per-ABI `.so` (cargo-ndk) and

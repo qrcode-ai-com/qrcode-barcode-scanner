@@ -13,7 +13,17 @@ jobs:
       matrix:
         os: [windows-2025, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # The packed step also runs the camera, destination, example and overlay suites and the overlay
+    # witnesses. On a laptop with Chromium, Firefox and Playwright WebKit the step took 9.1 to 9.5
+    # min over two runs, of which the overlay witnesses took 3.4 to 3.8 min (Chromium 53-58 s,
+    # Firefox 96-118 s, WebKit 53 s) and the overlay suite 52 s. This job runs no WebKit, but
+    # installs Chromium and Firefox and adds the SIMD-disabled Chromium; no timing from these
+    # runners exists yet. Each overlay witness has a three-minute deadline, so a stalled page fails
+    # its witnesses instead of holding the job until this limit cancels it. If the receipt's phases
+    # put this job near 20 min, move the overlay witnesses to a job of their own rather than raising
+    # this limit. WebKit (QRSCAN_TEST_WEBKIT=1) runs locally only: its Linux and Windows builds are
+    # not yet qualified on these runner images.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -28,7 +28,7 @@ env:
   # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain),
   # handed to maturin-action, which installs it (inside the manylinux
   # container too). maturin pinned exact: the version PR CI already resolved.
-  RUST_TOOLCHAIN: "1.97.0"
+  RUST_TOOLCHAIN: "1.99.1"
   MATURIN_VERSION: v1.15.0
 
 defaults:
@@ -70,7 +70,7 @@ jobs:
       - name: type-check the stub for Python 3.10
         run: |
           pip install "mypy==1.15.0"
-          mypy --python-version 3.10 --strict qrcode_ai_scanner.pyi
+          mypy --python-version 3.10 --strict qrcode_barcode_scanner.pyi
       # The sdist on every PR too: its file set and its PEP 639 license files
       # are judged here, not first at the tag.
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
@@ -370,7 +370,7 @@ jobs:
       # credential involved.
       - name: compare the files PyPI already serves with the inspected set
         run: python3 scripts/package-inspect.py pypi-live dist/* --strict --quiet
-      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
           skip-existing: true

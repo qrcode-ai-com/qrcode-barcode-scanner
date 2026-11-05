@@ -106,7 +106,7 @@ fn score_only_under_frame_profile_is_usage_error_2() {
         Some(2),
         "score suppressed by profile = usage error"
     );
-    assert!(out.stdout.is_empty());
+    assert_eq!(out.stdout.len(), 0);
     assert_eq!(
         String::from_utf8(out.stderr).unwrap(),
         "✖ the frame profile computes no score (use --profile full|fast)\n"
@@ -122,7 +122,7 @@ fn score_only_without_a_detection_is_exit_1_and_says_so() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    assert!(out.stdout.is_empty());
+    assert_eq!(out.stdout.len(), 0);
     assert_eq!(
         String::from_utf8(out.stderr).unwrap(),
         "no QR code found — no score\n"
@@ -145,7 +145,7 @@ fn score_only_with_every_axis_skipped_is_usage_error_2() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert!(out.stdout.is_empty());
+    assert_eq!(out.stdout.len(), 0);
     assert_eq!(
         String::from_utf8(out.stderr).unwrap(),
         "✖ every stress axis is skipped — no score to print (drop an axis from --score-skip-axes)\n"
@@ -436,7 +436,7 @@ fn every_category_report_validates_against_the_wire_schema() {
         );
         assert_eq!(
             report["versions"],
-            serde_json::json!({"scanner": env!("CARGO_PKG_VERSION"), "pipeline": 4, "score_contract": 5}),
+            serde_json::json!({"scanner": env!("CARGO_PKG_VERSION"), "pipeline": 5, "score_contract": 5}),
             "{rel}: versions block is the wire's compatibility anchor"
         );
     }
@@ -677,4 +677,58 @@ fn score_skip_checks_flag_threads_and_rejects_typos() {
         .unwrap();
     assert_eq!(out.status.code(), Some(2), "typo'd check = usage error");
     assert!(String::from_utf8_lossy(&out.stderr).contains("unknown score check"));
+}
+
+/// `--capabilities` prints the build's readers as JSON and exits 0: the
+/// default binary carries both engines and every symbology in the schema's
+/// order, with the markers its reports carry.
+#[test]
+fn capabilities_print_the_default_build_readers() {
+    let out = qrscan().arg("--capabilities").output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let caps: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/scan-report.schema.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(caps["engines"], schema["$defs"]["EngineKind"]["enum"]);
+    assert_eq!(caps["symbologies"], schema["$defs"]["Symbology"]["enum"]);
+    let scanned = qrscan()
+        .arg(fixture("clean/gen_v2_l.png"))
+        .output()
+        .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&scanned.stdout).unwrap();
+    assert_eq!(caps["versions"], report["versions"]);
+    let mut keys: Vec<&str> = caps
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["engines", "symbologies", "versions"]);
+}
+
+/// `--capabilities` takes no image or scan option, and the image stays
+/// required without it: each is a usage error (exit 2) before any scan.
+#[test]
+fn capabilities_is_exclusive_and_the_image_stays_required() {
+    let with_image = qrscan()
+        .arg("--capabilities")
+        .arg(fixture("clean/gen_v2_l.png"))
+        .output()
+        .unwrap();
+    assert_eq!(with_image.status.code(), Some(2));
+    assert_eq!(with_image.stdout, b"", "a usage error prints no report");
+    let with_option = qrscan()
+        .args(["--capabilities", "--pretty"])
+        .output()
+        .unwrap();
+    assert_eq!(with_option.status.code(), Some(2));
+    let nothing = qrscan().output().unwrap();
+    assert_eq!(nothing.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&nothing.stderr).contains("<IMAGE>"));
 }

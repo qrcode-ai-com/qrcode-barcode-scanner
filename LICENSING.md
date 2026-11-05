@@ -1,6 +1,8 @@
 # Licensing
 
-The `qrcode-ai-scanner` engine is **dual-licensed**. You may use it under **either** license below.
+The QR Code & Barcode Scanner engine (`qrcode-barcode-scanner` packages from 0.11.0,
+`qrcode-ai-scanner` packages through 0.10.x) is **dual-licensed**. You may use it under
+**either** license below.
 
 ## ① AGPL-3.0-or-later — free & open source (the default)
 
@@ -11,9 +13,10 @@ network**, you must make your **complete corresponding source** available under 
 
 ## ② Commercial license — for proprietary / closed-source use
 
-To embed `qrcode-ai-scanner` in a **closed-source or proprietary** product — a native mobile
-app (iOS / Android), a SaaS you won't open-source, or any commercial software — **without**
-the AGPL's source-disclosure obligations, a commercial license is available.
+To embed the QR Code & Barcode Scanner engine in a **closed-source or proprietary**
+product — a native mobile app (iOS / Android), a SaaS you won't open-source, or any
+commercial software — **without** the AGPL's source-disclosure obligations, a commercial
+license is available.
 
 **→ For commercial licensing, contact `studio.supernovae@gmail.com`.**
 
@@ -35,6 +38,16 @@ are separately licensed **MIT-0**, as declared in that directory's LICENSE.
 They do not bundle or relicense the engine. Installing the scanner as a separate
 dependency retains its AGPL-3.0-or-later or agreed commercial terms. The MCP
 adapter and CLI container retain the engine's AGPL source/license materials.
+
+## Prebuilt `qrscan` archives
+
+The `qrcode-barcode-scanner-cli-X.Y.Z-<target>` archives attached to a release hold `LICENSE`,
+`LICENSING.md` and the third-party notices and license texts beside the program. Their
+corresponding source is the same release's `qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`, a
+`git archive` of the commit they were built from, whose SHA-256 is a line of
+`qrcode-barcode-scanner-cli-X.Y.Z-SHA256SUMS`. The third-party Rust crates linked into `qrscan`
+are not bundled: each archive's `build-info.json` lists them with their `Cargo.lock`
+checksums, and its `SOURCE.md` gives their crates.io download address.
 
 ## Contributions
 

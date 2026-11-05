@@ -35,6 +35,143 @@ and fuzzed.
   version 1, v2-L and v3-L, where an errors-only decode at the acceptance
   limit does not raise it.
 
+### Destination layer (optional JS module)
+
+Decoding never touches the network. The browser package's optional
+`/destination` and `/destination-node` JavaScript entries can turn a decoded
+URL, which is attacker-controlled text, into an outbound request when an
+application asks for one. That makes them a server-side request forgery (SSRF)
+surface on a server and a privacy exposure in a browser, so they carry their
+own policy. The Rust core, the CLI, the native packages and the WASM never call
+them. `/camera-overlay` imports `destinationCandidate` to read eligibility and
+checks a destination only through a verifier the application passes it, from a
+user action.
+
+- **Side effects.** A check is a real `GET`. It can count a visit, use up a
+  scan cap, consume a one-time link, trigger a rotation or fire any other effect
+  a server attaches to a request. Nothing checks on scan and nothing navigates:
+  start checks only from an explicit user action. A result is an observation,
+  never a safety verdict, and every URL in it is text to display, never a link.
+- **Browser transport.** `createFetchTransport()` needs an explicit `scope`
+  and answers `transport_unsupported` on server runtimes, where `fetch` has no
+  CORS and follows redirects anywhere. It sends no cookies, credentials or
+  referrer, yet each request still carries the user's IP address, user agent
+  and language, the `Sec-Fetch-*` headers and the page's `Origin`, so the
+  destination learns which application checked it. Before sending it checks
+  only the first URL: bad ports, address literals that are not public,
+  special-use and malformed names, mixed content. The browser resolves names
+  and follows redirects on its own, so a name that resolves to a private
+  address, or a redirect into a private network, is not refused by the module.
+  Use the Node resolver to apply the policy to every hop.
+
+**Node resolver policy.** `createNodeTransport()` follows redirects itself and
+applies these rules to every hop before anything is sent for it:
+
+| Concern | Rule |
+| --- | --- |
+| Schemes | `http` and `https` only. Another `Location` scheme ends the chain with `blocked_scheme`, which reports the scheme alone |
+| Credentials | Never sent. A `Location` with a user name or password ends the chain with `blocked_credentials` |
+| Ports | WHATWG Fetch bad ports always refused; network mode allows only `allowedPorts` (80 and 443 by default) |
+| Addresses | `public` addresses only, plus NAT64 `translation` addresses whose embedded IPv4 is public. Unspecified, loopback, private, shared, link-local (169.254.169.254 included), unique-local, site-local, multicast, broadcast, documentation, benchmarking, discard, reserved, IPv4-mapped and compatible, Teredo and 6to4 addresses, 168.63.129.16 and every `deniedRanges` entry are refused (`classifyAddress`) |
+| Names | `localhost`, `*.local`, `home.arpa`, `*.internal`, `*.invalid`, `*.onion`, `*.alt`, single-label and malformed names are refused before any lookup (`classifyHost`) |
+| Limits | `min(request.maxHops, maxHops)` redirects and one deadline for the whole chain; `maxConcurrent` attempts per transport and 32 per module, beyond which `resolver_busy` |
+| Request | `GET` with `Host`, `User-Agent: qrcode-barcode-scanner-destination-bot/1` by default, a fixed `Accept` and `Connection: close`; no cookies, `Referer`, `Origin` or `Authorization`; `Set-Cookie` ignored |
+| Response | Status and `Location` only, headers capped at 16384 bytes, strict HTTP parser. Results never report addresses, header values or where a name resolved |
+
+- **Rebinding and full answers.** Every hop resolves its name again. The
+  default resolver asks for A and AAAA records together, and an injected
+  `lookup` is called with `all: true`, `family: 0` and `hints: 0`, so no
+  address filtering hides an answer. One refused answer refuses the whole
+  answer: a DNS64 name whose A record is private is refused even when no
+  translation prefix is configured. The socket connects only to the vetted
+  answers, through the request's `lookup` option, with a new agent and
+  keep-alive off on each hop, so no connection is reused.
+- **Post-connect check.** Once the socket connects, the peer address is
+  compared with the vetted set; a mismatch destroys the socket with
+  `blocked_address` before any request byte is written. It is the backstop for
+  a connect that does not honour `lookup`. For `https`, the TLS handshake
+  starts at connect, before this check: an unvetted peer would receive one TLS
+  ClientHello, which carries the host name as SNI when the URL names a host,
+  and no HTTP byte.
+- **Cancelable resolver.** By default each attempt creates its own
+  `dns.promises.Resolver` (c-ares, 2000 ms timeout, two tries). It runs off the
+  libuv threadpool, so slow lookups cannot starve the application's file
+  system, crypto or zlib work, and the attempt cancels its pending queries at
+  the deadline, freeing its slot on time. It ignores `/etc/hosts` and system
+  resolver plugins; `dnsServers` pins its servers. A lookup reaches the name's
+  authoritative servers even when its answer is then refused, so a hostile name
+  owner can learn which recursive resolver the server uses. An injected
+  `lookup` replaces it: `dns.lookup` holds a threadpool thread until
+  `getaddrinfo` returns and cannot be canceled, so a transport using it is
+  limited to `maxConcurrent` 3.
+- **Proxies.** Each hop uses its own `http.Agent` or `https.Agent`, never the
+  global agent, so `HTTP_PROXY`, `HTTPS_PROXY`, `NODE_USE_ENV_PROXY` and
+  `--use-env-proxy` do not route its requests. There is no proxy support: an
+  application that must leave through a proxy supplies its own transport, and
+  that transport's policy is its own.
+- **TLS.** Certificate checks are always on. Every `https` hop passes
+  `rejectUnauthorized: true`, so `NODE_TLS_REJECT_UNAUTHORIZED=0`, whether set
+  in the environment or by a dependency at run time, cannot turn them off for
+  this resolver. `NODE_EXTRA_CA_CERTS`, and `--use-system-ca` where the running
+  Node supports it, still change the trust anchors; a custom `ca` is accepted
+  only in fixture mode. Node's trust store is not a browser's, and Node applies
+  no HSTS.
+- **Bodies.** Response bodies are never read. The resolver destroys each
+  response once it has the status and `Location`, and the browser transport
+  cancels the body unread, so meta refresh, JavaScript redirects and page
+  content stay invisible.
+
+**Operator duties: addresses.** The built-in tables cannot know your network.
+
+- On a host behind NAT64/DNS64 with a network-specific prefix, set
+  `translationPrefixes` (RFC 6052 prefix lengths 32, 40, 48, 56, 64 or 96).
+  Otherwise an address such as `<prefix>::a9fe:a9fe` reads as public while the
+  gateway translates it to 169.254.169.254. The well-known prefix
+  `64:ff9b::/96` is built in, and no prefix discovery (RFC 7050) is performed.
+- Add to `deniedRanges` the server's own public addresses, partner services
+  that allowlist its egress address, and platform endpoints other than
+  168.63.129.16. An IPv4 entry also refuses the mapped, compatible, translated
+  and 6to4 addresses that embed a matching IPv4.
+- Special-use, malformed and single-label names stay refused, even where an
+  intranet uses them.
+
+**Operator duties: the endpoint.** `createDestinationEndpoint()` lets a browser
+ask your server to make the request, so it remains an SSRF surface even with
+the policy above. The handler answers only `POST` with an `application/json`
+body (the MIME essence is compared, so `text/plain;application/json` is
+refused) within `maxBodyBytes` and `bodyTimeoutMs`. It accepts only a `Host`
+listed in `allowedHosts`, which defeats DNS rebinding against the endpoint
+itself. It refuses a present `Sec-Fetch-Site` other than `same-origin`, and an
+`Origin` other than `publicScheme://Host` or an `allowedOrigins` entry. A
+request with neither header passes only with
+`allowMissingFetchMetadata: true`. The handler never sends CORS headers, so a
+cross-origin JSON request fails its preflight. It refuses a `fetch` or
+`endpoint` transport at creation and logs nothing. The application owns the
+rest:
+
+- mount the handler on the page's own origin and before any body parser; after
+  one, it answers 500 `body_already_read`;
+- set `publicScheme` to the scheme browsers actually use (`https` by default),
+  and use `allowedOrigins` only behind a reverse proxy that rewrites `Host` or
+  for non-browser clients;
+- authenticate callers, limit their rate and watch for abuse; `resolver_busy`
+  is only a coarse bound;
+- keep URLs out of logs by default;
+- create one Node transport per process: a transport created per request
+  escapes its `maxConcurrent`, leaving only the module-wide ceiling of 32
+  attempts.
+
+**Name oracle.** By default the handler reports `dns_error` and a refused
+lookup answer (`blocked_address` with detail `Resolved address not allowed`)
+both as `name_unusable`, detail `Name not usable`, so a caller cannot tell an
+internal split-horizon name from a nonexistent one. `revealNameErrors: true`
+keeps them apart; literal and special-use refusals stay `blocked_address`
+either way. The merge hides neither timing nor the difference between a name
+failure and a public-address outcome (`connection_error`, `tls_error` or a
+resolved destination). Only the fixed sentences of
+`DESTINATION_POLICY.detailSentences`, some followed by an error code, reach the
+wire as `detail`; error messages, addresses and header values never do.
+
 ## Determinism
 
 Same bytes + same config + same scanner build ⇒ the same attempt sequence

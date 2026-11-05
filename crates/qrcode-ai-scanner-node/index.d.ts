@@ -2,7 +2,7 @@
 // package — see bindings/report-types.d.ts at the repo root (copied here
 // as ./report-types.d.ts at pack time by scripts/sync-report-types.mjs).
 export * from "./report-types";
-import type { ScanReport, StressAxis } from "./report-types";
+import type { Capabilities, ScanReport, StressAxis } from "./report-types";
 
 /** A skippable report section (`score.uec` / `score.iso15415` / `alpha.envelope`) — config-only, never serialized. */
 export type ScoreCheck = "uec" | "iso15415" | "alpha_envelope";
@@ -23,25 +23,36 @@ export interface ScanOptions {
   /** Default: "full". */
   profile?: ScanProfile;
   /**
-   * Cancels a QUEUED task. A RUNNING scan is not interrupted: once its image
-   * is decoded, its profile/budgetMs budget stops planned work at attempt
-   * granularity, and the bounded work spec/02-profiles.md § Budget semantics
-   * lists may finish past it.
+   * Rejects the scan with an `AbortError` DOMException when already aborted
+   * at the call, or when aborted while the task is QUEUED. A RUNNING scan is
+   * not interrupted: it settles as if not aborted, with its report or its own
+   * `[QRS-xxx]` fault. Once its image is decoded, its profile/budgetMs budget
+   * stops planned work at attempt granularity, and the bounded work
+   * spec/02-profiles.md § Budget semantics lists may finish past it. One
+   * signal may be shared by several scans.
    */
   signal?: AbortSignal;
   /**
    * Max accepted width/height in px (default 10000). Server deployments
-   * handling untrusted uploads SHOULD lower this (e.g. 4096).
+   * handling untrusted uploads SHOULD lower this (e.g. 4096). A whole number
+   * from 1 to 4294967295; anything else rejects `[QRS-006]` before the image
+   * is read.
    */
   maxDimension?: number;
-  /** Max accepted total pixels (default 64_000_000; servers: e.g. 16_000_000). */
+  /**
+   * Max accepted total pixels (default 64_000_000; servers: e.g. 16_000_000).
+   * A whole number from 1 to `Number.MAX_SAFE_INTEGER`; anything else
+   * rejects `[QRS-006]` before the image is read.
+   */
   maxPixels?: number;
   /**
    * Override the profile's wall-clock budget in ms — bound tail latency
    * without giving up the deep ladder. Unset keeps the profile default
    * (full 4000 · fast 800 · frame 80 ms); 0 = unbounded, the reproducible
-   * mode. A report the budget cut says so (`trace.budget_exhausted ===
-   * true`): empty detections are then not final, and a null score beside
+   * mode (a negative, NaN or Infinity too). A fraction floors to whole ms,
+   * so 0.5 is a zero-ms budget; above 4294967295 rejects `[QRS-006]`. A
+   * report the budget cut says so (`trace.budget_exhausted === true`):
+   * empty detections are then not final, and a null score beside
    * detections means "not judged" — never 0.
    */
   budgetMs?: number;
@@ -83,9 +94,15 @@ export interface ScanOptions {
   scorePreset?: "design" | "capture";
 }
 
-/** Async scan on the libuv pool — never blocks the event loop. */
+/** Runs the Rust scan on the libuv worker pool. */
 export function scan(image: Buffer | Uint8Array, options?: ScanOptions): Promise<ScanReport>;
 /** Blocking scan — scripts only. */
 export function scanSync(image: Buffer | Uint8Array, options?: Omit<ScanOptions, "signal">): ScanReport;
 /** Native crate version. */
 export function version(): string;
+/**
+ * The readers compiled into the loaded addon: its report `versions`, decode
+ * `engines` and the `symbologies` they can return. Says which readers are
+ * included, not that an image will decode.
+ */
+export function capabilities(): Capabilities;

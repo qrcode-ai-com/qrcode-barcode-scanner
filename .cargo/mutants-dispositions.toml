@@ -95,22 +95,102 @@
 # This is fixed-cohort qualification, not a fresh full-deep verdict.
 # Now 33 equivalent · 9 timeout-structural · 0 debt.
 
+# Re-anchored and extended (2026-11-02) on the tree of the commit that
+# carries this paragraph. Twenty-three entries had drifted with the 0.11
+# sources (locate.rs +5 lines, transform.rs +7, lib.rs +5, reconcile.rs +24,
+# ladder.rs +117 to +133, rxing_engine.rs +153). Each was matched to the one
+# generated mutant with the same file, column, mutation and source line, its
+# function was compared with 0.10.0 (53b3253), and its argument was re-read
+# where that function changed: BitMatrix::get, now rxing 0.9.3's, still
+# answers false past the last row. The exclusions of .cargo/mutants.toml moved
+# with them; the Binarized::black stub pattern had slid onto the compiled
+# function and hid eight of its mutants. New, from the survivors deep-checks
+# run 41376357942 reported in occurrence, reconcile, report, multi_reader,
+# rxing_engine, ladder and databar_expanded: unit tests now kill every one
+# they can tell apart, a nextest priority runs the DataBar Expanded search
+# checks before any test that could spin, thirteen equivalents and four hangs
+# are argued below, and one debt waits on a contract for non-finite points.
+# Now 46 equivalent · 13 timeout-structural · 1 debt.
+
 # ── equivalent ──────────────────────────────────────────────────────────────
 
 [[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 207
+column = 25
+mutation = "replace + with - in <impl Reader for RSSExpandedReader>::decode_with_hints"
+category = "equivalent"
+reason = """\
+  the only orientation a result carries here is the 180 that rxing 0.9.3's OneDReader writes for a \
+  reversed read, and (270 - 180) % 360 == 90 == (270 + 180) % 360"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 473
+column = 23
+mutation = "replace || with && in RSSExpandedReader::storeRow"
+category = "equivalent"
+reason = """\
+  with exactly one equivalent neighbour the mutant falls through to isPartialRow, which that \
+  neighbour's identical pairs make true: storeRow returns before any write, as the original does, \
+  and nothing in between has a side effect"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 811
+column = 62
+mutation = "replace + with * in RSSExpandedReader::parseFoundFinderPattern"
+category = "equivalent"
+reason = """\
+  findNextPair returns Ok only after setting startEnd[1] to the bar pixel that ends its fourth \
+  counted run, so that pixel is set and getNextUnset(startEnd[1] * 1) == getNextUnset(startEnd[1] \
+  + 1); no caller reaches this line with another startEnd"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 883
+column = 22
+mutation = "replace < with <= in RSSExpandedReader::decodeDataCharacter"
+category = "equivalent"
+reason = """\
+  differs only at count == 1, where (value + 0.5) as i32 == 1 puts value at 0.5 - 2^-25 or more \
+  (f32), above 0.3: the inner refusal never fires and count = 1 rewrites the same value (NaN casts \
+  to 0, infinity saturates, never to 1)"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 888
+column = 29
+mutation = "replace > with >= in RSSExpandedReader::decodeDataCharacter"
+category = "equivalent"
+reason = """\
+  differs only at count == 8, where (value + 0.5) as i32 == 8 puts value below 8.5 (f32), under \
+  8.7: the inner refusal never fires and count = 8 rewrites the same value"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 1007
+column = 31
+mutation = "replace < with <= in RSSExpandedReader::adjustOddEvenCounts"
+category = "equivalent"
+reason = """\
+  reached only in the mismatch-0 arm with both parities bad: oddSum is odd and evenSum even, never \
+  equal, so < and <= agree"""
+
+[[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 305
+line = 310
 column = 41
 mutation = "replace < with <= in Binarized<'a>::black"
 category = "equivalent"
 reason = """\
-  `y <= height` differs only at y = height, where rxing 0.9.1's BitMatrix::get returns false: \
+  `y <= height` differs only at y = height, where rxing 0.9.3's BitMatrix::get returns false: \
   for x < width the offset height · row_size + x / word lies at or past the end of its bits — \
   the false the original's short-circuit gives"""
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 465
+line = 470
 column = 34
 mutation = "replace | with ^ in Grid<'a>::format_words"
 category = "equivalent"
@@ -120,7 +200,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 469
+line = 474
 column = 36
 mutation = "replace | with ^ in Grid<'a>::format_words"
 category = "equivalent"
@@ -130,7 +210,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 472
+line = 477
 column = 36
 mutation = "replace | with ^ in Grid<'a>::format_words"
 category = "equivalent"
@@ -140,7 +220,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 539
+line = 544
 column = 37
 mutation = "replace | with ^ in decode_format"
 category = "equivalent"
@@ -150,7 +230,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 557
+line = 562
 column = 40
 mutation = "replace | with ^ in decode_version"
 category = "equivalent"
@@ -159,8 +239,62 @@ reason = """\
   generator is below 2^12 and version << 12 holds bits 12-17 only — bit-disjoint"""
 
 [[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/multi_reader.rs"
+line = 224
+column = 9
+mutation = "replace <impl Reader for FormatReader>::reset with ()"
+category = "equivalent"
+reason = """\
+  reset only forwards to the QR, Data Matrix, Aztec, PDF417 and MaxiCode readers, none of which \
+  overrides rxing 0.9.3's empty Reader::reset, and the stateful linear readers are built fresh for \
+  each decode: no state, output or allocation changes (killable once a sub-reader keeps state)"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/multi_reader.rs"
+line = 266
+column = 66
+mutation = "replace > with >= in decode_multiple"
+category = "equivalent"
+reason = """\
+  `j != i && supersedes(other, own, j > i, ..)` short-circuits: supersedes only runs for j != i, \
+  where j >= i and j > i agree"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/multi_reader.rs"
+line = 346
+column = 16
+mutation = "replace > with >= in inside"
+category = "equivalent"
+reason = """\
+  differs only at length == 0, and the f64 hypot of f32 differences is 0 only when both are 0: \
+  cross / length is then NaN and NaN >= -1.0 is false, the original's verdict for that edge"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/occurrence.rs"
+line = 207
+column = 37
+mutation = "replace + with * in Footprint::axis"
+category = "equivalent"
+reason = """\
+  only finite points reach axis (its one caller, same_symbol, reads Observation footprints, which \
+  Footprint::validated cleared of non-finite points); for them `i * 1` adds self-pairs of length \
+  exactly 0, which never displace a best under the strict `>`, and a zero maximum fails `>= 1.0` \
+  either way"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/occurrence.rs"
+line = 643
+column = 20
+mutation = "replace > with >= in centre_inside"
+category = "equivalent"
+reason = """\
+  a hypot is never negative and a NaN fails both, so they differ only at length == 0 (dx == dy == \
+  0): the mutant then divides 0 by 0, or 0 * inf by 0, a NaN, and NaN >= -tolerance is false, the \
+  original's verdict"""
+
+[[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/reconcile.rs"
-line = 220
+line = 244
 column = 43
 mutation = "replace < with <= in Read::fold"
 category = "equivalent"
@@ -172,7 +306,18 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/rxing_engine.rs"
-line = 383
+line = 427
+column = 14
+mutation = "replace match guard measured.is_empty() with false in footprint"
+category = "equivalent"
+reason = """\
+  with no points every later arm builds an empty point list (each length guard fails, so quad() \
+  never indexes) and Footprint::candidate turns an empty list into Footprint::unavailable(), what \
+  the early return gives"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/rxing_engine.rs"
+line = 536
 column = 14
 mutation = "replace match guard n >= 4 with true in location"
 category = "equivalent"
@@ -216,7 +361,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/ladder.rs"
-line = 1025
+line = 1155
 column = 49
 mutation = "replace * with / in Run<'_>::rescue_stage"
 category = "equivalent"
@@ -228,7 +373,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/ladder.rs"
-line = 1205
+line = 1338
 column = 49
 mutation = "replace * with / in Run<'_>::stage"
 category = "equivalent"
@@ -239,8 +384,19 @@ reason = """\
   (anchored there at 1183:49 before code above it grew)"""
 
 [[mutant]]
+file = "crates/qrcode-ai-scanner/src/ladder.rs"
+line = 1464
+column = 51
+mutation = "replace && with || in exclude_matrix_regions"
+category = "equivalent"
+reason = """\
+  the finite check is redundant: each corner is `a` in its own turn, a non-finite coordinate makes \
+  that turn NaN or infinite, and the convexity guard that follows requires four finite turns, so a \
+  region the mutant lets through is skipped there; only four cross products are added"""
+
+[[mutant]]
 file = "crates/qrcode-ai-scanner/src/lib.rs"
-line = 102
+line = 107
 column = 9
 mutation = "replace Scanner::builder -> ScannerBuilder with Default::default()"
 category = "equivalent"
@@ -386,7 +542,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 376
+line = 383
 column = 87
 mutation = "replace + with * in downscale_to"
 category = "equivalent"
@@ -396,7 +552,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 379
+line = 386
 column = 96
 mutation = "replace + with * in downscale_to"
 category = "equivalent"
@@ -406,7 +562,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 488
+line = 495
 column = 45
 mutation = "replace - with + in windowed_extremum_strided"
 category = "equivalent"
@@ -416,7 +572,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 488
+line = 495
 column = 45
 mutation = "replace - with / in windowed_extremum_strided"
 category = "equivalent"
@@ -426,7 +582,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 489
+line = 496
 column = 31
 mutation = "replace + with * in windowed_extremum_strided"
 category = "equivalent"
@@ -436,7 +592,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 508
+line = 515
 column = 24
 mutation = "replace | with ^ in morph_filter"
 category = "equivalent"
@@ -458,8 +614,48 @@ reason = """\
   in run 38105646991)"""
 
 [[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 463
+column = 25
+mutation = "replace < with <= in RSSExpandedReader::storeRow"
+category = "timeout-structural"
+reason = """\
+  at insertPos == len, get() is None and the loop never advances: a storeRow whose stored rows \
+  hold no greater row number spins"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 470
+column = 27
+mutation = "replace += with *= in RSSExpandedReader::storeRow"
+category = "timeout-structural"
+reason = """\
+  `insertPos *= 1` stays at 0: a storeRow whose first stored row does not come after the new one \
+  spins"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 736
+column = 23
+mutation = "replace += with *= in RSSExpandedReader::findNextPair"
+category = "timeout-structural"
+reason = """\
+  `rowOffset *= 1` never moves past a leading space: every pair search that starts in a quiet zone \
+  spins"""
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/databar_expanded.rs"
+line = 799
+column = 35
+mutation = "replace -= with /= in RSSExpandedReader::parseFoundFinderPattern"
+category = "timeout-structural"
+reason = """\
+  `firstElementStart /= 1` never moves, so the walk back over the space before an odd finder's \
+  window spins whenever its body runs; every observable difference is a hang"""
+
+[[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 529
+line = 534
 column = 15
 mutation = "replace ^= with &= in bch_remainder"
 category = "timeout-structural"
@@ -470,7 +666,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 529
+line = 534
 column = 15
 mutation = "replace ^= with |= in bch_remainder"
 category = "timeout-structural"
@@ -480,7 +676,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 529
+line = 534
 column = 28
 mutation = "replace << with >> in bch_remainder"
 category = "timeout-structural"
@@ -491,7 +687,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/engine/locate.rs"
-line = 529
+line = 534
 column = 36
 mutation = "replace - with / in bch_remainder"
 category = "timeout-structural"
@@ -512,7 +708,7 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/ladder.rs"
-line = 887
+line = 1004
 column = 19
 mutation = "replace += with *= in Run<'_>::reread"
 category = "timeout-structural"
@@ -533,10 +729,24 @@ reason = """\
 
 [[mutant]]
 file = "crates/qrcode-ai-scanner/src/transform.rs"
-line = 501
+line = 508
 column = 18
 mutation = "replace += with *= in windowed_extremum_strided"
 category = "timeout-structural"
 reason = """\
   `head *= 1` never advances the deque head, so the left-edge expiry loop spins as soon as the \
   window slides — TIMEOUT in run 37262272113"""
+
+# ── debt ────────────────────────────────────────────────────────────────────
+
+[[mutant]]
+file = "crates/qrcode-ai-scanner/src/engine/multi_reader.rs"
+line = 372
+column = 28
+mutation = "replace + with * in scan_line"
+category = "debt"
+reason = """\
+  for finite points `i * 1` only adds zero-length self-pairs, giving the same line; it differs for \
+  a non-finite coordinate ([(0,0),(NaN,0),(100,0)] gives None instead of Some), where the \
+  original's answer depends on point order. Decide the non-finite contract (dropping such points \
+  makes the mutant equivalent), then pin it"""

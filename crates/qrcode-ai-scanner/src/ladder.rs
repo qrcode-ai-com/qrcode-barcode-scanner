@@ -37,11 +37,12 @@ use web_time::Instant;
 
 use crate::engine::content::{self, ContentKey, EciEvidence, Fnc1, Reading, Segments};
 use crate::engine::locate::{LocateHint, Located};
+use crate::engine::occurrence::{self, Footprint, Kind, Observation};
 use crate::engine::reconcile::{Geometry, Rank, Read, ReadStore, Reconciled, Seed, inside, source};
 use crate::engine::{self, RawDetection, Refusal};
 use crate::error::{Result, ScanError};
 use crate::input::LumaImage;
-use crate::report::{EngineKind, PipelineTrace, Point, StageTrace, Symbology};
+use crate::report::{EngineKind, PipelineTrace, Point, Saturation, StageTrace, Symbology};
 use crate::rescue::{Acceptance, Margin, Rederived, RescueCandidate};
 use crate::transform::{self, Channel, SourcePlanes};
 
@@ -147,12 +148,14 @@ pub struct ScanConfig {
     /// neutral sweep — "does my design survive on MY theme/brand colors",
     /// answered inside one scan instead of one full scan per color
     /// (`alpha.envelope.palette`). Probes are luma-space like the rest of
-    /// the sweep and budget-bounded per probe. Every BINDING rejects more
-    /// than [`ScanConfig::MAX_ALPHA_PALETTE`] colors loudly (a palette is
-    /// the first caller-sized loop in the scan path — unbounded, it would
-    /// be a CPU amplifier under `budget_ms: None`); direct Rust embedders
-    /// hold the same line themselves. Empty (every profile's default) =
-    /// the neutral sweep only.
+    /// the sweep and budget-bounded per probe. At most
+    /// [`ScanConfig::MAX_ALPHA_PALETTE`] colors (a palette is the first
+    /// caller-sized loop in the scan path — unbounded, it would be a CPU
+    /// amplifier under `budget_ms: None`): [`ScanConfig::validate`], which
+    /// every scan runs first, refuses a longer one with `QRS-006`, and the
+    /// bindings refuse a longer list before the core sees it, with their own
+    /// argument error. Empty (every profile's default) = the neutral sweep
+    /// only.
     pub alpha_palette: Vec<[u8; 3]>,
 }
 
@@ -311,10 +314,62 @@ impl AlphaBackground {
 }
 
 impl ScanConfig {
-    /// Hard cap every binding enforces on `alpha_palette` (anti-DoS: a
-    /// palette entry costs a composite + up to three decode attempts).
-    /// 32 covers any real theme/brand palette with headroom.
+    /// Hard cap on `alpha_palette` (anti-DoS: a palette entry costs a
+    /// composite + up to three decode attempts). [`ScanConfig::validate`]
+    /// refuses a longer palette with `QRS-006`; every binding refuses one
+    /// before the core sees it. 32 covers any real theme/brand palette with
+    /// headroom.
     pub const MAX_ALPHA_PALETTE: usize = 32;
+
+    /// The largest `budget_ms` a scan accepts: 4 294 967 295 ms (about 49.7
+    /// days), the one range every binding can carry exactly and every
+    /// platform clock can add to now. A larger budget is refused
+    /// (`QRS-006`), never silently made unbounded.
+    pub const MAX_BUDGET_MS: u64 = 4_294_967_295;
+
+    /// Refuse a configuration no scan can honour (`QRS-006`), before any
+    /// input is read: a budget above [`ScanConfig::MAX_BUDGET_MS`], a zero
+    /// pyramid or engine side, a palette above
+    /// [`ScanConfig::MAX_ALPHA_PALETTE`]. [`crate::Scanner::scan`] checks it
+    /// first.
+    ///
+    /// # Errors
+    /// `QRS-006` naming the first option out of its domain.
+    pub fn validate(&self) -> crate::Result<()> {
+        if let Some(ms) = self.budget_ms
+            && ms > Self::MAX_BUDGET_MS
+        {
+            return Err(crate::ScanError::invalid_option(
+                "budget_ms",
+                format!(
+                    "{ms} ms is above the maximum {} ms (no budget = unbounded)",
+                    Self::MAX_BUDGET_MS
+                ),
+            ));
+        }
+        for (option, side) in [
+            ("pyramid_side", self.pyramid_side),
+            ("max_engine_side", self.max_engine_side),
+        ] {
+            if side == 0 {
+                return Err(crate::ScanError::invalid_option(
+                    option,
+                    "a side of 0 pixels; the smallest is 1",
+                ));
+            }
+        }
+        if self.alpha_palette.len() > Self::MAX_ALPHA_PALETTE {
+            return Err(crate::ScanError::invalid_option(
+                "alpha_palette",
+                format!(
+                    "{} colors (max {})",
+                    self.alpha_palette.len(),
+                    Self::MAX_ALPHA_PALETTE
+                ),
+            ));
+        }
+        Ok(())
+    }
 
     /// Everything on — the quality-gate profile (~4 s budget).
     #[must_use]
@@ -617,6 +672,10 @@ pub(crate) struct MergedDetection {
     /// adopted together with the corners.
     pub photometric_inverted: bool,
     pub engines: Vec<EngineKind>,
+    /// Where each physical copy of the content was measured (validated,
+    /// original space): at least one, at most
+    /// [`occurrence::MAX_OCCURRENCES`], earliest observed first.
+    pub occurrences: Vec<Footprint>,
 }
 
 /// Ladder result: the published detections, what they are, the walk's
@@ -661,6 +720,13 @@ impl LadderOutcome {
             self.trace.budget_exhausted == Some(true)
                 || fallback.trace.budget_exhausted == Some(true),
         );
+        // the fallback runs after a walk that published nothing: its
+        // detection and occurrence capacities held; a read left out by
+        // either walk is left out of the scan
+        self.trace.saturation = Some(Saturation::either(
+            self.trace.saturation.unwrap_or_default(),
+            fallback.trace.saturation.unwrap_or_default(),
+        ));
         let found = !fallback.merged.is_empty();
         if found {
             self.merged = fallback.merged;
@@ -708,6 +774,40 @@ fn candidate_geometry(candidate: &RescueCandidate) -> Geometry {
         )),
         ec: None,
     }
+}
+
+/// A footprint (original space) as the observation of a read at `rank`,
+/// measured on a plane whose longest side is `side`: validated in the
+/// `orig` image; nothing when it locates nothing.
+fn observation(
+    footprint: Footprint,
+    rank: Rank,
+    orig: (u32, u32),
+    side: u32,
+) -> Option<Observation> {
+    let footprint = footprint.validated(orig);
+    (footprint.kind != Kind::Unavailable).then_some(Observation {
+        footprint,
+        rank,
+        side,
+    })
+}
+
+/// The footprint of a candidate's grid (rqrr detected it; original-space
+/// bounds) as the observation of its parse or rescue.
+fn candidate_observation(
+    candidate: &RescueCandidate,
+    rank: Rank,
+    orig: (u32, u32),
+    side: u32,
+) -> Option<Observation> {
+    let modules = usize::from(candidate.version) * 4 + 17;
+    observation(
+        occurrence::rqrr_footprint(candidate.corners, modules, candidate.pixel),
+        rank,
+        orig,
+        side,
+    )
 }
 
 /// An engine read the scanner has not parsed, of a QR Code symbol.
@@ -772,7 +872,8 @@ impl Run<'_> {
 
     /// An engine hit as a read of this walk: original-space place and
     /// geometry, the photometry of its attempt travelling with its
-    /// corners; and what its re-read needs (attempt space).
+    /// corners, the footprint its reader measured (validated in original
+    /// space); and what its re-read needs (attempt space).
     fn read_of(
         &self,
         hit: RawDetection,
@@ -808,6 +909,12 @@ impl Run<'_> {
         read.scales = Some((side, side));
         read.geometry = geometry;
         read.matrix_regions.extend(hit.matrix_region.map(place));
+        read.observations.extend(observation(
+            hit.footprint.rescaled(dims, self.orig),
+            rank,
+            self.orig,
+            side,
+        ));
         (read, hit.locate)
     }
 
@@ -817,8 +924,15 @@ impl Run<'_> {
     /// declarations, FNC1 position, segments, geometry and the correction
     /// margin of the word it corrected, no engine; one proven malformed is a
     /// refusal at the grid's place. At most `MAX_RESCUE_CANDIDATES`, in the
-    /// order given (original-space corners, photometry stamped).
-    fn rederive(candidates: &[RescueCandidate], attempt: u32) -> (Vec<Read>, Vec<Refusal>) {
+    /// order given (original-space corners, photometry stamped); a parse
+    /// observes its grid's footprint in the `orig` image, measured on a
+    /// plane whose longest side is `side` (0: not known).
+    fn rederive(
+        candidates: &[RescueCandidate],
+        attempt: u32,
+        orig: (u32, u32),
+        side: u32,
+    ) -> (Vec<Read>, Vec<Refusal>) {
         let mut reads = Vec::new();
         let mut refusals = Vec::new();
         for (index, candidate) in candidates.iter().take(MAX_RESCUE_CANDIDATES).enumerate() {
@@ -852,6 +966,8 @@ impl Run<'_> {
                     // FNC1 or Hanzi symbol has no other measured word)
                     read.margin = Margin::Known(margin);
                     read.geometry = candidate_geometry(candidate);
+                    read.observations
+                        .extend(candidate_observation(candidate, rank, orig, side));
                     reads.push(read);
                 }
                 Rederived::Malformed { port } => {
@@ -966,7 +1082,7 @@ impl Run<'_> {
 
     /// S5 — try the collected rescue candidates when the walk published
     /// nothing (refused and withheld reads do not count); the first success
-    /// is collected.
+    /// at each place is collected (identically damaged twins are two).
     fn rescue_stage(&mut self, luma: &LumaImage, stages: &mut Vec<StageTrace>) -> Result<()> {
         if self.rescue_candidates.is_empty() || self.store.found() || !self.admit() {
             return Ok(());
@@ -975,10 +1091,17 @@ impl Run<'_> {
         let attempt = self.next_attempt();
         let mut tried = 0u32;
         let mut found = 0u32;
-        for candidate in self.rescue_candidates.clone() {
+        let mut rescued_at: Vec<[Point; 4]> = Vec::new();
+        for (index, candidate) in self.rescue_candidates.clone().into_iter().enumerate() {
             self.check_cancel()?;
             if !self.admit() {
                 break;
+            }
+            if rescued_at
+                .iter()
+                .any(|&place| same_grid(place, candidate.corners))
+            {
+                continue; // another orientation or photometry of a rescued grid
             }
             tried += 1;
             // Reports retain original-space corners. Rescue samples the
@@ -1008,7 +1131,7 @@ impl Run<'_> {
                 let rank = Rank {
                     attempt,
                     source: source::RESCUE,
-                    index: 0,
+                    index: u32::try_from(index).unwrap_or(u32::MAX),
                 };
                 let mut read = Read::new(Symbology::QrCode, key, Some(EngineKind::Rescue), rank)
                     .at(Some(candidate.corners));
@@ -1016,8 +1139,14 @@ impl Run<'_> {
                 read.parsed = true;
                 read.margin = Margin::Known(rescued.margin);
                 read.geometry = candidate_geometry(&candidate);
+                read.observations.extend(candidate_observation(
+                    &candidate,
+                    rank,
+                    self.orig,
+                    luma.width().max(luma.height()),
+                ));
                 self.store.collect(read);
-                break; // first rescue wins — candidates are dedupes of one symbol
+                rescued_at.push(candidate.corners);
             }
         }
         stages.push(StageTrace {
@@ -1031,7 +1160,8 @@ impl Run<'_> {
 
     /// Keep a bounded set of rescue inputs (S5 cost is per-candidate);
     /// dedupe by symbol identity (version/ec/mask, photometry, orientation)
-    /// — the same physical symbol surfaces across many attempts.
+    /// at one place — the same physical symbol surfaces across many
+    /// attempts, and an identically damaged twin elsewhere is another input.
     fn collect_rescue(
         &mut self,
         candidates: Vec<RescueCandidate>,
@@ -1042,6 +1172,10 @@ impl Run<'_> {
             if self.rescue_candidates.len() >= MAX_RESCUE_CANDIDATES {
                 return;
             }
+            if attempt_dims != self.orig {
+                candidate.corners = rescaled(candidate.corners, attempt_dims, self.orig);
+                candidate.pixel = rescaled_pixel(candidate.pixel, attempt_dims, self.orig);
+            }
             if self.rescue_candidates.iter().any(|c| {
                 (c.version, c.ec, c.mask, c.inverted, c.transposed)
                     == (
@@ -1051,11 +1185,9 @@ impl Run<'_> {
                         inverts,
                         candidate.transposed,
                     )
+                    && same_grid(c.corners, candidate.corners)
             }) {
                 continue;
-            }
-            if attempt_dims != self.orig {
-                candidate.corners = rescaled(candidate.corners, attempt_dims, self.orig);
             }
             candidate.inverted = inverts;
             self.rescue_candidates.push(candidate);
@@ -1109,11 +1241,13 @@ impl Run<'_> {
                 .iter()
                 .map(|candidate| RescueCandidate {
                     corners: rescaled(candidate.corners, dims, self.orig),
+                    pixel: rescaled_pixel(candidate.pixel, dims, self.orig),
                     inverted: inverts,
                     ..candidate.clone()
                 })
                 .collect();
-            let (parses, refused) = Self::rederive(&candidates, index);
+            let (parses, refused) =
+                Self::rederive(&candidates, index, self.orig, dims.0.max(dims.1));
             reads.extend(parses.into_iter().map(|read| (read, None)));
             refusals.extend(refused);
         }
@@ -1283,24 +1417,37 @@ fn deep_attempts(luma: &LumaImage, longest: u32) -> Vec<Attempt<'_>> {
     attempts
 }
 
+/// Whether two grids (original-space corners) are one symbol: the centre
+/// of either inside the other's box.
+fn same_grid(a: [Point; 4], b: [Point; 4]) -> bool {
+    inside(Some(a), Some(b)) || inside(Some(b), Some(a))
+}
+
 /// Four corners from one image's coordinate space to another's.
+fn rescaled(corners: [Point; 4], from: (u32, u32), to: (u32, u32)) -> [Point; 4] {
+    if from == to {
+        return corners;
+    }
+    corners.map(|p| rescaled_pixel(p, from, to))
+}
+
+/// A point, or a pixel's extent, from one image's coordinate space to
+/// another's.
 #[expect(
     clippy::cast_precision_loss,
     reason = "dimensions bounded by Limits::max_dimension — exact in f32"
 )]
-fn rescaled(mut corners: [Point; 4], from: (u32, u32), to: (u32, u32)) -> [Point; 4] {
-    if from != to {
-        let fx = to.0 as f32 / from.0 as f32;
-        let fy = to.1 as f32 / from.1 as f32;
-        for p in &mut corners {
-            p.x *= fx;
-            p.y *= fy;
-        }
+fn rescaled_pixel(p: Point, from: (u32, u32), to: (u32, u32)) -> Point {
+    if from == to {
+        return p;
     }
-    corners
+    Point {
+        x: p.x * (to.0 as f32 / from.0 as f32),
+        y: p.y * (to.1 as f32 / from.1 as f32),
+    }
 }
 
-/// The linear-only completion searches outside already decoded QR symbols.
+/// The non-QR completion searches outside already decoded QR symbols.
 /// Preserve every pixel outside the actual convex footprint: its bounding
 /// rectangle could also contain a genuine adjacent barcode. This plane is
 /// never used to measure or score the original symbols.
@@ -1402,11 +1549,13 @@ pub(crate) fn run_seeded(
             )?;
             if stop || run.store.settled() {
                 // A QR surviving the thumbnail says nothing about a nearby
-                // linear barcode: its narrow bars may have disappeared in
-                // that downscale. Complete the enabled direct stage for the
-                // linear family before accepting the pyramid's early exit.
+                // barcode or matrix code: its narrow bars or small modules
+                // may have disappeared in that downscale. Complete the enabled
+                // direct stage for non-QR families before accepting the exit.
                 // This remains a planned, budgeted attempt, with ordinary
-                // cancellation and trace accounting.
+                // cancellation and trace accounting. A thumbnail that read
+                // only other symbologies still ends the walk (07-pipeline
+                // property 2 states the known loss).
                 #[cfg(feature = "engine-rxing")]
                 if !stop
                     && config.direct
@@ -1428,7 +1577,7 @@ pub(crate) fn run_seeded(
                                 .collect();
                             exclude_matrix_regions(luma, &regions)
                         })],
-                        engine::FormatFilter::Linear,
+                        engine::FormatFilter::NonQr,
                         &mut stages,
                     )?;
                 }
@@ -1492,7 +1641,7 @@ pub(crate) fn run_seeded(
         // ladder published nothing — a decoded symbol never needs rescuing.
         run.rescue_stage(luma, &mut stages)?;
     }
-    run.finish(stages, started)
+    run.finish(stages, started, &planes.luma)
 }
 
 impl Run<'_> {
@@ -1500,12 +1649,18 @@ impl Run<'_> {
     /// in other attempts than the reads they locate or refuse (at most
     /// `MAX_RESCUE_CANDIDATES` clean re-derivations, no sampling — past the
     /// deadline too, after a last cancellation check), then the
-    /// reconciliation of the whole read set and each content interpreted
-    /// ONCE.
-    fn finish(mut self, stages: Vec<StageTrace>, started: Instant) -> Result<LadderOutcome> {
+    /// reconciliation of the whole read set, each content interpreted
+    /// ONCE and its observations grouped into occurrences over the original
+    /// `luma` (whatever the deadline: bounded comparisons).
+    fn finish(
+        mut self,
+        stages: Vec<StageTrace>,
+        started: Instant,
+        luma: &LumaImage,
+    ) -> Result<LadderOutcome> {
         self.check_cancel()?;
         let attempt = self.next_attempt();
-        let (parses, refusals) = Self::rederive(&self.rescue_candidates, attempt);
+        let (parses, refusals) = Self::rederive(&self.rescue_candidates, attempt, self.orig, 0);
         for refusal in refusals {
             self.store.refuse(refusal, attempt);
         }
@@ -1515,7 +1670,7 @@ impl Run<'_> {
         // PRIMARY-detection contract: QR family first, then by earliest
         // read — on a flyer carrying a QR + a retail barcode, the scored
         // "primary" (detections[0]) never depends on detector order
-        let reconciled = self.store.reconcile();
+        let (reconciled, detections_saturated) = self.store.reconcile_counted();
         let contents: Vec<(ContentKey, Reading)> = reconciled
             .iter()
             .map(|detection| {
@@ -1529,28 +1684,60 @@ impl Run<'_> {
                 (detection.key.clone(), reading)
             })
             .collect();
+        let mut occurrences_saturated = false;
         let merged = reconciled
             .iter()
             .zip(&contents)
-            .map(|(detection, (_, reading))| merged_detection(detection, reading))
+            .map(|(detection, (_, reading))| {
+                let (occurrences, saturated) =
+                    occurrence::group(detection.symbology, detection.observations.clone(), luma);
+                occurrences_saturated |= saturated | detection.observations_dropped;
+                merged_detection(
+                    detection,
+                    reading,
+                    occurrences.into_iter().map(|o| o.footprint).collect(),
+                )
+            })
             .collect();
         Ok(LadderOutcome {
             merged,
             contents,
-            store: self.store,
             rereads: self.rereads,
             trace: PipelineTrace {
                 stages,
                 engine_panics: self.panics,
                 total_ms: started.elapsed().as_secs_f64() * 1_000.0,
                 budget_exhausted: Some(self.cut),
+                saturation: Some(Saturation {
+                    reads: self.store.dropped > 0 || self.store.failed_closed(),
+                    detections: detections_saturated,
+                    occurrences: occurrences_saturated,
+                }),
             },
+            store: self.store,
         })
     }
 }
 
-/// A reconciled content as the score and the report see it.
-fn merged_detection(detection: &Reconciled, reading: &Reading) -> MergedDetection {
+#[cfg(test)]
+impl Run<'_> {
+    /// [`Run::finish`] over a blank plane of the original size: for walks
+    /// built from reads without an image. Linear footprints compare as
+    /// inconclusive there (one symbol); matrix grouping never reads pixels.
+    fn finish_blank(self, stages: Vec<StageTrace>, started: Instant) -> Result<LadderOutcome> {
+        let (width, height) = self.orig;
+        let blank = LumaImage::new(vec![255; width as usize * height as usize], width, height);
+        self.finish(stages, started, &blank)
+    }
+}
+
+/// A reconciled content as the score and the report see it, with its
+/// occurrences (earliest observed first).
+fn merged_detection(
+    detection: &Reconciled,
+    reading: &Reading,
+    occurrences: Vec<Footprint>,
+) -> MergedDetection {
     let (masked_stream, version, ec, mask) = match &detection.geometry.stream {
         Some((stream, version, ec, mask)) => {
             (Some(stream.clone()), Some(*version), Some(*ec), Some(*mask))
@@ -1573,6 +1760,7 @@ fn merged_detection(detection: &Reconciled, reading: &Reading) -> MergedDetectio
             .corners
             .is_some_and(|(_, inverted)| inverted),
         engines: detection.engines.clone(),
+        occurrences,
     }
 }
 
@@ -2341,7 +2529,7 @@ mod ladder_mutant_kills {
         let dims = (luma.width(), luma.height());
         let outcome = engine::decode_filtered(&luma, engine::FormatFilter::All);
         assert_eq!(outcome.rescue.len(), 1, "rqrr's grid");
-        let (parses, refusals) = Run::rederive(&outcome.rescue, 0);
+        let (parses, refusals) = Run::rederive(&outcome.rescue, 0, dims, 0);
         assert!(refusals.is_empty());
         let [parse] = &parses[..] else {
             panic!("one candidate parse: {parses:?}");
@@ -2378,6 +2566,7 @@ mod ladder_mutant_kills {
                 bit_len: 0,
             },
             corners: [Point { x: 0.0, y: 0.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 0,
             ec: EcLevel::M,
             mask: 0,
@@ -2387,11 +2576,12 @@ mod ladder_mutant_kills {
         };
         let mut candidates = vec![dud; MAX_RESCUE_CANDIDATES];
         candidates.push(outcome.rescue[0].clone());
-        let (parses, refusals) = Run::rederive(&candidates, 0);
+        let dims = (luma.width(), luma.height());
+        let (parses, refusals) = Run::rederive(&candidates, 0, dims, 0);
         assert!(parses.is_empty() && refusals.is_empty());
         // fourth, it does
         candidates.remove(0);
-        assert_eq!(Run::rederive(&candidates, 0).0.len(), 1);
+        assert_eq!(Run::rederive(&candidates, 0, dims, 0).0.len(), 1);
     }
 
     #[test]
@@ -2407,7 +2597,7 @@ mod ladder_mutant_kills {
         for (read, _) in reads_of(&run, outcome.detections, 1, dims) {
             run.store.collect(read);
         }
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(walked.merged.len(), 1);
         let d = &walked.merged[0];
         assert_eq!(d.text, "0109506000134352");
@@ -2432,13 +2622,13 @@ mod ladder_mutant_kills {
             run.store.collect(read);
         }
         assert_eq!(run.store.reconcile().len(), 1, "the port's GS1 read");
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert!(walked.merged.is_empty(), "{:?}", walked.merged);
         // and a cancel raised by then is honoured first
         let cancelled = CancelToken::new();
         cancelled.cancel();
         let err = fresh_run(&cancelled, dims)
-            .finish(Vec::new(), Instant::now())
+            .finish_blank(Vec::new(), Instant::now())
             .unwrap_err();
         assert_eq!(err.code(), "QRS-005");
     }
@@ -2734,7 +2924,7 @@ mod ladder_mutant_kills {
             let luma = fnc1_gtin_v1m(corrupt);
             let dims = (luma.width(), luma.height());
             let outcome = engine::decode_filtered(&luma, engine::FormatFilter::All);
-            let (parses, refusals) = Run::rederive(&outcome.rescue, 0);
+            let (parses, refusals) = Run::rederive(&outcome.rescue, 0, dims, 0);
             assert!(refusals.is_empty(), "{refusals:?}");
             let [parse] = &parses[..] else {
                 panic!("one candidate parse: {parses:?}");
@@ -3025,6 +3215,7 @@ mod ladder_mutant_kills {
                 engine_panics: 1,
                 total_ms,
                 budget_exhausted: Some(cut),
+                saturation: Some(Saturation::default()),
             },
         };
         let mut first = outcome(1.5, false);
@@ -3112,6 +3303,7 @@ mod ladder_mutant_kills {
                 bit_len: 64,
             },
             corners: [Point { x: 5.0, y: 5.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 3,
             ec: EcLevel::Q,
             mask: 2,
@@ -3121,6 +3313,11 @@ mod ladder_mutant_kills {
         };
         run.collect_rescue(vec![twin(), twin()], (100, 100), false);
         assert_eq!(run.rescue_candidates.len(), 1, "`!=` keeps the duplicate");
+        // the same identity at another place is a twin: another input
+        let mut elsewhere = twin();
+        elsewhere.corners = [Point { x: 60.0, y: 60.0 }; 4];
+        run.collect_rescue(vec![elsewhere], (100, 100), false);
+        assert_eq!(run.rescue_candidates.len(), 2, "a twin elsewhere is kept");
     }
 
     #[test]
@@ -3135,6 +3332,7 @@ mod ladder_mutant_kills {
                 bit_len: 64,
             },
             corners: [Point { x: 10.0, y: 10.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 1,
             ec: EcLevel::M,
             mask: 0,
@@ -3159,6 +3357,7 @@ mod ladder_mutant_kills {
                 bit_len: 64,
             },
             corners: [Point { x: 12.0, y: 7.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 1,
             ec: EcLevel::M,
             mask: 0,
@@ -3186,6 +3385,7 @@ mod ladder_mutant_kills {
                 bit_len: 0,
             },
             corners: [Point { x: 0.0, y: 0.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 0,
             ec: EcLevel::M,
             mask: 0,
@@ -3221,7 +3421,7 @@ mod ladder_mutant_kills {
         ));
         let mut stages = Vec::new();
         run.rescue_stage(&luma, &mut stages).unwrap();
-        assert!(stages.is_empty());
+        assert_eq!(stages.len(), 0);
     }
 
     #[test]
@@ -3300,7 +3500,7 @@ mod ladder_mutant_kills {
         };
         assert_eq!(run.collect_attempt(&img, outcome, false), 65);
         assert_eq!(run.store.dropped, 1, "the 65th distinct read is counted");
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(
             walked.merged.len(),
             crate::engine::reconcile::MAX_DETECTIONS
@@ -3357,7 +3557,7 @@ mod ladder_mutant_kills {
             },
             0,
         );
-        let mut first = walk1.finish(Vec::new(), Instant::now()).unwrap();
+        let mut first = walk1.finish_blank(Vec::new(), Instant::now()).unwrap();
         let mut walk2 = Run::new(&cancel, None, (100, 100), first.seed());
         let signalled = ContentKey {
             raw: b"abc".to_vec(),
@@ -3390,7 +3590,7 @@ mod ladder_mutant_kills {
             Some(EngineKind::Rxing),
             rank(1),
         ));
-        let second = walk2.finish(Vec::new(), Instant::now()).unwrap();
+        let second = walk2.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(
             second.merged.len(),
             1,
@@ -3411,7 +3611,7 @@ mod ladder_mutant_kills {
             },
             0,
         );
-        let mut first = walk1.finish(Vec::new(), Instant::now()).unwrap();
+        let mut first = walk1.finish_blank(Vec::new(), Instant::now()).unwrap();
         let mut walk2 = Run::new(&cancel, None, (100, 100), first.seed());
         walk2.store.collect(Read::new(
             Symbology::QrCode,
@@ -3431,7 +3631,7 @@ mod ladder_mutant_kills {
         );
         located.parsed = true;
         walk2.store.collect(located);
-        let second = walk2.finish(Vec::new(), Instant::now()).unwrap();
+        let second = walk2.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert!(first.fold_fallback(second));
         assert_eq!(
             first.merged[0].engines,
@@ -3461,7 +3661,7 @@ mod ladder_mutant_kills {
             },
             0,
         );
-        let mut first = walk1.finish(Vec::new(), Instant::now()).unwrap();
+        let mut first = walk1.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert!(first.merged.is_empty());
         let mut walk2 = Run::new(&cancel, None, (400, 100), first.seed());
         for (attempt, x) in [(0, 1.0), (1, 250.0)] {
@@ -3480,7 +3680,7 @@ mod ladder_mutant_kills {
                 .at(Some(square_at(x))),
             );
         }
-        let second = walk2.finish(Vec::new(), Instant::now()).unwrap();
+        let second = walk2.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(second.merged.len(), 1, "walk 2 publishes it");
         assert!(first.fold_fallback(second), "and the fold keeps it");
         assert_eq!(first.merged.len(), 1);
@@ -3504,7 +3704,7 @@ mod ladder_mutant_kills {
             let attempts = vec![Attempt::plain(|| blank.clone())];
             run.stage("direct", attempts, engine::FormatFilter::All, &mut stages)
                 .unwrap();
-            run.finish(stages, Instant::now()).unwrap()
+            run.finish_blank(stages, Instant::now()).unwrap()
         };
         for (first_cut, second_cut) in [(false, true), (true, false), (false, false), (true, true)]
         {
@@ -3679,6 +3879,7 @@ mod ladder_mutant_kills {
                 bit_len: 0,
             },
             corners: [Point { x: 0.0, y: 0.0 }; 4],
+            pixel: crate::engine::occurrence::UNIT_PIXEL,
             version: 0,
             ec: EcLevel::M,
             mask: 0,
@@ -3705,7 +3906,7 @@ mod ladder_mutant_kills {
             .unwrap();
         assert!(stop, "a cut stage stops the ladder");
         assert_eq!(stages[0].transforms_tried, 0);
-        let walked = run.finish(stages, Instant::now()).unwrap();
+        let walked = run.finish_blank(stages, Instant::now()).unwrap();
         assert_eq!(walked.trace.budget_exhausted, Some(true));
     }
 
@@ -3718,12 +3919,12 @@ mod ladder_mutant_kills {
         let mut stages = Vec::new();
         run.rescue_stage(&luma, &mut stages).unwrap();
         assert!(stages.is_empty(), "no candidate was tried: {stages:?}");
-        let walked = run.finish(stages, Instant::now()).unwrap();
+        let walked = run.finish_blank(stages, Instant::now()).unwrap();
         assert_eq!(walked.trace.budget_exhausted, Some(true));
         // nothing planned, nothing cut: S5 has no candidate to try
         let mut run = late_run(&cancel, (100, 100));
         run.rescue_stage(&luma, &mut Vec::new()).unwrap();
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(walked.trace.budget_exhausted, Some(false));
     }
 
@@ -3754,7 +3955,7 @@ mod ladder_mutant_kills {
         };
         run.collect_attempt(&luma, outcome, false);
         assert_eq!(run.rereads, 1, "the re-read ran past the deadline");
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(walked.contents[0].0.eci, eci_mark(4, 0));
         assert_eq!(walked.trace.budget_exhausted, Some(false));
     }
@@ -3772,7 +3973,7 @@ mod ladder_mutant_kills {
         for (read, _) in reads_of(&run, outcome.detections, 1, dims) {
             run.store.collect(read);
         }
-        let walked = run.finish(Vec::new(), Instant::now()).unwrap();
+        let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
         assert_eq!(walked.merged.len(), 1);
         assert!(walked.merged[0].fnc1 && walked.merged[0].corners.is_some());
         assert_eq!(walked.trace.budget_exhausted, Some(false));
@@ -3865,7 +4066,7 @@ mod ladder_mutant_kills {
         cancel.cancel();
         let mut run = fresh_run(&cancel, (64, 64));
         run.confirm(&plane, vec![upce(b"7")], false);
-        assert!(run.confirmations.is_empty());
+        assert_eq!(run.confirmations.len(), 0);
     }
 
     #[test]
@@ -3892,6 +4093,281 @@ mod ladder_mutant_kills {
         run.stage("pyramid", attempts, engine::FormatFilter::All, &mut stages)
             .unwrap();
         assert!(run.store.settled());
-        assert!(run.confirmations.is_empty());
+        assert_eq!(run.confirmations.len(), 0);
+    }
+
+    #[test]
+    #[cfg(feature = "engine-rxing")]
+    fn matrix_exclusion_whitens_the_covered_pixels_of_convex_regions_only() {
+        // an upright square (the port's usual corners) on a plane wider than
+        // high: exactly the pixels whose centres it covers, in rows of the
+        // plane's own width; regions past the plane's edges are clipped to
+        // it, and every region of the call applies. A concave or a flat
+        // outline is no symbol's and excludes nothing
+        let at = |pairs: [(f32, f32); 4]| pairs.map(|(x, y)| Point { x, y });
+        let original = LumaImage::new(vec![17; 7 * 5], 7, 5);
+        let upright = at([(1.0, 1.0), (5.0, 1.0), (5.0, 4.0), (1.0, 4.0)]);
+        #[rustfmt::skip]
+        let covered = [
+            17, 17, 17, 17, 17, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 255, 255, 255, 255, 17, 17,
+            17, 17, 17, 17, 17, 17, 17,
+        ];
+        assert_eq!(
+            exclude_matrix_regions(&original, &[upright]).data(),
+            covered
+        );
+        let past_top_left = at([(-3.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-3.0, 2.0)]);
+        let past_bottom_right = at([(4.0, 2.0), (9.0, 2.0), (9.0, 8.0), (4.0, 8.0)]);
+        #[rustfmt::skip]
+        let clipped = [
+            255, 255, 17, 17, 17, 17, 17,
+            255, 255, 17, 17, 17, 17, 17,
+            17, 17, 17, 17, 255, 255, 255,
+            17, 17, 17, 17, 255, 255, 255,
+            17, 17, 17, 17, 255, 255, 255,
+        ];
+        let both = [past_top_left, past_bottom_right];
+        assert_eq!(exclude_matrix_regions(&original, &both).data(), clipped);
+        let concave = at([(0.0, 0.0), (4.0, 2.0), (0.0, 4.0), (1.0, 2.0)]);
+        let flat = at([(0.0, 0.0), (1.0, 1.0), (4.0, 4.0), (2.0, 2.0)]);
+        for region in [concave, flat] {
+            assert_eq!(exclude_matrix_regions(&original, &[region]), original);
+        }
+    }
+
+    // ---- Run::finish ----
+
+    #[test]
+    fn the_reads_saturate_when_a_read_was_dropped_or_the_walk_failed_closed() {
+        // (01-report § PipelineTrace) distinct reads past the walk's
+        // capacity, or refused streams past every record (the walk failed
+        // closed), leave reads unreconciled: what they held is unknown, not
+        // absent. Neither: not saturated
+        let cancel = CancelToken::new();
+        let saturation = |dropped: u32, closed: bool| {
+            let seed = Seed {
+                closed,
+                ..Seed::default()
+            };
+            let mut run = Run::new(&cancel, None, (8, 8), seed);
+            run.store.dropped = dropped;
+            let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
+            walked.trace.saturation
+        };
+        let reads = |reads| {
+            Some(Saturation {
+                reads,
+                detections: false,
+                occurrences: false,
+            })
+        };
+        assert_eq!(saturation(0, false), reads(false));
+        assert_eq!(saturation(1, false), reads(true));
+        assert_eq!(saturation(0, true), reads(true));
+        assert_eq!(saturation(3, true), reads(true));
+    }
+
+    #[test]
+    fn the_occurrences_saturate_past_sixteen_copies_whatever_the_footprints_kept() {
+        // (01-report § Occurrences) one content read at more places than it
+        // publishes occurrences (16) is flagged, and still flagged when its
+        // footprints also passed what one read keeps (128): either capacity
+        // leaves copies unknown. A single copy is complete
+        let cancel = CancelToken::new();
+        let plane = LumaImage::new(vec![255; 200 * 120], 200, 120);
+        let walk = |copies: u16| {
+            let mut run = fresh_run(&cancel, (200, 120));
+            let detections = (0..copies)
+                .map(|i| {
+                    // ten-pixel squares twelve pixels apart, sixteen a row
+                    let x = f32::from(i % 16) * 12.0 + 1.0;
+                    let y = f32::from(i / 16) * 12.0 + 1.0;
+                    let corners = vec![
+                        Point { x, y },
+                        Point { x: x + 10.0, y },
+                        Point {
+                            x: x + 10.0,
+                            y: y + 10.0,
+                        },
+                        Point { x, y: y + 10.0 },
+                    ];
+                    let mut hit = RawDetection::qr(
+                        b"copy",
+                        EciEvidence::NoEci,
+                        Fnc1::None,
+                        EngineKind::Rxing,
+                    );
+                    hit.footprint = Footprint::candidate(Kind::Quad, corners, EngineKind::Rxing);
+                    hit
+                })
+                .collect();
+            let outcome = engine::EngineOutcome {
+                detections,
+                ..engine::EngineOutcome::default()
+            };
+            run.collect_attempt(&plane, outcome, false);
+            let walked = run.finish_blank(Vec::new(), Instant::now()).unwrap();
+            assert_eq!(walked.merged.len(), 1, "{copies} copies of one content");
+            let occurrences = walked.merged[0].occurrences.len();
+            (occurrences, walked.trace.saturation.map(|s| s.occurrences))
+        };
+        assert_eq!(walk(1), (1, Some(false)));
+        assert_eq!(walk(17), (16, Some(true)));
+        assert_eq!(walk(129), (16, Some(true)));
+    }
+
+    /// The axis-aligned box from `(from, from)` to `(to, to)`, its corners
+    /// in order from the first.
+    fn axis_box(from: f32, to: f32) -> [Point; 4] {
+        [
+            Point { x: from, y: from },
+            Point { x: to, y: from },
+            Point { x: to, y: to },
+            Point { x: from, y: to },
+        ]
+    }
+
+    /// A grid of `version` rqrr bounded at `bounds` on its unit pixel, not
+    /// re-derived by the engine pass.
+    fn grid_candidate(version: u8, bounds: [Point; 4]) -> RescueCandidate {
+        RescueCandidate {
+            stream: engine::MaskedStream {
+                bits: Vec::new(),
+                bit_len: 0,
+            },
+            corners: bounds,
+            pixel: occurrence::UNIT_PIXEL,
+            version,
+            ec: EcLevel::M,
+            mask: 0,
+            inverted: false,
+            transposed: false,
+            rederived: None,
+        }
+    }
+
+    /// A quadrilateral footprint rqrr's grid measured.
+    fn rqrr_quad(corners: [Point; 4]) -> Footprint {
+        Footprint {
+            kind: Kind::Quad,
+            points: corners.to_vec(),
+            detector: Some(EngineKind::Rqrr),
+        }
+    }
+
+    // ---- candidate_observation ----
+
+    #[test]
+    fn a_candidate_observes_the_outer_corners_of_its_version_s_grid() {
+        // rqrr's bounds frame one module past an N-module symbol, N = 4 ·
+        // version + 17; the observation keeps the symbol's own N modules.
+        // Upright at four pixels a module from (40, 40), version 1 (21
+        // modules, bounds to 128) ends at 124, version 7 (45, to 224) at 220
+        let rank = Rank {
+            attempt: 3,
+            source: source::CANDIDATE,
+            index: 1,
+        };
+        for (version, bounds_end, symbol_end) in [(1, 128.0, 124.0), (7, 224.0, 220.0)] {
+            let candidate = grid_candidate(version, axis_box(40.0, bounds_end));
+            let observation = candidate_observation(&candidate, rank, (400, 400), 300)
+                .expect("a grid inside the image is observed");
+            assert_eq!(
+                observation,
+                Observation {
+                    footprint: rqrr_quad(axis_box(40.0, symbol_end)),
+                    rank,
+                    side: 300,
+                },
+                "version {version}"
+            );
+        }
+    }
+
+    // ---- Run::collect_attempt (candidate geometry) ----
+
+    #[test]
+    fn a_re_derived_grid_is_observed_off_rqrr_s_anchor_in_original_pixels() {
+        // rqrr anchors a half-turned grid one pixel of its plane short of
+        // the symbol's corner along each axis, and the observation moves the
+        // bounds back by that pixel in original space. An attempt at half
+        // the original size bounds the grid from (61, 61) back to (17, 17):
+        // (122, 122) to (34, 34) in the original, moved back by two original
+        // pixels to (124, 124) and (36, 36), of which the version 1 symbol
+        // keeps 21 of 22 modules: (124, 124) to (40, 40)
+        let half_turned = [
+            Point { x: 61.0, y: 61.0 },
+            Point { x: 17.0, y: 61.0 },
+            Point { x: 17.0, y: 17.0 },
+            Point { x: 61.0, y: 17.0 },
+        ];
+        let mut candidate = grid_candidate(1, half_turned);
+        candidate.rederived = Some(Rederived::Parsed {
+            parsed: crate::rescue::bitstream::Parsed {
+                bytes: b"abc".to_vec(),
+                eci: Vec::new(),
+                fnc1: Fnc1::None,
+                structured_append: false,
+                segments: Vec::new(),
+                byte_segments: std::iter::once(0..3).collect(),
+            },
+            margin: 13,
+        });
+        let outcome = engine::EngineOutcome {
+            detections: vec![RawDetection::qr(
+                b"abc",
+                EciEvidence::NoEci,
+                Fnc1::None,
+                EngineKind::Rxing,
+            )],
+            rescue: vec![candidate],
+            ..engine::EngineOutcome::default()
+        };
+        let cancel = CancelToken::new();
+        let mut run = fresh_run(&cancel, (200, 200));
+        let plane = LumaImage::new(vec![255; 100 * 100], 100, 100);
+        run.collect_attempt(&plane, outcome, false);
+        let found = run.store.reconcile();
+        let [detection] = &found[..] else {
+            panic!("one detection: {found:?}");
+        };
+        let observed: Vec<(&Footprint, u32)> = detection
+            .observations
+            .iter()
+            .map(|observation| (&observation.footprint, observation.side))
+            .collect();
+        let symbol = [
+            Point { x: 124.0, y: 124.0 },
+            Point { x: 40.0, y: 124.0 },
+            Point { x: 40.0, y: 40.0 },
+            Point { x: 124.0, y: 40.0 },
+        ];
+        assert_eq!(observed, [(&rqrr_quad(symbol), 100)]);
+    }
+
+    // ---- Run::collect_rescue (one symbol) ----
+
+    #[test]
+    fn a_grid_centred_in_a_collected_grid_of_its_identity_is_that_symbol() {
+        // whichever of a large grid and a small one inside it comes first,
+        // only the centre of the small one lies in the other's box: they are
+        // one symbol, and the first is kept; a grid beside them is another
+        let (large, small, beside) = (
+            axis_box(0.0, 100.0),
+            axis_box(0.0, 20.0),
+            axis_box(150.0, 170.0),
+        );
+        let cancel = CancelToken::new();
+        for (first, second) in [(large, small), (small, large)] {
+            let mut run = fresh_run(&cancel, (200, 200));
+            let both = vec![grid_candidate(2, first), grid_candidate(2, second)];
+            run.collect_rescue(both, (200, 200), false);
+            run.collect_rescue(vec![grid_candidate(2, beside)], (200, 200), false);
+            let kept: Vec<[Point; 4]> = run.rescue_candidates.iter().map(|c| c.corners).collect();
+            assert_eq!(kept, [first, beside]);
+        }
     }
 }

@@ -9,11 +9,14 @@
 //!    (a NEW field the schema doesn't know breaks this),
 //! 4. every golden is a final report of THIS build (unbounded, its markers
 //!    and crate version), with no two detections that denote one content,
-//!    and `spec/README.md` names the committed fixture each one comes from.
+//!    and `spec/README.md` names the committed fixture each one comes from,
+//! 5. every golden equals a fresh scan of that fixture with the command line
+//!    that produced it, its measured timings aside (a behavior change that
+//!    leaves the goldens unregenerated breaks this).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{Detection, ImageInput, ScanReport, Scanner, Versions};
+use qrcode_barcode_scanner::{Detection, ImageInput, ScanReport, Scanner, Versions};
 
 fn spec_path(rel: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../../spec/{rel}"))
@@ -60,21 +63,35 @@ fn golden_examples_deserialize_and_validate() {
     assert!(checked >= 5, "expected the golden set, found {checked}");
 }
 
-/// Every golden, by file name, parsed through the real serde types.
-fn goldens() -> Vec<(String, ScanReport)> {
-    let mut all: Vec<(String, ScanReport)> = std::fs::read_dir(spec_path("examples"))
+/// A path from the repository root, where `qrscan` ran for the goldens.
+fn repo_path(rel: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(rel)
+}
+
+/// The file name of every golden in `spec/examples/`, sorted.
+fn golden_names() -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(spec_path("examples"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("json"))
-        .map(|path| {
-            let name = path.file_name().unwrap().to_str().unwrap().to_owned();
-            let report = serde_json::from_str(&std::fs::read_to_string(&path).unwrap())
-                .unwrap_or_else(|e| panic!("{name}: {e}"));
+        .map(|path| path.file_name().unwrap().to_str().unwrap().to_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// Every golden, by file name, parsed through the real serde types.
+fn goldens() -> Vec<(String, ScanReport)> {
+    golden_names()
+        .into_iter()
+        .map(|name| {
+            let raw = std::fs::read_to_string(spec_path(&format!("examples/{name}"))).unwrap();
+            let report = serde_json::from_str(&raw).unwrap_or_else(|e| panic!("{name}: {e}"));
             (name, report)
         })
-        .collect();
-    all.sort_by(|a, b| a.0.cmp(&b.0));
-    all
+        .collect()
 }
 
 /// Two detections denote the same content (spec/01 § Comparing contents):
@@ -124,39 +141,182 @@ fn goldens_are_final_reports_of_this_build() {
     }
 }
 
+/// One golden row of `spec/README.md` § Examples.
+struct ReadmeRow {
+    /// The golden's file name in `spec/examples/`.
+    golden: String,
+    /// The committed fixture the real binary scanned, from the repository
+    /// root.
+    fixture: String,
+    /// The whole row, whose last cell says what the golden shows.
+    row: String,
+}
+
+/// The golden rows of `spec/README.md` § Examples, in table order: one row
+/// per golden — its file, then the committed fixture the real binary
+/// scanned (the layout table's `examples/` row names the directory, not a
+/// golden).
+fn readme_golden_rows() -> Vec<ReadmeRow> {
+    let readme = std::fs::read_to_string(spec_path("README.md")).unwrap();
+    readme
+        .lines()
+        .filter(|l| l.starts_with("| [`examples/") && l.contains(".json`]"))
+        .map(|row| {
+            let cells: Vec<&str> = row.split('|').map(str::trim).collect();
+            let golden = cells[1]
+                .split('`')
+                .nth(1)
+                .and_then(|path| path.strip_prefix("examples/"))
+                .unwrap_or_else(|| panic!("a golden cell: {row}"));
+            let fixture = cells[2]
+                .split('`')
+                .nth(1)
+                .unwrap_or_else(|| panic!("a fixture cell: {row}"));
+            ReadmeRow {
+                golden: golden.to_owned(),
+                fixture: fixture.to_owned(),
+                row: row.to_owned(),
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn every_golden_names_its_committed_fixture() {
-    // spec/README.md § Examples: one row per golden — its file, then the
-    // committed fixture the real binary scanned (the layout table's
-    // `examples/` row names the directory, not a golden).
-    let readme = std::fs::read_to_string(spec_path("README.md")).unwrap();
     let mut listed = Vec::new();
-    let golden_rows = readme
-        .lines()
-        .filter(|l| l.starts_with("| [`examples/") && l.contains(".json`]"));
-    for row in golden_rows {
-        let cells: Vec<&str> = row.split('|').map(str::trim).collect();
-        let golden = cells[1]
-            .split('`')
-            .nth(1)
-            .and_then(|path| path.strip_prefix("examples/"))
-            .unwrap_or_else(|| panic!("a golden cell: {row}"));
-        let fixture = cells[2]
-            .split('`')
-            .nth(1)
-            .unwrap_or_else(|| panic!("a fixture cell: {row}"));
-        let on_disk = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(fixture);
+    for ReadmeRow {
+        golden, fixture, ..
+    } in readme_golden_rows()
+    {
         assert!(
-            on_disk.is_file(),
+            repo_path(&fixture).is_file(),
             "{golden}: fixture {fixture} is committed"
         );
-        listed.push(golden.to_owned());
+        listed.push(golden);
     }
     listed.sort();
-    let goldens: Vec<String> = goldens().into_iter().map(|(name, _)| name).collect();
-    assert_eq!(listed, goldens, "spec/README.md lists every golden once");
+    assert_eq!(
+        listed,
+        golden_names(),
+        "spec/README.md lists every golden once"
+    );
+}
+
+/// One golden and the command line that produced it, run from the
+/// repository root (`spec/README.md` § Examples):
+/// `qrscan <fixture> --profile full --budget-ms 0`, then
+/// `--alpha-palette '<alpha_palette>'` when set.
+struct GoldenScan {
+    /// The golden's file name in `spec/examples/`.
+    golden: &'static str,
+    /// The scanned fixture, from the repository root.
+    fixture: &'static str,
+    /// The `--alpha-palette` argument as typed: colors separated by commas.
+    alpha_palette: Option<&'static str>,
+}
+
+/// Declares `GOLDEN_SCANS`, every golden with its command line, and one
+/// test per golden, `golden_equals_a_fresh_scan::<name>`, which scans the
+/// fixture again and compares the report with the golden.
+macro_rules! golden_scans {
+    (@palette) => {
+        None
+    };
+    (@palette $palette:literal) => {
+        Some($palette)
+    };
+    ($($test:ident: $golden:literal from $fixture:literal
+        $(, alpha_palette $palette:literal)?;)+) => {
+        const GOLDEN_SCANS: &[GoldenScan] = &[$(GoldenScan {
+            golden: $golden,
+            fixture: $fixture,
+            alpha_palette: golden_scans!(@palette $($palette)?),
+        }),+];
+
+        // The goldens come from the CLI, whose build has both engines.
+        #[cfg(all(feature = "engine-rxing", feature = "engine-rqrr"))]
+        mod golden_equals_a_fresh_scan {
+            $(#[test]
+            fn $test() {
+                super::fresh_scan::assert_golden_equals_a_fresh_scan($golden);
+            })+
+        }
+    };
+}
+
+golden_scans! {
+    artistic_blob: "artistic-blob.json"
+        from "fixtures/artistic/blob-style-monkey-logo.webp";
+    clean_url: "clean-url.json" from "fixtures/clean/OK_68ms_100_4e875a2c.png";
+    crypto_bitcoin: "crypto-bitcoin.json" from "fixtures/payloads/crypto-bitcoin.png";
+    datamatrix: "datamatrix.json" from "fixtures/symbology/datamatrix.png";
+    ean13_retail_gtin: "ean13-retail-gtin.json" from "fixtures/symbology/ean13.png";
+    eci_iso_8859_2: "eci-iso-8859-2.json" from "fixtures/eci/eci4-a1.png";
+    eci_undecodable: "eci-undecodable.json" from "fixtures/eci/eci899-binary.png";
+    gs1_digital_link: "gs1-digital-link.json" from "fixtures/payloads/gs1-digital-link.png";
+    gs1_fnc1: "gs1-fnc1.json" from "fixtures/clean/gs1-fnc1.png";
+    hanzi_gb18030: "hanzi-gb18030.json" from "fixtures/eci/hanzi-zhongwen.png";
+    mecard: "mecard.json" from "fixtures/payloads/me_card.png";
+    micro_qr: "micro-qr.json" from "fixtures/symbology/microqr.png";
+    no_detection: "no-detection.json" from "fixtures/degraded/FAIL_1491ms_0_584c998c.png";
+    rescued_occluded: "rescued-occluded.json"
+        from "fixtures/degraded/logo-occluded-rescue.png";
+    sms: "sms.json" from "fixtures/payloads/sms.png";
+    transparent_envelope: "transparent-envelope.json"
+        from "playground/public/samples/transparent.png";
+    transparent_palette: "transparent-palette.json"
+        from "playground/public/samples/transparent.png", alpha_palette "#f5f5f4,#1c1917";
+    wifi: "wifi.json" from "fixtures/payloads/wifi.png";
+}
+
+#[test]
+fn golden_scans_cover_every_golden_and_agree_with_the_readme() {
+    let names = golden_names();
+    let on_disk: std::collections::BTreeSet<&str> = names.iter().map(String::as_str).collect();
+    let rows = readme_golden_rows();
+    let mut problems = Vec::new();
+    for name in &on_disk {
+        if !GOLDEN_SCANS.iter().any(|scan| scan.golden == *name) {
+            problems.push(format!(
+                "spec/examples/{name} has no entry in GOLDEN_SCANS: add the command line \
+                 that produced it"
+            ));
+        }
+    }
+    for (i, scan) in GOLDEN_SCANS.iter().enumerate() {
+        let golden = scan.golden;
+        if !on_disk.contains(golden) {
+            problems.push(format!(
+                "GOLDEN_SCANS names {golden}, which spec/examples/ does not contain"
+            ));
+            continue;
+        }
+        if GOLDEN_SCANS[..i].iter().any(|seen| seen.golden == golden) {
+            problems.push(format!("GOLDEN_SCANS lists {golden} twice"));
+        }
+        let Some(row) = rows.iter().find(|row| row.golden == golden) else {
+            problems.push(format!("{golden}: no row in spec/README.md § Examples"));
+            continue;
+        };
+        if row.fixture != scan.fixture {
+            problems.push(format!(
+                "{golden}: GOLDEN_SCANS scans {}, spec/README.md names {}",
+                scan.fixture, row.fixture
+            ));
+        }
+        // the README shows every option the golden adds to the common line
+        if let Some(palette) = scan.alpha_palette {
+            let option = format!("--alpha-palette '{palette}'");
+            if !row.row.contains(&option) {
+                problems.push(format!("{golden}: spec/README.md does not show {option}"));
+            }
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "GOLDEN_SCANS and the goldens disagree:\n{}",
+        problems.join("\n")
+    );
 }
 
 /// A validator for one `$defs` entry of the spec schema.
@@ -339,7 +499,7 @@ fn content_contract_objects_validate_and_its_negatives_do_not() {
             .collect();
         assert!(errors.is_empty(), "{content}: {errors:#?}");
         // the real types read it back to the same object
-        let back: qrcode_ai_scanner::DecodedContent =
+        let back: qrcode_barcode_scanner::DecodedContent =
             serde_json::from_value(content.clone()).unwrap_or_else(|e| panic!("{content}: {e}"));
         assert_eq!(&serde_json::to_value(&back).unwrap(), content);
     }
@@ -350,6 +510,100 @@ fn content_contract_objects_validate_and_its_negatives_do_not() {
             negative["why"],
             negative["content"]
         );
+    }
+}
+
+/// Occurrence test objects (each geometry kind at its point counts, both
+/// readers) and the schema's negatives (spec/01 § Occurrences).
+const OCCURRENCE_OBJECTS: &str = r#"{"valid":[
+{"geometry":{"kind":"quad","points":[{"x":32,"y":32},{"x":328,"y":32},{"x":328,"y":328},{"x":32,"y":328}],"reader":"rqrr"}},
+{"geometry":{"kind":"quad","points":[{"x":0.5,"y":1.5},{"x":90.5,"y":1.5},{"x":90.5,"y":91.5},{"x":0.5,"y":91.5}],"reader":"rxing"}},
+{"geometry":{"kind":"segment","points":[{"x":51,"y":393.5},{"x":293,"y":393.5}],"reader":"rxing"}},
+{"geometry":{"kind":"partial","points":[{"x":57.5,"y":153.5}],"reader":"rxing"}},
+{"geometry":{"kind":"partial","points":[{"x":57.5,"y":153.5},{"x":333.5,"y":153.5},{"x":365,"y":153.5},{"x":500,"y":153.5}],"reader":"rxing"}},
+{"geometry":{"kind":"partial","points":[{"x":1,"y":1},{"x":2,"y":1},{"x":3,"y":1},{"x":4,"y":1},{"x":5,"y":1},{"x":6,"y":1},{"x":7,"y":1},{"x":8,"y":1}],"reader":"rqrr"}},
+{"geometry":{"kind":"unavailable","points":[],"reader":null}}
+],"invalid":[
+{"why":"quad of three points","value":{"geometry":{"kind":"quad","points":[{"x":0,"y":0},{"x":9,"y":0},{"x":9,"y":9}],"reader":"rqrr"}}},
+{"why":"segment of three points","value":{"geometry":{"kind":"segment","points":[{"x":0,"y":0},{"x":5,"y":0},{"x":9,"y":0}],"reader":"rxing"}}},
+{"why":"partial without a point","value":{"geometry":{"kind":"partial","points":[],"reader":"rxing"}}},
+{"why":"partial of nine points","value":{"geometry":{"kind":"partial","points":[{"x":1,"y":1},{"x":2,"y":1},{"x":3,"y":1},{"x":4,"y":1},{"x":5,"y":1},{"x":6,"y":1},{"x":7,"y":1},{"x":8,"y":1},{"x":9,"y":1}],"reader":"rxing"}}},
+{"why":"unavailable with a point","value":{"geometry":{"kind":"unavailable","points":[{"x":0,"y":0}],"reader":null}}},
+{"why":"unavailable with a reader","value":{"geometry":{"kind":"unavailable","points":[],"reader":"rxing"}}},
+{"why":"measured without a reader","value":{"geometry":{"kind":"segment","points":[{"x":0,"y":0},{"x":9,"y":0}],"reader":null}}},
+{"why":"the rescue as reader","value":{"geometry":{"kind":"quad","points":[{"x":0,"y":0},{"x":9,"y":0},{"x":9,"y":9},{"x":0,"y":9}],"reader":"rescue"}}},
+{"why":"an unknown kind","value":{"geometry":{"kind":"box","points":[],"reader":null}}},
+{"why":"no reader key","value":{"geometry":{"kind":"unavailable","points":[]}}},
+{"why":"no geometry","value":{}},
+{"why":"a point without y","value":{"geometry":{"kind":"partial","points":[{"x":1}],"reader":"rxing"}}}
+]}"#;
+
+#[test]
+fn occurrence_objects_validate_and_their_negatives_do_not() {
+    let validator = definition("Occurrence");
+    let objects: serde_json::Value = serde_json::from_str(OCCURRENCE_OBJECTS).unwrap();
+    for occurrence in objects["valid"].as_array().unwrap() {
+        let errors: Vec<String> = validator
+            .iter_errors(occurrence)
+            .map(|e| format!("{} @ {}", e, e.instance_path()))
+            .collect();
+        assert!(errors.is_empty(), "{occurrence}: {errors:#?}");
+        // the real types read it back to the same object
+        let back: qrcode_barcode_scanner::Occurrence = serde_json::from_value(occurrence.clone())
+            .unwrap_or_else(|e| panic!("{occurrence}: {e}"));
+        let round = serde_json::to_value(&back).unwrap();
+        assert!(
+            validator.is_valid(&round),
+            "{occurrence} re-written as {round}"
+        );
+        assert_eq!(round["geometry"]["kind"], occurrence["geometry"]["kind"]);
+        assert_eq!(
+            round["geometry"]["points"].as_array().unwrap().len(),
+            occurrence["geometry"]["points"].as_array().unwrap().len()
+        );
+    }
+    for negative in objects["invalid"].as_array().unwrap() {
+        assert!(
+            !validator.is_valid(&negative["value"]),
+            "{}: {}",
+            negative["why"],
+            negative["value"]
+        );
+    }
+    // a detection carries one to sixteen occurrences
+    let occurrences = definition("Detection");
+    let golden: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(spec_path("examples/clean-url.json")).unwrap(),
+    )
+    .unwrap();
+    let mut detection = golden["detections"][0].clone();
+    assert!(occurrences.is_valid(&detection), "{detection}");
+    let one = detection["occurrences"][0].clone();
+    for (count, valid) in [(0, false), (1, true), (16, true), (17, false)] {
+        detection["occurrences"] = serde_json::Value::Array(vec![one.clone(); count]);
+        assert_eq!(
+            occurrences.is_valid(&detection),
+            valid,
+            "{count} occurrences"
+        );
+    }
+    // pipeline 5 always writes the field; older reports may omit it
+    detection.as_object_mut().unwrap().remove("occurrences");
+    assert!(occurrences.is_valid(&detection), "an older detection");
+}
+
+#[test]
+fn saturation_requires_its_three_flags() {
+    let validator = definition("Saturation");
+    assert!(validator.is_valid(&serde_json::json!(
+        {"reads": false, "detections": true, "occurrences": false}
+    )));
+    for negative in [
+        serde_json::json!({"reads": false, "detections": false}),
+        serde_json::json!({"reads": false, "detections": false, "occurrences": null}),
+        serde_json::json!({"reads": 0, "detections": false, "occurrences": false}),
+    ] {
+        assert!(!validator.is_valid(&negative), "{negative}");
     }
 }
 
@@ -371,4 +625,162 @@ fn fresh_scan_validates_against_the_spec_schema() {
         errors.is_empty(),
         "a live report no longer matches the published schema: {errors:#?}"
     );
+}
+
+/// The scans behind `golden_equals_a_fresh_scan`: each golden's fixture
+/// scanned again exactly as its command line scanned it.
+#[cfg(all(feature = "engine-rxing", feature = "engine-rqrr"))]
+mod fresh_scan {
+    use qrcode_barcode_scanner::{AlphaBackground, ImageInput, ScanConfig, ScanProfile, Scanner};
+    use serde_json::Value;
+
+    /// The profile `qrscan` builds (its `main`) for `--profile full
+    /// --budget-ms 0` and the given `--alpha-palette` argument. Any
+    /// `--budget-ms` takes its custom branch, which starts from the preset's
+    /// configuration and sets each option below. This mirrors that branch
+    /// rather than running `qrscan`, so a change to the branch must change
+    /// this function too.
+    fn cli_profile(alpha_palette: Option<&str>) -> ScanProfile {
+        let mut config = ScanProfile::Full.config();
+        // `--budget-ms 0` is unbounded
+        config.budget_ms = None;
+        // no `--score-skip-axes`, `--score-preset` or `--score-skip-checks`
+        config.score_skip_axes = Vec::new();
+        config.score_skip_checks = Vec::new();
+        // No `--alpha-background`: the preset's mode stays. For
+        // `--alpha-palette`, clap splits the argument at commas, and the
+        // CLI's private parser refuses more than `MAX_ALPHA_PALETTE` colors
+        // and reads each with the library's `AlphaBackground::palette_color`.
+        let colors: Vec<&str> = alpha_palette
+            .into_iter()
+            .flat_map(|arg| arg.split(','))
+            .collect();
+        assert!(
+            colors.len() <= ScanConfig::MAX_ALPHA_PALETTE,
+            "--alpha-palette {alpha_palette:?}: too many colors"
+        );
+        config.alpha_palette = colors
+            .into_iter()
+            .map(|color| {
+                AlphaBackground::palette_color(color)
+                    .unwrap_or_else(|| panic!("--alpha-palette: unknown color {color}"))
+            })
+            .collect();
+        ScanProfile::Custom(config)
+    }
+
+    /// Removes the measured timings, which `spec/README.md` § Examples
+    /// leaves to the producing run, at their exact places: `/trace/total_ms`
+    /// and `/trace/stages/<i>/ms`, the schema's only timing fields
+    /// (`PipelineTrace.total_ms`, `StageTrace.ms`).
+    fn remove_timings(report: &mut Value, whose: &str) {
+        let trace = report
+            .get_mut("trace")
+            .and_then(Value::as_object_mut)
+            .unwrap_or_else(|| panic!("{whose}: no /trace object"));
+        assert!(
+            trace.remove("total_ms").is_some(),
+            "{whose}: no /trace/total_ms"
+        );
+        let stages = trace
+            .get_mut("stages")
+            .and_then(Value::as_array_mut)
+            .unwrap_or_else(|| panic!("{whose}: no /trace/stages array"));
+        for (i, stage) in stages.iter_mut().enumerate() {
+            let ms = stage.as_object_mut().and_then(|stage| stage.remove("ms"));
+            assert!(ms.is_some(), "{whose}: no /trace/stages/{i}/ms");
+        }
+    }
+
+    /// Every JSON pointer at which `golden` and `emitted` differ, with both
+    /// values; a key or an element only one side has is `absent` on the
+    /// other. Leaves compare as JSON text: `serde_json`'s number equality
+    /// holds `-0.0` equal to `0.0`, which the printed reports tell apart.
+    fn differences(
+        pointer: &str,
+        golden: Option<&Value>,
+        emitted: Option<&Value>,
+        out: &mut Vec<String>,
+    ) {
+        match (golden, emitted) {
+            (Some(Value::Object(left)), Some(Value::Object(right))) => {
+                let keys: std::collections::BTreeSet<&String> =
+                    left.keys().chain(right.keys()).collect();
+                for key in keys {
+                    // a pointer escapes `~` and `/` in a key (RFC 6901)
+                    let token = key.replace('~', "~0").replace('/', "~1");
+                    let child = format!("{pointer}/{token}");
+                    differences(&child, left.get(key), right.get(key), out);
+                }
+            }
+            (Some(Value::Array(left)), Some(Value::Array(right))) => {
+                for i in 0..left.len().max(right.len()) {
+                    let child = format!("{pointer}/{i}");
+                    differences(&child, left.get(i), right.get(i), out);
+                }
+            }
+            _ => {
+                let (left, right) = (shown(golden), shown(emitted));
+                if left != right {
+                    out.push(format!("{pointer}: golden {left} · emitted {right}"));
+                }
+            }
+        }
+    }
+
+    /// A value as JSON text, or `absent`.
+    fn shown(value: Option<&Value>) -> String {
+        value.map_or_else(|| "absent".to_owned(), Value::to_string)
+    }
+
+    /// The comparison tells a negative zero from zero, as the printed
+    /// reports do, and finds nothing between equal values.
+    #[test]
+    fn a_negative_zero_differs_from_zero() {
+        let read = |text: &str| -> Value { serde_json::from_str(text).unwrap() };
+        let (negative, zero) = (read(r#"{"v":-0.0}"#), read(r#"{"v":0.0}"#));
+        let mut out = Vec::new();
+        differences("", Some(&negative), Some(&zero), &mut out);
+        assert_eq!(out, ["/v: golden -0.0 · emitted 0.0"]);
+        out.clear();
+        differences("", Some(&zero), Some(&read(r#"{"v":0.0}"#)), &mut out);
+        assert!(out.is_empty(), "{out:?}");
+    }
+
+    /// Scans `golden`'s fixture as its command line did and compares the
+    /// report with the golden as JSON values, measured timings aside.
+    pub(super) fn assert_golden_equals_a_fresh_scan(golden: &str) {
+        let scan = super::GOLDEN_SCANS
+            .iter()
+            .find(|scan| scan.golden == golden)
+            .unwrap_or_else(|| panic!("{golden}: no entry in GOLDEN_SCANS"));
+        let bytes = std::fs::read(super::repo_path(scan.fixture))
+            .unwrap_or_else(|e| panic!("{golden}: fixture {}: {e}", scan.fixture));
+        let report = Scanner::builder()
+            .profile(cli_profile(scan.alpha_palette))
+            .build()
+            .scan(ImageInput::encoded(&bytes))
+            .unwrap_or_else(|e| panic!("{golden}: scanning {}: {e}", scan.fixture));
+        // The report goes through JSON text and the reader that reads the
+        // golden: serde_json's default reader (without its `float_roundtrip`
+        // feature) can read a 17-digit float one ulp away from the value
+        // written, so comparing `to_value` with the read golden directly
+        // could show a drift that no printed number carries.
+        let printed = serde_json::to_value(&report).unwrap().to_string();
+        let mut emitted: Value = serde_json::from_str(&printed).unwrap();
+        let path = super::spec_path(&format!("examples/{golden}"));
+        let mut expected: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        remove_timings(&mut expected, golden);
+        remove_timings(&mut emitted, "the fresh scan");
+        let mut drifts = Vec::new();
+        differences("", Some(&expected), Some(&emitted), &mut drifts);
+        assert!(
+            drifts.is_empty(),
+            "{golden} differs from a fresh scan of {} at {} JSON pointer(s):\n{}",
+            scan.fixture,
+            drifts.len(),
+            drifts.join("\n")
+        );
+    }
 }

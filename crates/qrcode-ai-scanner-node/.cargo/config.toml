@@ -1,0 +1,9 @@
+# The Windows addon links the C runtime statically, as node.exe does. The
+# official Node binaries import no Visual C++ runtime DLL, so an addon that
+# imports VCRUNTIME140.dll (0.10.0's did) needs the Visual C++ Redistributable,
+# which a clean Windows install lacks. This is the napi-rs package template's
+# setting. `napi build` runs from this directory, so the release build reads
+# it; a RUSTFLAGS in the environment replaces it, as Cargo documents.
+# `scripts/native-floor.py --policy node` refuses the import in the release set.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

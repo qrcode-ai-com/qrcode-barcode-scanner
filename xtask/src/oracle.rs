@@ -67,7 +67,7 @@
 //! rule. Identical outputs are grouped before judging, the 16-detection cap
 //! and QR-first order (our wire shape) are recorded as information, and
 //! dispositions apply their outcome rule unchanged — an output that is not
-//! the pinned qrcode-ai-scanner reading marks the entry `differs`
+//! the pinned qrcode-barcode-scanner reading marks the entry `differs`
 //! (information) instead of stale. `--emit-observed <jsonl>` writes our own
 //! scans in that shape (decoded text and bytes included: keep it local).
 
@@ -75,7 +75,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Charset, Detection, EngineKind, Fnc1Position, ImageInput, Scanner, Symbology, Versions,
 };
 use rayon::prelude::*;
@@ -621,7 +621,7 @@ pub(crate) struct Disposition {
     pub(crate) image_sha256: &'static str,
     pub(crate) truth_sha256: &'static str,
     pub(crate) kind: DispositionKind,
-    /// The qrcode-ai-scanner judge verdict this entry was written against.
+    /// The qrcode-barcode-scanner judge verdict this entry was written against.
     pub(crate) verdict: Outcome,
     /// Why — public corpus facts only.
     pub(crate) note: &'static str,
@@ -665,7 +665,7 @@ enum DispositionState {
     /// Our own scan: hashes as pinned, but the output is not what the pin
     /// excuses — edit the table deliberately (blocks).
     Stale,
-    /// Observed decoder: its output is not the pinned qrcode-ai-scanner
+    /// Observed decoder: its output is not the pinned qrcode-barcode-scanner
     /// reading. Information only — the outcome rule still applies.
     Differs,
     /// Original pins still hold, but independently validated effective text
@@ -985,7 +985,7 @@ fn verdict_of(expected: Option<&[Expected]>, scan: &Scan, wire_binds: bool) -> V
 // ------------------------------------------------------------- observed
 
 /// Name the emitted and observed files use for our own scanner.
-const OUR_DECODER: &str = "qrcode-ai-scanner";
+const OUR_DECODER: &str = "qrcode-barcode-scanner";
 
 /// A decoder's metadata line in an `--observed` file.
 #[derive(Debug, Deserialize)]
@@ -2730,7 +2730,7 @@ pub(crate) fn run(args: Vec<String>) {
 mod tests {
     use super::*;
     use crate::external::RootSource;
-    use qrcode_ai_scanner::Symbology::{Ean13, MicroQrCode, QrCode};
+    use qrcode_barcode_scanner::Symbology::{Ean13, MicroQrCode, QrCode};
 
     fn qr(text: &str) -> Unit {
         Unit {
@@ -3009,9 +3009,9 @@ mod tests {
         let found = contract_violations(&plains(&[(Ean13, "1"), (QrCode, "2")]));
         assert_eq!(found.len(), 1, "{found:?}");
         assert!(found[0].contains("QR-family detection #1"), "{found:?}");
-        assert!(
-            contract_violations(&plains(&[(QrCode, "2"), (MicroQrCode, "3"), (Ean13, "1")]))
-                .is_empty()
+        assert_eq!(
+            contract_violations(&plains(&[(QrCode, "2"), (MicroQrCode, "3"), (Ean13, "1")])).len(),
+            0
         );
 
         let found = contract_violations(&plains(&[(QrCode, "A"), (QrCode, "A")]));
@@ -3021,7 +3021,10 @@ mod tests {
             "{found:?}"
         );
         // an EAN-13 and a QR carrying the same digits are two contents
-        assert!(contract_violations(&plains(&[(QrCode, "1"), (Ean13, "1")])).is_empty());
+        assert_eq!(
+            contract_violations(&plains(&[(QrCode, "1"), (Ean13, "1")])).len(),
+            0
+        );
         // messages carry indices, never payload text
         assert!(found.iter().all(|m| !m.contains("\"A\"")));
     }
@@ -3301,7 +3304,7 @@ mod tests {
 
     /// The same outcome rule for every decoder; only our own scan's
     /// unexcused output is a stale (blocking) table — another decoder's
-    /// merely `differs` from the pinned qrcode-ai-scanner reading.
+    /// merely `differs` from the pinned qrcode-barcode-scanner reading.
     #[test]
     fn dispositions_apply_identically_to_every_decoder() {
         let [known_wrong, double_qr] = DISPOSITIONS;
@@ -4235,7 +4238,7 @@ mod tests {
         assert!(observed.contract.is_empty(), "{:?}", observed.contract);
         assert_eq!(observed.wire_info.len(), 2, "{:?}", observed.wire_info);
         let ours = verdict_of(None, &scan, true);
-        assert!(ours.wire_info.is_empty());
+        assert_eq!(ours.wire_info.len(), 0);
         assert_eq!(
             ours.contract,
             contract_violations(&detections),
@@ -4425,13 +4428,16 @@ mod tests {
             "[] is the content of the located list"
         );
         let unobserved = read("\u{A1}", &[0xA1], Charset::Latin1, None);
-        assert!(contract_violations(&[declared.clone(), unobserved.clone()]).is_empty());
-        assert!(contract_violations(&[signalled, unobserved]).is_empty());
+        assert_eq!(
+            contract_violations(&[declared.clone(), unobserved.clone()]).len(),
+            0
+        );
+        assert_eq!(contract_violations(&[signalled, unobserved]).len(), 0);
         let mut second = declared.clone();
         if let Some(content) = second.content.as_mut() {
             content.fnc1 = Some(Fnc1Position::Second);
         }
-        assert!(contract_violations(&[declared, second]).is_empty());
+        assert_eq!(contract_violations(&[declared, second]).len(), 0);
     }
 
     /// The matching keeps the most exact meets, then the most meets: here a
@@ -4471,7 +4477,7 @@ mod tests {
         (row.verdict, row.outcome) = (verdict.raw, verdict.outcome);
         assert_eq!(row.outcome, Outcome::Unread);
         let rows = [row];
-        assert!(blockers(&Integrity::default(), &rows, &[]).is_empty());
+        assert_eq!(blockers(&Integrity::default(), &rows, &[]).len(), 0);
         let (groups, sets) = tallies(&rows);
         let tally = sets[&Set::Zxing];
         assert_eq!((tally.truth, tally.exact(), tally.unread()), (1, 0, 1));

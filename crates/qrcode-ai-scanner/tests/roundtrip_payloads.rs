@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, Payload, Scanner};
+use qrcode_barcode_scanner::{ImageInput, Payload, Scanner};
 
 fn qr_png(content: &str) -> Vec<u8> {
     let code = qrcode::QrCode::with_error_correction_level(content, qrcode::EcLevel::Q).unwrap();

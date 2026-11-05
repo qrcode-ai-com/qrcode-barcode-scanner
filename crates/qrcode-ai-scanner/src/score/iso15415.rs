@@ -44,7 +44,7 @@ fn grade_ceiling(value: f32, ceilings: [f32; 4]) -> IsoGrade {
 
 /// Sorted-slice percentile (nearest-rank; `p` in 0.0..=1.0).
 fn percentile(sorted: &[u8], p: f32) -> u8 {
-    debug_assert!(!sorted.is_empty());
+    debug_assert_ne!(sorted.len(), 0);
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -102,8 +102,19 @@ fn contrast_and_modulation(samples: &[u8]) -> Option<(IsoParameter, IsoParameter
     Some((symbol_contrast, modulation))
 }
 
+/// The distance between two corners, computed with IEEE 754 operations
+/// only: the square of an f32 difference is exact in f64, the sum rounds
+/// once, `sqrt` is correctly rounded, and one cast returns to f32. Every
+/// platform therefore measures the same value, whereas the platform's
+/// `hypotf` need not round the same way on every system, and the axial
+/// nonuniformity built on these distances is published unrounded.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the one rounding of the f64 distance to f32"
+)]
 fn dist(a: Point, b: Point) -> f32 {
-    (a.x - b.x).hypot(a.y - b.y)
+    let (dx, dy) = (f64::from(a.x - b.x), f64::from(a.y - b.y));
+    (dx * dx + dy * dy).sqrt() as f32
 }
 
 /// Axial Nonuniformity from the corner quad (clockwise from top-left).

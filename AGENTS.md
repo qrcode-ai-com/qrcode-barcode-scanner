@@ -12,34 +12,67 @@ scanner engine and one package family: **QR Code & Barcode Scanner**.
 QR/barcode modes and SEO pages do not authorize
 separate scanner engines, product extractions or alias/wrapper packages.
 
-The source repository is `supernovae-st/qrcode-barcode-scanner`. Its repository
-identity, history and tags are retained from its previous names. Published
-packages still use `qrcode-ai-scanner`; do not replace their install coordinates
-with the repository name. QR Code AI's SaaS and its creation engine have separate
-sources and release qualification. A mobile scanner binding is not a consumer
-app. Component licenses do not by themselves determine the SaaS's license.
+The source repository is `qrcode-ai-com/qrcode-barcode-scanner`. Its repository
+identity, history and tags are retained from its previous names. Releases up to
+0.10.x keep their former names: `qrcode-ai-scanner` and `qrcode-ai-scanner-cli`
+on crates.io, the `@supernovae-st` scope on npm, and `qrcode-ai-scanner` on PyPI
+(last release 0.9.0); never rename, edit or republish them. From 0.11.0 every
+package is published under the `qrcode-barcode-scanner` family: the crates
+`qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` (which installs
+`qrscan`), the npm packages `@qrcode-ai-com/qrcode-barcode-scanner`, its six
+platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, and
+`qrcode-barcode-scanner` on PyPI (imported as `qrcode_barcode_scanner`). No
+registry serves these names yet: they are pending publication. Nothing from
+0.11.0 on is published under a former name, and there are no alias or wrapper
+packages. The Flutter package is not yet published: it ships on
+pub.dev only as `qr_barcode_scanner`, never as `qrcode_ai_scanner`. Until a
+registry serves a new name, documents present that name as pending publication
+and give no copyable install line for it: they install the 0.10.1 release
+under its former name (crates.io and npm) or build from source (Python and the
+mobile bindings). Take install coordinates from README.md and the
+documentation, not from the repository name; the
+[migration guide](docs/guides/migrate-to-qrcode-barcode-scanner.mdx) maps each
+former name to its new one. QR Code AI's SaaS and its creation engine have
+separate sources and release qualification. A mobile scanner binding is not a
+consumer app. Component licenses do not by themselves determine the SaaS's
+license.
+
+These spellings are retained in 0.11 and are not install names: the repository
+directories (`crates/qrcode-ai-scanner*`, `bindings/kotlin/qrcodeaiscanner`,
+`bindings/swift/Sources/QrcodeAiScanner`); the never-published Cargo packages
+`qrcode-ai-scanner-node` and `qrcode-ai-scanner-wasm` (root workspace members,
+which `-p` still selects by these names) and `qrcode-ai-scanner-uniffi` and
+`qrcode-ai-scanner-fuzz` (outside the root workspace, addressed with
+`--manifest-path`); the UniFFI library `qrcode_ai_scanner_uniffi`, the Kotlin
+package `uniffi.qrcode_ai_scanner_uniffi`, the Gradle module `:qrcodeaiscanner`,
+the Kotlin build's root project name `qrcode-ai-scanner-kotlin`, the Swift
+`QrcodeAiScanner` package with its `QrcodeAiScannerFFI` binary target, and the
+Android namespaces of the Kotlin and Flutter bindings; and the platform
+identifiers of the Flutter example app. Do not rename them as a side effect of
+other work.
 
 Preserve historical package names, tags, schema IDs, licenses and wire contracts.
 Newly named packages need real builds and consumer qualification. A repository
-rename or documentation amendment does not publish or retire any artifact.
+rename or a documentation change does not publish or retire any artifact.
 
 ## Current implementation
 
 A Rust workspace producing EIGHT publish surfaces off one core —
 QR/barcode decoding + scannability scoring, specialty: artistic/
-AI-generated codes. Everything runs **locally** (no network calls
-anywhere in the library).
+AI-generated codes. The Rust core and WASM run **locally** with no network
+calls; the optional `./destination` module sends requests only through a
+transport the caller supplies.
 
 | Path | Artifact | Registry |
 |---|---|---|
-| `crates/qrcode-ai-scanner` | core library | crates.io |
-| `crates/qrcode-ai-scanner-cli` | `qrscan` binary | crates.io |
-| `crates/qrcode-ai-scanner-node` | `@supernovae-st/qrcode-ai-scanner` (napi) | npm |
-| `crates/qrcode-ai-scanner-wasm` | `@supernovae-st/qrcode-ai-scanner-wasm` | npm |
-| `crates/qrcode-ai-scanner-py` | `qrcode-ai-scanner` (PyO3, workspace-excluded) | PyPI |
-| `bindings/flutter` | `qrcode_ai_scanner` (FRB + cargokit) | pub.dev |
-| `bindings/kotlin` | `com.github.supernovae-st:qrcode-ai-scanner` | JitPack |
-| `bindings/swift` | `QrcodeAiScanner` (xcframework, tag-pinned) | SwiftPM |
+| `crates/qrcode-ai-scanner` | `qrcode-barcode-scanner`, the core library, pending publication | crates.io |
+| `crates/qrcode-ai-scanner-cli` | `qrcode-barcode-scanner-cli`, the `qrscan` binary, pending publication | crates.io |
+| `crates/qrcode-ai-scanner-node` | `@qrcode-ai-com/qrcode-barcode-scanner` (napi) and its six platform packages, pending publication | npm |
+| `crates/qrcode-ai-scanner-wasm` | `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, pending publication | npm |
+| `crates/qrcode-ai-scanner-py` | `qrcode-barcode-scanner` (PyO3, workspace-excluded), pending publication | PyPI |
+| `bindings/flutter` | Flutter plugin (FRB + cargokit), not yet published | pub.dev |
+| `bindings/kotlin` | com.github.qrcode-ai-com:qrcode-barcode-scanner, not yet qualified | JitPack |
+| `bindings/swift` | `QrcodeAiScanner` (xcframework), built from source: SwiftPM cannot add it by repository URL | SwiftPM (local package) |
 
 **Downstream, this crate is "the judge"**: the generator's e2e floors,
 the qrt templates layer and the 306-template factory all score through
@@ -60,21 +93,32 @@ score honesty is a cross-repo contract.
 
 ## Commands
 
+Use the compiler pin and locked gates in
+[Local development checks](RELEASING.md#local-development-checks). The workflow
+pin and the MSRV are separate contracts; an ambient Cargo compiler is not proof
+of CI parity. Inspect `RUST_TOOLCHAIN` in `.github/workflows/ci.yml` when the pin
+changes, and update command examples and condensed agent contexts together.
+
 ```bash
-cargo nextest run --workspace        # the test suite (count = whatever it prints)
-cargo clippy --workspace --all-targets   # MUST stay at 0 warnings (pedantic)
-cargo fmt --all
-cargo +1.88 check --locked           # MSRV floor
+cargo +1.99.1 nextest run --workspace --locked  # count = actual executed tests
+cargo +1.99.1 test --doc --workspace --locked
+RUSTFLAGS="-D warnings" cargo +1.99.1 clippy --workspace --all-targets --all-features --locked
+cargo +1.99.1 fmt --all --check
+cargo +1.88 check -p qrcode-barcode-scanner --all-features --locked  # MSRV floor
 python3 scripts/check-type-parity.py # Rust ↔ TS ↔ JSON-Schema drift gate
-cargo run -p xtask -- corpus-report  # decode-rate table from corpus.toml
-cargo run -p xtask -- sync-version [--check]  # one source → all 9 version surfaces (incl. doc pins)
-cargo run -p xtask -- gen-fixtures   # regenerate deterministic fixtures
+cargo +1.99.1 run --locked -p xtask -- corpus-report
+cargo +1.99.1 run --locked -p xtask -- sync-version --check
 ./scripts/build-wasm.sh              # wasm pkg (NEEDS binaryen ≥130 on PATH)
 node crates/qrcode-ai-scanner-node/test.mjs   # node smoke (build first: npm run build)
 node crates/qrcode-ai-scanner-wasm/test.mjs   # wasm smoke (build first)
 ```
 
-Deep checks (weekly `deep-checks.yml`): cargo-mutants in 85 shards, judged
+Regeneration commands write files: `xtask gen-fixtures`, `xtask sync-version`
+without `--check`, and `cargo fmt --all`. Use them for the intended owned change.
+Dependency/core changes also require the runbook's four excluded lock-root
+checks; a workspace pass does not cover Python, UniFFI, Flutter Rust or fuzz.
+
+Deep checks (weekly `deep-checks.yml`): cargo-mutants in 128 shards, judged
 by the `mutants-summary` job — red on a baseline failure or on any missed /
 timed-out mutant absent from `.cargo/mutants-dispositions.toml` (after an
 edit there: `python3 scripts/check-mutants-outcome.py --self-test`) · fuzz
@@ -152,8 +196,10 @@ manifest only and reports the gate as NOT VERIFIED, never as a pass.
 - rqrr rejects FNC1 symbols (mode 0x5/0x9) — rxing is the GS1 engine; the
   scanner re-derives the grid rqrr detected to read its declarations.
 - The goldens (`spec/examples/`) carry this build's `versions`, and
-  `spec_golden` pins them: a marker or version bump regenerates the whole
-  set from its committed fixtures (`qrscan <fixture> --profile full
+  `spec_golden` compares each with a fresh scan of its fixture: a behavior
+  change regenerates the goldens it moves (`golden_equals_a_fresh_scan::<name>`
+  names each one), and a marker or version bump regenerates the whole set,
+  from the committed fixtures (`qrscan <fixture> --profile full
   --budget-ms 0`, the table in `spec/README.md` § Examples); review every
   diff.
 - `cargo test --workspace --lib` style commands: prefer

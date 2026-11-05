@@ -8,7 +8,9 @@
 # (observed at load ≈ 100: it fails at ~4.1 s in a full parallel run, passes
 # serially). The others are the suite's heaviest CPU consumers, which starve
 # any budget running beside them: the artistic score pins (deep-ladder decode
-# + full stress score), the threaded-determinism pin (four budget-free
+# + full stress score; the artistic golden's reproduction in spec_golden runs
+# the same scan, while the other golden reproductions are lighter and run
+# outside the group), the threaded-determinism pin (four budget-free
 # full-ladder scans at once, every non-PDF417 symbology fixture included),
 # the score sweeps (one judgment per work quota
 # of three symbols · one scan per budget step) and the budget-flag sweeps
@@ -26,7 +28,7 @@
 wall-clock = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'test(artistic_image_that_decodes_must_not_score_zero) + test(blob_style_template_decodes_and_scores) + test(legacy_artistic_image_decodes_within_full_ladder) + test(concurrent_scans_yield_byte_identical_reports) + test(work_quota_cuts_are_absent_never_partial) + test(budget_cuts_never_ship_a_partial_judgment) + test(a_present_score_is_budget_independent) + test(flag_false_means_final) + test(unbounded_scans_never_set_the_flag)'
+filter = 'test(artistic_image_that_decodes_must_not_score_zero) + test(blob_style_template_decodes_and_scores) + test(/^golden_equals_a_fresh_scan::artistic_blob$/) + test(legacy_artistic_image_decodes_within_full_ladder) + test(concurrent_scans_yield_byte_identical_reports) + test(work_quota_cuts_are_absent_never_partial) + test(budget_cuts_never_ship_a_partial_judgment) + test(a_present_score_is_budget_independent) + test(flag_false_means_final) + test(unbounded_scans_never_set_the_flag)'
 test-group = 'wall-clock'
 threads-required = "num-cpus"
 
@@ -36,4 +38,34 @@ threads-required = "num-cpus"
 [[profile.default.overrides]]
 filter = 'test(/^score::warp::tests::zero_angle_rotation_preserves_rectangular_pixels_exactly$/)'
 priority = 100
+threads-required = "num-cpus"
+
+# The same for the DataBar Expanded pair search and row store: a broken loop
+# bound spins every other test that reads a symbol, while these direct checks
+# fail within milliseconds. Running them first, alone, stops the run before a
+# spinning test starts. The resume-position check calls a pure function and
+# cannot spin, so it goes before the searches that would spin on a broken
+# resume. No test is excluded.
+[[profile.default.overrides]]
+filter = 'test(/^engine::databar_expanded::tests::the_search_resumes_two_edges_after_a_rejected_candidate$/)'
+priority = 100
+threads-required = "num-cpus"
+
+[[profile.default.overrides]]
+filter = 'test(/^engine::databar_expanded::tests::(rows_are_stored_by_row_number_after_their_equals|repeated_or_partial_rows_are_not_stored_and_containing_rows_replace_them|an_internal_finder_too_close_to_the_previous_one_is_passed_over|no_pair_follows_a_pair_without_a_right_character|a_search_from_the_row_end_or_beyond_finds_nothing|an_odd_finder_takes_its_first_element_from_the_space_before_the_window|an_even_finder_is_matched_mirrored_with_its_first_element_after_the_window)$/)'
+priority = 99
+threads-required = "num-cpus"
+
+# The same for the DataBar Expanded bit stream: a broken countdown in the
+# bit-array builder keeps a character's loop on bit 11. A symbol read spins
+# there whenever that bit is clear, as it is in every first data character
+# without a composite link, unless the optimizer happens to fold the spin
+# into an overflow panic. This direct check sets bit 11 in all three of its
+# characters, so the same break indexes past its array's single storage
+# word within 65 iterations and panics at any optimization level. It runs
+# after the checks above, alone, before any test that decodes a symbol. No
+# test is excluded.
+[[profile.default.overrides]]
+filter = 'test(/^engine::databar_expanded::tests::each_character_contributes_twelve_bits_from_bit_eleven$/)'
+priority = 98
 threads-required = "num-cpus"

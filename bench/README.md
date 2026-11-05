@@ -2,7 +2,7 @@
 
 `xtask bench …` measures what the correctness oracle does not: outer-call
 latency, memory, allocations, throughput and WASM cost of the scanner,
-**base** (the published 0.9.0) versus **candidate** (this tree), by the
+**base** (the published 0.10.1) versus **candidate** (this tree), by the
 method this file states — `qrscan-bench/v5`, which every run's JSON output
 names under `bench`. Correctness stays with `xtask oracle`; the bench only
 records whether outputs agree.
@@ -15,10 +15,10 @@ dry run never yields a verdict.
 
 | runtime | what runs | base | candidate |
 |---|---|---|---|
-| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner = "=0.9.0"` | worker built against this tree by path |
-| `cli` | one `qrscan` process per scan | the published 0.9.0 CLI crate, built `--locked` | this tree's CLI |
-| `node` | the napi package's public `scan()` in Node | the v0.9.0 package files with the addon rebuilt from the v0.9.0 source | this tree's package + addon |
-| `wasm` | the wasm package's `scan_image()` in Node | the v0.9.0 package rebuilt from its source by the release recipe | a package built by `scripts/build-wasm.sh` |
+| `lib` | `Scanner::scan` in-process, in a generated worker | worker built against `qrcode-ai-scanner = "=0.10.1"` | worker built against this tree by path |
+| `cli` | one `qrscan` process per scan | the published 0.10.1 CLI crate, built `--locked` | this tree's CLI |
+| `node` | the napi package's public `scan()` in Node | the v0.10.1 package files with the addon rebuilt from the v0.10.1 source | this tree's package + addon |
+| `wasm` | the wasm package's `scan_image()` in Node | the v0.10.1 portable module (`pkg/compatible`) rebuilt from its source by the release recipe | a package built by `scripts/build-wasm.sh` |
 
 Modes: `full` (preset budget), `full-unbounded` (`budget_ms: None` — what
 every binding maps a budget of 0 to), `fast`, `frame`.
@@ -39,12 +39,13 @@ and candidate are the same file, or whose Node or WASM driver did not load
 — by its path in the package — the file the receipt hashes.
 
 The base is the base: a gated run also refuses (exit 2) a swapped,
-mislabelled or dirty side. Every base artifact must come from the v0.9.0
-release — the library worker and the CLI link `qrcode-ai-scanner` 0.9.0
+mislabelled or dirty side. Every base artifact must come from the v0.10.1
+release — the library worker and the CLI link `qrcode-ai-scanner` 0.10.1
 from crates.io (the unit cargo reported, with its package source), the
 CLI is the published crate (its sha256 pinned to the checksum crates.io
 lists), the Node addon and the WASM package are built from the `git
-archive` of the release commit. That archive is extracted outside any git
+archive` of the release commit (a local `v0.10.1` tag, when the clone has
+one, must name that commit). That archive is extracted outside any git
 tree, so a stamp ties a build to its `--source` instead: it refuses an
 artifact whose package manifest, as cargo reports it for the unit that
 produced the artifact, or a WASM package directory, lies outside that
@@ -54,7 +55,7 @@ the measured tree at the commit the run records, with a clean source — a
 library worker from its generated crate and a scanner unit built from that
 tree. Every source must be unchanged since the harness wrote or extracted
 it, and every worker's `hello` must name its side: the base's scanner
-version 0.9.0 or the tree's, and for a library worker the crate `bench
+version 0.10.1 or the tree's, and for a library worker the crate `bench
 prepare` generated for that side.
 
 - **Library workers.** `bench prepare` writes two crates **outside the
@@ -65,24 +66,37 @@ prepare` generated for that side.
   include `xtask/src/bench/worker.rs` by path and report its sha256 at
   `hello`: a run refuses workers compiled from another `worker.rs` than its
   own, so both sides always come from one `prepare` of the same tree.
-- **CLIs.** The published crate carries its own `Cargo.lock` and no
-  profile, so `cargo build --release --locked` of the extracted crate gives
-  the base; the candidate gets the same default release profile through
-  `--config` overrides of the workspace profile.
-- **Node addons.** The base addon is rebuilt from the v0.9.0 source — the
+- **CLIs.** The published crate carries its own `Cargo.lock` and one
+  profile table, `[profile.release.package.rxing] overflow-checks = true`,
+  so `cargo build --release --locked` of the extracted crate gives the
+  base: cargo's default release profile with rxing's overflow checks. The
+  candidate gets the same profile through `--config` overrides of the
+  workspace profile — `profile.release.lto=false`,
+  `profile.release.codegen-units=16` and
+  `profile.release.strip="debuginfo"` — and keeps the workspace's rxing
+  overflow checks: turning them off too is a refused profile.
+- **Node addons.** The base addon is rebuilt from the v0.10.1 source — the
   `git archive` of the release commit, extracted outside the workspace by
   `bench prepare-base`, built with its own `Cargo.lock` (`--locked`) and
   release profile on the candidate's toolchain. The published npm addon
   stays a correctness reference.
-- **WASM packages.** The base package is rebuilt from the same v0.9.0
+- **WASM packages.** The base package is rebuilt from the same v0.10.1
   source by its own `scripts/build-wasm.sh` — the release recipe:
-  `wasm-pack` with the wasm-bindgen of its lock, `RUSTFLAGS="-C
-  target-feature=+simd128"`, then `wasm-opt -O3 --enable-simd
-  --all-features` of binaryen `version_130` — on the candidate's toolchain.
-  A pair whose embedded compiler, wasm-opt version or flags, RUSTFLAGS,
-  module recipe (producers, wasm-bindgen, SIMD) or build environment
-  differ is refused; the published npm package stays a correctness
-  reference.
+  `wasm-pack` with the wasm-bindgen of its lock, then `wasm-opt` of
+  binaryen `version_130` — on the candidate's toolchain. That script
+  builds two modules: a SIMD one in `pkg` (`RUSTFLAGS="-C
+  target-feature=+simd128,-relaxed-simd"`, `wasm-opt … --enable-simd`) and
+  a portable one in `pkg/compatible` (`RUSTFLAGS="-C
+  target-feature=-simd128,-relaxed-simd"`, `wasm-opt -O3 --mvp-features`
+  plus the floor's features and `--disable-simd`). From 0.11 the release
+  recipe builds that portable module alone, in `pkg`, with the same
+  RUSTFLAGS and wasm-opt flags, so the base is `pkg/compatible` — the
+  `--package` of its stamp — and the pair compares one recipe. A pair
+  whose embedded compiler, wasm-opt version or flags, RUSTFLAGS, module
+  recipe (producers, wasm-bindgen, SIMD) or build environment differ is
+  refused: the v0.10.1 SIMD `pkg` against a 0.11 candidate is a refused
+  pair, never a speed comparison (a dry run records it, unfit). The
+  published npm package stays a correctness reference.
 - **Build manifests come from the build.** `bench stamp` runs the build
   itself and writes, next to the artifact, `<file>.build.json` (a package
   directory: `build.json`): `rustc -vV`, the compiler commits embedded in
@@ -93,7 +107,10 @@ prepare` generated for that side.
   debuginfo, debug assertions, overflow checks, features) — with the
   codegen-affecting environment (`*RUSTFLAGS*`, `CARGO_PROFILE_*`, `RUSTC`
   and its wrappers, as hashes). A WASM stamp records `wasm-opt --version`,
-  the script's wasm-opt flags and RUSTFLAGS, and the script's hash. Paths
+  the script's hash and the RUSTFLAGS and wasm-opt flags of the module it
+  stamps: those of the script's `wasm-pack build` whose `--out-dir`
+  (default `pkg`) and of its `wasm-opt` whose input lie in the `--package`
+  directory, else the script's first of each. Paths
   in the recorded command are cut to their last component. `bench
   prepare` and `bench prepare-base` carry manifests into the package
   directories they assemble; `bench inspect <path>` prints what a run
@@ -196,8 +213,9 @@ Known limits of what a report shows — reported, never judged:
   (`alpha`, per image and as `alpha_images` per class), each call's alpha
   state is recorded, and the timed calls whose state differs from their
   reference walk's are counted;
-- the candidate's own `trace.budget_exhausted`, when its build reports
-  one, is recorded per call and counted per side;
+- each side's own `trace.budget_exhausted`, when its build reports one
+  (0.10.1 and this tree both do), is recorded per call and counted per
+  side;
 - pairs that both variants cut at the same point — the same share of
   their own reference walks — carry no speed verdict (latency
   budget-bound, a work ratio of 1, a concordant `McNemar` pair); their
@@ -207,14 +225,12 @@ Known limits of what a report shows — reported, never judged:
   dry run's pre-screen reports its share per set;
 - an engine retry that re-flattens an alpha image between two walks
   spends time `total_ms` does not cover (the walk comparison still sees a
-  truncated retry), and a lighting set that 0.9.0 cuts right after a
-  failing cell, with every remaining cell failing, keeps its passed count
-  — that one cut is invisible in the judgment;
+  truncated retry);
 - a budget that cuts a knee bisection leaves the score complete and drops
   only that axis's `refined_failed_at`, which the judgment signature does
   not carry — the composite, the contract weights and each axis's cells
   passed of planned stay as the reference's — so the truncation test
-  cannot see it; the candidate's `trace.budget_exhausted` reports the cut
+  cannot see it; each side's `trace.budget_exhausted` reports the cut
   (counted per side). Seeing it would take a per-axis refined marker
   (present or absent) in the three signature builders — the library
   worker, the CLI report parser and the Node and WASM drivers — and a
@@ -288,7 +304,7 @@ codes and `file.rs:line:column` panic locations.
 A timing segment starts only when the one-minute load average is at most
 0.5 per logical core (for example 6 on a 12-core host), no other build
 runs (a cargo / rustc process in any worktree of this repository, or
-carrying the `qrscan` / `qrcode-ai-scanner` markers — arguments are read
+carrying the `qrscan` / `qrcode-ai-scanner` / `qrcode-barcode-scanner` markers — arguments are read
 to classify, never
 printed), the host is on AC power outside Low Power Mode, swap use is at
 most 8 GB (8 × 10⁹ bytes), and the run holds the host-wide bench lock
@@ -351,9 +367,16 @@ $X bench stamp --source <dir>/worker-base --artifact <target>/release/qrscan-ben
 $X bench stamp --source <dir>/worker-candidate --artifact <target>/release/qrscan-bench-worker-candidate \
   -- cargo build --release --manifest-path <dir>/worker-candidate/Cargo.toml
 
-# 3. base sources: the v0.9.0 git archive (and the published CLI crate);
-#    prepare-base prints the build and stamp of each base artifact
-$X bench prepare-base --work <dir> [--cli-crate qrcode-ai-scanner-cli-0.9.0.crate]
+# 3. base sources: the v0.10.1 git archive (and the published CLI crate);
+#    prepare-base prints the build and stamp of each base artifact — the
+#    base WASM package is the portable module, <src>/crates/qrcode-ai-scanner-wasm/pkg/compatible
+$X bench prepare-base --work <dir> [--cli-crate qrcode-ai-scanner-cli-0.10.1.crate]
+
+# 3b. the candidate CLI on the published crate's profile (Build parity, CLIs)
+$X bench stamp --source . --artifact <target>/candidate-cli/release/qrscan \
+  -- cargo build -p qrcode-barcode-scanner-cli --release --locked --target-dir <target>/candidate-cli \
+  --config profile.release.lto=false --config profile.release.codegen-units=16 \
+  --config 'profile.release.strip="debuginfo"'
 
 # 4. a dry run: gate recorded, not enforced; caps and host floor enforced; exit 3
 $X bench run --dry-run --per-group 1 --reps 2 --out <fresh dir> \

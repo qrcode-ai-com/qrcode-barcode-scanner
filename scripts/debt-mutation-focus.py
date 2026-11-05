@@ -100,7 +100,7 @@ def mutation_command(cohort, out):
     files = sorted({name.split(":", 1)[0] for name in expected})
     filters = [value for name in expected for value in ("-F", "^" + re.escape(name) + "$")]
     selectors = [value for file in files for value in ("--file", file)]
-    return ["cargo", "mutants", "-p", "qrcode-ai-scanner", "--in-place", "--cargo-arg=--locked",
+    return ["cargo", "mutants", "-p", "qrcode-barcode-scanner", "--in-place", "--cargo-arg=--locked",
             "--test-tool", "nextest", "--timeout", "180", "--build-timeout", "900", "-o", str(out)] + \
         selectors + filters + ["--in-diff", str(out / "anchors.diff"),
                                "--", "--all-features", "--lib", "-E", TESTS[cohort]]
@@ -142,7 +142,7 @@ def run(args):
     require(listing.returncode == 0, "mutant listing failed")
     names = [x["name"] for x in json.loads(listing.stdout.decode("utf-8"))]
     require(len(names) == len(expected) and set(names) == set(expected), "changed or incomplete cohort anchors")
-    tests = capture(["cargo", "nextest", "list", "-p", "qrcode-ai-scanner", "--locked", "--all-features", "--lib",
+    tests = capture(["cargo", "nextest", "list", "-p", "qrcode-barcode-scanner", "--locked", "--all-features", "--lib",
                      "--message-format", "json", "-E", TESTS[args.cohort]], out, "tests")
     require(tests.returncode == 0, "test discovery failed")
     discovered = json.loads(tests.stdout.decode("utf-8"))

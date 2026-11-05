@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution! `qrcode-ai-scanner` is one Rust core
+Thanks for considering a contribution! `qrcode-barcode-scanner` is one Rust core
 (`crates/qrcode-ai-scanner`) with thin façades on top (CLI, Node/napi, browser/WASM,
 Python/PyO3, and Kotlin+Swift via UniFFI). Most changes land in the core; the façades
 stay thin.
@@ -12,16 +12,24 @@ community and sustainable.
 
 ## Build & test
 
+Read [Local development checks](RELEASING.md#local-development-checks) for the
+exact compiler, locked workspace gates and excluded binding roots. The compiler
+pin comes from `RUST_TOOLCHAIN` in `.github/workflows/ci.yml`; the manifest's
+`rust-version` is the separately tested minimum. No repository toolchain file
+overrides a contributor's default, so use the explicit compiler selector.
+
+A first core check with the current pin is:
+
 ```bash
-cargo build --workspace
-cargo test  --workspace        # unit + integration + doctests
-cargo fmt   --all              # formatting
-cargo clippy --workspace --all-targets --all-features   # must be warning-free
+cargo +1.99.1 test -p qrcode-barcode-scanner --all-targets --locked
+cargo +1.99.1 fmt --all --check
 ```
 
-CI runs the same checks on Linux / macOS / Windows, plus a WASM build-shape
-check, a corpus report, and `cargo-deny` (licences + advisories). A PR is
-mergeable when CI is green.
+This core check does not execute all bindings, doctests or installed consumers.
+Before a PR, run the applicable workspace, type, MSRV, Wasm and package gates
+from the linked runbook. Source/build/packed-consumer checks have different
+scope; CI exercises the selected gates on Linux / macOS / Windows. Apply
+formatting to owned files when editing, then verify it with the check above.
 
 ## Code standards
 
@@ -34,9 +42,11 @@ mergeable when CI is green.
 ## The wire contract lives in `spec/`
 
 `spec/` is the **normative** `ScanReport` contract (wire format + JSON Schema +
-golden examples), validated in CI against the real types. If your change alters
-the output shape, update `spec/` and regenerate the golden examples in the same
-PR — CI will fail otherwise.
+golden examples), validated in CI against the real types and against a fresh
+scan of each golden's fixture. If your change alters a report (its shape or any
+value), update `spec/` and regenerate the affected golden examples in the same
+PR, with the command lines in `spec/README.md` § Examples — CI will fail
+otherwise.
 
 ## Pull requests
 

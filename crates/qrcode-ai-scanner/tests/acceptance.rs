@@ -7,7 +7,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner, Symbology};
+use qrcode_barcode_scanner::{ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner, Symbology};
 
 /// The GTIN of the low-contrast EAN-13 render (and of `ean13.png`).
 const EAN13: &str = "9506000134352";
@@ -36,7 +36,7 @@ fn png(img: &image::GrayImage) -> Vec<u8> {
 /// pure function of the pixels.
 fn scan(bytes: &[u8], mut config: ScanConfig) -> ScanReport {
     config.budget_ms = None;
-    config.score_depth = qrcode_ai_scanner::ScoreDepth::Off;
+    config.score_depth = qrcode_barcode_scanner::ScoreDepth::Off;
     Scanner::builder()
         .profile(ScanProfile::Custom(config))
         .build()

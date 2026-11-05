@@ -109,7 +109,7 @@ def main():
         raise SystemExit("exactly one Unreleased changelog section is required")
     date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     changelog.write_text(notes.replace("## Unreleased\n", f"## {version} — {date}\n", 1))
-    run("cargo", "build", "--release", "--locked", "-p", "qrcode-ai-scanner-cli")
+    run("cargo", "build", "--release", "--locked", "-p", "qrcode-barcode-scanner-cli")
     cli = target / "release/qrscan"
     for golden, fixture in rows:
         command = [str(cli), fixture, "--profile", "full", "--budget-ms", "0"]
@@ -127,7 +127,7 @@ def main():
     run(str(xtask), "sync-version", "--check")
     run("python3", "scripts/package-inspect.py", "versions", "--tag", "refs/tags/v" + version,
         "--strict", "--quiet")
-    run("cargo", "test", "--locked", "-p", "qrcode-ai-scanner", "--test", "spec_golden")
+    run("cargo", "test", "--locked", "-p", "qrcode-barcode-scanner", "--test", "spec_golden")
     changed = run("git", "diff", "--name-only").splitlines()
     patch = output / "release.patch"
     patch.write_text(run("git", "diff", "--binary"))

@@ -1,0 +1,204 @@
+---
+title: "Migrate to qrcode-barcode-scanner"
+description: "From 0.11.0 the scanner's packages carry new names. What changed, what did not, and how to move each runtime."
+---
+
+<Note>
+The 0.11.0 packages under the new names are **pending publication**. Until a
+registry serves them, this page names them without install lines: each
+registry's install and dependency lines are added here once its packages are
+published, and [Publication status](#publication-status) shows where each one
+stands. Releases up to 0.10.x stay installable under their previous names.
+</Note>
+
+## What changed
+
+From 0.11.0 the scanner ships as the **QR Code & Barcode Scanner** family, one
+name per registry:
+
+- `qrcode-barcode-scanner` on crates.io (the Rust library) and on PyPI (the
+  Python binding);
+- `qrcode-barcode-scanner-cli` on crates.io, which installs the `qrscan`
+  command;
+- `@qrcode-ai-com/qrcode-barcode-scanner` (Node, native) and
+  `@qrcode-ai-com/qrcode-barcode-scanner-wasm` (browser) on npm.
+
+The Flutter package is not yet published on pub.dev. The source repository is
+[`qrcode-ai-com/qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner);
+its former addresses redirect to it.
+
+## What did not change
+
+The rename itself changes no wire value. These stay as they were:
+
+- the JSON report and its `versions` object;
+- the schema `$id`;
+- the `[QRS-xxx]` error codes and the CLI exit codes;
+- the `qrscan` command and its flags;
+- option names and values;
+- the binding function names (`scan`, `scanSync`, `scanFrame`, `scan_frame`,
+  `capabilities` and the rest).
+
+The behaviour changes that 0.11.0 brings beside the rename are listed in the
+[changelog](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CHANGELOG.md),
+not repeated here.
+
+Releases up to 0.10.x stay installable under their previous names and are not
+modified. Nothing from 0.11.0 on is published under a previous name, and there
+are no alias or wrapper packages: moving to 0.11.0 means changing the package
+name.
+
+## Per runtime
+
+| Runtime | Up to 0.10.x | From 0.11.0 |
+|---|---|---|
+| Rust | `qrcode-ai-scanner` (last release 0.10.1), `use qrcode_ai_scanner::…` | `qrcode-barcode-scanner`, `use qrcode_barcode_scanner::…` |
+| CLI | `qrcode-ai-scanner-cli` (last release 0.10.1) | `qrcode-barcode-scanner-cli`; the command stays `qrscan` |
+| Node (native) | `@supernovae-st/qrcode-ai-scanner` and six platform packages (last release 0.10.1) | `@qrcode-ai-com/qrcode-barcode-scanner` and `@qrcode-ai-com/qrcode-barcode-scanner-<suffix>`, with the same six suffixes |
+| Browser | `@supernovae-st/qrcode-ai-scanner-wasm` (last release 0.10.1) | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` |
+| Python | `qrcode-ai-scanner` (last release 0.9.0; PyPI never had 0.10.x), `import qrcode_ai_scanner` | `qrcode-barcode-scanner`, `import qrcode_barcode_scanner` |
+| Flutter | never published (built from source) | not yet published (built from source) |
+| Kotlin | a JitPack coordinate under the former repository owner, never qualified | com.github.qrcode-ai-com:qrcode-barcode-scanner, once a JitPack build of the release tag succeeds |
+| Swift | built from source | built from source |
+| MCP server | adapter 0.1.0 on engine 0.10.0, a GitHub release asset, never on npm | `@qrcode-ai-com/qrcode-barcode-scanner-mcp` with its own version and the MCP Registry name `io.github.qrcode-ai-com/qrcode-barcode-scanner`, announced when published |
+| Agent skill | ClawHub `@thibautmelen/qr-image-scanner` 0.1.0, on engine 0.10.0 | the skill `qrcode-barcode-scanner` under the `qrcode-ai-com` publisher, with its own version, announced when published |
+| Container | `ghcr.io/supernovae-st/qrcode-ai-scanner:0.10.0` and `docker.io/thibautmelen/qrcode-ai-scanner:0.10.0` | ghcr.io/qrcode-ai-com/qrcode-barcode-scanner, announced when published; no Docker Hub image for 0.11 |
+
+## Steps
+
+For each runtime you use:
+
+1. Remove the previous package.
+2. Add the new one once its row in [Publication status](#publication-status)
+   says it is published.
+3. Change the imports.
+4. Rebuild your lockfiles, and clear CI caches that hold the previous package.
+5. Run one scan and check that the report's `versions.scanner` is `"0.11.0"`.
+
+The commands that remove the previous packages:
+
+```bash
+cargo remove qrcode-ai-scanner              # the Rust library, in your project
+cargo uninstall qrcode-ai-scanner-cli       # the installed qrscan 0.10.x
+npm uninstall @supernovae-st/qrcode-ai-scanner @supernovae-st/qrcode-ai-scanner-wasm
+python -m pip uninstall qrcode-ai-scanner
+```
+
+### Rust
+
+Change `use qrcode_ai_scanner::` to `use qrcode_barcode_scanner::`. The rename
+changes no type, function or feature name: only the crate name and its import
+path change. Once the crate is published, this page also shows how to keep the
+previous import path by renaming the dependency in your own manifest.
+
+### CLI
+
+Both crates install the same `qrscan` command, so Cargo refuses to install the
+new crate while the previous one is installed: uninstall the previous crate
+first, and check with `qrscan --version` which one runs. The flags, the output
+and the exit codes are unchanged, so scripts that call `qrscan` need no edit.
+Once the 0.11.0 GitHub release is published, it also carries prebuilt archives,
+`qrcode-barcode-scanner-cli-0.11.0-<target>`, with their checksums in
+`qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS`.
+
+### Node
+
+The platform packages keep their six suffixes: `darwin-arm64`, `darwin-x64`,
+`linux-arm64-gnu`, `linux-x64-gnu`, `linux-x64-musl` and `win32-x64-msvc`. The
+addon file inside each is now `qrcode-barcode-scanner.<suffix>.node`. The
+package has no WebAssembly or WASI fallback: on a host without its addon,
+loading throws `Cannot find native binding`. Remove the previous package, so
+that one engine is loaded.
+
+### Browser
+
+Change every import, `/auto` included, to
+`@qrcode-ai-com/qrcode-barcode-scanner-wasm`. The root and `/auto` exports work
+as before, and the Wasm file is now `qrcode-barcode-scanner_bg.wasm`. The
+`compatible/*` subpaths were removed: import the root export instead, and the
+loader option `variant: 'compatible'` still selects the same module.
+
+### Python
+
+Change `import qrcode_ai_scanner` to `import qrcode_barcode_scanner`; the
+functions and the report they return are the same. Until the package is on
+PyPI, build it from source as the [Python page](/api/python) shows.
+
+### Flutter, Kotlin and Swift
+
+The Flutter package is not yet published on pub.dev: build it from source as
+the [Flutter page](/api/flutter) shows. No JitPack build of the Kotlin binding
+is qualified yet, and the Swift package cannot be added by repository URL: build
+both from source as the [mobile page](/api/mobile) shows. Their module names are
+unchanged in 0.11: Kotlin imports `uniffi.qrcode_ai_scanner_uniffi` and Swift
+imports `QrcodeAiScanner`.
+
+### MCP server, agent skill and container
+
+Each one is announced when it is published under its new name. The `qrscan-mcp`
+command and its settings keep their names. The 0.1.0 skill and the 0.10.0
+container images stay as they are, with their digests.
+
+## Things that bite
+
+- **Two CLIs claim `qrscan`.** Uninstall the previous crate before installing
+  the new one, then check `qrscan --version`.
+- **Vendored files with the previous names.** A copied
+  `qrcode-ai-scanner.<suffix>.node` or `qrcode-ai-scanner_bg.wasm` is the
+  previous engine: delete it.
+- **Bundler rules that name the previous package.** Vite's
+  `optimizeDeps.exclude` (or any similar rule) must name
+  `@qrcode-ai-com/qrcode-barcode-scanner-wasm`. With the previous name left
+  there, Vite pre-bundles the new package and the Wasm load fails at runtime,
+  with no build error.
+- **Integrity pins.** Subresource integrity or other hash pins of the previous
+  Wasm file do not match the new one.
+- **Both Python distributions in one environment.** They install two import
+  names and two engines: uninstall the previous one.
+- **Python requirements on `qrcode-ai-scanner` 0.10 or later.** They never
+  resolved: PyPI has no 0.10.x under that name. Point them at
+  `qrcode-barcode-scanner` once it is published.
+
+## Retained spellings in 0.11
+
+These keep their earlier spelling in 0.11. None of them is an install name:
+
+- the repository directories `crates/qrcode-ai-scanner*`,
+  `bindings/kotlin/qrcodeaiscanner` and `bindings/swift/Sources/QrcodeAiScanner`;
+- the internal Cargo packages, which are never published:
+  `qrcode-ai-scanner-node`, `qrcode-ai-scanner-wasm`, `qrcode-ai-scanner-uniffi`
+  and `qrcode-ai-scanner-fuzz`;
+- the UniFFI, Kotlin, Swift and Android module names: the UniFFI library
+  `qrcode_ai_scanner_uniffi`, the Kotlin package `uniffi.qrcode_ai_scanner_uniffi`,
+  the Gradle module `:qrcodeaiscanner`, the Android namespaces of the Kotlin
+  binding (`studio.supernovae.qrcodeaiscanner`) and of the Flutter plugin
+  (`studio.supernovae.qrcode_ai_scanner`), the Swift package `QrcodeAiScanner`
+  and its binary target `QrcodeAiScannerFFI`;
+- the Flutter example app's platform identifiers;
+- the schema `$id`
+  (`https://github.com/supernovae-st/qrcode-ai-scanner/spec/scan-report.schema.json`),
+  an identifier rather than an address to fetch;
+- the container label key `io.qrcode-ai.scanner.packaging-revision`;
+- the `qrscan` and `qrscan-mcp` commands and the `QRSCAN_*`, `QRSCAN_MCP_*` and
+  `QRSMCP_*` settings.
+
+## Publication status
+
+| Registry | Packages | 0.11.0 |
+|---|---|---|
+| crates.io | `qrcode-barcode-scanner`, `qrcode-barcode-scanner-cli` | pending publication |
+| npm | `@qrcode-ai-com/qrcode-barcode-scanner`, its six platform packages, `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | pending publication |
+| PyPI | `qrcode-barcode-scanner` | pending publication |
+| GitHub release | the `qrcode-barcode-scanner-cli-0.11.0-*` CLI archives | pending publication |
+| pub.dev | the Flutter package | not yet published |
+| JitPack | com.github.qrcode-ai-com:qrcode-barcode-scanner | not yet qualified |
+
+When a registry serves 0.11.0, its row gains the date the published files were
+checked, a link, and whether the upload carries provenance, and this page gains
+that registry's install lines. The MCP server, the agent skill and the container
+image have versions of their own: each is listed here when it is published.
+
+## Questions and issues
+
+Open an issue in the
+[repository's issue tracker](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues).

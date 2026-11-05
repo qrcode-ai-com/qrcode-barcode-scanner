@@ -2,16 +2,16 @@
 
 QR decoding **+ scannability scoring** for artistic / AI-generated QR codes —
 the codes that break standard scanners. The native Rust core of
-[`qrcode-ai-scanner`](https://github.com/supernovae-st/qrcode-barcode-scanner),
+[`qrcode-ai-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner),
 bound to Flutter via [flutter_rust_bridge](https://pub.dev/packages/flutter_rust_bridge).
 Returns the same versioned `ScanReport` as the Python / Node / WASM / Kotlin /
 Swift bindings (one serde wire contract).
 
 ## Install
 
-```bash
-flutter pub add qrcode_ai_scanner
-```
+Not yet published on pub.dev, so there is no dependency line to copy: build it
+from source as shown in
+[Packaging from a candidate checkout](#packaging-from-a-candidate-checkout) below.
 
 > **Toolchain prerequisite.** This package compiles the Rust core at *your* app's
 > build time (via cargokit) — the building machine needs the **Rust toolchain
@@ -59,7 +59,7 @@ symbology does not report it — not proof that the symbol declares none.
 
 The development binding uses the workspace core by relative path. A pub.dev
 package instead bundles the **same candidate's sources**, from Cargo's normalized
-package archive, under `rust/vendor/qrcode-ai-scanner`. No published registry
+package archive, under `rust/vendor/qrcode-barcode-scanner`. No published registry
 version is substituted. From a clean, committed checkout, with Python 3.11+:
 
 ```bash
@@ -110,6 +110,6 @@ and trusted-publisher setup remain operator steps in `RELEASING.md`.
 ## License
 
 Dual-licensed **AGPL-3.0-or-later OR commercial** — see the repo-root
-[`LICENSING.md`](https://github.com/supernovae-st/qrcode-barcode-scanner/blob/main/LICENSING.md).
+[`LICENSING.md`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md).
 A closed-source app on the App Store / Play Store links the AGPL Rust core and
 therefore needs the **commercial** license: `studio.supernovae@gmail.com`.

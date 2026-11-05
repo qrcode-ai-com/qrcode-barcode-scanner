@@ -9,25 +9,28 @@ as a **JSON string** — parse it (`kotlinx.serialization`, `JSONDecoder`, …) 
 [`spec/scan-report.schema.json`](/api/report). `"No QR found"` is an empty
 `detections` array, not an error.
 
+The module names keep their original spelling: Kotlin imports
+`uniffi.qrcode_ai_scanner_uniffi` and Swift imports `QrcodeAiScanner`.
+
 ## Kotlin / Android (JitPack)
 
-```kotlin
-// settings.gradle.kts
-dependencyResolutionManagement {
-  repositories { maven { url = uri("https://jitpack.io") } }
-}
-// build.gradle.kts — vX.Y.Z: the latest release tag
-implementation("com.github.supernovae-st:qrcode-ai-scanner:vX.Y.Z")
-```
+<Note>
+No JitPack build of this binding has been qualified yet, so there is no
+dependency line to copy: build the AAR from source as shown in the
+[Kotlin binding's README](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/kotlin/README.md#build-locally),
+which also carries the coordinate of the current release.
 
-The [Kotlin binding's README](https://github.com/supernovae-st/qrcode-barcode-scanner/blob/main/bindings/kotlin/README.md)
-carries the coordinate of the current release.
+JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:&lt;tag&gt;
+</Note>
 
 ```kotlin
 import uniffi.qrcode_ai_scanner_uniffi.scan
 
 val json: String = scan(imageBytes, "full")   // "full" | "fast" | "frame"
 // parse `json` into your ScanReport model; empty detections = no QR
+
+// the compiled readers as JSON: {"versions", "engines", "symbologies"}
+val readers: String = uniffi.qrcode_ai_scanner_uniffi.capabilities()
 ```
 
 minSdk 21, 16 KB-page-safe (NDK r27). The scan is synchronous — call it off the
@@ -35,23 +38,35 @@ main thread.
 
 ## Swift / iOS (SwiftPM)
 
-```swift
-// Package.swift — X.Y.Z: the latest release tag
-.package(url: "https://github.com/supernovae-st/qrcode-barcode-scanner", from: "X.Y.Z"),
-```
+<Note>
+The Swift package cannot be added by repository URL: its manifest sits in
+`bindings/swift`, not at the repository root. Build it from source as shown in
+the [Swift binding's README](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/swift/README.md#build-the-xcframework-locally),
+then add the `bindings/swift` directory of that checkout to your app as a local
+package and link its `QrcodeAiScanner` library.
+</Note>
 
 ```swift
 import QrcodeAiScanner
 
 let json = try scan(image: imageData, profile: "full")  // empty detections = no QR
 let report = try JSONDecoder().decode(ScanReport.self, from: Data(json.utf8))
+
+// the compiled readers as JSON: {"versions", "engines", "symbologies"}
+let readers = try capabilities()
 ```
+
+`capabilities()` says which readers the library includes — `engines` in
+order `rxing`, `rqrr`, `rescue`, and the `symbologies` they can return
+(spec/01 § Capabilities) — not that an image will decode.
 
 iOS 13+. A native app on the App Store is almost always closed-source and needs
 the **commercial** license (it links the AGPL core) — `studio.supernovae@gmail.com`.
 
 ## Errors
 
-`scan` throws on invalid input / a bad profile; the message carries the
-`[QRS-xxx]` wire code ([catalog](/api/errors)). The report shape is the
-[one contract](/api/report).
+A scan fault throws `ScanBindingException.ScanFailed` (Kotlin) or
+`ScanBindingError.ScanFailed` (Swift); its message carries the `[QRS-xxx]`
+wire code ([catalog](/api/errors)). An unknown name or a palette above 32
+colors throws its own case (`UnknownProfile`, `PaletteTooLarge`, …) without
+a code. The report shape is the [one contract](/api/report).

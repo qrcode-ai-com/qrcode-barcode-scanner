@@ -1,5 +1,5 @@
 [package]
-name = "qrcode-ai-scanner-cli"
+name = "qrcode-barcode-scanner-cli"
 description = "CLI for QR code decoding and scannability scoring — artistic, AI-generated, and photo-captured QR codes"
 keywords = ["qrcode", "qr", "scanner", "cli", "validation"]
 categories = ["command-line-utilities", "multimedia::images"]
@@ -9,6 +9,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 authors.workspace = true
 
 [[bin]]
@@ -16,7 +17,7 @@ name = "qrscan"
 path = "src/main.rs"
 
 [dependencies]
-qrcode-ai-scanner = { version = "0.11.0", path = "../qrcode-ai-scanner", features = ["serde"] }
+qrcode-barcode-scanner = { version = "0.11.0", path = "../qrcode-ai-scanner", features = ["serde"] }
 clap = { workspace = true }
 serde_json.workspace = true
 

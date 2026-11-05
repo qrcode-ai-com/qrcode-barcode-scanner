@@ -90,7 +90,7 @@ impl Runtime {
     }
 }
 
-/// A = base (the published 0.9.0), B = candidate (this tree).
+/// A = base (the published 0.10.1), B = candidate (this tree).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Variant {
     Base,
@@ -134,9 +134,9 @@ impl Mode {
         }
     }
 
-    /// The preset's wall-clock budget (the same in 0.9.0 and this tree).
+    /// The preset's wall-clock budget (the same in 0.10.1 and this tree).
     pub(crate) fn budget_ms(self) -> Option<u64> {
-        use qrcode_ai_scanner::ScanProfile;
+        use qrcode_barcode_scanner::ScanProfile;
         let preset = match self {
             Self::Full => ScanProfile::Full,
             Self::FullUnbounded => return None,
@@ -1122,8 +1122,8 @@ fn scanner_unit(stamp: &manifest::Manifest) -> ScannerUnit<'_> {
     }
 }
 
-/// Why a base artifact is not the v0.9.0 release: the library worker and
-/// the CLI link the registry 0.9.0 scanner, the CLI comes from the
+/// Why a base artifact is not the v0.10.1 release: the library worker and
+/// the CLI link the registry 0.10.1 scanner, the CLI comes from the
 /// published crate (its sha256 pin), the Node addon and the WASM package
 /// from the `git archive` of the release commit — which sits outside any
 /// git tree, so their build record must say the build happened inside it.
@@ -1198,18 +1198,18 @@ fn candidate_source(
             ScannerUnit::Linked(unit) => match &unit.checkout {
                 Some(c) if unit.source == "path" && c.sha == measured.git_sha && c.tree == "clean" => {}
                 Some(c) => found.push(format!(
-                    "links qrcode-ai-scanner from {} at {} ({}), not the measured tree",
+                    "links qrcode-barcode-scanner from {} at {} ({}), not the measured tree",
                     unit.source,
                     short(&c.sha),
                     c.tree
                 )),
                 None => found.push(format!(
-                    "links qrcode-ai-scanner from {} outside any git work tree, not the measured tree",
+                    "links qrcode-barcode-scanner from {} outside any git work tree, not the measured tree",
                     unit.source
                 )),
             },
             ScannerUnit::Missing => {
-                found.push(String::from("its build shows no qrcode-ai-scanner unit"));
+                found.push(String::from("its build shows no qrcode-barcode-scanner unit"));
             }
             ScannerUnit::Unrecorded => {}
         }
@@ -1218,13 +1218,13 @@ fn candidate_source(
 }
 
 /// Why a worker's hello names another side: its scanner version (the base
-/// runs 0.9.0, the candidate the measured tree's), and for a library
+/// runs 0.10.1, the candidate the measured tree's), and for a library
 /// worker the generated crate it was built as.
 fn hello_identity(runtime: Runtime, variant: Variant, hello: &Hello) -> Vec<String> {
     let side = variant.as_str();
     let expected = match variant {
         Variant::Base => super::BASE_VERSION.to_owned(),
-        Variant::Candidate => qrcode_ai_scanner::Versions::current().scanner,
+        Variant::Candidate => qrcode_barcode_scanner::Versions::current().scanner,
     };
     let mut found = Vec::new();
     if hello.scanner != expected {
@@ -1247,7 +1247,7 @@ fn hello_identity(runtime: Runtime, variant: Variant, hello: &Hello) -> Vec<Stri
     found
 }
 
-/// What a side must be built from — the base from the v0.9.0 release
+/// What a side must be built from — the base from the v0.10.1 release
 /// ([`base_source`]), the candidate from the measured tree at its recorded
 /// commit ([`candidate_source`]), each from a source unchanged since it
 /// was written — and what its worker's hello must name
@@ -2981,7 +2981,7 @@ mod tests {
         assert_eq!(abba(&[A, B], 5), vec![A, B, B, A, A, B, B, A, A, B]);
         assert_eq!(abba(&[A, B], 2), vec![A, B, B, A]);
         assert_eq!(abba(&[B], 3), vec![B, B, B]);
-        assert!(abba(&[], 5).is_empty());
+        assert_eq!(abba(&[], 5).len(), 0);
         let twelve = abba(&[A, B], COLD_PAIRS);
         assert_eq!(twelve.iter().filter(|v| **v == A).count(), 12);
         assert_eq!(twelve.len(), 24);
@@ -3128,7 +3128,7 @@ mod tests {
         ] {
             args.extend([flag, "/p"]);
         }
-        assert!(opts(&args).expect("parses").subset().is_empty());
+        assert_eq!(opts(&args).expect("parses").subset().len(), 0);
         let mut sampled = args.clone();
         sampled.extend(["--per-group", "1"]);
         assert_eq!(
@@ -3298,7 +3298,10 @@ mod tests {
             worker: None,
             loaded: None,
         };
-        assert!(worker_parity(&hello("w", "m"), &hello("w", "m"), "w").is_empty());
+        assert_eq!(
+            worker_parity(&hello("w", "m"), &hello("w", "m"), "w").len(),
+            0
+        );
         let stale = worker_parity(&hello("old", "m"), &hello("w", "m"), "w");
         assert_eq!(stale.len(), 1);
         assert_eq!(stale[0].what, "worker_source");
@@ -3405,12 +3408,12 @@ mod tests {
             !dropped.walk_cut(&reference)
                 && dropped.judgment_cut(&reference, Mode::Full)
                 && dropped.truncated(&reference, Mode::Full),
-            "this tree drops a cut judgment"
+            "0.10.1 and this tree drop a cut judgment"
         );
         let short = call(3990.0, (2, 5), "x", "v62w100,5/5,2/5");
         assert!(
             short.judgment_cut(&reference, Mode::Fast),
-            "0.9.0 ships a cut axis"
+            "a build before 0.10 (0.9.0) ships a cut axis"
         );
         let short_after_failure = call(3990.0, (2, 5), "x", "v62w100,5/5,1/5x");
         assert!(
@@ -4109,7 +4112,7 @@ mod tests {
             fixture: None,
             vendored_files: Vec::new(),
         };
-        assert!(pin_findings(&pinned, Set::ALL).is_empty());
+        assert_eq!(pin_findings(&pinned, Set::ALL).len(), 0);
         let drifted = Inputs {
             manifest_sha256: String::from("ff"),
             ..pinned.clone()
@@ -4260,7 +4263,7 @@ mod tests {
                 .map(|f| f.detail.clone())
                 .collect()
         };
-        assert!(loaded("qrcode-ai-scanner.darwin-arm64.node").is_empty());
+        assert_eq!(loaded("qrcode-ai-scanner.darwin-arm64.node").len(), 0);
         assert_eq!(
             loaded("nested/qrcode-ai-scanner.darwin-arm64.node"),
             vec![String::from(
@@ -4356,20 +4359,21 @@ mod tests {
     }
 
     /// Every side built from its own source passes: the library workers
-    /// from one prepare, the base linking the registry 0.9.0 scanner and
-    /// the candidate the measured tree, the CLI base from the published
-    /// crate, the Node and WASM bases from the release archive, the
-    /// candidates from the measured tree; each hello names its side.
+    /// from one prepare, the base linking the registry scanner of the base
+    /// release and the candidate the measured tree, the CLI base from the
+    /// published crate, the Node and WASM bases from the release archive,
+    /// the candidates from the measured tree; each hello names its side.
     #[test]
     fn sides_built_from_their_own_sources_pass() {
-        let current = qrcode_ai_scanner::Versions::current().scanner;
-        let registry = Some(("0.9.0", "crates.io", None));
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
+        let base = super::super::BASE_VERSION;
+        let registry = Some((base, "crates.io", None));
         let from_tree = Some((current.as_str(), "path", Some(("c0ffee", "clean"))));
         let generated = ("generated", "c0ffee", "clean");
         let git = ("git", "c0ffee", "clean");
         let archive = ("archive", super::super::BASE_COMMIT, "clean");
         let published = ("crate", super::super::CLI_CRATE_SHA256, "clean");
-        let base_hello = worker_hello("0.9.0", "qrscan-bench-worker-base");
+        let base_hello = worker_hello(base, "qrscan-bench-worker-base");
         let candidate_hello = worker_hello(&current, "qrscan-bench-worker-candidate");
         let fit = [
             (
@@ -4433,8 +4437,11 @@ mod tests {
         let refused = vec![String::from(
             "source: base: its manifest does not record a build inside its source — stamp it again",
         )];
-        let mut node = stamped(archive, Some(("0.9.0", "path", None)));
-        assert!(identity_of((Runtime::Node, Variant::Base), &node, None).is_empty());
+        let mut node = stamped(archive, Some((super::super::BASE_VERSION, "path", None)));
+        assert_eq!(
+            identity_of((Runtime::Node, Variant::Base), &node, None).len(),
+            0
+        );
         if let Some(build) = node.build.as_mut() {
             build.inside_source = false;
         }
@@ -4452,7 +4459,10 @@ mod tests {
             env: BTreeMap::new(),
             inside_source: true,
         });
-        assert!(identity_of((Runtime::Wasm, Variant::Base), &wasm, None).is_empty());
+        assert_eq!(
+            identity_of((Runtime::Wasm, Variant::Base), &wasm, None).len(),
+            0
+        );
         if let Some(build) = wasm.wasm_build.as_mut() {
             build.inside_source = false;
         }
@@ -4460,11 +4470,18 @@ mod tests {
             identity_of((Runtime::Wasm, Variant::Base), &wasm, None),
             refused
         );
-        let mut candidate = stamped(("git", "c0ffee", "clean"), Some(("0.9.0", "path", None)));
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
+        let mut candidate = stamped(
+            ("git", "c0ffee", "clean"),
+            Some((current.as_str(), "path", None)),
+        );
         if let Some(build) = candidate.build.as_mut() {
             build.inside_source = false;
         }
-        assert!(identity_of((Runtime::Node, Variant::Candidate), &candidate, None).is_empty());
+        assert_eq!(
+            identity_of((Runtime::Node, Variant::Candidate), &candidate, None).len(),
+            0
+        );
     }
 
     /// Swapped, mislabelled and dirty sides are refused by name: library
@@ -4479,20 +4496,21 @@ mod tests {
         reason = "one table of refused sides, each with its exact finding"
     )]
     fn swapped_mislabelled_and_dirty_sides_are_refused() {
-        let current = qrcode_ai_scanner::Versions::current().scanner;
-        let registry = Some(("0.9.0", "crates.io", None));
+        let current = qrcode_barcode_scanner::Versions::current().scanner;
+        let base = super::super::BASE_VERSION;
+        let registry = Some((base, "crates.io", None));
         let from_tree = Some((current.as_str(), "path", Some(("c0ffee", "clean"))));
         let generated = ("generated", "c0ffee", "clean");
         let archive = ("archive", super::super::BASE_COMMIT, "clean");
-        let base_hello = worker_hello("0.9.0", "qrscan-bench-worker-base");
+        let base_hello = worker_hello(base, "qrscan-bench-worker-base");
         let candidate_hello = worker_hello(&current, "qrscan-bench-worker-candidate");
         // the two library workers swapped
         let mut swapped_base = vec![format!(
-            "source: base: links qrcode-ai-scanner {current} from path, not 0.9.0 from crates.io"
+            "source: base: links qrcode-ai-scanner {current} from path, not {base} from crates.io"
         )];
-        if current != "0.9.0" {
+        if current != base {
             swapped_base.push(format!(
-                "scanner: base: the worker runs scanner {current}, the base is 0.9.0"
+                "scanner: base: the worker runs scanner {current}, the base is {base}"
             ));
         }
         swapped_base.push(String::from(
@@ -4513,7 +4531,7 @@ mod tests {
         );
         assert!(
             swapped_candidate.contains(&String::from(
-                "source: candidate: links qrcode-ai-scanner from crates.io outside any git work tree, not the measured tree"
+                "source: candidate: links qrcode-barcode-scanner from crates.io outside any git work tree, not the measured tree"
             )) && swapped_candidate.contains(&String::from(
                 "scanner: candidate: the worker was built as qrscan-bench-worker-base, not qrscan-bench-worker-candidate"
             )),
@@ -4523,37 +4541,54 @@ mod tests {
             (
                 (Runtime::Cli, Variant::Base),
                 stamped(("git", "c0ffee", "clean"), registry),
-                "source: base: built from git c0ffee, not the v0.9.0 release",
+                format!("source: base: built from git c0ffee, not the v{base} release"),
             ),
             (
                 (Runtime::Cli, Variant::Base),
                 stamped(("crate", "ff", "clean"), registry),
-                "source: base: built from crate ff, not the v0.9.0 release",
+                format!("source: base: built from crate ff, not the v{base} release"),
             ),
             (
                 (Runtime::Cli, Variant::Base),
                 stamped(("crate", super::super::CLI_CRATE_SHA256, "dirty"), registry),
-                "source: base: built from a source that is dirty",
+                String::from("source: base: built from a source that is dirty"),
             ),
             (
                 (Runtime::Node, Variant::Base),
                 stamped(("archive", "0123", "clean"), None),
-                "source: base: built from archive 0123, not the v0.9.0 release",
+                format!("source: base: built from archive 0123, not the v{base} release"),
+            ),
+            (
+                (Runtime::Wasm, Variant::Base),
+                stamped(
+                    (
+                        "archive",
+                        "170e3fb30008f0dc20793712213f7d4c6f2d233e",
+                        "clean",
+                    ),
+                    None,
+                ),
+                format!("source: base: built from archive 170e3fb30008, not the v{base} release"),
             ),
             (
                 (Runtime::Node, Variant::Candidate),
                 stamped(("git", "c0ffee", "dirty"), None),
-                "source: candidate: built from a source that is dirty",
+                String::from("source: candidate: built from a source that is dirty"),
             ),
             (
                 (Runtime::Wasm, Variant::Candidate),
                 stamped(("git", "beef", "clean"), None),
-                "source: candidate: built from git beef, not the measured tree at c0ffee",
+                String::from(
+                    "source: candidate: built from git beef, not the measured tree at c0ffee",
+                ),
             ),
             (
                 (Runtime::Wasm, Variant::Candidate),
                 stamped(archive, None),
-                "source: candidate: built from archive 170e3fb30008, not the measured tree at c0ffee",
+                format!(
+                    "source: candidate: built from archive {}, not the measured tree at c0ffee",
+                    &super::super::BASE_COMMIT[..12]
+                ),
             ),
             (
                 (Runtime::Lib, Variant::Candidate),
@@ -4561,25 +4596,42 @@ mod tests {
                     generated,
                     Some((current.as_str(), "path", Some(("c0ffee", "dirty")))),
                 ),
-                "source: candidate: links qrcode-ai-scanner from path at c0ffee (dirty), not the measured tree",
+                String::from(
+                    "source: candidate: links qrcode-barcode-scanner from path at c0ffee (dirty), not the measured tree",
+                ),
             ),
         ];
         for (side, stamp, finding) in &refused {
             assert_eq!(
                 identity_of(*side, stamp, None),
-                vec![String::from(*finding)],
+                vec![finding.clone()],
                 "{side:?}"
             );
         }
+        // a worker still built against the previous base, 0.9.0
         assert_eq!(
             identity_of(
                 (Runtime::Lib, Variant::Base),
                 &stamped(generated, registry),
-                Some(&worker_hello("0.8.0", "qrscan-bench-worker-base"))
+                Some(&worker_hello("0.9.0", "qrscan-bench-worker-base"))
             ),
-            vec![String::from(
-                "scanner: base: the worker runs scanner 0.8.0, the base is 0.9.0"
+            vec![format!(
+                "scanner: base: the worker runs scanner 0.9.0, the base is {base}"
             )]
+        );
+        assert_eq!(
+            identity_of(
+                (Runtime::Cli, Variant::Base),
+                &stamped(
+                    ("crate", super::super::CLI_CRATE_SHA256, "clean"),
+                    Some(("0.9.0", "crates.io", None))
+                ),
+                None
+            ),
+            vec![format!(
+                "source: base: links qrcode-ai-scanner 0.9.0 from crates.io, not {base} from crates.io"
+            )],
+            "a CLI base linking the previous registry scanner"
         );
         let unknown = Source {
             git_sha: String::from("unknown"),

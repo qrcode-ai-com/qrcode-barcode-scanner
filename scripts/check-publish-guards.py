@@ -26,12 +26,27 @@ A job is PRIVILEGED when it publishes (cargo publish/yank/owner, npm
 publish/unpublish/deprecate/dist-tag/owner/access/stage, pnpm/yarn/bun
 publish, napi pre-publish unless it uploads nothing, pub publish,
 twine/uv/maturin/poetry publish, gh release create/upload/edit/delete or a
-`gh api` releases call, pypa/gh-action-pypi-publish,
-rust-lang/crates-io-auth-action), with options before the subcommand,
-npm's abbreviations and backslash-continued lines included, or when it
-holds a write permission (`id-token: write` included: it can mint registry
-tokens). Every privileged job must:
+`gh api` call naming a release, an HTTP client (curl, wget, Invoke-WebRequest,
+Invoke-RestMethod, iwr, irm) on a line naming the GitHub API,
+pypa/gh-action-pypi-publish, rust-lang/crates-io-auth-action or a release
+action: RELEASE_ACTIONS), with options before the subcommand (gh's before
+either word), npm's abbreviations and backslash-continued lines included,
+or when it holds a write permission (`id-token: write` included: it can
+mint registry tokens). Every privileged job must:
 
+  release-create  create no release: no `gh release create` (or its alias
+               `new`), no REST POST to a releases collection (`gh api` or an
+               HTTP client), no release-creating action. The owner creates
+               the one draft release before the tag (RELEASING.md § 5); a job
+               only uploads into it
+  release-asset  replace, delete, edit or publish no release or asset: no
+               `gh release upload --clobber`, no `gh release delete`,
+               `delete-asset` or `edit`, no `gh api` call naming a release
+               (a REST path or a GraphQL mutation, in any case), no line,
+               env or input naming the GitHub API (api.github.com,
+               uploads.github.com, GITHUB_API_URL, GITHUB_GRAPHQL_URL), no
+               gh alias or extension and no release action. The owner
+               publishes, once
   guard        run from a release tag only: its raw `if:` has the top-level
                conjunct startsWith(github.ref, 'refs/tags/v'), never under
                `||`; no `#`; no `${{` unless one expression spans the whole
@@ -49,9 +64,10 @@ tokens). Every privileged job must:
   gate         run, as its first step after the checkout, exactly
                `python3 scripts/package-inspect.py versions --tag "$GITHUB_REF" --strict --quiet`
                (no key but name and working-directory, nothing joined to it)
-  reinspect    the three jobs that download an artifact another job built
-               (publish-native, publish-wasm, python › release) re-inspect it
-               in the job — a `package-inspect.py archive … --strict` step —
+  reinspect    the jobs that download an artifact another job built
+               (publish-native, publish-wasm, python › release, cli-archives
+               › attach) re-inspect it in the job — a
+               `package-inspect.py archive … --strict` step —
                before their first publishing step, so a swapped artifact
                cannot reach a registry on the versions gate alone
   pypi-live    a job uploading with pypa/gh-action-pypi-publish runs, before
@@ -116,6 +132,35 @@ artifact they download, by the same name to the same path; no cache; and
 exactly OPERAND_PROOF_RUN, which expands every operand as they spell it and
 fails unless that npm's own npm-package-arg reads each as a file. It only
 parses: no registry call.
+
+cli-archives.yml › attach (CLI_JOB) uploads the prebuilt qrscan archives,
+and nothing else, into the draft release the owner created. Beyond the
+rules above (inspect, consume, consume-container and qualified among its
+needs; reinspect), it is held to these:
+
+  cli-uses     no action but actions/checkout and actions/download-artifact,
+               spelled so: no other code sees its token or its files
+  cli-steps    no `if:` or `continue-on-error:` on a step: each one runs,
+               and its failure stops the job
+  cli-download one download, exactly CLI_DOWNLOAD (cli-release-set into
+               cli-release, digest-mismatch error) and no other key; every
+               download of the jobs it publishes from sets digest-mismatch
+               error too
+  cli-sums     after the download and before the first step holding the
+               token, a step runs exactly CLI_REINSPECT_RUN with
+               QUALIFIED_SUMS_SHA256 from needs.qualified.outputs.sums_sha256
+               and no other key; qualified maps that output from its
+               `cli-release.py qualify` step: the bytes uploaded are the set
+               the consumers judged
+  cli-token    exactly four steps hold the token (GH_TOKEN, GITHUB_TOKEN or
+               github.token, in any key or value), in this order and exactly
+               as CLI_TOKEN_RUNS says, with env GH_TOKEN alone and no other
+               key: list, view, upload (each file found in the re-inspection
+               record first) and readback. None names python, and neither the
+               job nor the workflow env holds a token: the plan and the
+               readback verdict read files, without it
+  cli-lineage  one upload of the workflow can be cli-release-set: assemble's,
+               by that literal name; no upload sets `overwrite:`
 
 Every job whose outputs a privileged job publishes (the jobs whose artifacts
 it downloads, then theirs, looked for among the jobs it needs) restores no
@@ -199,6 +244,61 @@ SHA = re.compile(r"[0-9a-f]{40}")
 EXACT = re.compile(r"\d+\.\d+\.\d+")
 DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
 
+# The prebuilt qrscan archives: attach uploads the set the consumers judged,
+# through these exact lines only, into the draft the owner created.
+CLI_WORKFLOW = "cli-archives.yml"
+CLI_JOB = (CLI_WORKFLOW, "attach")
+CLI_SET = "cli-release-set"
+CLI_PRODUCER = "assemble"
+CLI_USES = ("actions/checkout", "actions/download-artifact")
+CLI_DOWNLOAD = {"name": CLI_SET, "path": "cli-release", "digest-mismatch": "error"}
+CLI_SUMS_ENV = {"QUALIFIED_SUMS_SHA256": "${{ needs.qualified.outputs.sums_sha256 }}"}
+CLI_REINSPECT_RUN = "\n".join((
+    "set -euo pipefail",
+    "commit=\"$(git rev-parse 'HEAD^{commit}')\"",
+    'python3 scripts/package-inspect.py archive "$PWD"/cli-release/* --release-set --commit "$commit" --tag '
+    '"$GITHUB_REF_NAME" --sums-sha256 "$QUALIFIED_SUMS_SHA256" --source-tree . --strict --quiet --record '
+    '"$RUNNER_TEMP/cli-inspected.sha256"',
+))
+CLI_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
+# The only steps holding the token, in this order: list, view, upload, readback.
+CLI_TOKEN_STEPS = ("list", "view", "upload", "readback")
+CLI_TOKEN_RUNS = (
+    "\n".join((
+        "set -euo pipefail",
+        'mkdir "$RUNNER_TEMP/cli-gh"',
+        'gh --version > "$RUNNER_TEMP/cli-gh/gh-version.txt"',
+        'gh release list --limit 1000 --json tagName,isDraft > "$RUNNER_TEMP/cli-gh/list.json"',
+    )),
+    "\n".join((
+        "set -euo pipefail",
+        'gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > '
+        '"$RUNNER_TEMP/cli-gh/view.json"',
+        'if gh release view "$GITHUB_REF_NAME" --json assets --jq \'[.assets[].name | '
+        'select(startswith("qrcode-barcode-scanner-cli-"))] | length > 0\' | grep -qx true; then',
+        '  gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-barcode-scanner-cli-*\' --dir '
+        '"$RUNNER_TEMP/cli-gh/present"',
+        "fi",
+    )),
+    "\n".join((
+        "set -euo pipefail",
+        "while IFS= read -r file; do",
+        '  grep -qxF "$(sha256sum -- "$file")" "$RUNNER_TEMP/cli-inspected.sha256"',
+        '  gh release upload "$GITHUB_REF_NAME" "$file"',
+        'done < "$RUNNER_TEMP/cli-upload.txt"',
+    )),
+    "\n".join((
+        "set -euo pipefail",
+        'gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,targetCommitish,assets > '
+        '"$RUNNER_TEMP/cli-gh/readback.json"',
+        'gh release download "$GITHUB_REF_NAME" --pattern \'qrcode-barcode-scanner-cli-*\' --dir '
+        '"$RUNNER_TEMP/cli-readback"',
+    )),
+)
+# A step holds the job token when one of its keys or values names it.
+TOKEN = re.compile(r"\b(?:GH|GITHUB|GH_ENTERPRISE|GITHUB_ENTERPRISE)_TOKEN\b"
+                   r"|\bgithub\s*(?:\.\s*token\b|\[\s*['\"]token['\"]\s*\])|\btojson\s*\(\s*github\s*\)", re.I)
+
 # Jobs that download an artifact another job built and upload it: each must
 # re-inspect that artifact in the job itself, before its first publishing step
 # — the versions gate does not prove the bytes a sibling job produced.
@@ -206,6 +306,7 @@ REINSPECT_JOBS = {
     ("npm-publish.yml", "publish-native"),
     ("npm-publish.yml", "publish-wasm"),
     ("python.yml", "release"),
+    CLI_JOB,
 }
 
 # What a job uploading with pypa/gh-action-pypi-publish runs, verbatim, before
@@ -283,6 +384,7 @@ INSPECTION = {
     ("python.yml", "release"): "inspect",
     ("mobile.yml", "ios-release"): "ios",
     ("flutter.yml", "publish"): "test",
+    CLI_JOB: "inspect",
 }
 
 # Archive shape and installed runtime are separate release gates.
@@ -290,6 +392,7 @@ CONSUMERS = {
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
+    CLI_JOB: {"consume", "consume-container", "qualified"},
 }
 
 # What a job relying on the setup-node/-python relaxation runs, verbatim, in
@@ -335,15 +438,51 @@ PUBLISHING_TOOLS = (
     ("maturin", frozenset({"publish", "upload"}), "maturin publish"),
     ("poetry", frozenset({"publish"}), "poetry publish"),
 )
+# GitHub release writes. gh takes its options before either word (`gh -R o/r
+# release create`); a line is read as written and with its quotes stripped.
+GH_OPTIONS = r"(?:\s+-\S+(?:\s+[^-\s]\S*)?)*"
+GH_RELEASE = r"\bgh" + GH_OPTIONS + r"\s+release" + GH_OPTIONS + r"\s+"
+GH_API = r"\bgh" + GH_OPTIONS + r"\s+api\b"
+GITHUB_API = re.compile(r"\b(?:api|uploads)\.github\.com\b|\bGITHUB_(?:API|GRAPHQL)_URL\b"
+                        r"|\bgithub\.(?:api|graphql)_url\b", re.I)
+HTTP_CLIENT = re.compile(r"\b(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\b", re.I)
+RELEASE = "gh release"
+OWNER_CREATES = "the owner creates the one draft release before the tag (RELEASING.md § 5); a job only uploads into it"
+# `gh release new` is gh's alias of create.
+GH_CREATE = re.compile(GH_RELEASE + r"(?:create|new)\b")
+# A gh api call naming a release, in any letter case: a REST path or a GraphQL
+# mutation (deleteRelease).
+GH_API_RELEASE = re.compile(GH_API + r".*release", re.I)
+# What no job runs: the owner creates the one draft, and publishes it, by hand.
+RELEASE_ASSET = (
+    (re.compile(GH_RELEASE + r"upload\b.*\s--clobber\b"), "replaces an attached asset"),
+    (re.compile(GH_RELEASE + r"delete(?:-asset)?\b"), "deletes a release or an asset"),
+    (re.compile(GH_RELEASE + r"edit\b"), "edits or publishes a release: the owner's step"),
+    (GH_API_RELEASE, "a release API call bypasses this review"),
+    (GITHUB_API, "names the GitHub API: a call to it bypasses this review"),
+    (re.compile(r"\bgh" + GH_OPTIONS + r"\s+(?:alias|extension|ext)\b"),
+     "a gh alias or extension runs a command this review cannot read"),
+)
+RELEASE_ACTIONS = ("actions/github-script", "softprops/action-gh-release", "ncipollo/release-action",
+                   "actions/create-release", "actions/upload-release-asset")
+RELEASE_CREATING_ACTIONS = ("softprops/action-gh-release", "ncipollo/release-action", "actions/create-release")
+# A REST call creating a release: a POST to a releases collection, stated or
+# implied by the client's body options (gh api fields, curl data, wget post).
+RELEASES_COLLECTION = re.compile(r"/releases/?(?=$|[\s?])")
+REST_METHOD = re.compile(r"(?:^|\s)(?:-X\s*|--method[=\s]\s*|--request[=\s]\s*|-(?i:method)[:\s]\s*)([A-Za-z]+)")
+GH_API_BODY = re.compile(r"(?:^|\s)(?:-[fF]|--field|--raw-field|--input)(?=[=\s]|$)")
+HTTP_BODY = re.compile(r"(?:^|\s)(?:-[dF]|--data(?:-\w+)?|--json|--form(?:-string)?|--post-data|--post-file)"
+                       r"(?=[=\s]|$)")
 PUBLISHING_RUN = (
     (re.compile(r"\bdocker\s+(push|manifest\s+push)\b"), "docker publish"),
     (re.compile(r"\bpython3\s+distribution/docker/publish\.py\s+publish\b"), "docker publish"),
     (re.compile(r"\bnapi\s+pre-?publish\b"), "napi pre-publish"),
     (re.compile(r"\bpub\s+(publish|lish)\b"), "pub publish"),
-    (re.compile(r"\bgh\s+release\s+(create|upload|edit|delete)\b"), "gh release"),
-    (re.compile(r"\bgh\s+api\b.*\breleases\b"), "gh release"),
+    (re.compile(GH_RELEASE + r"(create|new|upload|edit|delete)\b"), RELEASE),
+    (GH_API_RELEASE, RELEASE),
+    (re.compile(HTTP_CLIENT.pattern + r".*(?:" + GITHUB_API.pattern + r")", re.I), RELEASE),
 )
-PUBLISHING_ACTIONS = ("pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action")
+PUBLISHING_ACTIONS = ("pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action") + RELEASE_ACTIONS
 NPM_FETCH = frozenset({"install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal",
                        "isntall", "add", "update", "up", "upgrade", "udpate", "exec", "x", "init", "create",
                        "innit", "install-test", "it"})
@@ -1034,19 +1173,66 @@ def _operand_proof_problems(wf: dict, publishers: list) -> list:
     return out
 
 
+def _plain(line: str) -> str:
+    """LINE as its shell words, quotes stripped: `gh "release" create` reads gh release create."""
+    return " ".join(_words(line))
+
+
+def _action_in(action: str, names) -> bool:
+    """ACTION (without its ref) is one of NAMES or a path inside one, in any letter case."""
+    action = action.lower()
+    return any(action == name or action.startswith(name + "/") for name in names)
+
+
+def _creates_release(line: str) -> str:
+    """How LINE (a command line) creates a GitHub release, or ''."""
+    plain = _plain(line)
+    if GH_CREATE.search(plain):
+        return "gh release create"
+    if not RELEASES_COLLECTION.search(plain):
+        return ""
+    method = REST_METHOD.search(plain)
+    if re.search(GH_API, plain):
+        body = GH_API_BODY.search(plain)
+    elif HTTP_CLIENT.search(plain):
+        body = HTTP_BODY.search(plain)
+    else:
+        return ""
+    post = method.group(1).upper() == "POST" if method else bool(body)
+    return "a REST POST to a releases collection" if post else ""
+
+
+def _release_asset(line: str) -> list:
+    """The RELEASE_ASSET reasons LINE (a command line) matches, as written or with its quotes stripped."""
+    plain = _plain(line)
+    return [reason for pattern, reason in RELEASE_ASSET if pattern.search(line) or pattern.search(plain)]
+
+
+def _creating_action(step) -> str:
+    """Why STEP's action creates a release, or ''."""
+    action, _ = _uses(step)
+    if _action_in(action, RELEASE_CREATING_ACTIONS):
+        return f"{step.get('uses')} creates or updates a release"
+    if _action_in(action, ("actions/github-script",)) and re.search(
+            r"\bcreateRelease\b|\bPOST\s+/repos/\S*/releases\b", _text(step.get("with")), re.I):
+        return f"{step.get('uses')} calls the release-creating endpoint"
+    return ""
+
+
 def publishing_steps(steps) -> list:
     """(index, what) of every step that publishes."""
     found = []
     for index, step in enumerate(steps):
         action, _ = _uses(step)
-        if any(action == a or action.startswith(a + "/") for a in PUBLISHING_ACTIONS):
-            found.append((index, action))
+        if _action_in(action, PUBLISHING_ACTIONS):
+            found.append((index, RELEASE if _action_in(action, RELEASE_ACTIONS) else action))
             continue
         for line in _code_lines(step.get("run")):
             found += [(index, what) for tool, subcommands, what in PUBLISHING_TOOLS
                       if _invokes(line, tool, subcommands)]
+            plain = _plain(line)
             for pattern, what in PUBLISHING_RUN:
-                if not pattern.search(line):
+                if not (pattern.search(line) or pattern.search(plain)):
                     continue
                 if what == "napi pre-publish" and ("--dry-run" in line or (
                         "--skip-optional-publish" in line and
@@ -1222,6 +1408,91 @@ def _oci_contract_problems(wf: dict, publisher: dict, first_publish: int) -> lis
     return out
 
 
+def _bare(env) -> dict:
+    """ENV (a step's env, or a constant) with the whitespace inside each value removed; {} when not a map."""
+    return {str(k): re.sub(r"\s+", "", str(v)) for k, v in env.items()} if isinstance(env, dict) else {}
+
+
+def _cli_problems(job_id: str, job: dict, wf: dict) -> list:
+    """(job, code, message, step index or -1) for each way cli-archives.yml ›
+    attach could upload other bytes than the set the consumers judged, or
+    reach a release through other lines than the reviewed ones."""
+    out, steps = [], _steps(job)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(code: str, message: str, index: int = -1, where: str = job_id) -> None:
+        out.append((where, code, message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in CLI_USES:
+            fail("cli-uses", f"{step.get('uses')}: attach uses only {' and '.join(CLI_USES)}, so no other code sees "
+                             "its token or its files", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail("cli-steps", f"`{key}:` on an attach step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    if len(downloads) != 1 or set(steps[downloads[0]]) - {"name", "uses", "with"} or \
+            steps[downloads[0]].get("with") != CLI_DOWNLOAD:
+        fail("cli-download", f"download steps {[i + 1 for i in downloads]}: exactly one, with {CLI_DOWNLOAD} and no "
+                             "other key, so the set the consumers judged arrives digest-checked")
+    for producer in _artifact_lineage(wf, job_id):
+        for i, step in enumerate(_steps(jobs[producer])):
+            given = step.get("with") if isinstance(step.get("with"), dict) else {}
+            if _uses(step)[0] == "actions/download-artifact" and str(given.get("digest-mismatch")) != "error":
+                fail("cli-download", "a download without `digest-mismatch: error`, in a job attach publishes from",
+                     i, producer)
+    tokens = [i for i, step in enumerate(steps) if TOKEN.search(_text(step))]
+    first_token = tokens[0] if tokens else len(steps)
+    if not any(set(steps[i]) <= {"name", "env", "run"} and _block(steps[i].get("run")) == CLI_REINSPECT_RUN and
+               _bare(steps[i].get("env")) == _bare(CLI_SUMS_ENV) and downloads[:1] and downloads[0] < i < first_token
+               for i in range(len(steps))):
+        fail("cli-sums", "after the download and before the first step holding the token, re-inspect exactly as "
+                         "CLI_REINSPECT_RUN says, with QUALIFIED_SUMS_SHA256 from needs.qualified.outputs.sums_sha256 "
+                         "and no other key: the bytes uploaded are the set the consumers judged")
+    qualified = jobs.get("qualified", {})
+    outputs = qualified.get("outputs") if isinstance(qualified.get("outputs"), dict) else {}
+    source = re.fullmatch(r"\$\{\{\s*steps\.([\w-]+)\.outputs\.sums_sha256\s*\}\}",
+                          str(outputs.get("sums_sha256", "")).strip())
+    qualify = next((s for s in _steps(qualified) if source and str(s.get("id")) == source.group(1)), {})
+    if not any(re.search(r"\bscripts/cli-release\.py\s+qualify\b", line) and "--github-output" in _words(line)
+               for line in _code_lines(qualify.get("run"))):
+        fail("cli-sums", f"outputs.sums_sha256 {outputs.get('sums_sha256')!r}: map it from the `cli-release.py "
+                         "qualify` step's output, the sha256 of the SUMS every consumer judged", where="qualified")
+    if len(tokens) != len(CLI_TOKEN_RUNS):
+        fail("cli-token", f"steps {[i + 1 for i in tokens]} hold the token: exactly the {len(CLI_TOKEN_RUNS)} reviewed "
+                          f"gh steps ({', '.join(CLI_TOKEN_STEPS)}) may")
+    for k, i in enumerate(tokens):
+        step = steps[i]
+        if k < len(CLI_TOKEN_RUNS) and (set(step) - {"name", "env", "run"} or _block(step.get("run")) !=
+                                        CLI_TOKEN_RUNS[k] or _bare(step.get("env")) != _bare(CLI_TOKEN_ENV)):
+            fail("cli-token", f"token step {k + 1} must run exactly the reviewed {CLI_TOKEN_STEPS[k]} lines "
+                              "(CLI_TOKEN_RUNS), with env GH_TOKEN alone and no other key", i)
+        if re.search(r"\bpython", str(step.get("run") or ""), re.I):
+            fail("cli-token", "names python in a step holding the token: the plan and the readback verdict read "
+                              "files, without it", i)
+    for level, env in (("job", job.get("env")), ("workflow", wf.get("env"))):
+        if TOKEN.search(_text(env)):
+            fail("cli-token", f"the {level} env names a token: every attach step would hold it")
+
+    def may_be_set(name: str) -> bool:
+        return bool(re.fullmatch(".*".join(map(re.escape, re.split(r"\$\{\{.*?\}\}", name))), CLI_SET))
+
+    uploads = [(other, i, step.get("with") if isinstance(step.get("with"), dict) else {})
+               for other, body in jobs.items() for i, step in enumerate(_steps(body))
+               if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    writers = [(other, i) for other, i, given in uploads if may_be_set(str(given.get("name", "artifact")))]
+    literal = [(other, i) for other, i, given in uploads if str(given.get("name")) == CLI_SET]
+    if writers != literal or [other for other, _ in literal] != [CLI_PRODUCER]:
+        where = ", ".join(f"{other} (step {i + 1})" for other, i in writers) or "no job"
+        fail("cli-lineage", f"{CLI_SET} may be uploaded by {where}: one upload, {CLI_PRODUCER}'s, by that literal "
+                            "name, so attach downloads the set the consumers judged")
+    for other, i, given in uploads:
+        if "overwrite" in given:
+            fail("cli-lineage", f"`overwrite: {given['overwrite']}`: an artifact is written once, so no later step "
+                                "replaces what the consumers judged", i, other)
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1252,8 +1523,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
-    releases = any(what == "gh release" for _, what in publishing)
-    registry = any(what != "gh release" for _, what in publishing)
+    releases = any(what == RELEASE for _, what in publishing)
+    registry = any(what != RELEASE for _, what in publishing)
     if not isinstance(perms, dict):
         flag("permissions", f"job-level permissions must be an explicit map, got {perms!r}")
     elif oci:
@@ -1277,6 +1548,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     for level, env_map in (("job", job.get("env")), *((f"step {i + 1}", s.get("env")) for i, s in enumerate(steps))):
         if env_map is not None and not isinstance(env_map, dict):
             flag("floating-rust", f"{level} env {env_map!r} is not a mapping: no check can resolve it")
+    for level, env_map in (("workflow", wf.get("env")), ("job", job.get("env"))):
+        if GITHUB_API.search(_text(env_map)):
+            flag("release-asset", f"the {level} env names the GitHub API: a call to it bypasses this review")
     for i, step in enumerate(steps):
         uses = step.get("uses")
         action, ref = _uses(step)
@@ -1295,6 +1569,17 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("shell", f"step shell {step['shell']!r}, not bash", i)
         if "${{" in str(step.get("run") or ""):
             flag("expression", "a `${{ }}` interpolated into a script: pass the value through env", i)
+        if why := _creating_action(step):
+            flag("release-create", f"{why}: {OWNER_CREATES}", i)
+        if _action_in(action, RELEASE_ACTIONS):
+            flag("release-asset", f"{uses}: a release action writes releases outside this review", i)
+        if GITHUB_API.search(_text(step.get("env")) + "\n" + _text(step.get("with"))):
+            flag("release-asset", "names the GitHub API in its env or inputs: a call to it bypasses this review", i)
+        for line in _code_lines(step.get("run")):
+            if why := _creates_release(line):
+                flag("release-create", f"`{line}` creates a release ({why}): {OWNER_CREATES}", i)
+            for reason in _release_asset(line):
+                flag("release-asset", f"{reason}: `{line}`", i)
         for code, message in _toolchain_findings(step):
             flag(code, message, i)
         rust = _resolve("RUST_TOOLCHAIN", step.get("env"), job.get("env"), wf.get("env"))
@@ -1346,6 +1631,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     if _runs_npm_publish(job):
         for message in _operand_spelling_problems(steps, needs, wf):
             flag("npm-operand", message)
+    if (workflow, job_id) == CLI_JOB:
+        out += [Finding(workflow, where, code, message, index)
+                for where, code, message, index in _cli_problems(job_id, job, wf)]
     pypi = [step for step in steps if re.fullmatch(r"pypa/gh-action-pypi-publish(/.+)?", _uses(step)[0])]
     if pypi:
         inputs = [step.get("with") if isinstance(step.get("with"), dict) else {} for step in pypi]
@@ -1685,7 +1973,7 @@ SNEAKY_CARGO = """
       - uses: actions/checkout@v7
       - run: |
           cargo \\
-            publish -p qrcode-ai-scanner
+            publish -p qrcode-barcode-scanner
 """
 OIDC_PNPM = """
   sneaky:
@@ -1710,9 +1998,66 @@ REUSABLE = """
     uses: someone/workflows/.github/workflows/publish.yml@main
     secrets: inherit
 """
-ALL_WORKFLOWS = ("ci.yml", "crates-publish.yml", "deep-checks.yml", "flutter.yml", "mobile.yml", "npm-publish.yml",
-                 "python.yml", "toolchain-probe.yml")
-PIN_LINE = '  RUST_TOOLCHAIN: "1.97.0"\n'
+ALL_WORKFLOWS = ("ci.yml", "cli-archives.yml", "crates-publish.yml", "debt-mutations.yml", "deep-checks.yml",
+                 "flutter.yml", "mobile.yml", "npm-publish.yml", "python.yml", "registry-consumers-0101.yml",
+                 "toolchain-probe.yml")
+PIN_LINE = '  RUST_TOOLCHAIN: "1.99.1"\n'
+
+# What LINE_CASES expects, spelled out: how a line creates a release, and the
+# RELEASE_ASSET reasons, in their order.
+GH_CREATES, REST_POST = "gh release create", "a REST POST to a releases collection"
+CLOBBERS, DELETES, EDITS = ("replaces an attached asset", "deletes a release or an asset",
+                            "edits or publishes a release: the owner's step")
+API_CALL = "a release API call bypasses this review"
+NAMES_API = "names the GitHub API: a call to it bypasses this review"
+GH_HIDES = "a gh alias or extension runs a command this review cannot read"
+# (command line, how it creates a release, its RELEASE_ASSET reasons, whether a
+# step running it writes a release and so makes its job privileged).
+LINE_CASES = (
+    ("gh release create v0 x.zip", GH_CREATES, (), True),
+    ('gh -R o/r release create "$TAG" --draft --verify-tag', GH_CREATES, (), True),
+    ("gh --repo=o/r release -R o/r create v0", GH_CREATES, (), True),
+    ('gh release "create" v0', GH_CREATES, (), True),
+    ("gh release new v0 --draft", GH_CREATES, (), True),
+    ('x=$(gh release create v0 --draft)', GH_CREATES, (), True),
+    ('gh release upload "$GITHUB_REF_NAME" "$file"', "", (), True),
+    ("gh release upload v0 x.zip --clobber", "", (CLOBBERS,), True),
+    ("gh release -R o/r upload v0 x.zip --clobber", "", (CLOBBERS,), True),
+    ("gh release delete-asset v0 x.zip --yes", "", (DELETES,), True),
+    ("gh release delete v0 --yes --cleanup-tag", "", (DELETES,), True),
+    ("gh release edit v0 --draft=false", "", (EDITS,), True),
+    ("gh release view v0 --json assets", "", (), False),
+    ("gh release list --limit 1000 --json tagName,isDraft", "", (), False),
+    ("gh release download v0 -p x.zip -O out.zip --clobber", "", (), False),
+    ("gh release verify-asset v0 x.zip", "", (), False),
+    ("gh api -X PATCH repos/o/r/releases/1 -F draft=false", "", (API_CALL,), True),
+    ("gh api -X DELETE repos/o/r/releases/assets/1", "", (API_CALL,), True),
+    ("gh api repos/o/r/releases -f tag_name=v0", REST_POST, (API_CALL,), True),
+    ("gh api --method POST repos/o/r/releases", REST_POST, (API_CALL,), True),
+    ("gh api repos/o/r/releases --method GET", "", (API_CALL,), True),
+    ("gh api repos/o/r/releases/latest", "", (API_CALL,), True),
+    ("gh api graphql -f query='mutation { deleteRelease(input: {id: \"x\"}) { clientMutationId } }'", "",
+     (API_CALL,), True),
+    ("gh api repos/o/r/commits/HEAD", "", (), False),
+    ('curl -X POST -H "Authorization: Bearer $GH_TOKEN" https://uploads.github.com/x', "", (NAMES_API,), True),
+    ("curl -fsSL -d '{\"tag_name\":\"v0\"}' https://api.github.com/repos/o/r/releases", REST_POST, (NAMES_API,),
+     True),
+    ("curl -f https://api.github.com/repos/o/r/releases", "", (NAMES_API,), True),
+    ('curl --json @release.json "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/releases"', REST_POST, (NAMES_API,),
+     True),
+    ("Invoke-RestMethod -Method Post -Uri https://api.github.com/repos/o/r/releases -Body $json", REST_POST,
+     (NAMES_API,), True),
+    ("Invoke-RestMethod https://api.github.com/repos/o/r/releases", "", (NAMES_API,), True),
+    ("irm https://API.GitHub.com/repos/o/r/releases", "", (NAMES_API,), True),
+    ("wget --post-data='{\"tag_name\":\"v0\"}' https://api.github.com/repos/o/r/releases", REST_POST,
+     (NAMES_API,), True),
+    ("url=https://api.github.com/repos/o/r/releases", "", (NAMES_API,), False),
+    ('curl -sSfL -o "$archive" https://github.com/WebAssembly/binaryen/releases/download/version_130/b.tar.gz', "",
+     (), False),
+    ('curl -sSf "https://registry.npmjs.org/x/1.0.0"', "", (), False),
+    ("gh alias set mk 'release create'", "", (GH_HIDES,), False),
+    ("gh extension install o/gh-x", "", (GH_HIDES,), False),
+)
 
 # (name, mode, edits [(workflow, old, new)], extra files {path: text}, exit, needle).
 # The real tree passes both modes; each mutated copy must exit as said, with
@@ -1785,10 +2130,9 @@ MUTATIONS = (
     ("contents: write without gh release", P, [("python.yml", "      contents: read\n      id-token: write # trusted "
                                                 "publishing", "      contents: write\n      id-token: write # trusted "
                                                 "publishing")], {}, 1, "`contents: write`"),
-    ("id-token on the GitHub-release job", P, [("mobile.yml", "      contents: write # create the GitHub release + "
-                                                "attach the asset", "      contents: write # create the GitHub "
-                                                "release + attach the asset\n      id-token: write")], {}, 1,
-     "`id-token: write`"),
+    ("id-token on the GitHub-release job", P, [("mobile.yml", "      contents: write",
+                                                "      id-token: write\n      contents: write")], {}, 1,
+     "mobile.yml › ios-release [permissions] `id-token: write`"),
     ("job permissions write-all", P, [("flutter.yml", "    permissions:\n      contents: read\n      id-token: write "
                                        "# OIDC — pub.dev automated publishing, no token", "    permissions: write-all")],
      {}, 1, "an explicit map"),
@@ -1840,7 +2184,7 @@ MUTATIONS = (
     ("cargo options before the subcommand, in ci › packaging", P, [(
         "ci.yml", "      - run: python3 scripts/package-inspect.py crates --strict --quiet\n",
         "      - run: python3 scripts/package-inspect.py crates --strict --quiet\n      - run: cargo --locked publish "
-        "-p qrcode-ai-scanner\n")], {}, 1, "ci.yml › packaging [guard]"),
+        "-p qrcode-barcode-scanner\n")], {}, 1, "ci.yml › packaging [guard]"),
     ("npm's abbreviation `npm pu`, in a ci job", P, [("ci.yml", "      - run: node test.mjs\n",
                                                       "      - run: node test.mjs\n      - run: npm pu ./x.tgz "
                                                       "--ignore-scripts\n")], {}, 1, "ci.yml › node-smoke [guard]"),
@@ -1983,9 +2327,9 @@ MUTATIONS = (
         "crates-publish.yml", "      - uses: rust-lang/crates-io-auth-action",
         "      - run: cargo +\"$RUST_TOOLCHAIN\" install cargo-release\n      - uses: rust-lang/crates-io-auth-action")],
      {}, 1, "crates-publish.yml › publish [unlocked-install]"),
-    ("piped installer in a publish job", P, [("mobile.yml", "      - name: publish + verify the xcframework asset",
+    ("piped installer in a publish job", P, [("mobile.yml", "      - name: attach + verify the xcframework asset",
                                               "      - run: curl -sSf https://example.invalid/install.sh | sh\n"
-                                              "      - name: publish + verify the xcframework asset")], {}, 1,
+                                              "      - name: attach + verify the xcframework asset")], {}, 1,
      "pipes a download into an interpreter"),
     # -- what a publish step uploads
     ("cargo publish verifying again", P, [("crates-publish.yml", 'cargo publish -p "$crate" --locked --no-verify',
@@ -2083,7 +2427,7 @@ MUTATIONS = (
      "npm-publish.yml › publish-native [npm-operand]"),
     ("the operand check without its absolute-path test", P, [
         ("npm-publish.yml", OPERAND_CHECK, OPERAND_CHECK.replace('[[ "$1" == /* ]] && ', ""))], {}, 1,
-     "npm-publish.yml › publish-native [npm-operand] (step 7) the step must define `inspected` once"),
+     "npm-publish.yml › publish-native [npm-operand] (step 8) the step must define `inspected` once"),
     # -- how the operand is spelled: npm reads a relative dir/file.tgz as the
     #    GitHub repository dir/file.tgz, so every spelling is absolute and the
     #    same in the publishing step, the record and the operand proof
@@ -2233,7 +2577,7 @@ MUTATIONS = (
     ("maturin on a literal toolchain", T, [("python.yml", "rust-toolchain: ${{ env.RUST_TOOLCHAIN }}",
                                             "rust-toolchain: 1.96.0")], {}, 1, "rust-toolchain '1.96.0'"),
     ("RUSTUP_TOOLCHAIN in a workflow env", T, [("ci.yml", "  RUSTFLAGS: -D warnings\n", "  RUSTFLAGS: -D warnings\n"
-                                                "  RUSTUP_TOOLCHAIN: 1.97.0\n")], {}, 1, "RUSTUP_TOOLCHAIN overrides"),
+                                                "  RUSTUP_TOOLCHAIN: 1.99.1\n")], {}, 1, "RUSTUP_TOOLCHAIN overrides"),
     ("the MSRV leg below rust-version", T, [("ci.yml", "dtolnay/rust-toolchain@1.88", "dtolnay/rust-toolchain@1.87")],
      {}, 1, "the one literal is the MSRV leg"),
     ("the MSRV leg by SHA, no toolchain input", T, [("ci.yml", "dtolnay/rust-toolchain@1.88",
@@ -2283,6 +2627,246 @@ MUTATIONS += (
     ("OCI download ignores official digest", P, [("oci-publish.yml", "          digest-mismatch: error", "          digest-mismatch: ignore")], {}, 1, "exact frozen platform artifact"),
 )
 
+# The mutations edit cli-archives.yml as it ships. attach's steps: 1 checkout,
+# 2 gate, 3 download, 4 re-inspection, 5 list, 6 its plan, 7 view, 8 plan,
+# 9 upload, 10 readback, 11 judge; an inserted step lands before the judge.
+# Every job repeats the same checkout and download, so attach's anchors for
+# them run on into the next step: each anchor occurs once in the file
+# (self_test refuses otherwise).
+CLI = CLI_WORKFLOW
+CLI_IF = "    if: startsWith(github.ref, 'refs/tags/v') && inputs.mode != 'public-download'"
+CLI_NEEDS = "    needs: [inspect, consume, consume-container, qualified]\n"
+CLI_PERMS = "      contents: write # upload the CLI assets into the owner's draft release\n"
+CLI_CHECKOUT = f"      - uses: {CHECKOUT}\n        with:\n          persist-credentials: false\n{GATE_STEP}"
+CLI_REINSPECT_NAME = "      - name: re-inspect the set the consumers judged, before any release call\n"
+CLI_DOWNLOADED = ("          name: cli-release-set\n          path: cli-release\n          digest-mismatch: error\n"
+                  + CLI_REINSPECT_NAME)
+CLI_SUMS = "          QUALIFIED_SUMS_SHA256: ${{ needs.qualified.outputs.sums_sha256 }}\n"
+CLI_REINSPECT_STEP = (CLI_REINSPECT_NAME + "        env:\n" + CLI_SUMS + "        run: |\n"
+                      + "".join(f"          {line}\n" for line in CLI_REINSPECT_RUN.split("\n")))
+CLI_LIST = "      - name: list the releases (gh read)\n        env:\n          GH_TOKEN: ${{ github.token }}\n"
+CLI_LISTED = '          gh release list --limit 1000 --json tagName,isDraft > "$RUNNER_TEMP/cli-gh/list.json"\n'
+CLI_LIST_PLAN = "      - name: exactly one release carries the tag (no token)\n"
+CLI_PLAN = "      - name: plan the upload from files (no token)\n"
+CLI_LOOP = "          set -euo pipefail\n          while IFS= read -r file; do\n"
+CLI_CHECKED = '            grep -qxF "$(sha256sum -- "$file")" "$RUNNER_TEMP/cli-inspected.sha256"\n'
+CLI_UPLOADED = '            gh release upload "$GITHUB_REF_NAME" "$file"\n'
+CLI_READBACK = "      - name: read back the CLI assets (gh reads)\n"
+CLI_JUDGE = "      - name: judge the readback (no token)\n"
+CLI_SET_UPLOAD = "          name: cli-release-set\n          path: ${{ runner.temp }}/cli-release\n"
+CLI_BUILDS = ("          pattern: cli-build-*\n          path: ${{ runner.temp }}/cli-build\n"
+              "          digest-mismatch: error\n")
+CLI_BUILD_STEP = "      - name: build qrscan, then scan the binary for build-host paths\n"
+
+
+MOBILE_TAIL, CRATES_TAIL = "      - uses: actions/download-artifact@", "      # This job can mint"
+
+
+def _cli_step(step: str) -> list:
+    """The edit inserting STEP (YAML text) into attach, right before the judge."""
+    return [(CLI, CLI_JUDGE, step + CLI_JUDGE)]
+
+
+def _after_gate(workflow: str, tail: str, step: str) -> list:
+    """The edit inserting STEP (YAML text) right after WORKFLOW's versions gate, which TAIL follows."""
+    return [(workflow, GATE_STEP + tail, GATE_STEP + step + tail)]
+
+
+MUTATIONS += (
+    # == cli-archives.yml › attach: the rules every privileged job meets
+    ("cli attach without the tag guard", P, [(CLI, CLI_IF, "    if: inputs.mode != 'public-download'")], {}, 1,
+     "cli-archives.yml › attach [guard]"),
+    ("cli attach guard under ||", P, [(CLI, CLI_IF, CLI_IF.replace("'refs/tags/v') &&", "'refs/tags/v') ||"))], {},
+     1, "inputs.mode != 'fetch-rehearsal'\"` puts the tag guard under ||"),
+    ("cli attach without inspect", P, [(CLI, CLI_NEEDS, CLI_NEEDS.replace("inspect, ", ""))], {}, 1,
+     "cli-archives.yml › attach [needs] needs ['consume', 'consume-container', 'qualified']: must include 'inspect'"),
+    ("cli attach without the container consumers", P, [(CLI, CLI_NEEDS, CLI_NEEDS.replace(" consume-container,", ""))],
+     {}, 1, "cli-archives.yml › attach [needs] needs ['inspect', 'consume', 'qualified']: must include "
+            "'consume-container'"),
+    ("cli attach without qualified", P, [(CLI, CLI_NEEDS, CLI_NEEDS.replace(", qualified", ""))], {}, 1,
+     "cli-archives.yml › attach [needs] needs ['inspect', 'consume', 'consume-container']: must include 'qualified'"),
+    ("cli attach in environment releases", P, [(CLI, "    environment: release\n    concurrency:",
+                                                "    environment: releases\n    concurrency:")], {}, 1,
+     "cli-archives.yml › attach [environment] environment 'releases'"),
+    ("cli attach with attestations: write", P, [(CLI, CLI_PERMS, CLI_PERMS + "      attestations: write\n")], {}, 1,
+     "cli-archives.yml › attach [permissions] `attestations: write` is more than this job needs"),
+    ("cli attach with id-token: write", P, [(CLI, CLI_PERMS, CLI_PERMS + "      id-token: write\n")], {}, 1,
+     "cli-archives.yml › attach [permissions] `id-token: write` is more than this job needs"),
+    ("cli attach re-inspects through the versions gate only", P, [(CLI, "python3 scripts/package-inspect.py archive "
+                                                                   "\"$PWD\"/cli-release/* --release-set --commit "
+                                                                   "\"$commit\"", "python3 scripts/package-inspect.py "
+                                                                   "versions --commit \"$commit\"")], {}, 1,
+     "cli-archives.yml › attach [reinspect]"),
+    ("cli attach gate || true", P, [(CLI, GATE_STEP, GATE_STEP.replace("--quiet", "--quiet || true"))], {}, 1,
+     "cli-archives.yml › attach [gate]"),
+    ("cli attach checkout persisting the token", P, [(CLI, CLI_CHECKOUT, f"      - uses: {CHECKOUT}\n{GATE_STEP}")],
+     {}, 1, "cli-archives.yml › attach [persist-credentials] (step 1)"),
+    ("cli attach judge interpolating the ref", P, [(CLI, 'readback --tag "$GITHUB_REF_NAME"',
+                                                    'readback --tag "${{ github.ref_name }}"')], {}, 1,
+     "cli-archives.yml › attach [expression] (step 11)"),
+    ("cli attach listing with a secret", P, [(CLI, CLI_LIST, CLI_LIST.replace("${{ github.token }}",
+                                                                              "${{ secrets.GITHUB_TOKEN }}"))], {}, 1,
+     "cli-archives.yml › attach [secrets]"),
+    ("cli build restoring rust-cache", P, [(CLI, CLI_BUILD_STEP, "      - uses: Swatinem/rust-cache@6323deb102c322ba6"
+                                            "fcbdcafc7e3dddab59af2b6 # v2.9.2\n" + CLI_BUILD_STEP)], {}, 1,
+     "cli-archives.yml › build [tag-cache] (step 6)"),
+    ("cli assemble restoring actions/cache", P, [(CLI, "      - run: cargo fetch --locked\n",
+                                                  "      - uses: actions/cache@" + "a" * 40 + "\n        with: { path: "
+                                                  "\"~/.cargo/registry\", key: cli }\n"
+                                                  "      - run: cargo fetch --locked\n")],
+     {}, 1, "cli-archives.yml › assemble [tag-cache] (step 5)"),
+    # -- no job replaces, deletes, edits or publishes a release, by any client
+    ("cli attach uploading with --clobber", P, [(CLI, CLI_UPLOADED,
+                                                 CLI_UPLOADED.replace('"$file"', '"$file" --clobber'))],
+     {}, 1, "cli-archives.yml › attach [release-asset] (step 9) replaces an attached asset"),
+    ("cli attach deleting an asset", P, _cli_step('      - run: gh release delete-asset "$GITHUB_REF_NAME" x.zip '
+                                                  "--yes\n"),
+     {}, 1, "cli-archives.yml › attach [release-asset] (step 11) deletes a release or an asset"),
+    ("cli attach publishing the draft", P, _cli_step('      - run: gh release edit "$GITHUB_REF_NAME" --draft=false\n'),
+     {}, 1, "cli-archives.yml › attach [release-asset] (step 11) edits or publishes a release: the owner's step"),
+    ("cli attach publishing through gh api PATCH", P, _cli_step("      - run: gh api -X PATCH repos/o/r/releases/1 -F "
+                                                                "draft=false\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) a release API call bypasses this review"),
+    ("cli attach deleting through gh api DELETE", P, _cli_step("      - run: gh api -X DELETE "
+                                                               "repos/o/r/releases/assets/1\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) a release API call bypasses this review"),
+    ("cli attach deleting through a GraphQL mutation", P, _cli_step(
+        "      - run: |\n          gh api graphql -f query='mutation { deleteRelease(input: {id: \"x\"}) { "
+        "clientMutationId } }'\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) a release API call bypasses this review"),
+    ("cli attach uploading through curl", P, _cli_step(
+        '      - run: |\n          curl -X POST -H "Authorization: Bearer $GH_TOKEN" https://uploads.github.com/x\n'),
+     {}, 1, "cli-archives.yml › attach [release-asset] (step 11) names the GitHub API: a call to it bypasses"),
+    ("cli attach listing through Invoke-RestMethod", P, _cli_step(
+        "      - run: Invoke-RestMethod https://api.github.com/repos/o/r/releases\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) names the GitHub API: a call to it bypasses"),
+    ("cli attach through softprops", P, _cli_step("      - uses: softprops/action-gh-release@" + "a" * 40 + "\n"
+                                                  "        with:\n          files: x.zip\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) softprops/action-gh-release@" + "a" * 40),
+    ("cli attach through github-script", P, _cli_step("      - uses: actions/github-script@" + "b" * 40 + "\n"
+                                                      "        with:\n          script: |\n            await github."
+                                                      "rest.repos.deleteReleaseAsset({ owner: 'o', repo: 'r', "
+                                                      "asset_id: 1 })\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) actions/github-script@" + "b" * 40),
+    ("cli attach judge given the API URL", P, [(CLI, CLI_JUDGE, CLI_JUDGE + "        env:\n          API: ${{ "
+                                                "github.api_url }}\n")], {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) names the GitHub API in its env or inputs"),
+    ("cli workflow env naming the API", P, [(CLI, "env:\n  CARGO_TERM_COLOR: always\n", "env:\n  CARGO_TERM_COLOR: "
+                                             "always\n  API: https://api.github.com\n")], {}, 1,
+     "cli-archives.yml › attach [release-asset] the workflow env names the GitHub API"),
+    ("cli attach through a gh alias", P, _cli_step("      - run: gh alias set up 'release upload'\n"), {}, 1,
+     "cli-archives.yml › attach [release-asset] (step 11) a gh alias or extension runs a command"),
+    ("mobile ios-release publishing its draft", P, _after_gate(
+        "mobile.yml", MOBILE_TAIL, '      - run: gh release edit "$GITHUB_REF_NAME" --draft=false\n'), {}, 1,
+     "mobile.yml › ios-release [release-asset] (step 3) edits or publishes a release"),
+    ("crates publish reading releases through gh api", P, _after_gate(
+        "crates-publish.yml", CRATES_TAIL, "      - run: gh api repos/o/r/releases/latest\n"), {}, 1,
+     "crates-publish.yml › publish [release-asset] (step 3) a release API call bypasses this review"),
+    ("a ci job calling the releases API through curl", P, [("ci.yml", "      - run: node test.mjs\n",
+                                                            "      - run: node test.mjs\n      - run: curl -fsS "
+                                                            "https://api.github.com/repos/o/r/releases\n")], {}, 1,
+     "ci.yml › node-smoke [guard]"),
+    ("a ci job with a release action", P, [("ci.yml", "      - run: node test.mjs\n",
+                                            "      - run: node test.mjs\n      - uses: softprops/action-gh-release@"
+                                            + "c" * 40 + "\n")], {}, 1, "ci.yml › node-smoke [guard]"),
+    # -- no job creates a release: the owner creates the one draft
+    ("cli attach creating the draft", P, [(CLI, CLI_LOOP, CLI_LOOP.replace(
+        "          while", '          gh release create "$GITHUB_REF_NAME" --draft --verify-tag || true\n'
+                           "          while"))],
+     {}, 1, "cli-archives.yml › attach [release-create] (step 9)"),
+    ("cli attach creating through gh api", P, _cli_step("      - run: gh api repos/o/r/releases -f tag_name=v0 -F "
+                                                        "draft=true\n"), {}, 1,
+     "cli-archives.yml › attach [release-create] (step 11) `gh api repos/o/r/releases -f tag_name=v0 -F draft=true` "
+     "creates a release (a REST POST to a releases collection)"),
+    ("cli attach creating through curl --json", P, _cli_step(
+        '      - run: curl --json @r.json "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/releases"\n'), {}, 1,
+     'cli-archives.yml › attach [release-create] (step 11) `curl --json @r.json "$GITHUB_API_URL/repos/'
+     '$GITHUB_REPOSITORY/releases"` creates a release (a REST POST to a releases collection)'),
+    ("cli attach creating with gh -R", P, _cli_step("      - run: gh -R o/r release create v0 --draft\n"), {}, 1,
+     "cli-archives.yml › attach [release-create] (step 11) `gh -R o/r release create v0 --draft` creates a release "
+     "(gh release create)"),
+    ("cli attach creating through ncipollo", P, _cli_step("      - uses: ncipollo/release-action@" + "c" * 40 + "\n"
+                                                          "        with:\n          draft: true\n"), {}, 1,
+     "cli-archives.yml › attach [release-create] (step 11) ncipollo/release-action@" + "c" * 40
+     + " creates or updates"),
+    ("cli attach creating through github-script", P, _cli_step(
+        "      - uses: actions/github-script@" + "d" * 40 + "\n        with:\n          script: |\n            await "
+        "github.rest.repos.createRelease({ owner: 'o', repo: 'r', tag_name: 'v0', draft: true })\n"), {}, 1,
+     "cli-archives.yml › attach [release-create] (step 11) actions/github-script@" + "d" * 40 + " calls the "
+     "release-creating endpoint"),
+    ("mobile ios-release creating the release", P, _after_gate(
+        "mobile.yml", MOBILE_TAIL, '      - run: gh release create "$GITHUB_REF_NAME" --draft --verify-tag\n'), {}, 1,
+     "mobile.yml › ios-release [release-create] (step 3)"),
+    ("mobile ios-release creating with gh release new", P, _after_gate(
+        "mobile.yml", MOBILE_TAIL, '      - run: gh release new "$GITHUB_REF_NAME" --draft\n'), {}, 1,
+     "mobile.yml › ios-release [release-create] (step 3)"),
+    # -- attach's own contract
+    ("cli attach with a setup-python step", P, [(CLI, GATE_STEP, GATE_STEP + "      - uses: actions/setup-python@"
+                                                 "5fda3b95a4ea91299a34e894583c3862153e4b97 # v7\n        with: { "
+                                                 "python-version: \"3.14\" }\n")], {}, 1,
+     "cli-archives.yml › attach [cli-uses] (step 3) actions/setup-python@"),
+    ("cli attach checkout in another case", P, [(CLI, CLI_CHECKOUT, CLI_CHECKOUT.replace("actions/checkout",
+                                                                                         "Actions/Checkout"))], {}, 1,
+     "cli-archives.yml › attach [cli-uses] (step 1) Actions/Checkout@"),
+    ("cli attach judge continuing on error", P, [(CLI, CLI_JUDGE, CLI_JUDGE + "        continue-on-error: true\n")], {},
+     1, "cli-archives.yml › attach [cli-steps] (step 11) `continue-on-error:`"),
+    ("cli attach readback behind an if", P, [(CLI, CLI_READBACK, CLI_READBACK + "        if: success()\n")], {}, 1,
+     "cli-archives.yml › attach [cli-steps] (step 10) `if:`"),
+    ("cli attach download ignoring the digest", P, [(CLI, CLI_DOWNLOADED, CLI_DOWNLOADED.replace("error", "ignore"))],
+     {}, 1, "cli-archives.yml › attach [cli-download] download steps [3]"),
+    ("cli attach downloading a second artifact", P, [(CLI, CLI_LIST_PLAN, "      - uses: actions/download-artifact@"
+                                                      "9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2\n        "
+                                                      "with: { name: cli-qualification, path: q }\n" + CLI_LIST_PLAN)],
+     {}, 1, "cli-archives.yml › attach [cli-download] download steps [3, 6]"),
+    ("cli assemble download without the digest check", P, [(CLI, CLI_BUILDS, CLI_BUILDS.replace(
+        "          digest-mismatch: error\n", ""))], {}, 1, "cli-archives.yml › assemble [cli-download] (step 4)"),
+    ("cli attach re-inspection without the qualified sums", P, [(CLI, ' --sums-sha256 "$QUALIFIED_SUMS_SHA256"', "")],
+     {}, 1, "cli-archives.yml › attach [cli-sums] after the download and before the first step holding the token"),
+    ("cli attach sums from another output", P, [(CLI, CLI_SUMS, CLI_SUMS.replace("sums_sha256 }}", "commit }}"))], {},
+     1, "cli-archives.yml › attach [cli-sums] after the download and before the first step holding the token"),
+    ("cli qualified output from a constant", P, [(CLI, "      sums_sha256: ${{ steps.qualify.outputs.sums_sha256 }}\n",
+                                                  '      sums_sha256: "0000"\n')], {}, 1,
+     "cli-archives.yml › qualified [cli-sums] outputs.sums_sha256 '0000'"),
+    ("cli qualify step without its output", P, [(CLI, ' --github-output "$GITHUB_OUTPUT"\n      - uses: actions/upload',
+                                                 "\n      - uses: actions/upload")], {}, 1,
+     "cli-archives.yml › qualified [cli-sums] outputs.sums_sha256 '${{ steps.qualify.outputs.sums_sha256 }}'"),
+    ("cli attach re-inspecting after the first token step", P, [
+        (CLI, CLI_REINSPECT_STEP, ""), (CLI, CLI_LIST_PLAN, CLI_REINSPECT_STEP + CLI_LIST_PLAN)],
+     {}, 1, "cli-archives.yml › attach [cli-sums] after the download and before the first step holding the token"),
+    ("cli attach plan given the token", P, [(CLI, CLI_PLAN, CLI_PLAN + "        env:\n          GH_TOKEN: ${{ "
+                                             "github.token }}\n")], {}, 1,
+     "cli-archives.yml › attach [cli-token] steps [5, 7, 8, 9, 10] hold the token"),
+    ("cli attach token step running python", P, [(CLI, CLI_LISTED, CLI_LISTED + "          python3 -c 'print(1)'\n")],
+     {}, 1, "cli-archives.yml › attach [cli-token] (step 5) names python"),
+    ("cli attach upload without the record check", P, [(CLI, CLI_CHECKED, "")], {}, 1,
+     "cli-archives.yml › attach [cli-token] (step 9) token step 3 must run exactly the reviewed upload lines"),
+    ("cli attach download given the token", P, [(CLI, CLI_DOWNLOADED, CLI_DOWNLOADED.replace(
+        "error\n", "error\n          github-token: ${{ github.token }}\n"))], {}, 1,
+     "cli-archives.yml › attach [cli-token] steps [3, 5, 7, 9, 10] hold the token"),
+    ("cli attach token in the job env", P, [(CLI, "    environment: release\n", "    env:\n      GH_TOKEN: ${{ "
+                                             "github.token }}\n    environment: release\n")], {}, 1,
+     "cli-archives.yml › attach [cli-token] the job env names a token"),
+    ("cli inspect upload renamed to the set", P, [(CLI, "          name: cli-receipt-floor\n",
+                                                   "          name: cli-release-set\n")], {}, 1,
+     "cli-archives.yml › attach [cli-lineage] cli-release-set may be uploaded by assemble (step 7), inspect "
+     "(step 7)"),
+    ("cli consume upload a name could make the set", P, [(CLI, "          name: cli-receipt-${{ matrix.target }}\n",
+                                                          "          name: cli-${{ matrix.target }}\n")], {}, 1,
+     "cli-release-set may be uploaded by assemble (step 7), consume (step 5)"),
+    ("cli assemble overwriting the set", P, [(CLI, CLI_SET_UPLOAD, CLI_SET_UPLOAD + "          overwrite: true\n")], {},
+     1, "cli-archives.yml › assemble [cli-lineage] (step 7) `overwrite: true`"),
+    ("cli-archives.yml as reviewed", P, [], {}, 0, "cli-archives.yml › attach, "),
+    # -- the one-toolchain policy over cli-archives.yml
+    ("cli build with RUSTUP_TOOLCHAIN in its script", T, [(CLI, "        run: python scripts/cli-release.py build",
+                                                           "        run: RUSTUP_TOOLCHAIN=1.99.1 python "
+                                                           "scripts/cli-release.py build")], {}, 1,
+     "cli-archives.yml › build (step 6) [script]"),
+    ("cli build on a literal toolchain", T, [(CLI, "          toolchain: ${{ env.RUST_TOOLCHAIN }}\n          targets:",
+                                              "          toolchain: 1.99.1\n          targets:")], {}, 1,
+     "cli-archives.yml › build (step 2) [leg]"),
+    ("cli-archives.yml as reviewed, one toolchain", T, [], {}, 0, "0 violation(s)"),
+)
+
 
 def _run(argv: list) -> tuple:
     sink = io.StringIO()
@@ -2298,6 +2882,11 @@ def _run(argv: list) -> tuple:
 
 def self_test() -> int:
     failures = []
+    for line, creates, reasons, writes in LINE_CASES:
+        got = (_creates_release(line), tuple(_release_asset(line)),
+               any(what == RELEASE for _, what in publishing_steps([{"run": line}])))
+        if got != (creates, reasons, writes):
+            failures.append(f"the line `{line}`: read as {got}, want {(creates, reasons, writes)}")
     for mode in (P, T):
         code, out = _run(["--toolchains"] if mode == T else [])
         if code != 0:
@@ -2308,18 +2897,20 @@ def self_test() -> int:
             workflows = root / ".github" / "workflows"
             shutil.copytree(ROOT / ".github" / "workflows", workflows)
             shutil.copyfile(ROOT / "Cargo.toml", root / "Cargo.toml")
-            missing = []
+            unplaced = []
             for workflow, old, new in edits:
                 text = (workflows / workflow).read_text()
-                if old is None:
-                    text += new
-                elif old in text:
-                    text = text.replace(old, new, 1)
+                found = 1 if old is None else text.count(old)
+                # cli-archives.yml repeats the same blocks in every job: there an
+                # anchor names one line, so the edit lands in the job the needle judges.
+                if found == 0:
+                    unplaced.append(f"not found in {workflow}")
+                elif found > 1 and workflow == CLI_WORKFLOW:
+                    unplaced.append(f"found {found} times in {workflow}")
                 else:
-                    missing.append(workflow)
-                (workflows / workflow).write_text(text)
-            if missing:
-                failures.append(f"{name}: anchor not found in {', '.join(missing)} (update the mutation)")
+                    (workflows / workflow).write_text(text + new if old is None else text.replace(old, new, 1))
+            if unplaced:
+                failures.append(f"{name}: anchor {', '.join(unplaced)} (update the mutation)")
                 continue
             for path, text in extra.items():
                 (root / path).parent.mkdir(parents=True, exist_ok=True)
@@ -2330,9 +2921,10 @@ def self_test() -> int:
                                 f"{'present' if needle in out else 'absent'}\n{out}")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    total = 2 + len(MUTATIONS)
-    print(f"self-test: {total - len(failures)}/{total} scenarios as expected (the real tree passes both policies; "
-          f"{len(MUTATIONS)} mutated copies each exit as expected)")
+    total = len(LINE_CASES) + 2 + len(MUTATIONS)
+    print(f"self-test: {total - len(failures)}/{total} scenarios as expected ({len(LINE_CASES)} release command "
+          f"lines read exactly; the real tree passes both policies; {len(MUTATIONS)} mutated copies each exit as "
+          "expected)")
     return 1 if failures else 0
 
 

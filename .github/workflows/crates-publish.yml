@@ -1,6 +1,7 @@
 name: crates-publish
 
-# Publishes the Rust lib + CLI to crates.io on a release tag.
+# Publishes the Rust lib (qrcode-barcode-scanner) and CLI
+# (qrcode-barcode-scanner-cli) to crates.io on a release tag.
 #
 # This pipeline was MISSING through v0.4.0 and v0.5.0: the README's first
 # install surface (`cargo add qrcode-ai-scanner`) silently served 0.3.0 while
@@ -19,6 +20,13 @@ name: crates-publish
 # the job ends): no long-lived token in the repo. Each crate binds this
 # workflow file and the `crates-io` environment on crates.io first
 # (RELEASING.md § Publishing).
+#
+# crates.io binds a trusted publisher only to a crate that already exists, so
+# this job cannot upload the first version of a new crate name: it fails with
+# nothing uploaded. The owner uploads that first version from the archives
+# this workflow inspected, core then CLI, and binds the crate; the job,
+# approved or re-run, then finds the version live and compares it with its
+# inspected archive.
 
 on:
   push:
@@ -31,7 +39,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain).
-  RUST_TOOLCHAIN: "1.97.0"
+  RUST_TOOLCHAIN: "1.99.1"
 
 jobs:
   package:
@@ -55,7 +63,17 @@ jobs:
       # its own archive, then the archives read back: LICENSE · README ·
       # version · the cli's core pin · no stray files.
       - name: package + inspect the two .crate files
-        run: python3 scripts/package-inspect.py crates --verify --strict --quiet
+        shell: bash
+        run: python3 scripts/package-inspect.py crates --verify --strict --quiet --out "$RUNNER_TEMP/rust-package-inspection"
+      - name: retain package inspection diagnostics, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: rust-package-inspection-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/rust-package-inspection
+            target/package/*.crate
+          if-no-files-found: warn
       - name: install inspected archives outside the checkout and run consumers
         id: consumer
         shell: bash
@@ -141,17 +159,17 @@ jobs:
           set -euo pipefail
           ws=$(grep -m1 -E '^version' Cargo.toml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
           live() {
-            curl -fsSL -H "User-Agent: qrcode-ai-scanner-ci (release gate)" \
+            curl -fsSL -H "User-Agent: qrcode-barcode-scanner-ci (release gate)" \
               "https://crates.io/api/v1/crates/$1/$2" >/dev/null 2>&1
           }
-          for crate in qrcode-ai-scanner qrcode-ai-scanner-cli; do
+          for crate in qrcode-barcode-scanner qrcode-barcode-scanner-cli; do
             if live "$crate" "$ws"; then
               echo "$crate $ws already on crates.io — skip"
               # It must be the archive inspected here: the sparse index records
               # each version's cksum (sha256 of the .crate). A mismatch means
               # another publisher (e.g. an old ref's token job) uploaded it.
               path="${crate:0:2}/${crate:2:2}/$crate"
-              index=$(curl -sSL -H "User-Agent: qrcode-ai-scanner-ci (release gate)" "https://index.crates.io/$path" || true)
+              index=$(curl -sSL -H "User-Agent: qrcode-barcode-scanner-ci (release gate)" "https://index.crates.io/$path" || true)
               cksum_live=$(printf '%s' "$index" | grep -F "\"vers\":\"$ws\"" | sed -nE 's/.*"cksum":"([0-9a-f]{64})".*/\1/p' | head -n1 || true)
               cksum_local=$(sha256sum "$RUNNER_TEMP/inspected/$crate-$ws.crate" | cut -d' ' -f1)
               if [ "$cksum_live" != "$cksum_local" ]; then

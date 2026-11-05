@@ -18,7 +18,7 @@ env:
   # bump, not on a random Tuesday (the repo's probe wrote that down after the
   # 1.96 runner deaths). MSRV (1.88) and fuzzing (a dated nightly) are the
   # named exceptions. RELEASING.md § toolchain has the why.
-  RUST_TOOLCHAIN: "1.97.0"
+  RUST_TOOLCHAIN: "1.99.1"
 
 jobs:
   lint:
@@ -49,6 +49,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features --locked
+      # The core with one engine, as a dependency without default features
+      # builds it: the clippy above has both engines, so a lint that fires
+      # only without one of them reached no check (clippy::vec_init_then_push
+      # fired in Capabilities::current() without rxing).
+      - name: clippy · the core with one engine (rqrr only, rxing only)
+        run: |
+          cargo clippy -p qrcode-barcode-scanner --locked --no-default-features \
+            --features engine-rqrr,serde --lib
+          cargo clippy -p qrcode-barcode-scanner --locked --no-default-features \
+            --features engine-rxing,serde --lib
 
   test:
     strategy:
@@ -65,6 +75,19 @@ jobs:
       - run: python3 scripts/check-type-parity.py
       - run: cargo nextest run --workspace --locked
       - run: cargo test --doc --workspace --locked
+      # The build descriptor (spec/01-report.md § Capabilities) with one engine
+      # compiled in, as a dependency without default features gets it: every
+      # step above builds both. With rqrr only, the whole unit-test binary
+      # compiles and its capabilities tests run (other unit tests pin results
+      # of the default build). One row: the lists do not vary by OS.
+      - name: capabilities · the core with one engine (rqrr only, rxing only)
+        if: runner.os == 'Linux'
+        run: |
+          cargo nextest run -p qrcode-barcode-scanner --locked --no-default-features \
+            --features engine-rqrr,serde --lib --test capabilities \
+            -E 'binary(capabilities) | test(/^capabilities::/)'
+          cargo nextest run -p qrcode-barcode-scanner --locked --no-default-features \
+            --features engine-rxing,serde --test capabilities
 
   # MSRV floor — every manifest says rust-version 1.88 and jitpack.yml PINS
   # 1.88.0; stable-only CI lets MSRV rot land silently and break JitPack at
@@ -81,8 +104,8 @@ jobs:
       # a fresh re-resolution can pull a dep whose MSRV floor moved (image
       # 0.25.10 → 1.88 did exactly that) and fail the job for the wrong
       # reason. Lockfile drift then fails loudly here instead.
-      - run: cargo check -p qrcode-ai-scanner --all-features --locked
-      - run: cargo check -p qrcode-ai-scanner-cli --locked
+      - run: cargo check -p qrcode-barcode-scanner --all-features --locked
+      - run: cargo check -p qrcode-barcode-scanner-cli --locked
 
   wasm-shape:
     runs-on: ubuntu-24.04
@@ -97,7 +120,7 @@ jobs:
       # the wasm binding crate (phase C) owns that wiring; the core shape
       # check runs rqrr-only to pin "core compiles single-thread, no rayon".
       - run: >
-          cargo check -p qrcode-ai-scanner --locked
+          cargo check -p qrcode-barcode-scanner --locked
           --target wasm32-unknown-unknown
           --no-default-features --features engine-rqrr,serde
       # The PUBLISHED wasm crate was previously never built on PRs — breakage
@@ -137,6 +160,92 @@ jobs:
       - name: pack + inspect the npm tarballs (LICENSE · file set · loader)
         working-directory: .
         run: python3 scripts/package-inspect.py node --strict --quiet
+      # This runner's target in its release shape, staged as pack-native stages
+      # every target at tag time (create-npm-dirs · artifacts · LICENSE ·
+      # pre-publish · product README, nothing uploaded), then packed and read back.
+      - name: stage + inspect the linux-x64-gnu release shape
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/bindings-x86_64-unknown-linux-gnu
+          cp qrcode-barcode-scanner.linux-x64-gnu.node artifacts/bindings-x86_64-unknown-linux-gnu/
+          pnpm exec napi create-npm-dirs
+          pnpm exec napi artifacts
+          cp LICENSE npm/linux-x64-gnu/
+          pnpm exec napi pre-publish -t npm --no-gh-release --skip-optional-publish
+          cp ../../distribution/npm/README.md npm/linux-x64-gnu/README.md
+          mkdir -p "$RUNNER_TEMP/platform"
+          cp -R npm/linux-x64-gnu "$RUNNER_TEMP/platform/"
+          cd ../..
+          python3 scripts/package-inspect.py node --platform-dirs "$RUNNER_TEMP/platform" \
+            --strict --quiet --out "$RUNNER_TEMP/npm-native"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: npm-native-linux-x64-gnu
+          path: ${{ runner.temp }}/npm-native/archives/*/*.tgz
+          if-no-files-found: error
+
+  # The installed packages on the shared truth set (fixtures/consumer-truth.json:
+  # exact contents, primary, occurrences, score or null per case), on the Node
+  # majors npm-publish.yml consume-native and consume-wasm run them on at tag
+  # time: the tarballs the smoke jobs packed and read back, installed offline
+  # outside the checkout, then the option table (scripts/option-domains.mjs)
+  # on every scan path and the load, cancellation and initialization phases
+  # (scripts/loader-phases.mjs). The judges' own planted-defect scenarios run
+  # first. The native rows run 18, 20, 22 and 24, from the floor the package
+  # advertises (engines.node >= 18); the WASM rows, 22 and 24.
+  node-consumer:
+    needs: node-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-native-linux-x64-gnu
+          path: ${{ runner.temp }}/native-tarballs
+      - run: node scripts/consumer-truth.mjs --self-test
+      - run: node scripts/option-domains.mjs --self-test
+      - name: clean offline install + the shared truth set
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./crates/qrcode-ai-scanner-node/package.json').version")
+          node scripts/packed-node-consumer.mjs native "$RUNNER_TEMP/native-tarballs" \
+            fixtures/clean/gen_v5_q.png "$version" linux-x64-gnu
+
+  wasm-consumer:
+    needs: wasm-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-wasm-tarball
+          path: ${{ runner.temp }}/wasm-tarball
+      - run: node scripts/consumer-truth.mjs --self-test
+      - run: node scripts/option-domains.mjs --self-test
+      - name: clean offline install + the shared truth set
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./crates/qrcode-ai-scanner-node/package.json').version")
+          node scripts/packed-node-consumer.mjs wasm "$RUNNER_TEMP/wasm-tarball" \
+            fixtures/clean/gen_v5_q.png "$version"
 
   wasm-smoke:
     runs-on: ubuntu-24.04
@@ -197,6 +306,35 @@ jobs:
       - run: python3 scripts/package-inspect.py licenses --strict --quiet
       - run: python3 scripts/package-inspect.py versions --strict --quiet
       - run: python3 scripts/package-inspect.py crates --strict --quiet
+      # The shared truth set's judge, its planted-defect scenarios first, then
+      # the inspected .crate files installed outside the checkout, as
+      # crates-publish.yml runs them at tag time: a library consumer on the
+      # packaged and on the latest-compatible graph plus the installed CLI,
+      # each judged on every case, compiled by RUST_TOOLCHAIN exported as
+      # RUSTUP_TOOLCHAIN (the receipt records rustc -vV and cargo -V).
+      - run: python3 scripts/consumer_truth.py --self-test
+      # The native platform-floor judge npm-publish runs on every release
+      # addon: synthesized ELF, Mach-O and PE files, clean and planted, then
+      # the command line on npm tarballs of them (a full release set, the same
+      # set with a win32 addon importing the Visual C++ runtime, five of six,
+      # a target twice, no addon at all).
+      - run: python3 scripts/native-floor.py --self-test
+      # The tooling cli-archives.yml runs: the release commands on stub tools,
+      # clean and planted, with that workflow's matrices held to the release
+      # targets; then the archive consumer and its anonymous fetch, on a
+      # stand-in qrscan.
+      - run: python3 scripts/cli-release.py --self-test
+      - run: python3 scripts/packed-cli-consumer.py --self-test
+      # The WASM build record build-wasm.sh writes and package-inspect checks
+      # (scripts/wasm_provenance.py): its feature-envelope decoder on planted
+      # modules (an immediate is not an opcode; unknown or truncated code is
+      # incomplete), the loader's two probes against the floor, and modified
+      # bytes, stale inputs or another version refused.
+      - run: python3 scripts/wasm_provenance.py --self-test
+      - name: install the inspected .crate files outside the checkout and run consumers
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          python3 scripts/packed-rust-consumer.py target/package fixtures/clean/gen_v5_q.png "$version"
 
   corpus:
     runs-on: ubuntu-24.04

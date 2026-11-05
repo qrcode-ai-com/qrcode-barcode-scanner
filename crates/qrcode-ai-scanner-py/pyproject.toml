@@ -6,7 +6,7 @@ requires = ["maturin>=1.9.3,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "qrcode-ai-scanner"
+name = "qrcode-barcode-scanner"
 description = "QR decoding + scannability scoring for artistic, AI-generated, and photo-captured QR codes — Rust core via PyO3."
 requires-python = ">=3.8"
 readme = "README.md"
@@ -28,16 +28,17 @@ dynamic = ["version"]
 test = ["pytest", "jsonschema", "pillow"]
 
 [project.urls]
-Repository = "https://github.com/supernovae-st/qrcode-barcode-scanner"
-Documentation = "https://github.com/supernovae-st/qrcode-barcode-scanner/tree/main/docs"
+Homepage = "https://qrcode-ai.com/"
+Repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+Documentation = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/docs"
 
 [tool.maturin]
-module-name = "qrcode_ai_scanner"
+module-name = "qrcode_barcode_scanner"
 # The sdist relocates pyproject.toml above the vendored crates. Pure-Rust
 # wheel builds look for the module stub beside that file, not beside the
 # relocated Cargo.toml; carry these exact files at the sdist root too.
 include = [
-  { path = "qrcode_ai_scanner.pyi", format = "sdist" },
+  { path = "qrcode_barcode_scanner.pyi", format = "sdist" },
   { path = "py.typed", format = "sdist" },
 ]
 

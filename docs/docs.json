@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "QR Code AI Scanner",
+  "name": "QR Code & Barcode Scanner",
   "description": "QR decoding + scannability scoring for artistic, AI-generated, and photo-captured QR codes. Deterministic, sovereign, pure Rust.",
   "colors": {
     "primary": "#005EFF",
@@ -42,6 +42,7 @@
             "group": "Guides",
             "pages": [
               "guides/choosing-a-surface",
+              "guides/migrate-to-qrcode-barcode-scanner",
               "guides/nuxt-verify",
               "guides/agents"
             ]
@@ -77,12 +78,12 @@
       "anchors": [
         {
           "anchor": "Normative spec",
-          "href": "https://github.com/supernovae-st/qrcode-barcode-scanner/tree/main/spec",
+          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec",
           "icon": "scale-balanced"
         },
         {
           "anchor": "GitHub",
-          "href": "https://github.com/supernovae-st/qrcode-barcode-scanner",
+          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
           "icon": "github"
         },
         {
@@ -95,7 +96,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/supernovae-st/qrcode-barcode-scanner",
+      "github": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
       "website": "https://qrcode-ai.com"
     }
   }

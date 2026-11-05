@@ -7,7 +7,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
 
 fuzz_target!(|data: &[u8]| {
     // Start from Full's config (deep + rescue on, full scoring) and only

@@ -4,17 +4,20 @@
 // (budgetMs 0) — under a profile budget, machine load alone would turn the
 // score null and this smoke red. The contract markers come from the JSON
 // Schema, which every contract change updates (the AGENTS.md cascade).
-import { scan, scanSync, version } from "./index.js";
+import { capabilities, scan, scanSync, version } from "./index.js";
 import { execFileSync } from "node:child_process";
+import { getEventListeners } from "node:events";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { assertOptionDomains, pngSize } from "../../scripts/option-domains.mjs";
 
 const here = (rel) => new URL(rel, import.meta.url);
 const pkg = JSON.parse(readFileSync(here("./package.json"), "utf8"));
-const markers = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs.Versions.properties;
+const schemaDefs = JSON.parse(readFileSync(here("../../spec/scan-report.schema.json"), "utf8")).$defs;
+const markers = schemaDefs.Versions.properties;
 const fixture = (rel) => readFileSync(here(`../../fixtures/${rel}`));
 const attempts = (report) => report.trace.stages.reduce((n, stage) => n + stage.transforms_tried, 0);
 const untimed = ({ trace, ...rest }) => ({
@@ -26,6 +29,18 @@ const AXES = ["resolution", "blur", "contrast", "perspective", "rotation", "ligh
 
 // one version end to end: the manifest, the binary, the report
 assert.equal(version(), pkg.version);
+
+// the published addon is the default build: both engines, every symbology
+// in schema order, and the same markers its reports carry
+assert.deepEqual(capabilities(), {
+  versions: {
+    scanner: pkg.version,
+    pipeline: markers.pipeline.const,
+    score_contract: markers.score_contract.const,
+  },
+  engines: schemaDefs.EngineKind.enum,
+  symbologies: schemaDefs.Symbology.enum,
+});
 
 const clean = fixture("clean/gen_v5_q.png");
 const report = await scan(clean, { profile: "full", budgetMs: 0 });
@@ -66,10 +81,74 @@ assert.deepEqual(frame.detections.map((d) => d.content.text), [V5Q]);
 // invalid input rejects with the QRS tag
 await assert.rejects(() => scan(Buffer.from("garbage")), /QRS-001/);
 
-// abort BEFORE start rejects
+// abort BEFORE start rejects with an AbortError DOMException
 const controller = new AbortController();
 controller.abort();
-await assert.rejects(() => scan(clean, { signal: controller.signal }), /Abort/i);
+await assert.rejects(() => scan(clean, { signal: controller.signal }),
+  (error) => error instanceof DOMException && error.name === "AbortError");
+// a signal that is not an AbortSignal rejects rather than being ignored;
+// null leaves the scan without one
+for (const signal of [{}, { aborted: false }, "abort", 1]) {
+  await assert.rejects(() => scan(clean, { signal }),
+    (error) => error instanceof TypeError && error.message === "options.signal must be an AbortSignal",
+    JSON.stringify(signal));
+}
+assert.deepEqual((await scan(clean, { profile: "fast", budgetMs: 0, signal: null }))
+  .detections.map((d) => d.content.text), [V5Q]);
+// a scan leaves the caller's own onabort handler in place (napi replaced it)
+{
+  const own = new AbortController();
+  let called = 0;
+  own.signal.onabort = () => { called++; };
+  await scan(clean, { profile: "fast", budgetMs: 0, signal: own.signal });
+  own.abort();
+  assert.equal(called, 1, "the caller's onabort still runs after a scan");
+}
+
+// abort while QUEUED, on one pool thread (UV_THREADPOOL_SIZE is read once, at
+// the pool's first use, so a child process): aborted right after the call, a
+// scan waiting behind a blocker rejects with the same DOMException. One signal
+// may serve several scans: reused after a completed scan, it still cancels the
+// scans queued later (napi alone stops at the completed task).
+const queuedAbort = `
+  const { scan } = require(${JSON.stringify(fileURLToPath(here("./index.js")))});
+  const [held, queued, clean] = process.argv.slice(1).map((file) => require("node:fs").readFileSync(file));
+  const options = { profile: "full", budgetMs: 0 };
+  const settle = (promise) => promise.then(
+    (report) => ({ resolved: true, texts: report.detections.map((d) => d.content.text).sort() }),
+    (error) => ({ resolved: false, domException: error instanceof DOMException, name: error.name }));
+  (async () => {
+    const controller = new AbortController();
+    const blocker = settle(scan(held, options));
+    const aborted = settle(scan(queued, { ...options, signal: controller.signal }));
+    controller.abort();
+    const single = { blocker: await blocker, aborted: await aborted };
+    const shared = new AbortController();
+    const first = await settle(scan(clean, { profile: "fast", budgetMs: 0, signal: shared.signal }));
+    const holder = settle(scan(held, options));
+    const later = [queued, queued].map((image) => settle(scan(image, { ...options, signal: shared.signal })));
+    shared.abort();
+    const reused = { first, blocker: await holder, later: await Promise.all(later) };
+    console.log(JSON.stringify({ pool: process.env.UV_THREADPOOL_SIZE, single, reused }));
+  })();`;
+const cancelled = JSON.parse(execFileSync(process.execPath, ["-e", queuedAbort,
+  ...["symbology/mixed-code128-qr.png", "artistic/blob-style-monkey-logo.webp", "clean/gen_v5_q.png"]
+    .map((rel) => fileURLToPath(here(`../../fixtures/${rel}`)))],
+{ env: { ...process.env, UV_THREADPOOL_SIZE: "1" }, encoding: "utf8" }));
+const abortError = { resolved: false, domException: true, name: "AbortError" };
+const heldScan = { resolved: true, texts: ["STOCK-4827", "https://qrc-ai.com/76xMa"] };
+assert.deepEqual(cancelled, {
+  pool: "1",
+  single: { blocker: heldScan, aborted: abortError },
+  reused: { first: { resolved: true, texts: [V5Q] }, blocker: heldScan, later: [abortError, abortError] },
+}, "a queued abort rejects like a pre-aborted signal, through a reused signal too");
+// one listener per shared signal, however many scans it serves (one per scan
+// trips Node's 10-listener warning), and none once they settle
+const batchSignal = new AbortController().signal;
+const batch = Array.from({ length: 12 }, () => scan(clean, { profile: "fast", budgetMs: 0, signal: batchSignal }));
+assert.equal(getEventListeners(batchSignal, "abort").length, 1, "one listener for twelve pending scans");
+for (const done of await Promise.all(batch)) assert.deepEqual(done.detections.map((d) => d.content.text), [V5Q]);
+assert.equal(getEventListeners(batchSignal, "abort").length, 0, "no listener left once the scans settle");
 
 // budgetMs rides its wire position: a 1 ms budget stops the Full ladder after
 // fewer attempts than the unbounded run of the same never-decoding image. The
@@ -86,6 +165,14 @@ assert.equal(cut.trace.budget_exhausted, true, "the empty 1 ms report is not a f
 assert.equal(whole.trace.budget_exhausted, false);
 // 0 = UNBOUNDED, not a 0 ms budget (that would return empty before any attempt)
 assert.deepEqual(scanSync(clean, { profile: "fast", budgetMs: 0 }).detections.map((d) => d.content.text), [V5Q]);
+
+// Option domains (spec/02-profiles.md § Option domains): the numbers reach
+// the core as doubles, never through Node-API's integer conversions. The one
+// table the wasm smoke and the packed consumers run, on both Node paths.
+for (const [name, call] of [["scanSync", scanSync], ["scan", scan]]) {
+  await assertOptionDomains({ name, call: (options, image) => call(image, { profile: "fast", ...options }),
+    input: clean, texts: [V5Q], size: pngSize(clean), unreadable: Buffer.from("garbage"), unreadableCode: "QRS-001" });
+}
 
 // scoreSkipAxes: skipped axes absent from the wire, weights declare the
 // partial contract; typos reject loudly
@@ -153,18 +240,60 @@ assert.throws(() => scanSync(clean, { alphaPalette: ["auto"] }), /unknown palett
 assert.throws(() => scanSync(clean, { alphaPalette: Array.from({ length: 33 }, () => "#ffffff") }),
   /alpha palette too large/, "the anti-DoS cap rejects loudly, never truncates silently");
 
+// The loader's names. It looks up this package's own addon files and platform
+// packages, nothing else: no former package name, no WebAssembly fallback. A
+// smoke run loads one branch only, so the branch of every committed target is
+// read from the text: its addon file, its platform package and that package's
+// manifest, each looked up exactly once.
+const loader = readFileSync(here("./native.js"), "utf8");
+assert.doesNotMatch(loader, /@supernovae-st\/|qrcode[-_]ai[-_]scanner/, "the loader names no former package");
+assert.doesNotMatch(loader, /wasi|wasm/i, "the loader has no WebAssembly fallback");
+// napi's platform suffix of each target in napi.targets: it names the addon
+// file and the platform package of that target.
+const NAPI_SUFFIX = {
+  "x86_64-apple-darwin": "darwin-x64",
+  "aarch64-apple-darwin": "darwin-arm64",
+  "x86_64-unknown-linux-gnu": "linux-x64-gnu",
+  "aarch64-unknown-linux-gnu": "linux-arm64-gnu",
+  "x86_64-unknown-linux-musl": "linux-x64-musl",
+  "x86_64-pc-windows-msvc": "win32-x64-msvc",
+};
+// What the loader requires besides a binding: fs, its own manifest, ldd.
+const helpers = ["node:fs", "./package.json", "child_process"];
+const lookups = [...loader.matchAll(/require\('([^']+)'\)/g)].map(([, specifier]) => specifier)
+  .filter((specifier) => !helpers.includes(specifier));
+const foreign = lookups.filter((specifier) =>
+  !specifier.startsWith(`./${pkg.napi.binaryName}.`) && !specifier.startsWith(`${pkg.name}-`));
+assert.deepEqual(foreign, [],
+  "every lookup is an addon file named after napi.binaryName or a platform package of this one");
+for (const target of pkg.napi.targets) {
+  const suffix = NAPI_SUFFIX[target];
+  assert.ok(suffix, `the napi suffix of the committed target ${target}`);
+  for (const specifier of [`./${pkg.napi.binaryName}.${suffix}.node`, `${pkg.name}-${suffix}`,
+    `${pkg.name}-${suffix}/package.json`]) {
+    assert.equal(lookups.filter((found) => found === specifier).length, 1,
+      `the loader looks up ${specifier} exactly once`);
+  }
+}
+
 // The loader's version check. NAPI_RS_ENFORCE_VERSION_CHECK only guards an
 // INSTALLED platform package, never the local .node the scans above loaded,
 // so rebuild the layout npm creates in a scratch node_modules (this package's
 // `files` + package.json, and a platform package around the built binary)
 // and load it in a child process. 0.9.0 shipped comparing against '0.8.1'
 // and refused its own binaries with the check on.
-assert.doesNotMatch(readFileSync(here("./native.js"), "utf8"), /!== '\d+\.\d+\.\d+'|expected \d+\.\d+\.\d+ but got/,
+assert.doesNotMatch(loader, /!== '\d+\.\d+\.\d+'|expected \d+\.\d+\.\d+ but got/,
   "the loader compares against package.json, never a literal version");
-const binaries = readdirSync(here(".")).filter((f) => /^qrcode-ai-scanner\.[\w-]+\.node$/.test(f));
+// Every addon next to native.js counts, whatever its name: one left by an
+// earlier build under another name would sit unnoticed beside the one the
+// scans above loaded.
+const binaries = readdirSync(here(".")).filter((f) => f.endsWith(".node"));
 assert.equal(binaries.length, 1, `exactly one built binary next to native.js: ${binaries}`);
 const [binary] = binaries;
-const platform = `${pkg.name}-${binary.slice("qrcode-ai-scanner.".length, -".node".length)}`;
+const stem = `${pkg.napi.binaryName}.`;
+assert.ok(binary.startsWith(stem) && /^[\w-]+\.node$/.test(binary.slice(stem.length)),
+  `the built binary is named ${stem}<suffix>.node: ${binary}`);
+const platform = `${pkg.name}-${binary.slice(stem.length, -".node".length)}`;
 const scratch = mkdtempSync(join(tmpdir(), "qrscan-loader-"));
 try {
   const mainDir = join(scratch, "node_modules", ...pkg.name.split("/"));
@@ -221,4 +350,5 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
-console.log(`node binding OK — native ${version()} · loader version check exercised via ${platform}`);
+console.log(`node binding OK — native ${version()} · loader branches named for ${pkg.napi.targets.length} targets` +
+  ` · loader version check exercised via ${platform}`);

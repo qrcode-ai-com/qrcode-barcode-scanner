@@ -1,9 +1,9 @@
-//! Node bindings — `@supernovae-st/qrcode-ai-scanner`.
+//! Node bindings — `@qrcode-ai-com/qrcode-barcode-scanner`.
 //!
 //! CPU-bound scans run as `AsyncTask` on the libuv pool: the event loop
 //! never blocks, even on a 2-4s artistic-QR Full scan. `AbortSignal`
-//! cancels queued tasks; once running, cancellation is cooperative
-//! (checked between decode attempts).
+//! rejects a queued task with an `AbortError`; a running scan is not
+//! interrupted (the budget bounds it, see `ScanTask`).
 //!
 //! Reports cross the boundary as JSON strings (the exact serde contract,
 //! snake_case, `raw` as base64) — the index.js wrapper parses them. One
@@ -11,30 +11,32 @@
 
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, ImageInput, Limits, ScanConfig, ScanProfile, Scanner, ScoreCheck, ScorePreset,
-    StressAxis,
+    StressAxis, options,
 };
 
 /// Server deployments SHOULD lower the input caps (the library default —
 /// 10000px / 64MP — is a desktop/CLI posture): pass `maxDimension` /
-/// `maxPixels` per call.
-fn limits_from(max_dimension: Option<u32>, max_pixels: Option<i64>) -> Limits {
+/// `maxPixels` per call. The numbers arrive as doubles, never through
+/// Node-API's integer conversions (which wrap modulo 2^32 and turn `NaN`
+/// into 0): a whole number from 1 (`maxDimension` to `u32::MAX`,
+/// `maxPixels` to `Number.MAX_SAFE_INTEGER`), anything else QRS-006.
+fn limits_from(max_dimension: Option<f64>, max_pixels: Option<f64>) -> Result<Limits> {
     let mut limits = Limits::default();
     if let Some(dim) = max_dimension {
-        limits.max_dimension = dim;
+        limits.max_dimension =
+            options::max_dimension_from_number(dim).map_err(|e| scan_error(&e))?;
     }
-    if let Some(px) = max_pixels
-        && let Ok(px) = u64::try_from(px)
-    {
-        limits.max_pixels = px;
+    if let Some(px) = max_pixels {
+        limits.max_pixels = options::max_pixels_from_number(px).map_err(|e| scan_error(&e))?;
     }
-    limits
+    Ok(limits)
 }
 
 fn profile_from(
     name: Option<&str>,
-    budget_ms: Option<u32>,
+    budget_ms: Option<f64>,
     score_skip_axes: Option<Vec<String>>,
     score_skip_checks: Option<Vec<String>>,
     alpha_background: Option<String>,
@@ -137,10 +139,15 @@ fn profile_from(
         Some(preset) => preset.skips(),
         None => skip,
     };
-    // budgetMs overrides the preset's wall-clock budget (0 = unbounded, the
-    // reproducible mode; unset keeps the profile default) — server embedders
-    // bound tail latency without giving up the deep ladder, and a cut report
-    // says so (`trace.budget_exhausted`).
+    // budgetMs overrides the preset's wall-clock budget (0, a negative, NaN
+    // or Infinity = unbounded, the reproducible mode; a fraction floors to
+    // whole ms; above 4294967295 is QRS-006; unset keeps the profile
+    // default) — server embedders bound tail latency without giving up the
+    // deep ladder, and a cut report says so (`trace.budget_exhausted`).
+    let budget_ms = budget_ms
+        .map(options::budget_ms_from_number)
+        .transpose()
+        .map_err(|e| scan_error(&e))?;
     if budget_ms.is_none()
         && skip.is_empty()
         && checks.is_empty()
@@ -151,7 +158,7 @@ fn profile_from(
     }
     let mut config = profile.config();
     if let Some(ms) = budget_ms {
-        config.budget_ms = (ms > 0).then_some(u64::from(ms));
+        config.budget_ms = ms;
     }
     config.score_skip_axes = skip;
     config.score_skip_checks = checks;
@@ -162,11 +169,11 @@ fn profile_from(
     Ok(ScanProfile::Custom(config))
 }
 
-fn to_json(report: &qrcode_ai_scanner::ScanReport) -> Result<String> {
+fn to_json(report: &qrcode_barcode_scanner::ScanReport) -> Result<String> {
     serde_json::to_string(report).map_err(|e| Error::from_reason(format!("serialize: {e}")))
 }
 
-fn scan_error(e: &qrcode_ai_scanner::ScanError) -> Error {
+fn scan_error(e: &qrcode_barcode_scanner::ScanError) -> Error {
     // QRS-xxx lands in the message — consumers match `[QRS-...]`
     Error::new(Status::GenericFailure, format!("{} [{}]", e, e.code()))
 }
@@ -217,9 +224,9 @@ pub fn scan(
     image: Buffer,
     profile: Option<String>,
     signal: Option<AbortSignal>,
-    max_dimension: Option<u32>,
-    max_pixels: Option<i64>,
-    budget_ms: Option<u32>,
+    max_dimension: Option<f64>,
+    max_pixels: Option<f64>,
+    budget_ms: Option<f64>,
     score_skip_axes: Option<Vec<String>>,
     score_skip_checks: Option<Vec<String>>,
     alpha_background: Option<String>,
@@ -237,7 +244,7 @@ pub fn scan(
             alpha_palette,
             score_preset,
         )?,
-        limits: limits_from(max_dimension, max_pixels),
+        limits: limits_from(max_dimension, max_pixels)?,
     };
     Ok(AsyncTask::with_optional_signal(task, signal))
 }
@@ -253,9 +260,9 @@ pub fn scan(
 pub fn scan_sync(
     image: Buffer,
     profile: Option<String>,
-    max_dimension: Option<u32>,
-    max_pixels: Option<i64>,
-    budget_ms: Option<u32>,
+    max_dimension: Option<f64>,
+    max_pixels: Option<f64>,
+    budget_ms: Option<f64>,
     score_skip_axes: Option<Vec<String>>,
     score_skip_checks: Option<Vec<String>>,
     alpha_background: Option<String>,
@@ -272,7 +279,7 @@ pub fn scan_sync(
             alpha_palette,
             score_preset,
         )?)
-        .limits(limits_from(max_dimension, max_pixels))
+        .limits(limits_from(max_dimension, max_pixels)?)
         .build();
     let report = scanner
         .scan(ImageInput::encoded(&image))
@@ -284,4 +291,13 @@ pub fn scan_sync(
 #[napi]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_owned()
+}
+
+/// The readers compiled into this addon as JSON (index.js parses): its
+/// report `versions`, decode `engines` and the `symbologies` they can
+/// return. Says which readers are included, not that an image will decode.
+#[napi]
+pub fn capabilities_json() -> Result<String> {
+    serde_json::to_string(&qrcode_barcode_scanner::Capabilities::current())
+        .map_err(|e| Error::from_reason(format!("serialize: {e}")))
 }

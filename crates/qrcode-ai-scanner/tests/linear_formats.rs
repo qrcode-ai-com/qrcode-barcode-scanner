@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, ScanProfile, Scanner, Symbology};
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner, Symbology};
 
 fn assert_read(bytes: &[u8], symbology: Symbology, text: &str) {
     let mut config = ScanProfile::Full.config();

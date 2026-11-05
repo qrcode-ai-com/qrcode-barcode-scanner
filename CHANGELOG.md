@@ -6,41 +6,498 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ## 0.11.0 — 2026-10-31
 
+### Package names
+
+- From 0.11.0 the packages carry the QR Code & Barcode Scanner family names,
+  one per registry. Each new name is versioned from its first release under
+  that name, 0.11.0:
+  - Rust library: `qrcode-ai-scanner` becomes `qrcode-barcode-scanner` on
+    crates.io, imported as `qrcode_barcode_scanner`.
+  - Command line: `qrcode-ai-scanner-cli` becomes `qrcode-barcode-scanner-cli`
+    on crates.io. Both crates install the `qrscan` command, so uninstall the
+    former one first.
+  - Node: `@supernovae-st/qrcode-ai-scanner` and its six platform packages
+    become `@qrcode-ai-com/qrcode-barcode-scanner` and
+    `@qrcode-ai-com/qrcode-barcode-scanner-<suffix>` on npm, with the same six
+    suffixes. The addon file is `qrcode-barcode-scanner.<suffix>.node`.
+  - Browser: `@supernovae-st/qrcode-ai-scanner-wasm` becomes
+    `@qrcode-ai-com/qrcode-barcode-scanner-wasm` on npm. Its module files are
+    `qrcode-barcode-scanner.js`, `qrcode-barcode-scanner.d.ts` and
+    `qrcode-barcode-scanner_bg.wasm`, and the `compatible/` paths are gone
+    (browser upgrade note, under Changed).
+  - Python: `qrcode-ai-scanner`, last released as 0.9.0, becomes
+    `qrcode-barcode-scanner` on PyPI, imported as `qrcode_barcode_scanner`.
+  - The `qrscan` archives, new on the GitHub release, are named
+    `qrcode-barcode-scanner-cli-0.11.0-*` (under Added).
+- Nothing from 0.11.0 on is published under a former name, and there are no
+  alias or wrapper packages. Releases up to 0.10.x stay installable under
+  their former names and are not modified.
+- The rename itself changes no wire value: the JSON report and its
+  `versions`, the schema `$id`, the `[QRS-xxx]` codes, the exit codes, the
+  `qrscan` flags, the option names and values and the binding function names
+  stay as they were.
+- The Kotlin binding's Maven coordinate follows the repository: group
+  `com.github.qrcode-ai-com`, artifact `qrcode-barcode-scanner`. The UniFFI,
+  Kotlin, Swift and Android module names, the repository directories and the
+  never-published Cargo packages `qrcode-ai-scanner-node`,
+  `qrcode-ai-scanner-wasm`, `qrcode-ai-scanner-uniffi` and
+  `qrcode-ai-scanner-fuzz` keep their earlier spelling. The Python binding's
+  Cargo package becomes `qrcode-barcode-scanner-py`; it names the CycloneDX
+  SBOM file and its root component in each wheel. The Flutter package's
+  pub.dev name and first release are recorded in
+  `bindings/flutter/CHANGELOG.md` when it is published there.
+- The MCP adapter, the agent skill and the container images keep their
+  published names and versions; their next releases take names from the new
+  family. No 0.11 image goes to Docker Hub.
+- The first version under each new npm name is uploaded by the repository
+  owner from the tag run's inspected tarballs, as RELEASING.md describes, so
+  npm 0.11.0 carries no npm provenance; later versions are published by CI
+  with provenance.
+- The migration guide maps each former name to its new one and gives the steps
+  for each runtime:
+  <https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx>
+
 ### Fixed
 
+- The perspective warp's sine and cosine, the glare model's exponential and
+  one distance in the ISO 15415 grading are computed in f64 and rounded once
+  to f32. Computed in f32, they could differ between platform math libraries
+  and move a stress axis or a score.
+- The native Node addon for Windows (`win32-x64-msvc`) links the C runtime
+  statically, as `node.exe` does, so it imports no Visual C++ runtime DLL.
+  0.10.0's addon imported `VCRUNTIME140.dll`, which a Windows install without
+  the Visual C++ Redistributable lacks; GitHub's Windows runners carry it, so
+  the consumer jobs could not see the difference.
+  `scripts/native-floor.py` reads each release addon's bytes (ELF needed
+  libraries and symbol versions, Mach-O load commands and minimum OS, PE
+  imports and delay imports). It refuses an addon that needs more than Node
+  18 needs on its platform: glibc 2.28, macOS 10.15 on x64 and 11 on arm64,
+  no Visual C++ runtime DLL, and no library outside the operating system,
+  including one a Mach-O addon loads lazily, weakly, upward or as a
+  re-export. `npm-publish` runs it on the packed release set and again on
+  the tarballs about to be uploaded. On every pull request CI runs its
+  self-test: planted binaries, then the command line on npm tarballs (a
+  release set, the same set with a win32 addon importing `VCRUNTIME140.dll`,
+  five of six targets, a target twice, no addon).
 - A QR code found in the downscaled pyramid no longer suppresses a readable
-  neighboring linear barcode. A budgeted linear-only read at input resolution
+  neighboring barcode or small matrix code. One budgeted non-QR read at input resolution
   completes QR pyramid results before the early return.
   Regression coverage retains `STOCK-4827` beside a QR in fast, frame and full
-  profiles, including both browser WASM variants. Detection identity, QR quality
-  scoring and wire fields remain unchanged; `versions.pipeline` advances to 4.
+  profiles, including the existing browser WASM checks, and adds native exact
+  QR/Data Matrix coverage in both placements. Detection identity and QR quality
+  scoring remain unchanged. This completion is pipeline 4's change; the release
+  publishes pipeline 5 with occurrences (below).
+- Equal printed copies of one linear content are no longer collapsed into one
+  read. The scanner's copy of rxing 0.9.3's multiple-barcode reader
+  (`src/engine/multi_reader.rs`, Apache-2.0 notices kept, `THIRD-PARTY.md`)
+  decides duplicates by kind of symbol and by the image's pixels instead of
+  point count, normalizes every read's points into the image's frame, reads a
+  node again past a read without points, uses one fixed reader order and a
+  fresh reader state for each read. All three rxing entry points use it: the
+  unrestricted, family and single-format passes; the local DataBar Expanded
+  reader; and the rMQR-only pass of score cells and envelope probes.
+- The S5 rescue keeps identically damaged twins at different places as
+  separate candidates and rescues each place, instead of stopping at the
+  first recovered stream.
+- An unparsed QR Code read that stands, by its other places or on a parse
+  made elsewhere, publishes no copy where a refusal of its content was
+  placed: a copy proved malformed is never an occurrence.
+- The DataBar Expanded reader clears the rows of its upright pass before the
+  rotated pass, so it never assembles a symbol from rows of two frames.
 - Preserved the console candidate's Code 93 checksum rejection, small DataBar
   decoding and guarded DataBar Expanded recovery. The consolidated rxing 0.9.3
   adapter retains the local Expanded reader with its Apache-2.0 notices, valid
   positive fixtures and illegal finder-sequence negative vector.
-- The complementary linear pass masks only measured regions of already admitted
+- The complementary non-QR pass masks only measured regions of already admitted
   QR symbols on its cloned plane. This avoids the false Code 39 `J` read from an
   artistic QR's module texture while retaining genuine Code 39 symbols,
   including a one-character `J` alone and beside a QR. Ordinary Code 39 admission
   and scoring on the original image remain unchanged.
+- Node and WASM read `budget_ms`, `max_dimension` and `max_pixels` the same
+  way (`spec/02-profiles.md` § Option domains). Reproduced on the installed
+  0.10.1 packages: Node's integer conversions wrapped `budgetMs: 4294967297`
+  to a 1 ms budget, ran `budgetMs: 0.5` unbounded, turned `maxDimension: -1`
+  into no size cap and refused every image on `maxPixels: NaN` or `Infinity`;
+  WASM ran `budget_ms: 1e300` without a practical bound, also lifted the size
+  cap on `max_dimension: -1`, and replaced `max_pixels: 0` or `NaN` by the
+  default cap and `Infinity` by none. Both now take doubles through one
+  mapping. One table of cases (`scripts/option-domains.mjs`: unset, zero,
+  negative, fractional, non-finite, cap-boundary and out-of-range values,
+  every refused value also beside an unreadable input) runs on both
+  workspace builds and, in the packed Node consumers, on every scan path of
+  both installed packages; its self-test refuses those 0.10.1 conversions
+  and ten neighbouring defects.
+- Node `scan`: a signal aborted while the scan is queued rejects with an
+  `AbortError` DOMException, the class a signal already aborted at the call
+  gets; the addon's rejection was a plain `Error` named `AbortError`. One
+  `AbortSignal` may serve several scans: napi stopped an abort at the
+  signal's first task that had completed, so a signal reused after a
+  completed scan did not cancel the scans queued behind it. Each scan now
+  hands the addon a signal of its own; one listener links them to the
+  caller's signal and is removed once the last scan sharing it settles, and
+  the caller's `signal.onabort` is no longer replaced. A running scan is
+  still not interrupted and settles as if not aborted: its report, or its
+  own `[QRS-xxx]` fault. A `signal` that is not an `AbortSignal` rejects
+  with `TypeError: options.signal must be an AbortSignal` instead of being
+  ignored; `null` still means no signal.
+- The core crate's README and rustdoc, the `alpha_palette` field doc and the
+  UniFFI `ScanFailed` and `scan` docs name `QRS-006`, an option outside its
+  domain. `spec/02-profiles.md` § Option domains gives Rust
+  `ScanConfig.budget_ms` its own row: `None` is unbounded and `Some(0)` a
+  zero-millisecond budget, while the CLI and the bindings keep `0` =
+  unbounded.
+- A zero `max_dimension` or `max_pixels` is an option error (`QRS-006`) on
+  every surface, no longer a `QRS-002`/`QRS-003` that blamed every image.
+- Python `__all__` names each public name once: 0.10 listed `scan` and
+  `scan_frame` twice, since PyO3 already appends every added function.
 
 ### Added
 
-- The browser package's `/camera` entry exports a measured-geometry tracker,
-  normalized video projection and a camera capture controller. It supports
-  frame callbacks, serialized worker decoding, cancellation of late permission
-  answers and results, track revocation and cleanup on page departure. Geometry
-  stays absent when the reader only measured a scan line. Consumers own their
-  visual treatment and explicit actions on decoded content.
-- `/camera-overlay` provides framework-free corner brackets, stable keyboard
-  target selection and an explicit HTTP(S) payload action, with host theming,
-  contain/cover/fill geometry, mirroring and complete teardown.
+- `QRS-006` InvalidOption: an option outside its domain, refused before the
+  input is read, so it is reported beside unreadable bytes too.
+  `ScanConfig::MAX_BUDGET_MS`, `ScanConfig::validate`, `Limits::validate` and
+  the `options` module (the JavaScript number mapping both JS packages use)
+  are public. The scan deadline uses checked arithmetic: an unrepresentable
+  deadline would be `QRS-006`, never a panic or an unbounded scan. The
+  suspected native overflow did not reproduce: `Instant + u64::MAX ms` is
+  representable on the native clocks, and a test keeps that observation.
+- **Occurrences** (`versions.pipeline` 4 → 5). Every detection carries
+  `occurrences`: where each physical copy of its content was measured, 1 to
+  16, earliest observed first. Two printed copies of one content are one
+  detection with two occurrences, never two detections. Each geometry is what a
+  reader measured, never completed: `quad` (validated outer corners, clockwise;
+  for the QR family the first is the symbol's origin corner in every rotation,
+  mirrored or not), `segment` (a linear reader's scan-line points), `partial`
+  or `unavailable`, with the `reader` that measured it. rqrr's quads are
+  corrected for its pixel-anchor bias, exact at the quarter turns; `corners`,
+  `meta` and the score keep their meaning. Copies are grouped by geometry and,
+  for linear symbols, by the pixels between scan lines; a pair that cannot be
+  decided is never split into an invented copy and is flagged. Rules:
+  `spec/01-report.md` § Occurrences.
+- `trace.saturation` reports the capacities a scan reached, whatever the budget:
+  reads past a walk's capacity or refusal records that failed closed,
+  contents past the 16 published detections, incomplete occurrences. A set flag
+  means what was left out is unknown, not absent. Both new keys are absent from
+  older reports; the JSON Schema, TypeScript, Dart and type-parity gate cover
+  them.
+- **Camera capture and tracking** (`/camera`, browser package).
+  `createDetectionTracker()` follows each measured copy of a code from frame to
+  frame: a spatial track per occurrence, with content, occurrence and track
+  identities kept apart, and a content track for a read without a position,
+  which claims none. Association is deterministic and one-to-one, and
+  ambiguity is explicit: a contested track expires with reason `ambiguous` and
+  names its successors, and a read without a position that could belong to
+  several tracks of one content is reported as `unresolved`, naming them,
+  instead of being given to one. Geometry is withheld after `staleMs` and
+  identities expire after `reacquireMs`, by time, through one deadline timer. A
+  `ScanReport` proves a code absent only through its trace (no budget cut, no
+  read or detection saturation, and for one copy of a code still read, no
+  occurrence saturation); a bare array of detections never does unless the
+  caller passes `{ complete: true }`. Decoded results are kept apart from
+  tracks. `update()`, `snapshot()`, `advance()`, `reset()` and `clear()` each
+  return a new `TrackerSnapshot` object, whose detections are the engine's
+  objects, by reference; a successful `forget(id)` returns `true` and sends its
+  snapshot to `onChange`.
+  `projectVideoGeometry()` maps a track's geometry into a centered `contain`,
+  `cover` or `fill` view and reports `inView`. `createCameraScanner()` captures
+  through `requestVideoFrameCallback` where it exists, with its timestamps,
+  keeps one decode in flight across sessions, reports its states and a
+  `stalled` flag, fails with a `CameraScannerError` code that keeps the native
+  cause, aborts a decode after `decodeTimeoutMs` and replaces a hung decoder
+  through the optional `recover`, switches devices with `setConstraints()`,
+  and, given `tracker`, updates it before `onResult` and resets it whenever a
+  session ends. `stop()`, a hidden page and `pagehide` release the camera and
+  discard late permission answers and results; importing the module requests
+  no camera.
+  Since earlier 0.11 development builds: `holdMs` is removed (passing it throws
+  a TypeError naming `staleMs` and `reacquireMs`), a frame's `timestamp` is now
+  `observedAt`, `update()` returns a snapshot and takes `{ now, complete }`, and
+  a bare array no longer proves absence.
+- WASM `scan_frame` takes `scan_image`'s other options after `budget_ms`
+  (positional #6 to #12): `max_dimension`, `max_pixels`, `score_skip_axes`,
+  `score_skip_checks`, `alpha_background`, `alpha_palette` and `score_preset`,
+  with the same domains and errors. Calls with five arguments are unchanged;
+  a transparent frame flattens over `alpha_background` before luma.
+- **Capabilities**: the readers compiled into a build — its report
+  `versions`, the decode `engines` (`rxing`; `rqrr` and `rescue`) and the
+  `symbologies` they can return, all of them with rxing and `qr_code` alone in
+  an rqrr-only build. Rust `Capabilities::current()`, WASM, Node and Python
+  `capabilities()` (typed `Capabilities` in TypeScript and the stub), UniFFI
+  `capabilities()` as a JSON string, and `qrscan --capabilities`. It says
+  which readers are included, not that an image decodes; never part of a
+  report. Flutter does not expose it in this release. Rules:
+  `spec/01-report.md` § Capabilities. CI also builds the core with one
+  engine (rqrr only, rxing only), as a dependency without default features
+  gets it, lints each build and runs its capabilities tests.
+- **Camera overlay and readout** (`/camera-overlay`, browser package, no
+  framework). `createCameraOverlay()` draws from tracker snapshots: one rounded
+  four-corner outline per valid measured quad, a line for a scan line and
+  points for partial evidence, never an invented rectangle. Dimming and blur
+  of the rest of the view keep sharp cutouts over precise quads; they switch
+  on after `dwellMs` of steady eligibility and stay off for at least
+  `cooldownMs` after switching off, and `focus: 'off'` disables them. It
+  follows the video's `object-fit` (`contain`, `cover`, `fill`, `none`,
+  `scale-down`), `object-position` and mirroring, with explicit alignment
+  states that hide the markers rather than misplace them. It adds stable
+  per-track colors and numbers, an accessible rail (one radio group, keyboard
+  and digit shortcuts, a status announcer that leaves decoded content out by
+  default) and an exact readout: 19 symbology labels, the family, the payload
+  kind, the complete content with invisible characters shown by name, ECI,
+  FNC1 and the exact bytes, GS1 fields, and the encoded URL with an Open
+  button and a destination slot that starts unchecked and checks only through
+  a `/destination` verifier the application passes, from a user action.
+  Labels (`DEFAULT_LABELS`), colors (`--qr-scanner-*` properties) and the
+  stylesheet (`styleNonce`, or `styles: 'none'` with `CAMERA_OVERLAY_CSS`) are
+  replaceable. Optional thumbnails crop the scanned frame, and the page copies
+  a frame only when `wantsFrameImage()` asks. Pure helpers are exported:
+  `describeDetection`, `segmentText`, `symbologyFamily`, `parseObjectPosition`,
+  `overlayMediaRect`, `projectOverlayPoint`, `projectOverlayGeometry`,
+  `quadOutline` and `quadRegion`. Since earlier 0.11 development builds:
+  `update(snapshot)` takes one tracker snapshot instead of tracks and a frame,
+  ignores one older than the last applied and does nothing after `destroy()`;
+  default names are `Code N` for every symbology; the readout replaces the
+  pill, and Open is a button; `select()` returns a boolean; and
+  `--qr-scanner-highlight` colors only `colors: 'mono'`, each track otherwise
+  taking its own color.
+- **URL destination checks** (optional, JavaScript only). The browser
+  package's `/destination` entry (no imports; browsers, module workers, Node
+  and SSR) decides with `destinationCandidate()` whether the `url` of a `url`,
+  `gs1_digital_link` or `me_card` payload, or a given string, is a checkable
+  http(s) URL: `http://` or `https://` at its first character, a WHATWG URL
+  without credentials, at most 16384 UTF-16 code units, and no control,
+  separator (space included), format, default-ignorable or lone surrogate code
+  point. Nothing is trimmed or repaired; an ineligible value names its
+  `reason` and is never requested, and an eligible one keeps the exact
+  `encodedUrl` apart from its canonical `requestUrl`. Importing, scanning and
+  creating a verifier or a transport send nothing. A request leaves only from
+  `verifier.resolve()`, `resolveDestination()` or a transport's `resolve()`,
+  through a transport the application supplies: browser `fetch` in an explicit
+  `network` or `fixture` `scope` (no credentials, referrer or cache;
+  `transport_unsupported` on server runtimes), an application endpoint (same
+  origin by default), prepared `simulated` results, or a custom transport
+  whose every observation is validated. `createDestinationVerifier()` keeps
+  one frozen 18-key snapshot per encoded URL (state and reason, transport
+  label and provenance, `requestSent`, final URL, status, observed redirect
+  steps, times), joins repeated checks and bounds its attempts, queue and
+  entries; `createDestinationSelection()` never shows a late result under
+  another code. `/destination-node` (Node only, tested on Node 22 and 24; its
+  export has a `node` condition alone) adds `createNodeTransport()`, which
+  follows redirects itself and checks every hop: http(s) only, WHATWG Fetch
+  bad ports refused and only ports 80 and 443 by default, special-use names
+  refused, every DNS answer vetted through a cancelable per-attempt resolver,
+  public addresses only with configurable NAT64 prefixes and denied ranges, a
+  post-connect address check, proxy settings ignored, certificate checks
+  always on, bodies never read. Its `createDestinationEndpoint()` serves the
+  endpoint transport from the application's own origin and merges name
+  failures into `name_unusable` by default. `/camera-overlay` reads
+  eligibility through `destinationCandidate()` and checks a destination only
+  through a verifier the application passes it, from a user action. A result
+  is an observation of one request chain, never a safety verdict: it names its
+  transport and provenance and reports every URL as text. `destination.js`,
+  `destination-node.js` and their declarations ship in the package, whose npm
+  description names the optional checks. Decoding, the Rust core and the WASM
+  module make no network calls. Usage and operator duties: `docs/api/wasm.mdx`
+  and `docs/concepts/security.mdx`.
+- **Examples in the browser package** (`examples/`, with their README). They
+  run from the installed package folder, with no bundler or download: the
+  pages through a static server on localhost, `ssr.mjs` with Node.
+  `headless.html` and `headless.js` scan an image the user chooses or drops in
+  a module worker on the device, show every decoded value as text and never
+  open a link, name the package version, the WASM module's SHA-256 and the
+  loaded module's version, and tell a complete result, a list cut by a
+  capacity, a valid empty result, and input, configuration and loading errors
+  apart. `camera.html` and `camera.js` wire the camera controller, the tracker
+  and the overlay as an application would: the camera opens only when the user
+  asks, a frame is copied only when the overlay wants a thumbnail, a hung frame
+  replaces the worker, Open is off, and destination checks stay off until the
+  user turns them on. `ssr.mjs` imports the camera, overlay and destination
+  modules in Node, with each DOM, camera and network global it lists replaced
+  by a trap. `scanner.worker.js`, which each page starts as its own module
+  worker, owns one scanner and answers `load`, `scan_image` and `scan_frame`
+  requests by `id`, so one page can serve image scanning and camera frames
+  from one WASM module and one initialization. The packed browser job checks that sharing on its own test
+  page: an image scan and camera frames make one `.wasm` request and one
+  instantiation, and only a `recover` instantiates again. It also runs both
+  example pages from the installed archive in Playwright's Chromium and
+  Firefox, and in CI in a Chromium with WebAssembly SIMD disabled too; finds,
+  from a broader policy, the Content-Security-Policy that `examples/README.md`
+  documents and runs both pages under it; runs `ssr.mjs`; and builds that
+  README's bundler forms with Vite.
+- **Installed-package truth set**: `fixtures/consumer-truth.json`, 35 inputs
+  with their exact contents as a multiset, primary, occurrence geometry and
+  score/null association under the full profile with no budget: every
+  symbology, two identical QRs beside a Code 128, an ECI 4/ECI 26 equal-text
+  witness, QR with a small Data Matrix, Hanzi, GS1, EXIF orientation, a
+  partial artistic read, the rescue path, refusals, a valid empty image and a
+  malformed input. Twin Python and JavaScript judges
+  (`scripts/consumer_truth.py`, `scripts/consumer-truth.mjs`) also require a
+  final, unsaturated trace and refuse each departure in their self-tests.
+  The packed Rust (library on the packaged and the latest-compatible graph,
+  installed CLI), native Node, WASM and Python
+  consumers run every input through the installed package and record one
+  identity digest; for every pull request CI runs the Rust consumer, the
+  native Node one (linux-x64-gnu) on Node 18, 20, 22 and 24 and the WASM one
+  on Node 22 and 24.
+  New fixtures: `symbology/upce.png`, `symbology/qr-twins-code128.png`,
+  `symbology/qr-small-datamatrix.png` and `eci/eci4-eci26-equal-text.png`.
+- **Load and initialization phases** of the installed packages
+  (`scripts/loader-phases.mjs`), run by every packed Node consumer, each case
+  in a fresh process. Native: the main package installed without its
+  platform package throws `Cannot find native binding` at `require`, its
+  cause naming that package, with no WASI binding standing in; on one pool
+  thread, an aborted queued scan rejects with an `AbortError` DOMException,
+  also through a signal reused after a completed scan, while the decodable
+  fixture aborted as it runs still resolves with its report. WASM: through
+  the installed `./auto`
+  loader, each `ScannerInitError` code a Node realm can reach
+  (`invalid_options`, `asset_network_failed`, `asset_http_failed` with its
+  status, `asset_read_failed`, `binary_invalid`, `wasm_validation_failed`,
+  `wasm_instantiate_failed`, `wasm_unavailable`, `wasm_features_unsupported`)
+  in one attempt whose promise a second call shares, beside one load of the
+  installed bytes that scans. `loader_import_failed` and `wasm_compile_failed`
+  need a browser and are not claimed there. The Node API page states the
+  package's scope: encoded images through `scan`/`scanSync`, no raw-frame or
+  camera interface, a load failure distinct from `[QRS-xxx]` rejections.
+- **Prebuilt `qrscan` archives** on the GitHub release:
+  `qrcode-barcode-scanner-cli-0.11.0-<target>.tar.gz` for
+  `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu` (glibc 2.28 or
+  later), `x86_64-apple-darwin` (macOS 10.15 or later) and
+  `aarch64-apple-darwin` (macOS 11.0 or later), and
+  `qrcode-barcode-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip` (C runtime
+  linked statically), beside `qrcode-barcode-scanner-cli-0.11.0-source.tar.gz`,
+  their corresponding source as a `git archive` of the tagged commit, and
+  `qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS`. Each archive holds `qrscan`,
+  `LICENSE`, `LICENSING.md`, the third-party notices and license texts,
+  `SOURCE.md`, `build-info.json` and a README (`distribution/cli/README.md`).
+  The binaries are not code-signed or notarized: there is no Apple Developer
+  ID signature, no notarization and no Authenticode signature, so macOS
+  refuses a copy a browser downloaded until its quarantine attribute is
+  removed, and Windows can warn of an unknown publisher; the README gives the
+  steps. SHA256SUMS is an asset of the same release: it detects a damaged
+  download, not a substituted release, and no GPG or minisign signature or
+  build provenance attestation covers the archives. No musl, Windows on Arm
+  or universal macOS archive is built.
+- `.github/workflows/cli-archives.yml` builds the five archives on every pull
+  request that touches their inputs and on every push to main, inspects them
+  (`scripts/package-inspect.py archive`, `scripts/cli-release.py licenses`,
+  `scripts/native-floor.py --policy cli`) and runs each one from its archive
+  as a user would (`scripts/packed-cli-consumer.py`): on its own platform,
+  and the Linux archives also in AlmaLinux 8.10 (glibc 2.28) and Debian 12
+  containers, with the installed-package truth set and no engine panic
+  allowed. On a `v*` tag it uploads the qualified set into the draft release
+  the owner created before the tag; after publication, a `public-download`
+  dispatch downloads every asset anonymously and runs the same checks.
+  `scripts/check-publish-guards.py` refuses, in every publishing job, a
+  release created, edited, published or deleted and an asset replaced
+  (RELEASING.md § 5 to § 7, § CLI archives).
 
 ### Changed
 
-- Consolidated the compatible WASM/automatic loader and exact historical registry
+- Pin rqrr 0.11.0 for corrected mixed-size Reed-Solomon block deinterleaving
+  and truncated character-count rejection. Independently encoded regressions
+  preserve exact scanner content and verify restored rqrr consensus; the
+  scanner's existing strict parser continues to reject malformed prefixes.
+- Build and CI compiler pins use Rust 1.99.1. The minimum supported Rust
+  version remains 1.88; typed slice chunks and C buffer declarations match
+  the compiler checks without suppressing warnings.
+- The temporary Rust consumer names its compiler: the caller's
+  `RUSTUP_TOOLCHAIN`, else `RUST_TOOLCHAIN`, else the one CI pin, exported to
+  every Cargo call and checked against `rustc -vV`. Its receipt records
+  `rustc -vV` and `cargo -V`, so a local rustup default no longer selects it.
+- The packed Rust and Python consumers read every process output and file as
+  UTF-8, not in the locale's encoding: on Windows (cp1252) the Rust consumer
+  turned `中文`, `Ą` and `日本` into mojibake before judging them.
+- Package metadata names the transferred source repository,
+  `qrcode-ai-com/qrcode-barcode-scanner` (the `supernovae-st` addresses
+  redirect): Cargo `repository`, npm `repository.url` (npm provenance requires
+  it to match the building repository), Python project URLs, the pubspec,
+  podspec and POM. The crates.io, npm and PyPI packages take new names and the
+  JitPack coordinate follows the repository (Package names, above); the
+  Flutter package is not yet published. RELEASING.md records that each new
+  name gets a trusted publisher of its own (on crates.io and npm once its
+  first version exists, on PyPI as a pending publisher before the first
+  upload), and that the publishers of the former names are never re-bound to
+  this repository.
+- The native Node package's advertised floor (`engines.node >= 18`) is
+  executed: its packed consumers run on Node 18, 20, 22 and 24 for every
+  release target, musl included, and for linux-x64-gnu on every pull request.
+  The floor itself is unchanged.
+- The packed Python consumer can run on interpreters back to the advertised
+  floor (`requires-python >= 3.8`, abi3-py38): its probe no longer needs
+  3.9's `Path.is_relative_to`, and its venv links the interpreter like
+  `python -m venv`, since a copied standalone 3.8–3.10 interpreter cannot
+  find its `libpython`. CPython 3.8, 3.9 and 3.10 were run locally; the
+  Python workflow's consumer rows remain 3.11 and 3.14. Its pytest suite
+  keeps its 3.11 floor.
+- Consolidated the automatic loader (`/auto`) and exact historical registry
   probes from the 0.10.1 branch. The historical probes remain separately named;
   they do not qualify 0.11.0 registry publication.
+- The browser package ships one portable WASM module, compiled without SIMD
+  for every supported engine, instead of a SIMD and a compatible module. Its
+  `build-info.json` records the module's SHA-256, the features its code uses
+  (bulk memory, sign extension and nontrapping float-to-int), a digest of the
+  compiled sources and locks, the recipe and the tool versions. The release
+  inspection refuses a second module, and bytes, inputs or features that
+  disagree with that record. Measured locally on twelve 1280×720 frames
+  (Node 22, V8, darwin-arm64), the portable build took 1.09× the SIMD build's
+  time in `frame` and 1.03× in `fast`, with identical reports, and is about
+  2 % smaller. CI runs the record's own self-test
+  (`scripts/wasm_provenance.py --self-test`) on every pull request.
+- Cleared open dependency advisories outside the scanner's own graph: the
+  Flutter Rust lock moves tokio 1.34.0 to 1.38.2 (GHSA-rr8g-9fpq-6wmg), the
+  packed Python consumer suite pins Pillow 13.0.0 with every wheel hashed
+  (it needs Python 3.11, the consumer matrix's floor), and the browser test
+  host and playground resolve vite 6.4.5 (GHSA-8g5g-mxqh-grgj), postcss 8.5.31
+  and source-map-js 1.2.2.
+  The MCP adapter's test graph moves fast-uri to 3.1.9, qs to 6.16.1 and
+  body-parser to 2.4.0 (GHSA-27r3-jxmh-p828); its production tree is unchanged.
+- The MCP adapter's packed gate compares the schema it ships with the schema
+  of the engine release it pins (still 0.10), recorded by hash, instead of
+  this checkout's specification, which now describes 0.11 reports.
+- The weekly mutation suite runs in 128 shards instead of 85: on the 0.11
+  candidate (4421 mutants) two shards reached the 85-minute limit. The
+  measured per-mutant costs, replayed over 128 shards, put the slowest at
+  58 minutes; the limit itself is unchanged.
+- **Upgrade note.** A `budget_ms` above 4 294 967 295 ms (about 49.7 days) is
+  refused with `QRS-006` in Rust, Python and Kotlin/Swift, which accepted any
+  `u64` before: this is the range the CLI and Node already carried. Unbounded
+  stays `0` in the bindings and `None` in Rust. In Node and WASM a fractional
+  `max_dimension`/`max_pixels` is refused instead of truncated, and a
+  negative one instead of becoming no cap or the default.
+- **Upgrade note (Rust).** `Scanner::scan` runs `ScanConfig::validate` and
+  `Limits::validate` before it reads the input, so a `ScanConfig` that 0.10
+  scanned can now return `QRS-006`: more than 32 `alpha_palette` colors
+  (`ScanConfig::MAX_ALPHA_PALETTE`; 0.10 applied no cap in the core) or a
+  `pyramid_side` or `max_engine_side` of 0 (0.10 downscaled to 1 px: the S1
+  pyramid image, or every engine input).
+  Only direct Rust embedders are affected: the bindings and the CLI already
+  refused a longer palette with their own argument error, and none of them
+  exposes the two sides.
+- **Upgrade note (browser).** `scanner.variant` is `"portable"`.
+  `{variant: "compatible"}` loads that same module; `{variant: "simd"}` rejects
+  with `invalid_options`, and `simd_unavailable` is no longer a code. The
+  `compatible/*` export paths of 0.10.x (`compatible/qrcode-ai-scanner.js` and
+  `compatible/qrcode-ai-scanner_bg.wasm`) were removed, together with the
+  `compatible/` directory: import the package root, which loads the portable
+  module, and `{variant: "compatible"}` still selects it.
+- `mobile › ios-release` no longer creates the GitHub release: it uploads the
+  xcframework zip and `checksum.txt` only into the owner's draft, the one
+  release that carries the tag and targets the tagged commit, and
+  `bindings/swift/release.sh` prints the draft-first steps instead of
+  `gh release create`. The owner creates that draft before pushing the tag
+  and publishes it once (RELEASING.md § 5 to § 7).
+
+### Known limitations
+
+- An Aztec code is read only when it lies over the center of the image the
+  engine scans. Drawn alone on a white 1280×720 frame, the 138 px symbol of
+  `fixtures/symbology/aztec.png` is read centered, or with the frame's center
+  8 px inside one of its edges, and missed, in every profile and with no
+  budget cut, with that center 16 px beyond one of its corners along each axis
+  or 32 px past one of its edges, or with the code in a corner of the frame;
+  `scan_image` and `scan_frame` agree. The published 0.9.0 browser package
+  misses the same placements: this is not new, but a camera frame that holds
+  several codes rarely centers one, so ask users to center an Aztec code.
 
 ## 0.10.1 — 2026-10-20
 

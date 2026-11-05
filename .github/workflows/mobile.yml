@@ -33,7 +33,7 @@ env:
   CARGO_TERM_COLOR: always
   # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain).
   # jitpack.yml builds the JitPack AAR on its own (1.88.0), outside Actions.
-  RUST_TOOLCHAIN: "1.97.0"
+  RUST_TOOLCHAIN: "1.99.1"
 
 jobs:
   # PR/push gate (mirrors python.yml's `test` job): host build of the wrapper +
@@ -230,7 +230,11 @@ jobs:
           if-no-files-found: error
 
   # Tag-only, and its own job: the build above never holds a write token, and
-  # no branch dispatch reaches the GitHub release.
+  # no branch dispatch reaches the GitHub release. It never creates, edits or
+  # publishes a release: the owner creates one draft per tag before pushing
+  # the tag and publishes it once (RELEASING.md §5-§7). This job only uploads
+  # its own two assets, the xcframework zip and checksum.txt, into that draft,
+  # and leaves every other asset alone.
   ios-release:
     needs: ios
     if: startsWith(github.ref, 'refs/tags/v')
@@ -240,7 +244,7 @@ jobs:
       group: publish-${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: false
     permissions:
-      contents: write # create the GitHub release + attach the asset
+      contents: write # upload the xcframework and checksum.txt into the owner's draft release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -255,53 +259,82 @@ jobs:
           path: build
       # The release carries the xcframework whose checksum Package.swift
       # pins, so a SwiftPM consumer's url+checksum resolution succeeds.
-      # bindings/swift/release.sh is the authoritative publisher (it builds
-      # the exact asset whose checksum it pins). The CI-built zip is attached
-      # only where no asset is, and only when it IS the pinned archive: the
-      # comparison comes before the release is created or touched, so a
-      # mismatch leaves nothing behind.
-      - name: publish + verify the xcframework asset
+      # bindings/swift/release.sh builds the exact asset whose checksum it
+      # pins, and the owner attaches it to the draft. The CI-built zip is
+      # attached only to that draft, only where no zip is, and only when it
+      # IS the pinned archive. Every refusal comes before the upload, so it
+      # leaves nothing behind.
+      - name: attach + verify the xcframework asset
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           zip=build/QrcodeAiScannerFFI.xcframework.zip
+          commit="$(git rev-parse 'HEAD^{commit}')"
           # SwiftPM's checksum is the archive's SHA-256 (what `swift package
           # compute-checksum` prints), so sha256sum checks it on Linux. Read
           # the pin from the active binaryTarget's `checksum:` line, not the
           # first 64-hex string anywhere in the file (a comment could carry one).
           pinned="$(grep -oE 'checksum:[[:space:]]*"[a-f0-9]{64}"' bindings/swift/Package.swift | grep -oE '[a-f0-9]{64}' | head -n1 || true)"
           echo "Package.swift   : ${pinned:-<none>}"
-          # 1. Never clobber an attached asset (release.sh's, whose checksum
-          #    Package.swift pins); attach the CI-built one only on a match.
-          if gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name' 2>/dev/null \
-               | grep -qx 'QrcodeAiScannerFFI.xcframework.zip'; then
+          # 1. Exactly one release carries the tag, draft or published: the
+          #    owner's. This job never creates one, so it stops here instead.
+          gh release list --limit 1000 --json tagName,isDraft,createdAt \
+            --jq '.[] | "\(.tagName) draft=\(.isDraft) created=\(.createdAt)"' > "$RUNNER_TEMP/ios-releases.txt"
+          awk -v tag="$GITHUB_REF_NAME" '$1 == tag' "$RUNNER_TEMP/ios-releases.txt" > "$RUNNER_TEMP/ios-tagged.txt"
+          count="$(awk 'END { print NR }' "$RUNNER_TEMP/ios-tagged.txt")"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no release for $GITHUB_REF_NAME: the owner creates the draft (RELEASING.md §5), then re-runs this job."
+            exit 1
+          fi
+          if [ "$count" -gt 1 ]; then
+            echo "::error::$count releases carry the tag $GITHUB_REF_NAME, where only the owner's draft may: nothing was uploaded."
+            while IFS= read -r release; do echo "::error::  $release"; done < "$RUNNER_TEMP/ios-tagged.txt"
+            exit 1
+          fi
+          # 2. That release targets the tagged commit.
+          gh release view "$GITHUB_REF_NAME" --json isDraft,targetCommitish,assets \
+            --jq '"draft=\(.isDraft)", "target=\(.targetCommitish)", (.assets[] | "asset=\(.name)")' > "$RUNNER_TEMP/ios-release.txt"
+          draft="$(sed -n 's/^draft=//p' "$RUNNER_TEMP/ios-release.txt")"
+          target="$(sed -n 's/^target=//p' "$RUNNER_TEMP/ios-release.txt")"
+          echo "release         : draft ${draft:-<none>}, target ${target:-<none>}"
+          echo "tagged commit   : $commit"
+          if [ "$target" != "$commit" ]; then
+            echo "::error::the release for $GITHUB_REF_NAME targets ${target:-<none>}, not the tagged commit $commit: nothing was uploaded."
+            exit 1
+          fi
+          # 3. Never clobber an attached zip (release.sh's, whose checksum
+          #    Package.swift pins). Upload the CI-built one only into the
+          #    draft, never next to a stray checksum.txt, and only on a match.
+          if grep -qxF 'asset=QrcodeAiScannerFFI.xcframework.zip' "$RUNNER_TEMP/ios-release.txt"; then
             echo "::notice::xcframework asset already attached — leaving it untouched."
+          elif [ "$draft" != true ]; then
+            echo "::error::$GITHUB_REF_NAME is published without the xcframework: a published release is never completed in place; ship the next patch version (RELEASING.md §6)."
+            exit 1
+          elif grep -qxF 'asset=checksum.txt' "$RUNNER_TEMP/ios-release.txt"; then
+            echo "::error::the draft for $GITHUB_REF_NAME carries checksum.txt without the xcframework: the owner deletes it from the draft, then re-runs this job."
+            exit 1
           else
             built="$(sha256sum "$zip" | cut -d' ' -f1)"
             echo "CI-built asset  : $built"
             if [ "$built" != "${pinned:-}" ]; then
-              echo "::error::the CI-built xcframework is not the archive Package.swift pins: nothing was created or uploaded."
-              echo "::error::Attach the zip  bindings/swift/release.sh $GITHUB_REF_NAME  built, then re-run this job."
+              echo "::error::the CI-built xcframework is not the archive Package.swift pins: nothing was uploaded."
+              echo "::error::Attach the zip  bindings/swift/release.sh $GITHUB_REF_NAME  built to the draft, then re-run this job."
               exit 1
             fi
             # checksum.txt from the sha256 THIS job computed for the zip it
             # checked, never the downloaded file trusted unseen.
             printf '%s\n' "$built" > build/checksum.txt
-            # The release must exist — create if absent, else confirm. Never
-            # mask a real create failure behind `|| true`.
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes 2>/dev/null \
-              || gh release view "$GITHUB_REF_NAME" >/dev/null
             gh release upload "$GITHUB_REF_NAME" "$zip" build/checksum.txt
-            echo "::notice::attached the CI-built xcframework."
+            echo "::notice::attached the CI-built xcframework to the draft."
           fi
-          # 2. VERIFY the PUBLISHED asset (whoever uploaded it) matches the pin.
-          gh release download "$GITHUB_REF_NAME" -p QrcodeAiScannerFFI.xcframework.zip -O "$RUNNER_TEMP/published.zip" --clobber
-          published="$(sha256sum "$RUNNER_TEMP/published.zip" | cut -d' ' -f1)"
-          echo "published asset : $published"
-          if [ "$published" != "${pinned:-}" ]; then
+          # 4. VERIFY the attached asset (whoever uploaded it) matches the pin.
+          gh release download "$GITHUB_REF_NAME" -p QrcodeAiScannerFFI.xcframework.zip -O "$RUNNER_TEMP/attached.zip" --clobber
+          attached="$(sha256sum "$RUNNER_TEMP/attached.zip" | cut -d' ' -f1)"
+          echo "attached asset  : $attached"
+          if [ "$attached" != "${pinned:-}" ]; then
             echo "::error::checksum mismatch — SwiftPM would reject this release."
-            echo "::error::Re-run  bindings/swift/release.sh $GITHUB_REF_NAME  so the pin matches the asset."
+            echo "::error::A draft: the owner replaces the zip with the archive Package.swift pins, then re-runs this job. A published release: ship the next patch version (RELEASING.md §6)."
             exit 1
           fi
-          echo "::notice::SwiftPM checksum verified — the release resolves cleanly."
+          echo "::notice::SwiftPM checksum verified — the attached asset is the archive Package.swift pins."

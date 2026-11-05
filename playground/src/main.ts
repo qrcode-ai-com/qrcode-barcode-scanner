@@ -1,8 +1,8 @@
-import init, { scan_image, scan_frame, version } from '@supernovae-st/qrcode-ai-scanner-wasm';
+import init, { scan_image, scan_frame, version } from '@qrcode-ai-com/qrcode-barcode-scanner-wasm';
 import type {
   ScanReport, Score, AxisScore, Detection, DecodedContent, Payload, Hint,
   Iso15415Report, IsoParameter, UecReport, Grade, AlphaReport, AlphaEnvelope,
-} from '@supernovae-st/qrcode-ai-scanner-wasm';
+} from '@qrcode-ai-com/qrcode-barcode-scanner-wasm';
 import './style.css';
 
 /* ---------- DOM ---------- */

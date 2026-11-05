@@ -85,7 +85,7 @@ use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use qrcode_ai_scanner::ImageInput;
+use qrcode_barcode_scanner::ImageInput;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -115,7 +115,7 @@ struct Entry {
     eci: Option<Vec<oracle::Eci>>,
     /// The symbol's FNC1 position (`"first"` · `"second"`). Requires
     /// `raw_hex`.
-    fnc1: Option<qrcode_ai_scanner::Fnc1Position>,
+    fnc1: Option<qrcode_barcode_scanner::Fnc1Position>,
 }
 
 fn repo_root() -> PathBuf {
@@ -358,6 +358,100 @@ fn gen_fixtures() {
     );
     gen_content_fixtures(&root);
     gen_payload_fixtures(&root);
+    gen_occurrence_fixtures(&root);
+}
+
+/// The composed inputs of the installed-package truth set
+/// (`fixtures/consumer-truth.json`, `fixtures/symbology/CONTENT-FIXTURES.md`):
+/// the same layouts as the `occurrences` and `mixed_symbols` rows, as files an
+/// installed package can read. Every symbol is written here or by an
+/// independent maker, and pasted where its expected geometry is known.
+fn gen_occurrence_fixtures(root: &Path) {
+    use qrcode::{EcLevel, QrCode};
+    // The small Data Matrix `DM-4827` written by bwip-js 4.11.4 (BWIPP), not
+    // by rxing: raw({bcid: "datamatrix", text: "DM-4827", scale: 1}), one
+    // row of modules per string.
+    const ROWS: [&str; 12] = [
+        "101010101010",
+        "101110110011",
+        "100110010000",
+        "111001101101",
+        "100010101010",
+        "110011010111",
+        "110101001000",
+        "111010101101",
+        "100110011010",
+        "100000110101",
+        "110110111010",
+        "111111111111",
+    ];
+    // a QR with its four-module quiet zone, 5 px per module
+    let render = |code: &QrCode| {
+        code.render::<image::Luma<u8>>()
+            .module_dimensions(5, 5)
+            .quiet_zone(true)
+            .build()
+    };
+    let paste = |canvas: &mut image::GrayImage, symbol: &image::GrayImage, x: u32, y: u32| {
+        image::imageops::replace(canvas, symbol, i64::from(x), i64::from(y));
+    };
+    let white =
+        |width: u32, height: u32| image::GrayImage::from_pixel(width, height, image::Luma([255]));
+    // 'Ą' twice: byte A1 under ECI 4 (ISO/IEC 8859-2), bytes C4 84 under
+    // ECI 26 (UTF-8) — one text, two contents, side by side.
+    let latin2 = render(&v3_m(|b| {
+        b.push_eci_designator(4)?;
+        b.push_byte_data(&[0xA1])
+    }));
+    let utf8 = render(&v3_m(|b| {
+        b.push_eci_designator(26)?;
+        b.push_byte_data(&[0xC4, 0x84])
+    }));
+    let mut pair = white(latin2.width() + utf8.width() + 120, latin2.height() + 80);
+    paste(&mut pair, &latin2, 40, 40);
+    paste(&mut pair, &utf8, latin2.width() + 80, 40);
+    save_luma(&pair, &root.join("fixtures/eci/eci4-eci26-equal-text.png"));
+    // Two identical QR copies beside the Code 128 control `STOCK-4827`: two
+    // contents, three physical occurrences.
+    let barcode = image::open(root.join("fixtures/symbology/code128-stock-4827.png"))
+        .unwrap()
+        .to_luma8();
+    let twin = render(
+        &QrCode::with_error_correction_level("https://qrc-ai.com/occurrences", EcLevel::M).unwrap(),
+    );
+    let side = twin.width();
+    let mut twins = white(
+        2 * side + barcode.width() + 120,
+        side.max(barcode.height()) + 80,
+    );
+    paste(&mut twins, &twin, 40, 40);
+    paste(&mut twins, &twin, side + 80, 40);
+    paste(&mut twins, &barcode, 2 * side + 100, 60);
+    save_luma(
+        &twins,
+        &root.join("fixtures/symbology/qr-twins-code128.png"),
+    );
+    // A 12-px-module QR and, far to its right, the small Data Matrix (ROWS)
+    // at 3 px per module with a four-module quiet zone.
+    let matrix = image::GrayImage::from_fn(60, 60, |x, y| {
+        let (x, y) = (x / 3, y / 3);
+        let dark = (4..16).contains(&x)
+            && (4..16).contains(&y)
+            && ROWS[(y - 4) as usize].as_bytes()[(x - 4) as usize] == b'1';
+        image::Luma([if dark { 0 } else { 255 }])
+    });
+    let qr = QrCode::with_error_correction_level("https://qrc-ai.com/mixed-symbols", EcLevel::M)
+        .unwrap()
+        .render::<image::Luma<u8>>()
+        .module_dimensions(12, 12)
+        .build();
+    let mut mixed = white(1_600, 600);
+    paste(&mut mixed, &qr, 40, 40);
+    paste(&mut mixed, &matrix, 1_300, 240);
+    save_luma(
+        &mixed,
+        &root.join("fixtures/symbology/qr-small-datamatrix.png"),
+    );
 }
 
 /// The golden sources of the content contract (spec/README § Examples):
@@ -784,8 +878,8 @@ fn baseline(bin: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qrcode_ai_scanner::Charset;
-    use qrcode_ai_scanner::Symbology::{self, Ean13, QrCode};
+    use qrcode_barcode_scanner::Charset;
+    use qrcode_barcode_scanner::Symbology::{self, Ean13, QrCode};
 
     #[test]
     fn runtime_repo_root_selection_is_explicit_and_absolute() {
@@ -918,7 +1012,7 @@ mod tests {
     /// same text under a second symbology is extra output — a miss.
     #[test]
     fn a_text_only_truth_is_met_once() {
-        use qrcode_ai_scanner::Symbology::MicroQrCode;
+        use qrcode_barcode_scanner::Symbology::MicroQrCode;
         let truth = entry(Some("E"), None);
         assert_eq!(
             entry_state(&truth, &seen(&[(QrCode, "E"), (MicroQrCode, "E")])),

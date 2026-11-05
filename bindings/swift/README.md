@@ -1,6 +1,6 @@
-# qrcode-ai-scanner — Swift / iOS binding
+# qrcode-barcode-scanner — Swift / iOS binding
 
-SwiftPM package for `qrcode-ai-scanner`, generated from the shared UniFFI crate
+SwiftPM package for `qrcode-barcode-scanner`, generated from the shared UniFFI crate
 `crates/qrcode-ai-scanner-uniffi`. SwiftPM versions are the repo's git tags
 (`vX.Y.Z`) — no manifest version field to sync.
 
@@ -22,26 +22,28 @@ The distributed xcframework includes `LICENSE` and `LICENSING.md` inside its
 bundle. The release helper refuses a version that differs from the workspace
 version and uses the committed Cargo lockfile.
 
-## Install (SwiftPM, on a tagged release)
+## Install
 
-```swift
-// Package.swift — X.Y.Z: the latest release tag
-dependencies: [
-    .package(url: "https://github.com/supernovae-st/qrcode-barcode-scanner", from: "X.Y.Z"),
-],
-// target deps:
-.product(name: "QrcodeAiScanner", package: "qrcode-ai-scanner"),
-```
+There is no SwiftPM dependency line to copy: the package manifest sits in
+`bindings/swift`, not at the repository root, so SwiftPM cannot add this
+repository by URL. Build from source instead: run the commands in
+[Build the xcframework locally](#build-the-xcframework-locally) on a Mac with
+Xcode, then add the `bindings/swift` directory of that checkout to your app as
+a local package and link its `QrcodeAiScanner` library.
 
-On a release the `.binaryTarget` resolves to the GitHub-release xcframework zip
-via `url` + `checksum` (CI fills them — see `Package.swift`), so consumers need
-no build step.
+The Swift names keep their original spelling: the `QrcodeAiScanner` library and
+module, and the `QrcodeAiScannerFFI` binary target.
 
 ## Usage
 
 `scan(...)` throws `ScanBindingError` and returns the `ScanReport` as a **JSON
 `String`** (the cross-surface wire SSOT). Decode with `JSONDecoder` against
-`spec/scan-report.schema.json`. Run it off the main thread — the scan is sync.
+`spec/scan-report.schema.json`, leniently: the wire grows by additive keys and
+enum values (pipeline 5 added `detections[].occurrences` and
+`trace.saturation`). `JSONDecoder` ignores keys your types do not declare, but
+a `Codable` enum throws on a raw value it does not know: decode enum-like
+values such as `geometry.kind` as `String`, or give the enum an unknown case,
+and make new keys optional. Run it off the main thread — the scan is sync.
 
 ```swift
 import QrcodeAiScanner

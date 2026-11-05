@@ -1,4 +1,4 @@
-//! Kotlin/Android + Swift/iOS bindings for `qrcode-ai-scanner` (UniFFI).
+//! Kotlin/Android + Swift/iOS bindings for `qrcode-barcode-scanner` (UniFFI).
 //!
 //! Thin wrapper over the Rust core: bytes → scan → the same versioned
 //! `ScanReport`, returned as a JSON **String** (serialized via the core's serde
@@ -45,7 +45,10 @@ pub enum ScanBindingError {
     /// `score_preset` and `score_skip_axes` were BOTH passed.
     #[error("score_preset and score_skip_axes are mutually exclusive — pass one")]
     ScorePresetConflict,
-    /// A real scan fault (invalid/oversized buffer, cancellation).
+    /// A scan fault. A core error carries its `[QRS-xxx]` code in the
+    /// message: an option outside its domain (`QRS-006`: a `budget_ms` above
+    /// 4 294 967 295 or a zero cap, refused before the image is read) or an
+    /// invalid or oversized image or frame buffer (`QRS-001..004`).
     #[error("scan failed: {0}")]
     ScanFailed(String),
 }
@@ -161,7 +164,8 @@ fn profile_from(
 
 /// Optional input caps from the caller. Mobile embedders SHOULD lower them
 /// (the library default — 10000 px / 64 MP — is a desktop/CLI posture);
-/// violations reject BEFORE any pixel work (QRS-002 / QRS-003).
+/// violations reject BEFORE any pixel work (QRS-002 / QRS-003), and a zero
+/// cap before the input is read (QRS-006).
 fn limits_from(max_dimension: Option<u32>, max_pixels: Option<u64>) -> Limits {
     let mut limits = Limits::default();
     if let Some(dim) = max_dimension {
@@ -176,8 +180,10 @@ fn limits_from(max_dimension: Option<u32>, max_pixels: Option<u64>) -> Limits {
 /// Decode + score an encoded image (PNG · JPEG · WebP · GIF).
 ///
 /// Returns the `ScanReport` as a JSON string. "No QR found" is a normal result
-/// (empty `detections`); an error is raised only for invalid input / bad
-/// profile / cancellation.
+/// (empty `detections`); an error is raised only for a bad argument (its own
+/// case, such as `UnknownProfile` or `PaletteTooLarge`) or a scan fault
+/// (`ScanFailed`): an option outside its domain (`QRS-006`) or an invalid or
+/// oversized image (`QRS-001..003`).
 ///
 /// `max_dimension` / `max_pixels` cap the input before any pixel work
 /// (defaults 10000 px / 64 MP — lower them on server/mobile hardening paths).
@@ -260,6 +266,16 @@ pub fn scan_frame(
         .scan(ImageInput::rgba8(&rgba, width, height))
         .map_err(|e| ScanBindingError::ScanFailed(format!("{} [{}]", e, e.code())))?;
     serde_json::to_string(&report).map_err(|e| ScanBindingError::ScanFailed(e.to_string()))
+}
+
+/// The readers compiled into this library as a JSON **String**: its report
+/// `versions`, decode `engines` and the `symbologies` they can return
+/// (spec/01-report.md § Capabilities). Says which readers are included, not
+/// that an image will decode.
+#[uniffi::export]
+pub fn capabilities() -> Result<String, ScanBindingError> {
+    serde_json::to_string(&scanner_core::Capabilities::current())
+        .map_err(|e| ScanBindingError::ScanFailed(format!("serialize capabilities: {e}")))
 }
 
 #[cfg(test)]
@@ -660,5 +676,30 @@ mod tests {
             matches!(err, ScanBindingError::UnknownAlphaBackground(ref n) if n == "transparent"),
             "typo must be the typed loud error, got {err:?}"
         );
+    }
+
+    // The library is a default build: both engines and every symbology in the
+    // schema's order, with the markers its reports carry.
+    #[test]
+    fn capabilities_list_the_default_build_readers() {
+        let caps: Value = serde_json::from_str(&capabilities().unwrap()).unwrap();
+        let schema: Value = serde_json::from_str(
+            &std::fs::read_to_string(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../spec/scan-report.schema.json"
+            ))
+            .expect("schema present"),
+        )
+        .unwrap();
+        let defs = &schema["$defs"];
+        assert_eq!(caps["engines"], defs["EngineKind"]["enum"]);
+        assert_eq!(caps["symbologies"], defs["Symbology"]["enum"]);
+        let report = assert_envelope(
+            &scan(clean_qr(), "fast".into(), None, None, Some(0), None, None, None, None, None).unwrap(),
+        );
+        assert_eq!(caps["versions"], report["versions"]);
+        let mut keys: Vec<&str> = caps.as_object().unwrap().keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["engines", "symbologies", "versions"]);
     }
 }

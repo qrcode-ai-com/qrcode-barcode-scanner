@@ -3,8 +3,17 @@ title: "CLI — qrscan"
 description: "The scanner in scripts and CI."
 ---
 
+<Note>
+From 0.11.0, `qrscan` ships in the `qrcode-barcode-scanner-cli` crate,
+**pending publication** on crates.io; this page describes that release. Until
+crates.io serves it, the line below installs 0.10.1 from the crate's previous
+name, `qrcode-ai-scanner-cli`. Both crates install the same `qrscan` command:
+uninstall `qrcode-ai-scanner-cli` before installing the new crate. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-cargo install qrcode-ai-scanner-cli
+cargo install qrcode-ai-scanner-cli@0.10.1
 ```
 
 ## Usage
@@ -16,7 +25,14 @@ qrscan <image> [--profile full|fast|frame] [--budget-ms <ms>]
                [--alpha-background auto|white|black|none|"#rrggbb"]
                [--alpha-palette <color,...>]
                [--pretty|-p] [--score-only|-s]
+qrscan --capabilities
 ```
+
+`qrscan --capabilities` prints the readers compiled into the binary as JSON
+— its report `versions`, decode `engines` and the `symbologies` they can
+return — and exits 0; it takes no image or other option. It says which
+readers are included, not that an image will decode (spec/01
+§ Capabilities).
 
 `--budget-ms` overrides the profile's wall-clock budget (`full` 4000 ·
 `fast` 800 · `frame` 80 ms); `--budget-ms 0` is unbounded — the
@@ -87,7 +103,7 @@ controls and spoofing characters print as `\u{…}`. See
 
 | Exit | Meaning |
 |---|---|
-| `0` | ≥1 symbol decoded, of any symbology (with `--score-only`: its complete score on stdout) |
+| `0` | ≥1 symbol decoded, of any symbology (with `--score-only`: its complete score on stdout) · `--capabilities`: the build's capabilities JSON on stdout |
 | `1` | no symbol found (all modes) — final only when the scan was not cut (`trace.budget_exhausted: false`) |
 | `2` | invalid input/usage — message on stderr with `[QRS-xxx]` · `--score-only` with a configuration that computes no score (`frame`, every axis skipped) or after a contained fault |
 | `3` | `--score-only` only: a symbol decoded, but the budget ran out before its score was judged — nothing on stdout; retry with a larger `--budget-ms` (`0` never yields 3) |

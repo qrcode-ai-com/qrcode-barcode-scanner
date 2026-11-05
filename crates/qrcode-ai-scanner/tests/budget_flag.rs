@@ -7,7 +7,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner};
+use qrcode_barcode_scanner::{ImageInput, ScanConfig, ScanProfile, ScanReport, Scanner};
 
 fn fixture(rel: &str) -> Vec<u8> {
     let path = format!("{}/../../fixtures/{rel}", env!("CARGO_MANIFEST_DIR"));
@@ -260,11 +260,11 @@ fn sweep(name: &str, bytes: &[u8]) {
     println!("{name}: unbounded {unbounded_ms} ms · {whole} final · {partial} partial");
 }
 
-fn is_alpha_hint(hint: &qrcode_ai_scanner::Hint) -> bool {
+fn is_alpha_hint(hint: &qrcode_barcode_scanner::Hint) -> bool {
     matches!(
         hint,
-        qrcode_ai_scanner::Hint::AlphaBackgroundDependent { .. }
-            | qrcode_ai_scanner::Hint::AddBackgroundPlate { .. }
+        qrcode_barcode_scanner::Hint::AlphaBackgroundDependent { .. }
+            | qrcode_barcode_scanner::Hint::AddBackgroundPlate { .. }
     )
 }
 

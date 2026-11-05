@@ -4,7 +4,7 @@
 
 use image::imageops::FilterType;
 use image::{GrayImage, Luma, Rgba, RgbaImage};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     AlphaBackground, EngineKind, ImageInput, Point, ScanConfig, ScanProfile, ScanReport, Scanner,
     ScoreDepth, StructuralReport,
 };

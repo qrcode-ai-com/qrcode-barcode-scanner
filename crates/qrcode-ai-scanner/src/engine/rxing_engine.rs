@@ -35,6 +35,7 @@ use rxing::RXingResultMetadataValue as MetaValue;
 use super::RawDetection;
 use super::content::{EciEvidence, EngineReading, Fnc1, Segments};
 use super::locate::{Frame, LocateHint};
+use super::occurrence::{Footprint, Kind};
 use crate::input::LumaImage;
 use crate::report::{EcLevel, EngineKind, Point, Symbology};
 use crate::rescue::{Margin, bitstream};
@@ -109,7 +110,11 @@ pub(super) fn decode(luma: &LumaImage, filter: super::FormatFilter) -> Vec<RawDe
     use rxing::BarcodeFormat as F;
     let possible = match filter {
         super::FormatFilter::All => None,
-        super::FormatFilter::Linear => Some(std::collections::HashSet::from([
+        super::FormatFilter::NonQr => Some(std::collections::HashSet::from([
+            F::DATA_MATRIX,
+            F::AZTEC,
+            F::PDF_417,
+            F::MAXICODE,
             F::EAN_13,
             F::EAN_8,
             F::UPC_A,
@@ -143,18 +148,13 @@ pub(super) fn decode(luma: &LumaImage, filter: super::FormatFilter) -> Vec<RawDe
     let found = if filter == super::FormatFilter::Only(Symbology::RectangularMicroQrCode) {
         decode_rmqr(luma, &mut hints)
     } else {
-        rxing::helpers::detect_multiple_in_luma_with_hints(
-            luma.data().to_vec(),
-            luma.width(),
-            luma.height(),
-            &mut hints,
-        )
+        decode_all(luma, &mut hints)
     };
     let mut results = found.unwrap_or_default();
     if matches!(
         filter,
         super::FormatFilter::All
-            | super::FormatFilter::Linear
+            | super::FormatFilter::NonQr
             | super::FormatFilter::Only(Symbology::DataBarExpanded)
     ) && !results
         .iter()
@@ -170,20 +170,44 @@ pub(super) fn decode(luma: &LumaImage, filter: super::FormatFilter) -> Vec<RawDe
     results.iter().filter_map(observe).collect()
 }
 
-fn decode_expanded(luma: &LumaImage) -> rxing::common::Result<Vec<rxing::RXingResult>> {
-    use rxing::multi::MultipleBarcodeReader as _;
+/// The binarized attempt image every rxing pass reads: the helper's hybrid
+/// binarizer over the luma bytes.
+fn bitmap(
+    luma: &LumaImage,
+) -> rxing::common::Result<
+    rxing::BinaryBitmap<rxing::common::HybridBinarizer<rxing::Luma8LuminanceSource>>,
+> {
     let source =
         rxing::Luma8LuminanceSource::new(luma.data().to_vec(), luma.width(), luma.height())?;
-    let mut image = rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(source));
+    Ok(rxing::BinaryBitmap::new(
+        rxing::common::HybridBinarizer::new(source),
+    ))
+}
+
+/// The unrestricted, family and single-format passes: the helper's reader
+/// stack (`detect_multiple_in_luma_with_hints`, `TryHarder` on) as the
+/// scanner's multiple reader runs it — the format dispatch in one fixed
+/// order, every point in the image's frame, physically distinct copies of
+/// one content kept (`multi_reader`).
+fn decode_all(
+    luma: &LumaImage,
+    hints: &mut rxing::DecodeHints,
+) -> rxing::common::Result<Vec<rxing::RXingResult>> {
+    hints.TryHarder = hints.TryHarder.or(Some(true));
+    let mut image = bitmap(luma)?;
+    let mut reader = super::multi_reader::FormatReader::default();
+    super::multi_reader::decode_multiple(&mut reader, &mut image, hints, luma)
+}
+
+fn decode_expanded(luma: &LumaImage) -> rxing::common::Result<Vec<rxing::RXingResult>> {
+    let mut image = bitmap(luma)?;
+    // The patched reader reads only TryHarder; the ladder retries inverted images.
     let hints = rxing::DecodeHints {
         TryHarder: Some(true),
-        AlsoInverted: Some(true),
         ..Default::default()
     };
-    rxing::multi::GenericMultipleBarcodeReader::new(
-        super::databar_expanded::RSSExpandedReader::default(),
-    )
-    .decode_multiple_with_hints(&mut image, &hints)
+    let mut reader = super::databar_expanded::RSSExpandedReader::default();
+    super::multi_reader::decode_multiple(&mut reader, &mut image, &hints, luma)
 }
 
 /// The pass of an rMQR-only filter (score cells, envelope probes): the
@@ -199,13 +223,10 @@ fn decode_rmqr(
     luma: &LumaImage,
     hints: &mut rxing::DecodeHints,
 ) -> rxing::common::Result<Vec<rxing::RXingResult>> {
-    use rxing::multi::MultipleBarcodeReader as _;
     hints.TryHarder = hints.TryHarder.or(Some(true));
-    let source =
-        rxing::Luma8LuminanceSource::new(luma.data().to_vec(), luma.width(), luma.height())?;
-    let mut image = rxing::BinaryBitmap::new(rxing::common::HybridBinarizer::new(source));
-    rxing::multi::GenericMultipleBarcodeReader::new(rxing::MultiFormatReader::default())
-        .decode_multiple_with_hints(&mut image, hints)
+    let mut image = bitmap(luma)?;
+    let mut reader = rxing::MultiFormatReader::default();
+    super::multi_reader::decode_multiple(&mut reader, &mut image, hints, luma)
 }
 
 /// Which rxing QR reader produced a result — it decides what
@@ -268,34 +289,28 @@ fn observe(result: &rxing::RXingResult) -> Option<RawDetection> {
         engine_reading: EngineReading::None,
         location: None,
         matrix_region: None,
+        footprint: Footprint::unavailable(),
         locate: None,
         needs_confirmation: false,
         margin: Margin::Unknown,
     };
     if !symbology.is_qr_family() {
-        let text = result.getText();
-        // DataBar (RSS-14) carries a GTIN-14: any other text is no DataBar
-        // the reader decoded
-        if symbology == Symbology::DataBar
-            && !(text.len() == 14 && text.bytes().all(|b| b.is_ascii_digit()))
-        {
-            return None;
-        }
-        // outside the QR content contract: the engine's reading, never its
-        // byte segments (they omit every non-byte encodation)
-        detection.raw = non_qr_raw(text);
-        detection.fnc1 = identifier_fnc1(identifier);
-        detection.needs_confirmation = needs_confirmation(symbology, ec_level);
-        return Some(detection);
+        return non_qr(detection, result, identifier, ec_level);
     }
     let reader = reader(symbology, ec_level)?;
+    detection.footprint = footprint(symbology, Some(reader), result.getPoints());
     detection.location = location(result.getPoints()).map(|points| match reader {
         // rxing 0.9.3's grid sampler returns TL, TR, BL, BR. Keep the
         // cyclic corner order required by the scanner's grid re-read.
         Reader::Port => [points[0], points[1], points[3], points[2]],
         Reader::Codewords(_) => points,
     });
-    if reader == Reader::Port && result.getPoints().len() == 4 {
+    // a corner the sampler could not project is its (0,0) default, not a
+    // measurement: no exclusion region from it
+    if reader == Reader::Port
+        && result.getPoints().len() == 4
+        && !result.getPoints().iter().any(|p| unprojected(*p))
+    {
         detection.matrix_region = detection.location;
     }
     match reader {
@@ -360,6 +375,92 @@ fn observe(result: &rxing::RXingResult) -> Option<RawDetection> {
         }
     }
     Some(detection)
+}
+
+/// A result of another symbology than the QR family: outside the QR
+/// content contract, the engine's reading, never its byte segments (they
+/// omit every non-byte encodation), and the footprint its points measured.
+fn non_qr(
+    mut detection: RawDetection,
+    result: &rxing::RXingResult,
+    identifier: &str,
+    ec_level: Option<&str>,
+) -> Option<RawDetection> {
+    let symbology = detection.symbology;
+    let text = result.getText();
+    // DataBar (RSS-14) carries a GTIN-14: any other text is no DataBar the
+    // reader decoded
+    if symbology == Symbology::DataBar
+        && !(text.len() == 14 && text.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return None;
+    }
+    detection.footprint = footprint(symbology, None, result.getPoints());
+    detection.raw = non_qr_raw(text);
+    detection.fnc1 = identifier_fnc1(identifier);
+    detection.needs_confirmation = needs_confirmation(symbology, ec_level);
+    Some(detection)
+}
+
+/// rxing 0.9.3's grid sampler default for a corner no sampling region
+/// covers (`default_grid_sampler.rs`, `projectCorner`): exactly (0,0),
+/// without the half pixel every projected corner carries.
+fn unprojected(p: rxing::Point) -> bool {
+    p.x.to_bits() == 0 && p.y.to_bits() == 0
+}
+
+/// What an rxing result's points measured of its symbol, in attempt space
+/// and before validation (`occurrence` module doc): never completed or
+/// extended. QR family: the port's four sampler corners (TL, TR, BL, BR,
+/// outer corners plus half a pixel) as the quad TL, TR, BR, BL on the outer
+/// corners; the lineage reader's finder centres (and alignment pattern) as
+/// partial points. Data Matrix and Aztec: their four corners. PDF417: the
+/// symbol corners of its eight vertices (TL, BL, TR, BR, then the codeword
+/// area's four) when all are present — missing vertices lose their index,
+/// so fewer are partial. Linear symbologies: the scan line's two points.
+/// `DataBar` and its Expanded form: the finder spans, partial. `MaxiCode`:
+/// its points, partial, if any (rxing 0.9.3 reports none).
+fn footprint(symbology: Symbology, reader: Option<Reader>, points: &[rxing::Point]) -> Footprint {
+    let measured: Vec<Point> = points.iter().map(|p| Point { x: p.x, y: p.y }).collect();
+    let quad = |order: [usize; 4]| order.map(|i| measured[i]).to_vec();
+    let (kind, published) = match symbology {
+        _ if measured.is_empty() => return Footprint::unavailable(),
+        Symbology::QrCode | Symbology::MicroQrCode | Symbology::RectangularMicroQrCode => {
+            match reader {
+                Some(Reader::Port)
+                    if points.len() == 4 && !points.iter().any(|p| unprojected(*p)) =>
+                {
+                    let outer = quad([0, 1, 3, 2])
+                        .into_iter()
+                        .map(|p| Point {
+                            x: p.x - 0.5,
+                            y: p.y - 0.5,
+                        })
+                        .collect();
+                    (Kind::Quad, outer)
+                }
+                _ => (
+                    Kind::Partial,
+                    points
+                        .iter()
+                        .filter(|p| !unprojected(**p))
+                        .map(|p| Point { x: p.x, y: p.y })
+                        .collect(),
+                ),
+            }
+        }
+        Symbology::DataMatrix | Symbology::Aztec if measured.len() == 4 => (Kind::Quad, measured),
+        Symbology::Pdf417 if measured.len() == 8 => (Kind::Quad, quad([0, 2, 3, 1])),
+        Symbology::DataMatrix
+        | Symbology::Aztec
+        | Symbology::Pdf417
+        | Symbology::MaxiCode
+        | Symbology::DataBar
+        | Symbology::DataBarExpanded => (Kind::Partial, measured),
+        _ if measured.len() == 2 => (Kind::Segment, measured),
+        _ => (Kind::Partial, measured),
+    };
+    Footprint::candidate(kind, published, EngineKind::Rxing)
 }
 
 /// Whether a port read's bytes are its text: the text's own bytes or, behind
@@ -1308,6 +1409,68 @@ mod tests {
         LumaImage::new(img.into_raw(), w, h)
     }
 
+    /// The fixtures under `symbology/` holding several symbols: where the
+    /// upstream post-filter and `multi_reader` are meant to differ.
+    const SEVERAL_SYMBOLS: [&str; 6] = [
+        "datamatrix-pair-japanese.png",
+        "ean13-addon5-code128.png",
+        "maxicode-over-code128.png",
+        "mixed-code128-qr.png",
+        "qr-small-datamatrix.png",
+        "qr-twins-code128.png",
+    ];
+
+    #[test]
+    fn a_lone_symbol_reads_the_same_through_the_scanner_reader_and_upstream() {
+        // multi_reader's local modifications (THIRD-PARTY.md) decide which
+        // copies survive and where points lie, never what a lone symbol
+        // reads: on every committed single-symbol fixture, the unrestricted
+        // pass and rxing 0.9.3's own helper over the same plane (hybrid
+        // binarizer, TryHarder on) read the same formats and texts
+        let dir = format!("{}/../../fixtures/symbology", env!("CARGO_MANIFEST_DIR"));
+        let mut names: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| {
+                std::path::Path::new(name).extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("png") || ext.eq_ignore_ascii_case("jpg")
+                }) && !SEVERAL_SYMBOLS.contains(&name.as_str())
+            })
+            .collect();
+        names.sort();
+        assert!(names.len() >= 30, "the single-symbol set: {names:?}");
+        let reads = |results: &[rxing::RXingResult]| {
+            let mut reads: Vec<(String, String)> = results
+                .iter()
+                .map(|r| {
+                    (
+                        format!("{:?}", r.getBarcodeFormat()),
+                        r.getText().to_owned(),
+                    )
+                })
+                .collect();
+            reads.sort();
+            reads.dedup();
+            reads
+        };
+        let mut read = 0;
+        for name in &names {
+            let luma = fixture(&format!("symbology/{name}"));
+            let ours =
+                super::decode_all(&luma, &mut rxing::DecodeHints::default()).unwrap_or_default();
+            let upstream = rxing::helpers::detect_multiple_in_luma_with_hints(
+                luma.data().to_vec(),
+                luma.width(),
+                luma.height(),
+                &mut rxing::DecodeHints::default(),
+            )
+            .unwrap_or_default();
+            assert_eq!(reads(&ours), reads(&upstream), "{name}");
+            read += usize::from(!ours.is_empty());
+        }
+        assert!(read >= 25, "{read} of {} fixtures read", names.len());
+    }
+
     #[test]
     fn an_rmqr_only_pass_reads_rmqr_and_nothing_else() {
         // The score cells and envelope probes of an rMQR symbol decode that
@@ -1390,6 +1553,335 @@ mod tests {
             found.iter().all(|d| d.symbology != Symbology::QrCode),
             "Only(Ean13) must NOT return a QR (mutant drops the restriction): {:?}",
             found.iter().map(|d| d.symbology).collect::<Vec<_>>()
+        );
+    }
+
+    /// rxing result points at `pairs`.
+    fn rxing_points(pairs: &[(f32, f32)]) -> Vec<rxing::Point> {
+        pairs.iter().map(|&(x, y)| rxing::Point { x, y }).collect()
+    }
+
+    /// The footprint an rxing reader measured at `pairs`, before validation.
+    fn measured(kind: super::Kind, pairs: &[(f32, f32)]) -> super::Footprint {
+        super::Footprint {
+            kind,
+            points: pairs
+                .iter()
+                .map(|&(x, y)| crate::report::Point { x, y })
+                .collect(),
+            detector: Some(EngineKind::Rxing),
+        }
+    }
+
+    #[test]
+    fn only_the_samplers_exact_origin_default_is_unprojected() {
+        // rxing 0.9.3's grid sampler leaves a corner no sampling region
+        // covers at exactly (0,0); a corner on one edge of the image, or
+        // anywhere else, is a measurement
+        let at = |x, y| rxing::Point { x, y };
+        assert!(super::unprojected(at(0.0, 0.0)));
+        for (x, y) in [(0.0, 12.5), (12.5, 0.0), (0.5, 0.5), (12.5, 30.5)] {
+            assert!(!super::unprojected(at(x, y)), "({x}, {y})");
+        }
+    }
+
+    #[test]
+    fn footprints_keep_what_each_reader_measured() {
+        // never completed or extended: the port's four sampler corners (TL,
+        // TR, BL, BR, half a pixel in) become the outer-corner quad TL, TR,
+        // BR, BL; any other QR-family point set is partial as measured, an
+        // unprojected corner dropped; each other symbology keeps its own
+        // shape, and two points are a scan line only for a linear reader
+        use super::Kind::{Partial, Quad, Segment};
+        let footprint = |symbology, reader, pairs: &[(f32, f32)]| {
+            super::footprint(symbology, reader, &rxing_points(pairs))
+        };
+        let port = Some(Reader::Port);
+        let corners = [(10.5, 10.5), (50.5, 10.5), (10.5, 50.5), (50.5, 50.5)];
+        let outer = [(10.0, 10.0), (50.0, 10.0), (50.0, 50.0), (10.0, 50.0)];
+        for symbology in [
+            Symbology::QrCode,
+            Symbology::MicroQrCode,
+            Symbology::RectangularMicroQrCode,
+        ] {
+            let quad = footprint(symbology, port, &corners);
+            assert_eq!(quad, measured(Quad, &outer), "{symbology:?}");
+        }
+        let [top_left, top_right, _, bottom_right] = corners;
+        assert_eq!(
+            footprint(
+                Symbology::QrCode,
+                port,
+                &[top_left, top_right, (0.0, 0.0), bottom_right]
+            ),
+            measured(Partial, &[top_left, top_right, bottom_right])
+        );
+        let three = &corners[..3];
+        assert_eq!(
+            footprint(Symbology::QrCode, port, three),
+            measured(Partial, three)
+        );
+        // the lineage reader's finder centres (BL, TL, TR), then its
+        // alignment pattern when found
+        let lineage = Some(Reader::Codewords(EcLevel::M));
+        let centres = [(20.5, 40.5), (20.5, 20.5), (40.5, 20.5), (37.5, 37.5)];
+        for n in [3, 4] {
+            let points = &centres[..n];
+            assert_eq!(
+                footprint(Symbology::QrCode, lineage, points),
+                measured(Partial, points)
+            );
+        }
+        // Data Matrix and Aztec: their four corners as measured
+        let square = [(5.0, 5.0), (25.0, 5.0), (25.0, 25.0), (5.0, 25.0)];
+        for symbology in [Symbology::DataMatrix, Symbology::Aztec] {
+            assert_eq!(footprint(symbology, None, &square), measured(Quad, &square));
+            let three = &square[..3];
+            assert_eq!(footprint(symbology, None, three), measured(Partial, three));
+        }
+        // PDF417: TL, BL, TR, BR, then the codeword area's four vertices —
+        // the symbol corners TL, TR, BR, BL when all eight are present
+        let vertices = [
+            (2.0, 3.0),
+            (2.0, 30.0),
+            (60.0, 3.0),
+            (60.0, 30.0),
+            (8.0, 3.0),
+            (8.0, 30.0),
+            (54.0, 3.0),
+            (54.0, 30.0),
+        ];
+        let symbol = [(2.0, 3.0), (60.0, 3.0), (60.0, 30.0), (2.0, 30.0)];
+        let pdf417 = |points: &[(f32, f32)]| footprint(Symbology::Pdf417, None, points);
+        assert_eq!(pdf417(&vertices), measured(Quad, &symbol));
+        assert_eq!(pdf417(&vertices[..4]), measured(Partial, &vertices[..4]));
+        for symbology in [
+            Symbology::DataMatrix,
+            Symbology::Aztec,
+            Symbology::Pdf417,
+            Symbology::MaxiCode,
+            Symbology::DataBar,
+            Symbology::DataBarExpanded,
+        ] {
+            let two = &square[..2];
+            let partial = footprint(symbology, None, two);
+            assert_eq!(partial, measured(Partial, two), "{symbology:?}");
+        }
+        // linear symbologies: the scan line's two points; any other count
+        // (an add-on's points appended) is partial
+        let line = [(3.0, 20.0), (45.0, 20.0), (90.0, 20.0), (120.0, 20.0)];
+        for symbology in [Symbology::Ean13, Symbology::Code128, Symbology::Itf] {
+            let two = &line[..2];
+            assert_eq!(footprint(symbology, None, two), measured(Segment, two));
+            for n in [1, 3, 4] {
+                let points = &line[..n];
+                assert_eq!(
+                    footprint(symbology, None, points),
+                    measured(Partial, points),
+                    "{symbology:?} {n}"
+                );
+            }
+        }
+        for (symbology, reader) in [
+            (Symbology::QrCode, port),
+            (Symbology::Pdf417, None),
+            (Symbology::Ean13, None),
+        ] {
+            let nothing = footprint(symbology, reader, &[]);
+            assert_eq!(nothing, super::Footprint::unavailable(), "{symbology:?}");
+        }
+    }
+
+    #[test]
+    fn only_the_ports_four_projected_corners_frame_a_matrix_region() {
+        // the matrix region masks a decoded QR symbol out of the non-QR
+        // completion plane: only the port's four sampler corners measure its
+        // outline. An unprojected (0,0) corner, three points, or the lineage
+        // reader's finder centres (inside the outline, the fourth corner
+        // completed) frame none. The port's sampler always returns four
+        // corners: what three port points locate is recorded, not a contract
+        let corner = |(x, y): (f32, f32)| crate::report::Point { x, y };
+        let port = |pairs: &[(f32, f32)]| {
+            let result = port_result("abc", b"abc".to_vec(), "]Q1").with_point(rxing_points(pairs));
+            let read = observe(&result).expect("a plain port read of its own text");
+            (read.location, read.matrix_region)
+        };
+        // TL, TR, BL, BR as the port reports them; located TL, TR, BR, BL
+        let [top_left, top_right, bottom_left, bottom_right] =
+            [(10.5, 10.5), (50.5, 10.5), (10.5, 50.5), (50.5, 50.5)];
+        let outline = [top_left, top_right, bottom_right, bottom_left].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, bottom_left, bottom_right]),
+            (Some(outline), Some(outline))
+        );
+        let unprojected = [top_left, top_right, bottom_right, (0.0, 0.0)].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, (0.0, 0.0), bottom_right]),
+            (Some(unprojected), None)
+        );
+        // incidental, not a completion: the lineage rule for finder centres
+        // (BL, TL, TR) applied to the port's TL, TR, BL order
+        let incidental = [top_left, top_right, (-29.5, 50.5), bottom_left].map(corner);
+        assert_eq!(
+            port(&[top_left, top_right, bottom_left]),
+            (Some(incidental), None)
+        );
+        let lineage = |pairs: &[(f32, f32)]| {
+            let result = general_reader_result(mixed_codewords(), "0", &[b"abc"])
+                .with_point(rxing_points(pairs));
+            let read = observe(&result).expect("the reader's own codewords");
+            (read.location, read.matrix_region)
+        };
+        // the finder centres BL, TL, TR, then an alignment pattern
+        let centres = [(20.5, 40.5), (20.5, 20.5), (40.5, 20.5)];
+        let [bottom_left, top_left, top_right] = centres;
+        let completed = [bottom_left, top_left, top_right, (40.5, 40.5)].map(corner);
+        assert_eq!(lineage(&centres), (Some(completed), None));
+        let aligned = [bottom_left, top_left, top_right, (37.5, 37.5)];
+        assert_eq!(lineage(&aligned), (Some(aligned.map(corner)), None));
+    }
+
+    /// The committed `DataBar` Expanded symbol, downscaled to `side` pixels
+    /// along its longer side.
+    fn databar_expanded(side: u32) -> LumaImage {
+        let symbol = fixture("symbology/databar-expanded-bwipp-regression.png");
+        crate::transform::downscale_to(&symbol, side)
+    }
+
+    /// What a pass read: each result's format and text, in order.
+    fn reads(results: &[rxing::RXingResult]) -> Vec<(rxing::BarcodeFormat, &str)> {
+        results
+            .iter()
+            .map(|result| (*result.getBarcodeFormat(), result.getText()))
+            .collect()
+    }
+
+    /// No read at all.
+    const NOTHING: [(rxing::BarcodeFormat, &str); 0] = [];
+
+    const EXPANDED_TEXT: &str = "(01)09506000134352(10)DEMO";
+
+    /// What the upstream reader stack alone reads under the hints `decode`
+    /// builds for a pass restricted to `only` (`None`: every format).
+    fn upstream(luma: &LumaImage, only: Option<rxing::BarcodeFormat>) -> Vec<rxing::RXingResult> {
+        let mut hints = rxing::DecodeHints {
+            AlsoInverted: Some(true),
+            PossibleFormats: only.map(|format| std::collections::HashSet::from([format])),
+            ..Default::default()
+        };
+        super::decode_all(luma, &mut hints).unwrap_or_default()
+    }
+
+    /// `left` and `right` side by side on a white plane, top-aligned.
+    fn beside(left: &LumaImage, right: &LumaImage) -> LumaImage {
+        let width = left.width() + right.width();
+        let height = left.height().max(right.height());
+        let mut plane = vec![255u8; (width * height) as usize];
+        for (image, offset) in [(left, 0), (right, left.width())] {
+            let side = image.width() as usize;
+            for y in 0..image.height() {
+                let row = &image.data()[y as usize * side..][..side];
+                let start = (y * width + offset) as usize;
+                plane[start..start + side].copy_from_slice(row);
+            }
+        }
+        LumaImage::new(plane, width, height)
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_only_runs_when_no_expanded_symbol_was_read() {
+        // At a quarter of the committed size both readers read the symbol:
+        // the decode publishes one read, so the patched pass, which would
+        // have added a second, did not run. At half the size the upstream
+        // reader stops at an internal false finder and the patched pass reads
+        // the symbol: one read again.
+        use rxing::BarcodeFormat::RSS_EXPANDED;
+        let quarter = databar_expanded(223);
+        assert_eq!(
+            reads(&upstream(&quarter, Some(RSS_EXPANDED))),
+            [(RSS_EXPANDED, EXPANDED_TEXT)]
+        );
+        assert_eq!(
+            reads(&super::decode_expanded(&quarter).unwrap()),
+            [(RSS_EXPANDED, EXPANDED_TEXT)],
+            "the patched pass reads the quarter-size symbol as well"
+        );
+        let half = databar_expanded(446);
+        assert_eq!(
+            reads(&upstream(&half, Some(RSS_EXPANDED))),
+            NOTHING,
+            "the upstream reader misses the half-size symbol"
+        );
+        for plane in [&quarter, &half] {
+            let found = decode(plane, FormatFilter::Only(Symbology::DataBarExpanded));
+            let [read] = &found[..] else {
+                panic!("one read of the {}-pixel symbol: {found:?}", plane.width());
+            };
+            assert_eq!(
+                (read.symbology, read.raw.as_slice()),
+                (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes())
+            );
+        }
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_reads_a_vertical_symbol() {
+        // TryHarder gives the patched reader its quarter-turn pass: the
+        // half-size symbol turned a quarter clockwise, which the upstream
+        // reader misses in both orientations, is read with its element
+        // string — the walk holds it for confirmation like any such read
+        use rxing::BarcodeFormat::RSS_EXPANDED;
+        let upright = databar_expanded(446);
+        let (width, height) = (upright.width(), upright.height());
+        let mut turned = vec![0u8; upright.data().len()];
+        for y in 0..height {
+            for x in 0..width {
+                // (x, y) moves to (height - 1 - y, x) in a height-wide image
+                turned[(x * height + (height - 1 - y)) as usize] =
+                    upright.data()[(y * width + x) as usize];
+            }
+        }
+        let vertical = LumaImage::new(turned, height, width);
+        assert_eq!(
+            reads(&upstream(&vertical, Some(RSS_EXPANDED))),
+            NOTHING,
+            "the upstream reader misses the vertical symbol"
+        );
+        let found = decode(&vertical, FormatFilter::Only(Symbology::DataBarExpanded));
+        let [read] = &found[..] else {
+            panic!("one read of the vertical symbol: {found:?}");
+        };
+        assert_eq!(
+            (read.symbology, read.raw.as_slice(), read.needs_confirmation),
+            (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes(), true)
+        );
+    }
+
+    #[test]
+    fn the_patched_databar_expanded_pass_runs_beside_a_read_of_another_symbol() {
+        // An unrestricted pass over the half-size symbol with a QR code to
+        // its right: the upstream readers read the QR code and miss the
+        // expanded symbol in the region left of it, so the patched pass still
+        // runs and the decode publishes both symbols. A read of another
+        // symbol never stands for the expanded symbol the upstream reader
+        // missed.
+        let qr = render(b"a second read", qrcode::EcLevel::M);
+        let plane = beside(&databar_expanded(446), &qr);
+        assert_eq!(
+            reads(&upstream(&plane, None)),
+            [(rxing::BarcodeFormat::QR_CODE, "a second read")]
+        );
+        let found = decode(&plane, FormatFilter::All);
+        let published: Vec<_> = found
+            .iter()
+            .map(|read| (read.symbology, read.raw.as_slice()))
+            .collect();
+        assert_eq!(
+            published,
+            [
+                (Symbology::QrCode, b"a second read".as_slice()),
+                (Symbology::DataBarExpanded, EXPANDED_TEXT.as_bytes()),
+            ]
         );
     }
 }

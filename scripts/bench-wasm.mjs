@@ -22,11 +22,16 @@
 //     `ok <raw> <gzip-9> <brotli-11> <glue bytes>` of the packed .wasm,
 //     compressed with Node zlib (gzip level 9, brotli quality 11).
 //
-// <package-dir> holds the glue named by package.json `main` (default
-// `qrcode-ai-scanner.js`) and its `_bg.wasm` — the published npm layout.
+// <package-dir> holds the glue named by package.json `main` and its
+// `_bg.wasm` — the published npm layout, which the current pkg/ follows
+// (`main` is `qrcode-barcode-scanner.js`). The v0.10.1 base is that
+// release's portable module folder, pkg/compatible, which has no
+// package.json (its build recipe deletes it): there the glue is the `.js`
+// named after the folder's one `*_bg.wasm`, so this fallback is what
+// loads the base.
 // Every command leaves within about 50 ms once its parent changes, even
 // inside a synchronous scan (bench-node.mjs exitWithParent).
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
@@ -37,11 +42,18 @@ const SIGNATURE = ["bytes", "profile", "max_dimension", "max_pixels", "budget_ms
 
 function locate(dir) {
   const manifest = resolve(dir, "package.json");
-  const main = existsSync(manifest)
-    ? (JSON.parse(readFileSync(manifest, "utf8")).main ?? "qrcode-ai-scanner.js")
-    : "qrcode-ai-scanner.js";
-  const glue = resolve(dir, main);
+  const main = existsSync(manifest) ? JSON.parse(readFileSync(manifest, "utf8")).main : undefined;
+  const glue = resolve(dir, main ?? soleGlue(dir));
   return { glue, wasm: glue.replace(/\.js$/, "_bg.wasm") };
+}
+
+/** The glue beside the folder's one `*_bg.wasm`, for a package without `main`. */
+function soleGlue(dir) {
+  const modules = readdirSync(dir).filter((name) => name.endsWith("_bg.wasm"));
+  if (modules.length !== 1) {
+    throw new Error(`${dir}: no package.json main, and ${modules.length} *_bg.wasm files instead of one`);
+  }
+  return modules[0].replace(/_bg\.wasm$/, ".js");
 }
 
 async function load(dir) {

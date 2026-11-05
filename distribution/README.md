@@ -1,6 +1,8 @@
 # Use the scanner with Docker, MCP or Agent Skills
 
-> The source repository is now `supernovae-st/qrcode-barcode-scanner`.
+> The source repository is now `qrcode-ai-com/qrcode-barcode-scanner`, transferred
+> from `supernovae-st/qrcode-barcode-scanner`; the release links below were
+> published at the earlier address, which redirects.
 > Installation names, release assets, versions and hashes below remain unchanged.
 > This rename does not publish a new scanner, container, MCP adapter or skill.
 > See the [source and package contract](../SOURCE-AND-EXTRACTION.md).

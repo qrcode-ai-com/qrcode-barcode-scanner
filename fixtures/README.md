@@ -22,8 +22,17 @@ Golden sources are not corpus entries: `clean/gs1-fnc1.png`, `eci/` (ECI
 and Hanzi symbols) and `payloads/` (one symbol per payload kind) are
 written by `gen-fixtures` from explicit segment streams, and
 [`../spec/README.md`](../spec/README.md) § Examples names the golden each
-one produces. The exact-content inputs under `symbology/` are listed in
-[`symbology/CONTENT-FIXTURES.md`](symbology/CONTENT-FIXTURES.md).
+one produces. The exact-content and occurrence inputs under `symbology/` are
+listed in [`symbology/CONTENT-FIXTURES.md`](symbology/CONTENT-FIXTURES.md).
+
+[`consumer-truth.json`](consumer-truth.json) is the shared truth set the
+installed-package consumers run (`scripts/consumer_truth.py` and its twin
+`scripts/consumer-truth.mjs`): per input, its sha256, the exact contents as a
+multiset, the primary, each occurrence's geometry kind (with layout positions
+where the composition fixes them) and the score/null association, under the
+full profile with no budget. Its sources are named per case: `corpus.toml`,
+`symbology/CONTENT-FIXTURES.md`, the spec examples, or a composition layout.
+Both judges refuse each departure in their `--self-test`.
 
 `cargo run -p xtask -- corpus-report` runs the scanner over the corpus and
 fails on any regression; `--write` refreshes the README results block.

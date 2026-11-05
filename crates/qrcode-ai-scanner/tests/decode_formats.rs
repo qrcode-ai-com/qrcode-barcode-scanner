@@ -7,7 +7,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{ImageInput, Scanner};
+use qrcode_barcode_scanner::{ImageInput, Scanner};
 
 const CONTENT: &str = "https://qrcode-ai.com/decode-formats";
 

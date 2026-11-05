@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     ImageInput, ScanConfig, ScanProfile, Scanner, Score, ScorePreset, StressAxis,
 };
 
@@ -113,12 +113,7 @@ fn presets_spell_the_two_postures() {
         ScorePreset::from_name("design").unwrap().skips(),
         vec![StressAxis::Perspective, StressAxis::Rotation]
     );
-    assert!(
-        ScorePreset::from_name("capture")
-            .unwrap()
-            .skips()
-            .is_empty()
-    );
+    assert_eq!(ScorePreset::from_name("capture").unwrap().skips().len(), 0);
     for junk in ["Design", "builder", ""] {
         assert!(ScorePreset::from_name(junk).is_none(), "{junk:?}");
     }
@@ -150,7 +145,7 @@ fn knee_axes_carry_a_refined_label() {
             .refined_failed_at
             .as_ref()
             .expect("every ordered-ramp knee is refined at Full depth");
-        assert!(!refined.is_empty());
+        assert_ne!(refined.len(), 0);
     }
     for axis in score.axes.iter().filter(|a| a.failed_at.is_none()) {
         assert!(
@@ -165,6 +160,6 @@ fn knee_axes_carry_a_refined_label() {
 #[test]
 fn old_reports_parse_with_weights_run_default() {
     let old = r#"{"value":87,"grade":"excellent","axes":[],"structural":null,"uec":null,"iso15415":null}"#;
-    let score: qrcode_ai_scanner::Score = serde_json::from_str(old).unwrap();
+    let score: qrcode_barcode_scanner::Score = serde_json::from_str(old).unwrap();
     assert_eq!(score.weights_run, 0);
 }

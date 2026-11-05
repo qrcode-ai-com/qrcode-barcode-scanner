@@ -24,10 +24,10 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORE = "crates/qrcode-ai-scanner"
 BINDING = "bindings/flutter"
-VENDOR = "rust/vendor/qrcode-ai-scanner"
+VENDOR = "rust/vendor/qrcode-barcode-scanner"
 METADATA = "flutter-bundle"
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
-PUBIGNORE_CORE = b"\n!rust/vendor/qrcode-ai-scanner/.cargo_vcs_info.json\n"
+PUBIGNORE_CORE = b"\n!rust/vendor/qrcode-barcode-scanner/.cargo_vcs_info.json\n"
 DEPENDENCY_KINDS = ("dependencies", "dev-dependencies", "build-dependencies")
 TARGET_KINDS = {"lib": ("autolib", "src"), "bin": ("autobins", "src/bin"),
                 "example": ("autoexamples", "examples"), "test": ("autotests", "tests"),
@@ -289,7 +289,7 @@ def validate_core(files, source, workspace, revision, license_bytes):
     manifest = tomllib.loads(files["Cargo.toml"].decode())
     original = tomllib.loads(source["Cargo.toml"].decode())
     validate_normalized_manifest(manifest, original, workspace, source)
-    require(manifest["package"]["name"] == "qrcode-ai-scanner", "wrong core package")
+    require(manifest["package"]["name"] == "qrcode-barcode-scanner", "wrong core package")
     require(files["LICENSE"] == license_bytes, "core LICENSE mismatch")
     require(files["Cargo.toml.orig"] == source["Cargo.toml"], "core source manifest mismatch")
     vcs = json.loads(files[".cargo_vcs_info.json"])
@@ -307,7 +307,7 @@ def bundle(core_archive, snapshot, revision):
     workspace = tomllib.loads(snapshot["Cargo.toml"].decode())["workspace"]
     version = workspace["package"]["version"]
     packed = read_archive(core_archive)
-    prefix = f"qrcode-ai-scanner-{version}"
+    prefix = f"qrcode-barcode-scanner-{version}"
     require(all(name.startswith(prefix + "/") for name in packed), "core archive name/version mismatch")
     core = subfiles(packed, prefix)
     source = subfiles(snapshot, CORE)
@@ -320,11 +320,11 @@ def bundle(core_archive, snapshot, revision):
     require(re.search(r"^version:\s*" + re.escape(version) + r"\s*$", files["pubspec.yaml"].decode(), re.M),
             "pubspec/core version mismatch")
     dependency = binding["dependencies"]["scanner-core"]
-    require(dependency.get("package") == "qrcode-ai-scanner"
+    require(dependency.get("package") == "qrcode-barcode-scanner"
             and dependency.get("path") == "../../../crates/qrcode-ai-scanner", "unexpected scanner-core dependency")
     require(METADATA not in binding["package"].get("metadata", {}), "binding already staged")
     rewritten, count = re.subn(r'(scanner-core\s*=\s*\{[^\n]*?\bpath\s*=\s*)"[^"]+"',
-                              r'\1"vendor/qrcode-ai-scanner"', text)
+                              r'\1"vendor/qrcode-barcode-scanner"', text)
     require(count == 1, "cannot rewrite exactly one scanner-core.path")
     metadata = {"candidate": revision, "core-version": version, "core-content-sha256": digest(core),
                 "core-source-sha256": digest(source), "core-archive-sha256": hashlib.sha256(core_archive).hexdigest()}
@@ -362,7 +362,7 @@ def verify_staged(files, snapshot, revision, *, unpublished_example_lock=False):
     manifest["package"]["metadata"].pop(METADATA)
     if not manifest["package"]["metadata"]:
         manifest["package"].pop("metadata")
-    require(manifest["dependencies"]["scanner-core"]["path"] == "vendor/qrcode-ai-scanner", "wrong bundled core path")
+    require(manifest["dependencies"]["scanner-core"]["path"] == "vendor/qrcode-barcode-scanner", "wrong bundled core path")
     manifest["dependencies"]["scanner-core"]["path"] = canonical["dependencies"]["scanner-core"]["path"]
     require(manifest == canonical, "staged binding manifest changed beyond path and bundle metadata")
     for name, data in binding.items():
@@ -376,13 +376,13 @@ def verify_staged(files, snapshot, revision, *, unpublished_example_lock=False):
 
 def fixture(version="0.9.0"):
     revision = "a" * 40
-    original = b'[package]\nname = "qrcode-ai-scanner"\nversion.workspace = true\nlicense.workspace = true\n'
+    original = b'[package]\nname = "qrcode-barcode-scanner"\nversion.workspace = true\nlicense.workspace = true\n'
     workspace = b'[workspace.package]\nversion = "0.9.0"\nlicense = "AGPL-3.0-or-later"\n'
-    manifest = b'[package]\nname = "qrcode-ai-scanner"\nversion = "0.9.0"\nlicense = "AGPL-3.0-or-later"\n'
+    manifest = b'[package]\nname = "qrcode-barcode-scanner"\nversion = "0.9.0"\nlicense = "AGPL-3.0-or-later"\n'
     core = {"Cargo.toml": manifest, "Cargo.toml.orig": original, "LICENSE": b"license\n",
             "src/lib.rs": b"pub fn value() -> u32 { 1 }\n", "Cargo.lock": b"version = 4\n",
             ".cargo_vcs_info.json": json.dumps({"git": {"sha1": revision}, "path_in_vcs": CORE}).encode()}
-    binding = b'[package]\nname = "qrcode_ai_scanner"\nversion = "0.9.0"\n[dependencies]\nscanner-core = { package = "qrcode-ai-scanner", path = "../../../crates/qrcode-ai-scanner", features = ["serde"] }\n'
+    binding = b'[package]\nname = "qrcode_ai_scanner"\nversion = "0.9.0"\n[dependencies]\nscanner-core = { package = "qrcode-barcode-scanner", path = "../../../crates/qrcode-ai-scanner", features = ["serde"] }\n'
     snapshot = {"Cargo.toml": workspace, "LICENSE": b"license\n", f"{CORE}/Cargo.toml": original,
                 f"{CORE}/LICENSE": b"license\n", f"{CORE}/src/lib.rs": core["src/lib.rs"],
                 f"{BINDING}/LICENSE": b"license\n", f"{BINDING}/pubspec.yaml": b"version: 0.9.0\n",
@@ -398,7 +398,7 @@ def self_test():
             self.core, self.snapshot, self.revision = fixture()
 
         def pack(self, core=None):
-            return archive_bytes({f"qrcode-ai-scanner-0.9.0/{name}": data
+            return archive_bytes({f"qrcode-barcode-scanner-0.9.0/{name}": data
                                   for name, data in (core or self.core).items()})
 
         def test_identity_and_determinism(self):
@@ -436,8 +436,13 @@ def self_test():
 
         def test_example_lock_names_current_path_dependency(self):
             version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+            pubspec = (ROOT / BINDING / "pubspec.yaml").read_text()
+            package = re.search(r"(?m)^name:[ \t]*(['\"]?)([a-z_][a-z0-9_]*)\1[ \t]*$", pubspec)
+            self.assertIsNotNone(package, "the binding pubspec has no top-level package name")
             lock = (ROOT / BINDING / "example/pubspec.lock").read_text()
-            entry = re.search(r"(?m)^  qrcode_ai_scanner:\n((?: {4}.*\n)*)", lock).group(1)
+            entry = re.search(rf"(?m)^  {package.group(2)}:\n((?: {{4}}.*\n)*)", lock)
+            self.assertIsNotNone(entry, f"the example lock has no {package.group(2)} entry")
+            entry = entry.group(1)
             self.assertIn('      path: ".."\n', entry)
             self.assertIn('    source: path\n', entry)
             self.assertIn(f'    version: "{version}"\n', entry)
@@ -452,6 +457,16 @@ def self_test():
                                 (f"{BINDING}/LICENSE", b"wrong")):
                 with self.subTest(name=name), self.assertRaises(ValueError):
                     bundle(self.pack(), self.snapshot | {name: value}, self.revision)
+
+        def test_refuses_previous_core_name(self):
+            previous = archive_bytes({f"qrcode-ai-scanner-0.9.0/{name}": data for name, data in self.core.items()})
+            with self.assertRaisesRegex(ValueError, "core archive name/version mismatch"):
+                bundle(previous, self.snapshot, self.revision)
+            for name in ("Cargo.toml", "Cargo.toml.orig"):
+                self.core[name] = self.core[name].replace(b'"qrcode-barcode-scanner"', b'"qrcode-ai-scanner"')
+            self.snapshot[f"{CORE}/Cargo.toml"] = self.core["Cargo.toml.orig"]
+            with self.assertRaisesRegex(ValueError, "wrong core package"):
+                bundle(self.pack(), self.snapshot, self.revision)
 
         def test_malicious_archives(self):
             for name, kind in (("../escape", tarfile.REGTYPE), ("/absolute", tarfile.REGTYPE),
@@ -534,7 +549,7 @@ def self_test():
             self.core["Cargo.toml"] += (
                 b'edition = "2024"\nbuild = false\nreadme = false\n'
                 b'autolib = false\nautobins = false\nautoexamples = false\nautotests = false\nautobenches = false\n'
-                b'[lib]\nname = "qrcode_ai_scanner"\npath = "src/lib.rs"\n'
+                b'[lib]\nname = "qrcode_barcode_scanner"\npath = "src/lib.rs"\n'
                 b'[[bin]]\nname = "tool"\npath = "src/bin/tool.rs"\n'
                 b'[[example]]\nname = "demo"\npath = "examples/demo/main.rs"\n'
                 b'[[test]]\nname = "sample"\npath = "tests/sample.rs"\n'
@@ -555,7 +570,7 @@ def self_test():
             declaration = b'\n[lib]\nproc-macro = true\n'
             self.core["Cargo.toml.orig"] += declaration
             self.snapshot[f"{CORE}/Cargo.toml"] += declaration
-            self.core["Cargo.toml"] += declaration + b'name = "qrcode_ai_scanner"\npath = "src/lib.rs"\n'
+            self.core["Cargo.toml"] += declaration + b'name = "qrcode_barcode_scanner"\npath = "src/lib.rs"\n'
             staged, _ = bundle(self.pack(), self.snapshot, self.revision)
             verify_staged(staged, self.snapshot, self.revision)
 
@@ -677,10 +692,10 @@ def main():
     cargo = [args.cargo_wrapper, "cargo"] if args.cargo_wrapper else ["cargo"]
     archive = args.core_archive
     if archive is None:
-        subprocess.run([*cargo, "package", "--locked", "--no-verify", "-p", "qrcode-ai-scanner"], cwd=ROOT, check=True)
+        subprocess.run([*cargo, "package", "--locked", "--no-verify", "-p", "qrcode-barcode-scanner"], cwd=ROOT, check=True)
         metadata = json.loads(subprocess.check_output([*cargo, "metadata", "--no-deps", "--format-version", "1"], cwd=ROOT))
         version = tomllib.loads(snapshot["Cargo.toml"].decode())["workspace"]["package"]["version"]
-        archive = pathlib.Path(metadata["target_directory"]) / "package" / f"qrcode-ai-scanner-{version}.crate"
+        archive = pathlib.Path(metadata["target_directory"]) / "package" / f"qrcode-barcode-scanner-{version}.crate"
     files, receipt = bundle(archive.read_bytes(), snapshot, revision)
     write_tree(args.output, files)
     if args.archive:

@@ -1,7 +1,7 @@
 [package]
 name = "qrcode-ai-scanner-wasm"
-description = "Browser WASM bindings for qrcode-ai-scanner — QR decoding + scannability scoring"
-publish = false # ships to npm (@supernovae-st/qrcode-ai-scanner-wasm), not crates.io
+description = "Browser WASM bindings for qrcode-barcode-scanner — QR decoding + scannability scoring"
+publish = false # ships to npm (@qrcode-ai-com/qrcode-barcode-scanner-wasm), not crates.io
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,8 +15,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # dual-engine build: rxing rides along since the artistic-decode rates
 # demanded it (the wasm_support wiring landed). scripts/build-wasm.sh builds
-# equivalent SIMD128 and non-SIMD variants from this same configuration.
-qrcode-ai-scanner = { path = "../qrcode-ai-scanner", default-features = false, features = [
+# one portable module from this configuration, with SIMD disabled.
+qrcode-barcode-scanner = { path = "../qrcode-ai-scanner", default-features = false, features = [
   "engine-rqrr",
   "engine-rxing",
   "serde",

@@ -132,7 +132,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use image::{GrayImage, Luma};
 use qrcode::canvas::{Canvas, MaskPattern, Module};
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     Charset, DecodedContent, Detection, EngineKind, Hint, ImageInput, ScanProfile, ScanReport,
     Scanner,
 };
@@ -1260,7 +1260,7 @@ fn build_grid() -> Vec<Cell> {
             for &pct in PAYLOAD_FRACTIONS {
                 let len = (fit * pct as usize / 100).max(1);
                 let truth = filler(len);
-                debug_assert!(!truth.is_empty());
+                debug_assert_ne!(truth.len(), 0);
                 for &(shape, _) in SHAPES {
                     for &(fill, _) in FILLS {
                         for &(position, _) in POSITIONS {
@@ -2354,7 +2354,7 @@ fn verify_base_symbols(scanner: &Scanner) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qrcode_ai_scanner::{EciSegment, Fnc1Position, Symbology};
+    use qrcode_barcode_scanner::{EciSegment, Fnc1Position, Symbology};
 
     fn rescued(correct: u32, wrong: u32) -> Bucket {
         Bucket {
@@ -2969,7 +2969,7 @@ mod tests {
             pins.push(extra);
             judge(PassId::Dual, &measured, &ledger(&pins, &[])).failures()
         };
-        assert!(with("floor\tdual\t5").is_empty());
+        assert_eq!(with("floor\tdual\t5").len(), 0);
         assert_eq!(
             with("floor\tdual\t4"),
             ["dual: strict_correct 5 above its floor 4: raise the floor to 5"],
@@ -3104,7 +3104,7 @@ mod tests {
             ledger(&pins.each_ref().map(String::as_str), rows)
         };
         let dual = book("dual", &[row("dual", &rescued)]);
-        assert!(judge(PassId::Dual, &measured, &dual).failures().is_empty());
+        assert_eq!(judge(PassId::Dual, &measured, &dual).failures().len(), 0);
         for pass in [PassId::Uncapped, PassId::Capped] {
             let name = pass.name();
             let refused =

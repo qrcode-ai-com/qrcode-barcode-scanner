@@ -1,10 +1,18 @@
 ---
-title: "Rust — qrcode-ai-scanner"
+title: "Rust — qrcode-barcode-scanner"
 description: "The core crate: Scanner, profiles, cancellation, batching."
 ---
 
+<Note>
+The `qrcode-barcode-scanner` crate is **pending publication** on crates.io, and
+the samples on this page target its 0.11.0 release. Until crates.io serves it,
+the line below adds 0.10.1 under the crate's previous name, `qrcode-ai-scanner`,
+imported as `qrcode_ai_scanner`. The
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+</Note>
+
 ```bash
-cargo add qrcode-ai-scanner
+cargo add qrcode-ai-scanner@0.10.1
 ```
 
 Features: `engine-rxing` + `engine-rqrr` (default — at least one
@@ -16,7 +24,7 @@ required) · `parallel` (rayon batching, native only — OFF for wasm) ·
 `Send + Sync`, no interior state — build once, share across threads.
 
 ```rust
-use qrcode_ai_scanner::{
+use qrcode_barcode_scanner::{
     CancelToken, ImageInput, Limits, ScanConfig, ScanProfile, Scanner,
 };
 
@@ -89,9 +97,15 @@ Two detections denote the same content when symbology, `raw`, `fnc1` and
 
 ### Errors
 
-`ScanError` (`thiserror` + `miette`): `.code()` → `"QRS-001"…"QRS-005"`
+`ScanError` (`thiserror` + `miette`): `.code()` → `"QRS-001"…"QRS-006"`
 ([catalog](/api/errors)). Pattern-match the code, not the variant — the
-enum is `#[non_exhaustive]`.
+enum is `#[non_exhaustive]`. `QRS-006` is an option outside its domain —
+a zero `Limits` cap, a zero side, a palette above
+`ScanConfig::MAX_ALPHA_PALETTE` or a `budget_ms` above
+`ScanConfig::MAX_BUDGET_MS` (4 294 967 295 ms) — refused before the input
+is read. `ScanConfig::validate` and `Limits::validate` run the same check
+ahead of a scan; `qrcode_barcode_scanner::options` maps a JavaScript number
+onto these domains (the WASM and Node bindings use it).
 
 ## Type surface
 
@@ -102,6 +116,13 @@ Everything the report contains is re-exported at the crate root:
 `Grade` · `StressAxis` · `Charset` · `EciSegment` · `Fnc1Position` ·
 `EcLevel` · `Point` · `Versions`.
 All public enums/structs are `#[non_exhaustive]` — match with `_` arms.
+
+`Capabilities::current()` describes the build itself, never a report: its
+`versions`, the decode `engines` compiled in (`rxing` with `engine-rxing`;
+`rqrr` and `rescue` with `engine-rqrr`) and the `symbologies` they can
+return — every one with rxing, `QrCode` alone in an rqrr-only build. It says
+which readers are included, not that an image will decode (spec/01
+§ Capabilities).
 
 <Note>
 Scoring evaluates the PRIMARY detection. wasm builds: keep the `parallel`

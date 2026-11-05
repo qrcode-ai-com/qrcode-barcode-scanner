@@ -1,8 +1,13 @@
-"""Install a produced wheel into a new venv and exercise its imported extension."""
+"""Install a produced wheel into a new venv and exercise its imported extension.
+
+Beyond the FIXTURE control (gen_v5_q.png), the installed module runs the shared
+truth set, fixtures/consumer-truth.json (consumer_truth.py).
+"""
 import argparse
 import base64
 import hashlib
 import importlib.metadata
+import importlib.util
 from importlib.machinery import EXTENSION_SUFFIXES
 import json
 import os
@@ -21,23 +26,37 @@ def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def inside(path, root):
+    """Path.is_relative_to, which the probe's floor interpreter (3.8) lacks."""
+    return path == root or root in path.parents
+
+
 def probe(args):
-    import qrcode_ai_scanner as qr
+    import qrcode_barcode_scanner as qr
 
     prefix = Path(sys.prefix).resolve()
     imported = Path(qr.__file__).resolve()
     assert sys.prefix != sys.base_prefix, "the consumer must run in a fresh venv"
-    assert imported.is_relative_to(prefix), (imported, prefix)
+    assert inside(imported, prefix), (imported, prefix)
     extensions = [Path(module.__file__).resolve() for name, module in sys.modules.items()
-                  if name.startswith("qrcode_ai_scanner.") and getattr(module, "__file__", "").endswith(tuple(EXTENSION_SUFFIXES))]
+                  if name.startswith("qrcode_barcode_scanner.") and getattr(module, "__file__", "").endswith(tuple(EXTENSION_SUFFIXES))]
     assert len(extensions) == 1, f"expected one loaded native extension, found {extensions}"
     extension = extensions[0]
-    assert extension.is_relative_to(prefix), (extension, prefix)
-    assert qr.__version__ == importlib.metadata.version("qrcode-ai-scanner") == args.version
+    assert inside(extension, prefix), (extension, prefix)
+    assert qr.__version__ == importlib.metadata.version("qrcode-barcode-scanner") == args.version
+    # Releases up to 0.9.0 were published as qrcode-ai-scanner. The wheel brings no
+    # alias under that name: neither its import package nor its distribution resolves.
+    assert importlib.util.find_spec("qrcode_ai_scanner") is None, "the previous import package resolves"
+    try:
+        importlib.metadata.version("qrcode-ai-scanner")
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    else:
+        raise AssertionError("the previous distribution qrcode-ai-scanner is installed")
     data = Path(args.fixture).read_bytes()
     text = "https://qrcode-ai.com/c/v5q"
     full = qr.scan(data, "full", budget_ms=0)
-    assert full["versions"] == {"scanner": args.version, "pipeline": 4, "score_contract": 5}
+    assert full["versions"] == {"scanner": args.version, "pipeline": 5, "score_contract": 5}
     assert full["trace"]["budget_exhausted"] is False
     assert len(full["detections"]) == 1
     det = full["detections"][0]
@@ -49,6 +68,12 @@ def probe(args):
     assert [axis["axis"] for axis in full["score"]["axes"]] == [
         "resolution", "blur", "contrast", "perspective", "rotation", "lighting"]
     assert full["score"]["uec"]["grade"] == full["score"]["iso15415"]["overall"] == "a"
+    # the installed build lists the readers it carries, in the contract's order
+    # UTF-8, never the locale's encoding (cp1252 on Windows)
+    contract = json.loads((Path(__file__).resolve().parents[1] / "spec/scan-report.schema.json")
+                          .read_text(encoding="utf-8"))["$defs"]
+    assert qr.capabilities() == {"versions": full["versions"], "engines": contract["EngineKind"]["enum"],
+                                 "symbologies": contract["Symbology"]["enum"]}
     frame = qr.scan(data, "frame", budget_ms=0)
     assert frame["score"] is None
     assert [det["content"]["text"] for det in frame["detections"]] == [text]
@@ -67,13 +92,37 @@ def probe(args):
             assert re.search(r"\[" + code + r"\]$", str(error)), str(error)
         else:
             raise AssertionError(f"expected {code}")
+    # the shared truth set through the installed module, inputs staged in the
+    # consumer: exact contents, primary, occurrences and score/null per case
+    spec = importlib.util.spec_from_file_location("consumer_truth", Path(__file__).resolve().parent / "consumer_truth.py")
+    truth_lib = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(truth_lib)
+    truth = truth_lib.load()
+    problems, identities = [], {}
+    for case, path in truth_lib.stage(truth, Path(args.receipt).parent / "truth"):
+        data = path.read_bytes()
+        if "error" in case:
+            try:
+                qr.scan(data, truth["scan"]["profile"], budget_ms=truth["scan"]["budget_ms"])
+            except ValueError as error:
+                if not str(error).endswith(f"[{case['error']}]"):
+                    problems.append(f"{case['id']}: {error}")
+            else:
+                problems.append(f"{case['id']}: no {case['error']}")
+            continue
+        report = qr.scan(data, truth["scan"]["profile"], budget_ms=truth["scan"]["budget_ms"])
+        problems += truth_lib.judge(case, report, full["versions"])
+        identities[case["id"]] = truth_lib.identity(report)
+    assert not problems, "\n".join(problems)
     receipt = {"verdict": "PASS", "python": sys.version, "platform": platform.platform(),
                "prefix": str(prefix), "imported": str(imported), "extension": str(extension),
                "extension_sha256": sha256(extension),
                "version": args.version, "full_score": full["score"]["value"],
                "wheel": args.wheel, "wheel_sha256": sha256(Path(args.wheel)),
-               "fixture_sha256": sha256(Path(args.fixture))}
-    Path(args.receipt).write_text(json.dumps(receipt, indent=2) + "\n")
+               "fixture_sha256": sha256(Path(args.fixture)),
+               "truth": {"file": "fixtures/consumer-truth.json", "sha256": sha256(truth_lib.TRUTH),
+                         "cases": len(truth["cases"]), "identities_sha256": truth_lib.identities_digest(identities)}}
+    Path(args.receipt).write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(receipt))
 
 
@@ -96,7 +145,9 @@ def main():
     assert len(wheels) == 1, f"expected one {args.wheel_tag} wheel, found {wheels}"
     consumer = Path(tempfile.mkdtemp(prefix="qrscan-packed-python-"))
     venv_dir = consumer / "venv"
-    venv.EnvBuilder(with_pip=True).create(venv_dir)
+    # Symlinked like `python -m venv` on POSIX: a copied interpreter that loads
+    # @executable_path/../lib/libpython (the 3.8-3.10 standalone builds) aborts.
+    venv.EnvBuilder(with_pip=True, symlinks=os.name != "nt").create(venv_dir)
     python = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     fixture = consumer / "fixture.png"
     shutil.copyfile(Path(args.fixture).resolve(), fixture)
@@ -136,14 +187,14 @@ def main():
                   for name in ["tests", "failures", "errors", "skipped"]}
         assert totals["tests"] > 0 and totals["failures"] == totals["errors"] == totals["skipped"] == 0, totals
         assert all(sha256(suite / relative) == digest for relative, digest in suite_inputs.items()), "pytest changed an input"
-        report = json.loads(receipt.read_text())
+        report = json.loads(receipt.read_text(encoding="utf-8"))
         report["pytest"] = {**totals, "junit": str(junit), "junit_sha256": sha256(junit),
                             "requirements_sha256": sha256(requirements),
                             "suite_inputs": suite_inputs}
-        receipt.write_text(json.dumps(report, indent=2) + "\n")
+        receipt.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report))
     if "GITHUB_OUTPUT" in env:
-        with open(env["GITHUB_OUTPUT"], "a") as output:
+        with open(env["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
             output.write(f"receipt={receipt}\n")
             if args.suite:
                 output.write(f"junit={junit}\n")

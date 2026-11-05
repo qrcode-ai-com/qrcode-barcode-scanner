@@ -49,7 +49,13 @@ pub(crate) const FLOOR_SWAP: u64 = 8_000_000_000;
 /// lives outside `/tmp`, which the system cleans.
 pub(crate) const LOCK_PATH: &str = "/var/tmp/qrscan-bench.lock";
 /// Substrings that tie a build process to this project.
-const PROJECT_MARKERS: [&str; 3] = ["qrscan", "qrcode-ai-scanner", "qrcode_ai_scanner"];
+const PROJECT_MARKERS: [&str; 5] = [
+    "qrscan",
+    "qrcode-ai-scanner",
+    "qrcode_ai_scanner",
+    "qrcode-barcode-scanner",
+    "qrcode_barcode_scanner",
+];
 /// Poll period while waiting for the gate.
 const POLL: Duration = Duration::from_secs(15);
 
@@ -932,7 +938,7 @@ mod tests {
             })
         };
         let (found, unread) = sibling_builds_in(&table(), &markers, 210, &cwd);
-        assert!(unread.is_empty());
+        assert_eq!(unread.len(), 0);
         assert_eq!(
             found,
             vec![
@@ -946,6 +952,44 @@ mod tests {
                 },
                 SiblingBuild {
                     pid: 500,
+                    tool: String::from("rustc")
+                },
+            ]
+        );
+    }
+
+    /// The base links the scanner under its published crate name and the
+    /// candidate under its new one: a rustc of either is a project build,
+    /// found by its arguments alone, while an unrelated one is not.
+    #[test]
+    fn both_scanner_crate_names_mark_a_project_build() {
+        let markers: Vec<String> = PROJECT_MARKERS.iter().map(|m| (*m).to_owned()).collect();
+        let table = parse_ps(
+            "  700     1 rustc --crate-name qrcode_barcode_scanner\n\
+               710     1 rustc --crate-name qrcode_ai_scanner\n\
+               720     1 rustc --crate-name serde\n",
+        );
+        let cwd = |pid: u32| -> Result<Option<String>, String> {
+            match pid {
+                720 => Ok(Some(String::from("/elsewhere"))),
+                _ => Err(format!("build process {pid} was probed")),
+            }
+        };
+        let (found, unread) = sibling_builds_in(&table, &markers, 1, &cwd);
+        assert_eq!(
+            unread,
+            Vec::<String>::new(),
+            "the markers decide, with no probe"
+        );
+        assert_eq!(
+            found,
+            vec![
+                SiblingBuild {
+                    pid: 700,
+                    tool: String::from("rustc")
+                },
+                SiblingBuild {
+                    pid: 710,
                     tool: String::from("rustc")
                 },
             ]

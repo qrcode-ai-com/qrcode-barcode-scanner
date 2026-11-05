@@ -8,7 +8,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use qrcode_ai_scanner::fuzzing;
+use qrcode_barcode_scanner::fuzzing;
 
 fuzz_target!(|data: &[u8]| {
     // Peel a 3-byte parameter header off the front (version · parity · erasure
