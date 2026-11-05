@@ -985,9 +985,13 @@ On the reviewed independent tag `agents-v<adapter-version>`, the workflow:
    reads no persistent registry credential and runs no package lifecycle script.
 5. Compares both registry integrity and public tarball bytes. An existing equal
    version records **`EXISTING_MATCH_NO_UPLOAD`**; different bytes or a failed
-   registry probe stop the job. A new successful upload requires provenance
-   metadata and records **`PUBLISHED_OIDC_AND_PUBLIC_BYTES`**. This checks the
-   metadata's presence, not a separate cryptographic attestation verification.
+   registry probe stop the job. After npm accepts an upload, only an HTTP 404
+   on that version's manifest triggers another read. The job polls for up to
+   seven minutes without sending another upload. If the deadline expires,
+   verify the public version and its archive before rerunning the immutable
+   tag. A new successful upload requires provenance metadata and records
+   **`PUBLISHED_OIDC_AND_PUBLIC_BYTES`**. The receipt checks that npm serves
+   the provenance metadata. Cryptographic attestation verification is separate.
 6. Installs the public npm spec in fresh Node22/24 consumers and compares the
    installed adapter bytes with the qualified artifact before exercising the
    MCP protocols. A green skip-only job does not establish an OIDC exchange.

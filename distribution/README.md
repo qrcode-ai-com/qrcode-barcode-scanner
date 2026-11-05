@@ -2,25 +2,28 @@
 
 ## Published agent integrations
 
-These **0.2.0** integrations reuse the published
+These independently versioned integrations reuse the published
 `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` native engine. Choose the
 interface your application or agent already supports:
 
 | Integration | Public package | Install |
 | --- | --- | --- |
-| MCP stdio adapter | [`@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.0`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.0) | `npm install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.0` |
+| MCP stdio adapter | [`@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1) | `npm install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1` |
 | Portable skill | [`qrcode-barcode-scanner@0.2.0`](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner) | `clawhub install qrcode-barcode-scanner --version 0.2.0` |
 | OpenClaw plugin bundle | [`@qrcode-ai-com/qrcode-barcode-scanner@0.2.0`](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner) | `openclaw plugins install clawhub:@qrcode-ai-com/qrcode-barcode-scanner@0.2.0` |
 
-The MCP adapter passed fresh registry installations on **macOS ARM64 with
-Node.js 22 and 24**. The skill and bundle passed registry installation and
-real **OpenClaw 2026.11.1** runtime calls on macOS ARM64. These checks do not
-establish installation in every client or on every native engine target.
+The MCP adapter passed fresh registry installations on **Linux x64 and
+macOS ARM64 with Node.js 22 and 24**. Its
+[0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
+was published through GitHub Trusted Publishing with verified npm provenance.
+The skill and bundle passed registry installation and real
+**OpenClaw 2026.11.1** runtime calls on macOS ARM64. Other clients and native
+engine targets need their own installed-consumer checks.
 
 Read the [MCP installation and stdio configuration](../integrations/mcp/),
 [portable skill instructions](../skills/qrcode-barcode-scanner/) or
 [bundle setup](../integrations/openclaw/) before activation. The bundle installs
-its exact adapter dependency through explicit setup. The adapter, skill and
+its exact adapter dependency (MCP 0.2.0) through explicit setup. The adapter, skill and
 bundle are versioned separately from the engine; adapter patch releases need
 not change the other integration versions.
 

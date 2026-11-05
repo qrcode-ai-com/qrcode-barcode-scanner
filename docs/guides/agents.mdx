@@ -8,15 +8,16 @@ workflows, CI bots) consuming the scanner.
 
 ## Published agent integrations
 
-The [MCP stdio adapter 0.2.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.0),
+The [MCP stdio adapter 0.2.1](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1),
 [ClawHub skill 0.2.0](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
 and [OpenClaw bundle 0.2.0](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner)
 reuse the published scanner 0.11.0. See the
 [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md)
 for installation and exact qualification scope. The npm adapter was installed
-and tested on macOS ARM64 with Node.js 22/24; the skill and bundle were installed
-and exercised through OpenClaw 2026.11.1 on macOS ARM64. Other product clients
-and the Official MCP Registry require separate qualification or publication.
+and tested on Linux x64 and macOS ARM64 with Node.js 22/24. The skill and bundle
+were installed and exercised through OpenClaw 2026.11.1 on macOS ARM64; the
+bundle pins MCP 0.2.0. Other product clients and the Official MCP Registry
+require separate qualification or publication.
 
 ## Ground truth to load
 
