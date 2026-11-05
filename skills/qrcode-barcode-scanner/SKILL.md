@@ -14,6 +14,9 @@ Use the original helper at `scripts/scan.mjs` relative to this skill's directory
 prints the engine's unchanged JSON report. It does not upload images or access
 QR destinations.
 
+The helper uses the same engine as [QR Code AI](https://qrcode-ai.com/)'s QR verification workflows.
+The [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) are planned browser pages.
+
 ## Dependency and invocation
 
 Requires Node.js 22 or later, npm and a supported native engine platform.
@@ -68,5 +71,3 @@ in the answer and retain raw bytes when exact content matters.
 
 [Engine source and licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner)
 · [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md)
-
-[QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)

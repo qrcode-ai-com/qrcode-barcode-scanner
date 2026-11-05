@@ -5,8 +5,7 @@ It reads a local PNG, JPEG, WebP or GIF image, decodes the QR codes, barcodes
 and other 2D codes in it, and prints a JSON scan report that includes a
 scannability score. A release that carries prebuilt archives offers one archive
 per platform below, a source archive of the same commit and a checksum file.
-This README is identical in every archive and in the source tree, at
-`distribution/cli/README.md`.
+Each archive includes the version of this guide from its source tag.
 
 ## Archives
 
@@ -151,6 +150,10 @@ Set-Location "qrcode-barcode-scanner-cli-$V-x86_64-pc-windows-msvc"
 
 ## Run
 
+Use `qrscan` to inspect a QR design from [QR Code AI](https://qrcode-ai.com/) before printing or to read a
+barcode label from a saved photo. The planned [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) will cover these
+one-off browser workflows.
+
 ```sh
 ./qrscan --version                # qrscan X.Y.Z
 ./qrscan image.png                # the JSON scan report on stdout
@@ -270,9 +273,3 @@ providing the corresponding source.
 Releases and their notes are listed at
 <https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases>, and the
 changes of each version in `CHANGELOG.md` of the source.
-
-## QR Code AI
-
-- [QR Code AI](https://qrcode-ai.com/)
-- [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
-- [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)

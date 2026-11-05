@@ -3,7 +3,7 @@
 Local stdio adapter **0.2.1** for the published
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
 It exposes one `scan_image` tool and two read-only resources. The adapter
-reuses the async native engine; it does not implement another decoder or score.
+reuses the async native engine. The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
 
 [Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
 
@@ -21,9 +21,11 @@ MSVC. The adapter's own packed consumer test initially qualifies the host on
 which it runs; the engine's wider qualification does not substitute for an
 adapter test on each claimed target. ARMv7 and musl ARM64 are unsupported.
 
-Archive qualification for this patch covers **macOS ARM64 on Node.js 22.22.2
-and 24.22.1**, with modern and legacy official SDK clients. Other platforms and
-product-client integrations need their own installed-consumer checks.
+The published 0.2.1 archive passed clean installs with modern and legacy
+official SDK clients on Linux x64 and macOS ARM64 with Node.js 22 and 24.
+See the [0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
+for provenance and verification. Product-client integrations have separate
+installed-consumer checks.
 
 Install the exact adapter version from the public npm registry:
 
@@ -77,6 +79,10 @@ product client; each needs discovery and a fixture call from the installed
 package.
 
 ## Tool contract
+
+Use `scan_image` when your client already has the image bytes, such as a QR
+design to check or a product label to read. QR Code AI plans a [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and a
+[barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) for people who need a browser tool.
 
 `scan_image` accepts exactly these fields:
 
@@ -167,7 +173,6 @@ Source engine: [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner
 The adapter is versioned separately from the engine. A local packed-consumer
 pass qualifies the tested archive and host; public registry installation and
 additional platforms retain separate checks.
-Product: [QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 License: **AGPL-3.0-or-later**, including the adapter; see [LICENSE](LICENSE).
 
 SDK API sources:

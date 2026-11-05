@@ -8,6 +8,10 @@ symbol positions, and assess QR scannability from a terminal or script.
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
 [Prebuilt archive guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/distribution/cli/README.md)
 
+Use `qrscan` to check a QR design from [QR Code AI](https://qrcode-ai.com/) or decode a barcode from
+a saved image. The planned [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) are the corresponding browser
+destinations.
+
 ## Scan a label
 
 ```sh
@@ -61,10 +65,6 @@ installation.
 [Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
 
 Releases up to 0.10.1 were published as `qrcode-ai-scanner-cli`; both install `qrscan`.
-
-Part of [QR Code AI](https://qrcode-ai.com/).
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
 
 License: [AGPL-3.0-or-later](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE).
 Commercial licensing is described in the
