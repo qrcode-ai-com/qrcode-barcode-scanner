@@ -1,0 +1,39 @@
+{
+  "schema": "qrscan-oci-inputs/1",
+  "version": "0.11.0",
+  "engineSource": "176ac96ef16ee330dbfc6ada10327d0b4e23a8b2",
+  "repository": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
+  "baseImage": "debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc",
+  "releaseManifest": {
+    "name": "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS",
+    "sha256": "1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e"
+  },
+  "platforms": {
+    "amd64": {
+      "target": "x86_64-unknown-linux-gnu",
+      "archive": "qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "b7c6669e332c7cc688228077b70d87f52154052e345992bd358aad6d6c7d3298",
+      "binarySha256": "77965589784699138d2b512f94067528eba552536160560daed191de824ea01c"
+    },
+    "arm64": {
+      "target": "aarch64-unknown-linux-gnu",
+      "archive": "qrcode-barcode-scanner-cli-0.11.0-aarch64-unknown-linux-gnu.tar.gz",
+      "sha256": "d5b5eff8ed336ef82a76865fd16e9a087afd5b1574b537747aea6d105ae7c5aa",
+      "binarySha256": "d010a03064011f8775fc6f0add357cbbc634366d4b96dc0b892ab2c6047b271a"
+    }
+  },
+  "sources": {
+    "qrcode-barcode-scanner-cli-0.11.0-source.tar.gz": {
+      "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-source.tar.gz",
+      "sha256": "8e5e09f0ec8d93ae49ca35615c05bb1d326448b6de9757cef86ef48d7bf3a96d"
+    },
+    "qrcode-barcode-scanner-0.11.0.crate": {
+      "url": "https://static.crates.io/crates/qrcode-barcode-scanner/qrcode-barcode-scanner-0.11.0.crate",
+      "sha256": "08d6f8736cc4d8c82836e8b2056d47809ba9ea9219ef904f5ba2935c8f972031"
+    },
+    "qrcode-barcode-scanner-cli-0.11.0.crate": {
+      "url": "https://static.crates.io/crates/qrcode-barcode-scanner-cli/qrcode-barcode-scanner-cli-0.11.0.crate",
+      "sha256": "9c29e1bb38efb23d5937527f284d773b265fabd501b8da8fffa3f54647ad11d3"
+    }
+  }
+}
