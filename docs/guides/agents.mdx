@@ -6,6 +6,18 @@ description: "Machine-first integration: the schema, the goldens, the loop."
 This page is written for LLM agents and automated pipelines (Nika
 workflows, CI bots) consuming the scanner.
 
+## Published agent integrations
+
+The [MCP stdio adapter 0.2.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.0),
+[ClawHub skill 0.2.0](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
+and [OpenClaw bundle 0.2.0](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner)
+reuse the published scanner 0.11.0. See the
+[distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md)
+for installation and exact qualification scope. The npm adapter was installed
+and tested on macOS ARM64 with Node.js 22/24; the skill and bundle were installed
+and exercised through OpenClaw 2026.11.1 on macOS ARM64. Other product clients
+and the Official MCP Registry require separate qualification or publication.
+
 ## Ground truth to load
 
 | Artifact | Use |
@@ -18,8 +30,11 @@ workflows, CI bots) consuming the scanner.
 ## Invariants you can rely on
 
 1. **Empty `detections` is success-with-nothing** — exit 1 on the CLI,
-   resolved Promise elsewhere. Only `QRS-\d{3}` faults are errors. It is
-   final only when `trace.budget_exhausted` is `false`.
+   resolved Promise elsewhere. Engine faults carry `QRS-\d{3}` codes;
+   bindings and adapters also have input-validation errors of their own.
+   An empty report is inconclusive if the budget flag is not explicitly
+   `false` or any capacity flag is true or missing. Even a completed search
+   establishes only that this build decoded no code from this input.
 2. The JSON shape is identical on every surface and evolves additively —
    tolerate unknown fields/kinds/hints.
 3. For the QR family, `content.raw` (base64) is the byte truth: the
@@ -39,17 +54,23 @@ workflows, CI bots) consuming the scanner.
    be located); `fnc1` only for GS1 (`first`) or AIM-application
    (`second`) data. An absent key means none was observed, or the
    symbology does not report it — not that the symbol declares none.
-5. **`trace.budget_exhausted` says whether a report is final.** `false`:
+5. **`trace.budget_exhausted` records a budget cut.** `false`:
    every planned unit ran, and the report equals the unbounded report for
    the same input, configuration and scanner build on the same platform
    (wall clock aside; PDF417 excepted — its decoder breaks ties in
    randomized order, spec/04 § Determinism). `true`: the wall-clock budget
    cut planned work. Then **re-scan unbounded first** (`--budget-ms 0`,
    `budgetMs: 0`, `budget_ms=0`); never regenerate, accept or reject on
-   that report. Absent (older reports): unknown, never final.
+   that report. Absent (older reports): unknown. The budget contract calls
+   `false` final; it does not mean every symbol or copy was found.
+   `trace.saturation.reads`, `.detections` and `.occurrences` record separate
+   capacity limits. Any true or missing flag leaves search completeness
+   unproven. Removing a time budget does not remove those capacities.
 6. Cache only reports whose flag is `false`, keyed on the input + the WHOLE
-   configuration (profile, budget, skipped axes and checks, alpha options)
-   + `versions`, on the same build.
+   configuration (profile, budget, input limits, skipped axes and checks,
+   alpha options) + `versions`, on the same build. Preserve saturation flags
+   in the cached report; a cached limited or unknown-capacity result cannot
+   establish absence.
 7. **`score: null` is never `0`.** With detections it means the
    configuration computes no score (`frame`, every axis skipped), the
    budget interrupted the judgment (`trace.budget_exhausted: true` — not
@@ -73,7 +94,9 @@ workflows, CI bots) consuming the scanner.
 
 ```text
 generate(params) → scan(full) →
-  ├─ trace.budget_exhausted  → re-scan unbounded first (never act on it)
+  ├─ budget flag true        → re-scan unbounded before judging
+  ├─ budget flag missing     → inspect report version; result is inconclusive
+  ├─ any saturation flag true or missing → inspect limits/version; narrow input if needed
   ├─ no detection            → adjust per trace (which stage died) + retry
   ├─ hints non-empty         → apply the mapped fixes:
   │    fix_finder_pattern{corner} → clear art at that corner
@@ -83,19 +106,25 @@ generate(params) → scan(full) →
   │    reduce_art_texture        → lower texture strength over data
   │    raise_error_correction    → bump EC level (l→m→q→h)
   │    low_correction_margin     → TREAT AS FAILURE (miscorrection risk)
-  └─ score ≥ threshold & hints ∅ → accept
+  └─ primary QR score ≥ threshold & hints ∅ → evaluate the application's quality gate
 ```
 
 The hints were designed to be actionable **without image analysis** — an
 agent can drive generation parameters from the report alone.
 
-## Acceptance gates (suggested)
+## Example QR quality gates
+
+These are application heuristics for a measured primary QR, not validated
+device-compatibility, print-quality or retail certification thresholds. Check
+the intended capture conditions and devices. A score does not prove that every
+code was found; GS1 payload conformance checks syntax within the validator's
+supported subset, not retail-system acceptance.
 
 | Context | Gate |
 |---|---|
-| web display | decoded + score ≥ 60 |
-| print / packaging | score ≥ 80 AND uec.grade ∈ `{a, b}` AND no hints |
-| retail GS1 | the above AND `payload.conformant === true` |
+| QR on a display | decoded + score ≥ 60 |
+| printed QR proof | score ≥ 80 AND `score.uec.grade` ∈ `{a, b}` AND no hints |
+| GS1 QR payload check | the above AND the selected detection's `payload.conformant === true` |
 | ANY content you act on | reject if `low_correction_margin` present (its absence is no proof on v1, v2-L and v3-L — invariant 9) |
 
 ## CLI patterns for tool use
@@ -105,13 +134,21 @@ qrscan in.png --budget-ms 0 | jq '{text: .detections[0].content.text,
                                    charset: .detections[0].content.charset,
                                    kind: .detections[0].payload.kind,
                                    score: .score.value,
-                                   final: (.trace.budget_exhausted == false),
+                                   budgetExhausted: .trace.budget_exhausted,
+                                   capacityLimitedOrUnknown:
+                                     ([.trace.saturation.reads,
+                                       .trace.saturation.detections,
+                                       .trace.saturation.occurrences] | any(. != false)),
                                    hints: [.hints[].hint]}'
 ```
 
 Gate on `charset` before acting on `text`: `"unknown"` means the scanner
-could not read every byte. `--budget-ms 0` makes the report final and
-reproducible; under a budget, read `final` first.
+could not read every byte. `budgetExhausted` preserves `true`, `false` or
+`null` for an absent flag. An empty detection list is inconclusive unless
+`budgetExhausted` is `false` and `capacityLimitedOrUnknown` is `false`.
+`--budget-ms 0` removes the time budget and enables reproducibility under the
+same build/configuration contract (PDF417 excepted); it does not remove
+capacity limits or certify complete detection.
 
 Exit codes are the branch signal: `0` decoded · `1` nothing · `2` fault
 (or, with `--score-only`, a configuration that computes no score) · `3`

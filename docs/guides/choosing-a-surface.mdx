@@ -41,7 +41,10 @@ qualification limits; a binding is not a mobile application.
   application build time through cargokit and needs the relevant platform toolchain.
 
 Container and agent adapters reuse these runtimes but keep separate publication
-and consumer evidence. A prepared integration is not another published SDK.
+and consumer evidence. The published MCP adapter, ClawHub skill and OpenClaw
+bundle are documented in the [agent integration guide](/guides/agents), including
+their installed-consumer scope. They use existing scanner runtimes and do not
+add a sixth scanner SDK. Prepared integrations still require their own publication.
 
 ## Picking a profile
 
