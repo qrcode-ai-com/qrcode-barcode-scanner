@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 export const ENGINE_VERSION = "0.11.0";
-export const ADAPTER_VERSION = "0.2.0";
+export const ADAPTER_VERSION = "0.2.1";
 const HARD_LIMITS = Object.freeze({ inputBytes: 8 * 1024 * 1024, dimension: 4096, pixels: 16_000_000, concurrent: 2 });
 const schema = readFileSync(new URL("../scan-report.schema.json", import.meta.url), "utf8");
 // Factory-created sessions in one process share native-work capacity.
