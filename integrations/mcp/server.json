@@ -1,20 +1,20 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.supernovae-st/qrcode-ai-scanner",
-  "title": "QR Code AI Scanner",
+  "name": "io.github.qrcode-ai-com/qrcode-barcode-scanner",
+  "title": "QR Code & Barcode Scanner",
   "description": "Decode supplied image bytes locally; preserve exact QR/barcode payloads and scannability reports.",
-  "websiteUrl": "https://qrcode-ai.com",
+  "websiteUrl": "https://qrcode-ai.com/",
   "repository": {
-    "url": "https://github.com/supernovae-st/qrcode-barcode-scanner",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
     "source": "github",
     "subfolder": "integrations/mcp"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packages": [{
     "registryType": "npm",
     "registryBaseUrl": "https://registry.npmjs.org",
-    "identifier": "@supernovae-st/qrcode-ai-scanner-mcp",
-    "version": "0.1.0",
+    "identifier": "@qrcode-ai-com/qrcode-barcode-scanner-mcp",
+    "version": "0.2.0",
     "transport": { "type": "stdio" }
   }]
 }

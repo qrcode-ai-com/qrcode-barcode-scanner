@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - "integrations/mcp/**"
-      - "skills/qr-image-scanner/**"
+      - "skills/qrcode-barcode-scanner/**"
       - ".github/workflows/ecosystem-checks.yml"
 
 permissions:
@@ -41,9 +41,10 @@ jobs:
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/skill-engine" --ignore-scripts --no-audit --no-fund \
-            --save-exact @supernovae-st/qrcode-ai-scanner@0.10.0
-          node skills/qr-image-scanner/scripts/test.mjs --engine-root "$RUNNER_TEMP/skill-engine" \
-            --fixture fixtures/clean/gen_v5_q.png > "$RUNNER_TEMP/ecosystem-qualified/skill.json"
+            --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0
+          node skills/qrcode-barcode-scanner/scripts/test.mjs --engine-root "$RUNNER_TEMP/skill-engine" \
+            --fixture fixtures/clean/gen_v5_q.png --mixed-fixture fixtures/symbology/mixed-code128-qr.png \
+            > "$RUNNER_TEMP/ecosystem-qualified/skill.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qrscan-ecosystem-node-${{ matrix.node }}

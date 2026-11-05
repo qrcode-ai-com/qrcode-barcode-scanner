@@ -27,20 +27,18 @@ writeFileSync(join(evidence, "installation.log"), installLog);
 copyFileSync(join(here, "protocol-consumer.mjs"), join(consumer, "probe.mjs"));
 copyFileSync(join(source, "fixtures/clean/gen_v5_q.png"), join(consumer, "clean.png"));
 copyFileSync(join(source, "fixtures/eci/eci899-binary.png"), join(consumer, "binary.png"));
+copyFileSync(join(source, "fixtures/symbology/mixed-code128-qr.png"), join(consumer, "mixed.png"));
 const white = readFileSync(join(source, "scripts/packed-node-consumer.mjs"), "utf8").match(/const white = Buffer.from\("([A-Za-z0-9+/=]+)"/);
 assert.ok(white, "reuse the established public negative PNG fixture");
 writeFileSync(join(consumer, "white.png"), Buffer.from(white[1], "base64"));
-const installed = join(consumer, "node_modules/@supernovae-st/qrcode-ai-scanner-mcp");
+const installed = join(consumer, "node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp");
 for (const file of ["LICENSE", "scan-report.schema.json", "src/cli.mjs", "src/server.mjs"]) assert.deepEqual(readFileSync(join(installed, file)), readFileSync(join(pkg, file)), `installed ${file} matches packed source bytes`);
-// The schema resource is the pinned engine release's schema, not this
-// checkout's spec, which moves ahead of the published runtime between
-// releases. spec/scan-report.schema.json at v0.10.0 (2d3b577) and v0.10.1
-// (af44088) are this same file; move the hash with the engine pin below.
-const pinnedEngineSchemaSha256 = "2a9be74224ad120f239392c70ead224dae069ff76eade144c9b186e488a54094";
+// Frozen v0.11.0 (176ac96) schema, byte-for-byte; update with the engine pin.
+const pinnedEngineSchemaSha256 = "101f84b2888bea2ba617dd4a1d97593bd1a7c7e37e4bd57da6767e944e21fcad";
 assert.equal(createHash("sha256").update(readFileSync(join(installed, "scan-report.schema.json"))).digest("hex"), pinnedEngineSchemaSha256, "the packaged schema is the pinned engine release's schema");
 assert.deepEqual(readFileSync(join(installed, "LICENSE")), readFileSync(join(source, "LICENSE")));
 const locked = JSON.parse(readFileSync(join(consumer, "package-lock.json")));
-assert.equal(locked.packages["node_modules/@supernovae-st/qrcode-ai-scanner"].version, "0.10.0");
+assert.equal(locked.packages["node_modules/@qrcode-ai-com/qrcode-barcode-scanner"].version, "0.11.0");
 assert.equal(locked.packages["node_modules/@modelcontextprotocol/server"].version, "2.3.1");
 assert.equal(locked.packages["node_modules/zod"].version, "4.6.7");
 const oversized = spawn(process.execPath, [join(installed, "src/cli.mjs")], { cwd: consumer, env: { PATH: process.env.PATH }, stdio: ["pipe", "pipe", "pipe"] });

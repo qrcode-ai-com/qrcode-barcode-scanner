@@ -8,13 +8,15 @@ import { deflateSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const argv = process.argv.slice(2);
-assert.equal(argv.length, 4, "Supply --engine-root DIRECTORY --fixture external-gen_v5_q.png");
+assert.equal(argv.length, 6, "Supply --engine-root DIRECTORY --fixture external-gen_v5_q.png --mixed-fixture external-mixed-code128-qr.png");
 assert.equal(argv[0], "--engine-root");
 assert.equal(argv[2], "--fixture");
+assert.equal(argv[4], "--mixed-fixture");
 const runtime = resolve(argv[1]);
 const fixture = resolve(argv[3]);
+const mixedFixture = resolve(argv[5]);
 const helper = fileURLToPath(new URL("scan.mjs", import.meta.url));
-const scratch = mkdtempSync(join(tmpdir(), "qr-image-scanner-test-"));
+const scratch = mkdtempSync(join(tmpdir(), "qrcode-barcode-scanner-test-"));
 const checks = [];
 const run = (image, args = [], engine = runtime, env = {}) => spawnSync(process.execPath,
   [helper, "--engine-root", engine, "--budget-ms", "0", ...args, "--", image],
@@ -49,7 +51,7 @@ function whitePng(width = 64, height = 64) {
 try {
   record("full-exact-report", () => {
     const report = parse(run(fixture), 0);
-    assert.deepEqual(report.versions, { scanner: "0.10.0", pipeline: 3, score_contract: 5 });
+    assert.deepEqual(report.versions, { scanner: "0.11.0", pipeline: 5, score_contract: 5 });
     assert.equal(report.trace.budget_exhausted, false);
     assert.equal(report.detections.length, 1);
     assert.equal(report.detections[0].symbology, "qr_code");
@@ -64,6 +66,16 @@ try {
     assert.equal(report.score, null);
     assert.equal(report.detections[0].content.text, "https://qrcode-ai.com/c/v5q");
   });
+  for (const profile of ["fast", "frame", "full"]) record(`mixed-qr-code128-${profile}`, () => {
+    const report = parse(run(mixedFixture, ["--profile", profile]), 0);
+    assert.deepEqual(report.versions, { scanner: "0.11.0", pipeline: 5, score_contract: 5 });
+    assert.equal(report.trace.budget_exhausted, false);
+    assert.deepEqual(report.detections.map(({ symbology, content }) => ({ symbology, text: content.text, raw: content.raw })).sort((a, b) => a.symbology.localeCompare(b.symbology)), [
+      { symbology: "code128", text: "STOCK-4827", raw: Buffer.from("STOCK-4827").toString("base64") },
+      { symbology: "qr_code", text: "https://qrc-ai.com/76xMa", raw: Buffer.from("https://qrc-ai.com/76xMa").toString("base64") },
+    ]);
+    if (profile === "frame") assert.equal(report.score, null);
+  });
   const white = join(scratch, "white.png"); writeFileSync(white, whitePng());
   record("valid-no-detection", () => {
     const report = parse(run(white, ["--profile", "frame"]), 1);
@@ -76,24 +88,24 @@ try {
   record("missing-file-is-error", () => assert.equal(parse(run(join(scratch, "absent.png")), 2).error.code, "input_file"));
   record("missing-dependency-refuses-ambient", () => assert.equal(parse(run(fixture, [], join(scratch, "missing")), 2).error.code, "dependency_missing"));
   const stale = join(scratch, "stale");
-  const packageDir = join(stale, "node_modules", "@supernovae-st", "qrcode-ai-scanner"); mkdirSync(packageDir, { recursive: true });
-  writeFileSync(join(packageDir, "package.json"), JSON.stringify({ name: "@supernovae-st/qrcode-ai-scanner", version: "0.9.0" }));
+  const packageDir = join(stale, "node_modules", "@qrcode-ai-com", "qrcode-barcode-scanner"); mkdirSync(packageDir, { recursive: true });
+  writeFileSync(join(packageDir, "package.json"), JSON.stringify({ name: "@qrcode-ai-com/qrcode-barcode-scanner", version: "0.9.0" }));
   record("stale-dependency-refused", () => assert.equal(parse(run(fixture, [], stale), 2).error.code, "dependency_version"));
   record("native-override-refused", () => assert.equal(parse(run(fixture, [], runtime, { NAPI_RS_NATIVE_LIBRARY_PATH: "/unused" }), 2).error.code, "dependency_override"));
   record("wasi-override-refused", () => assert.equal(parse(run(fixture, [], runtime, { NAPI_RS_FORCE_WASI: "true" }), 2).error.code, "dependency_override"));
-  const scope = join(runtime, "node_modules", "@supernovae-st");
-  const mainSource = join(scope, "qrcode-ai-scanner");
-  const nativeNames = readdirSync(scope).filter((name) => name.startsWith("qrcode-ai-scanner-") && readdirSync(join(scope, name)).some((file) => file.endsWith(".node")));
+  const scope = join(runtime, "node_modules", "@qrcode-ai-com");
+  const mainSource = join(scope, "qrcode-barcode-scanner");
+  const nativeNames = readdirSync(scope).filter((name) => name.startsWith("qrcode-barcode-scanner-") && readdirSync(join(scope, name)).some((file) => file.endsWith(".node")));
   assert.equal(nativeNames.length, 1, "Use a fresh runtime with its single installed native platform");
   const nativeName = nativeNames[0];
   const nativeSource = join(scope, nativeName);
   const binaryName = readdirSync(nativeSource).find((file) => file.endsWith(".node"));
   const clone = (name, native = true) => {
     const root = join(scratch, name);
-    const packages = join(root, "node_modules", "@supernovae-st"); mkdirSync(packages, { recursive: true });
-    cpSync(mainSource, join(packages, "qrcode-ai-scanner"), { recursive: true });
+    const packages = join(root, "node_modules", "@qrcode-ai-com"); mkdirSync(packages, { recursive: true });
+    cpSync(mainSource, join(packages, "qrcode-barcode-scanner"), { recursive: true });
     if (native) cpSync(nativeSource, join(packages, nativeName), { recursive: true });
-    return { root, main: join(packages, "qrcode-ai-scanner"), native: join(packages, nativeName) };
+    return { root, main: join(packages, "qrcode-barcode-scanner"), native: join(packages, nativeName) };
   };
   const sentinel = (main) => {
     const marker = join(scratch, "dependency-entry-was-executed");
@@ -103,7 +115,7 @@ try {
   };
   record("ancestor-native-refused-before-main-execution", () => {
     const c = clone("ancestor/project-runtime", false);
-    const ancestor = join(scratch, "ancestor/node_modules/@supernovae-st", nativeName); mkdirSync(ancestor, { recursive: true });
+    const ancestor = join(scratch, "ancestor/node_modules/@qrcode-ai-com", nativeName); mkdirSync(ancestor, { recursive: true });
     cpSync(nativeSource, ancestor, { recursive: true });
     const marker = sentinel(c.main);
     assert.equal(parse(run(fixture, [], c.root), 2).error.code, "dependency_missing");
@@ -155,5 +167,5 @@ try {
     assert.equal(existsSync(join(scratch, "injected")), false);
     assert.equal(existsSync(join(scratch, "injected2")), false);
   });
-  console.log(JSON.stringify({ helper: "qr-image-scanner", version: "0.1.0", engine: "0.10.0", node: process.version, checks }));
+  console.log(JSON.stringify({ helper: "qrcode-barcode-scanner", version: "0.2.0", engine: "0.11.0", node: process.version, checks }));
 } finally { rmSync(scratch, { recursive: true, force: true }); }
