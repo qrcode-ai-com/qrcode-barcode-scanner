@@ -6,8 +6,10 @@ run and its official artifact IDs/digests must be recorded before publication.
 """
 
 import argparse
+import copy
 import gzip
 import hashlib
+import io
 import json
 import subprocess
 import tarfile
@@ -21,12 +23,113 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def config_identity(tar, image, config):
+    """Bind the exported config to either Docker's config ID or OCI index ID."""
+    config_digest = "sha256:" + sha(config)
+    if image["Id"] == config_digest:
+        return config_digest
+    descriptor = image.get("Descriptor")
+    assert descriptor and descriptor["digest"] == image["Id"], (
+        "unknown image identity format"
+    )
+
+    def document(item):
+        digest = item["digest"]
+        assert digest.startswith("sha256:") and len(digest) == 71
+        data = tar.extractfile("blobs/sha256/" + digest[7:]).read()
+        assert "sha256:" + sha(data) == digest and len(data) == item["size"], (
+            "OCI descriptor mismatch"
+        )
+        return json.loads(data)
+
+    current = document(descriptor)
+    if "manifests" in current:
+        matches = [
+            item
+            for item in current["manifests"]
+            if item.get("platform", {}).get("os") == image["Os"]
+            and item.get("platform", {}).get("architecture") == image["Architecture"]
+        ]
+        assert len(matches) == 1, "OCI index must select one platform image"
+        current = document(matches[0])
+    assert current["config"]["digest"] == config_digest, (
+        "OCI index selected a different config"
+    )
+    assert current["config"]["size"] == len(config)
+    return config_digest
+
+
+def self_test():
+    config = b'{"architecture":"arm64"}'
+    config_digest = "sha256:" + sha(config)
+    manifest = json.dumps(
+        {"config": {"digest": config_digest, "size": len(config)}}
+    ).encode()
+    child = {
+        "digest": "sha256:" + sha(manifest),
+        "size": len(manifest),
+        "platform": {"os": "linux", "architecture": "arm64"},
+    }
+    index = json.dumps({"manifests": [child]}).encode()
+    descriptor = {"digest": "sha256:" + sha(index), "size": len(index)}
+    image = {
+        "Id": descriptor["digest"],
+        "Descriptor": descriptor,
+        "Os": "linux",
+        "Architecture": "arm64",
+    }
+
+    def archive():
+        out = io.BytesIO()
+        with tarfile.open(fileobj=out, mode="w") as tar:
+            for data in [manifest, index]:
+                item = tarfile.TarInfo("blobs/sha256/" + sha(data))
+                item.size = len(data)
+                tar.addfile(item, io.BytesIO(data))
+        return tarfile.open(fileobj=io.BytesIO(out.getvalue()))
+
+    with archive() as tar:
+        assert config_identity(tar, image, config) == config_digest
+        assert config_identity(tar, {"Id": config_digest}, config) == config_digest
+        count = 0
+        for mutate in [
+            lambda value: value.update(Architecture="amd64"),
+            lambda value: value.update(Id="sha256:" + "0" * 64),
+            lambda value: value["Descriptor"].update(size=1),
+        ]:
+            bad = copy.deepcopy(image)
+            mutate(bad)
+            try:
+                config_identity(tar, bad, config)
+            except (AssertionError, KeyError):
+                count += 1
+            else:
+                raise AssertionError("accepted invalid OCI identity")
+        try:
+            config_identity(tar, image, b"wrong config")
+        except AssertionError:
+            count += 1
+        else:
+            raise AssertionError("accepted substituted config")
+    print(
+        json.dumps(
+            {"result": "PASS", "valid_identity_forms": 2, "negative_cases": count}
+        )
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("image")
-    parser.add_argument("--consumer", type=Path, required=True)
-    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("image", nargs="?")
+    parser.add_argument("--consumer", type=Path)
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    if args.self_test:
+        self_test()
+        return
+    if not args.image or not args.consumer or not args.out:
+        parser.error("image, --consumer and --out are required")
     assert not args.out.exists(), "export destination must be new"
     consumer = json.loads(args.consumer.read_text())
     image = json.loads(
@@ -50,7 +153,7 @@ def main():
         assert len(manifests) == 1
         manifest = manifests[0]
         config = tar.extractfile(manifest["Config"]).read()
-        assert "sha256:" + sha(config) == image["Id"]
+        config_digest = config_identity(tar, image, config)
         layers = []
         for path, expected in zip(
             manifest["Layers"], image["RootFS"]["Layers"], strict=True
@@ -91,6 +194,7 @@ def main():
         "image": "ghcr.io/qrcode-ai-com/qrcode-barcode-scanner",
         "architecture": image["Architecture"],
         "image_id": image["Id"],
+        "config_digest": config_digest,
         "config_size": len(config),
         "raw_layers": layers,
         "binary_sha256": consumer["binary_sha256"],
