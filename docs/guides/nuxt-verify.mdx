@@ -12,12 +12,12 @@ version it ships, and the `NOT_JUDGED` status needs reports that carry
 `trace.budget_exhausted` (score contract 5 and later).
 
 <Note>
-The samples on this page import `@qrcode-ai-com/qrcode-barcode-scanner-wasm`,
-whose 0.11.0 release is **pending publication** on npm. Until npm serves it,
-0.10.1 installs under the package's previous name,
-`@supernovae-st/qrcode-ai-scanner-wasm`, which has the same `/auto` entry:
-import it and exclude it from pre-bundling under that name. The
-[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+The examples consume the published
+`@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0` package. Install it with
+`npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0`.
+Use the same package name for imports and dependency pre-bundling exclusions.
+The [migration guide](/guides/migrate-to-qrcode-barcode-scanner) documents the
+separate historical package.
 </Note>
 
 ## The verify handler
@@ -49,11 +49,15 @@ const onVerify = async () => {
   // attempt granularity: the decode, the normalization and the work spec/02
   // § Budget semantics lets run past the deadline all block the UI thread too.
   const report = scan_image(bytes, "full", undefined, undefined, 1500);
-  const cut = report.trace.budget_exhausted === true;
+  const saturation = report.trace.saturation;
+  const incomplete = report.trace.budget_exhausted !== false ||
+    (["reads", "detections", "occurrences"] as const).some(
+      (flag) => saturation?.[flag] !== false,
+    );
 
   if (!report.detections.length) {
-    // a cut search is not a "no": it ran out of time before the deep stage
-    scanStatus.value = cut ? ScanStatus.NOT_JUDGED : ScanStatus.NO;
+    // An incomplete or older unknown-capacity report cannot establish absence.
+    scanStatus.value = incomplete ? ScanStatus.NOT_JUDGED : ScanStatus.NO;
   } else if (report.score === null) {
     // decoded, not judged within the budget — never read null as 0
     scanStatus.value = ScanStatus.NOT_JUDGED;
@@ -65,28 +69,32 @@ const onVerify = async () => {
 };
 ```
 
-`NOT_JUDGED` is a status of its own: the budget ran out before the deep
-stage or the score finished. Show a neutral "still checking" state and
-re-scan off the critical path — on idle or at export — with a larger
-budget or `0` (unbounded). Collapsing it into `NO` or `LOW` would grade a
-valid design on the clock of the user's device.
+`NOT_JUDGED` is a status of its own. An empty result is inconclusive when
+the budget ran out, a capacity was reached, or capacity flags are absent.
+A decoded primary QR without a score is also unmeasured. For an exhausted
+budget, offer an explicit re-scan off the critical path with a larger budget
+or `0` (unbounded). More time does not remove a capacity limit: inspect its
+flags and narrow the selected input or handle the incomplete result.
+A present score measures the primary QR; it does not prove that every code
+in the image was found.
 
 ## The status mapping
 
 | Meter | Condition | Meaning for the user |
 |---|---|---|
-| HIGH | score ≥ 80 | safe on all devices and conditions |
-| MEDIUM | 60-79 | fine; older phones / poor light may struggle |
-| LOW | decoded, < 60 | works here, fragile in the wild |
-| NO | no detection, `trace.budget_exhausted === false` | regenerate |
-| NOT_JUDGED | decoded with no score, or no detection with `trace.budget_exhausted === true` | not a verdict: re-scan with more time |
+| HIGH | score ≥ 80 | high measured margin for the primary QR; device compatibility remains unverified |
+| MEDIUM | 60-79 | intermediate measured margin; verify the intended capture conditions |
+| LOW | decoded, < 60 | low measured margin; review encoding, contrast and capture conditions |
+| NO | no detection, budget not exhausted and all three saturation flags present and false | no code decoded by this completed search |
+| NOT_JUDGED | decoded without a score, or no detection in an incomplete/unknown-capacity report | inconclusive; inspect limits and re-scan explicitly |
 
 ## Product upgrades the report enables
 
 <CardGroup cols={2}>
-  <Card title="Retail-ready badge" icon="badge-check">
+  <Card title="GS1 Digital Link payload" icon="badge-check">
     `payload.kind === "gs1_digital_link" && payload.conformant` →
-    "Retail-ready ✓ (GS1 Sunrise 2027)". On `conformant: false`, show
+    "Conformant GS1 Digital Link payload". This checks payload structure, not a
+    product, print-quality certificate or universal retail readiness. On `conformant: false`, show
     `payload.issues` verbatim — each cites its violated GS1 rule.
   </Card>
   <Card title="Correction-margin caution" icon="shield-halved">
@@ -146,3 +154,9 @@ exact bytes you ship**: re-scan the exported file, not the preview.
 Don't forget the Vite exclude
 (`optimizeDeps.exclude: ["@qrcode-ai-com/qrcode-barcode-scanner-wasm"]`), with
 the name of the package you installed.
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

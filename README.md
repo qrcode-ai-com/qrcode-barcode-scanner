@@ -72,7 +72,7 @@ qrscan design.png -s --budget-ms 0
 
 Read a label, return the JSON report or inspect a QR design's quality.
 The command remains `qrscan` across the package-name migration.
-[CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/cli.mdx)
+[CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/cli.mdx)
 
 <details>
 <summary><strong>Rust example</strong></summary>
@@ -115,7 +115,7 @@ for (const detection of report.detections) {
 ```
 
 The package selects its native addon from six platform packages. Keep optional
-dependencies enabled. [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/node.mdx)
+dependencies enabled. [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/node.mdx)
 
 </details>
 
@@ -163,7 +163,7 @@ for detection in report["detections"]:
     print(detection["symbology"], detection["content"]["text"])
 ```
 
-[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/python.mdx)
+[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/python.mdx)
 
 </details>
 
@@ -185,7 +185,7 @@ Native runtimes have their own builds. There are no alias or wrapper packages;
 the two CLI crate names install the same command, so run
 `cargo uninstall qrcode-ai-scanner-cli` before installing the new one.
 Update imports and lockfiles, then check that a report's `versions.scanner`
-is `"0.11.0"`. [Migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+is `"0.11.0"`. [Migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
 
 ## Camera scanning
 
@@ -258,12 +258,11 @@ Aztec and some rotated Aztec/PDF417 scenes. [0.11 changelog](https://github.com/
 
 ## Documentation
 
-[Choose a runtime](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/guides/choosing-a-surface.mdx) · [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/node.mdx) · [Python guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/python.mdx) · [Nuxt integration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/guides/nuxt-verify.mdx)
+Current installation guides are linked below; report types, schemas and release examples stay pinned to 0.11.0.
 
-[Report types](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/bindings/report-types.d.ts) · [JSON Schema](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/scan-report.schema.json) · [Specification](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec/) · [Contributing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/CONTRIBUTING.md) · [Release runbook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/RELEASING.md)
+[Choose a runtime](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/choosing-a-surface.mdx) · [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/node.mdx) · [Python guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/python.mdx) · [Nuxt integration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/nuxt-verify.mdx)
 
-Package availability is listed above. The frozen API pages retain their
-prepublication notices; use this README's install commands for released packages.
+[Report types](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/bindings/report-types.d.ts) · [JSON Schema](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/scan-report.schema.json) · [Specification](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec/) · [Contributing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/CONTRIBUTING.md) · [Release runbook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/RELEASING.md)
 
 <details>
 <summary><strong>Build the released source</strong></summary>
@@ -284,8 +283,8 @@ cargo build --release --locked -p qrcode-barcode-scanner-cli
 <summary><strong>Containers, MCP, skills and other bindings</strong></summary>
 
 - [ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner): documentation-only 0.1.1, still referencing engine 0.10.0.
-- [MCP and skill downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.1.0) and [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/distribution/README.md).
-- Historical 0.10.0 containers on [GHCR](https://github.com/orgs/supernovae-st/packages/container/package/qrcode-ai-scanner) and [Docker Hub](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner). The new 0.11 container target is GHCR only.
+- Agent integrations 0.2.0 on engine 0.11.0 are tested and available in [source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations), pending registry publication. The [0.1.0 MCP and skill archives](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.1.0) remain historical. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md).
+- Historical 0.10.0 containers on [GHCR](https://github.com/orgs/supernovae-st/packages/container/package/qrcode-ai-scanner) and [Docker Hub](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner). The 0.11 image was uploaded to `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner`; anonymous access and public pulls remain unverified. Its [frozen image manifest](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/54fe03f78fa4b2aa0293994fe7ab27e065016603/distribution/docker/v0.11/release-0.11.0.json) and native producer checks are separate from public registry consumption. Docker Hub stays historical.
 - [Flutter](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/flutter/), [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.
 
 </details>

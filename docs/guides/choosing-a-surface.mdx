@@ -1,51 +1,47 @@
 ---
 title: "Choosing a surface"
-description: "Seven ways to run the same scanner — pick by where your code runs and what it needs to install."
+description: "Five published runtime entry points, with separate native mobile bindings."
 ---
 
-One Rust core, seven surfaces, the [same JSON report](/api/report). Pick by where
+One Rust core, five published runtime entry points and separate mobile bindings, the [same JSON report](/api/report). Pick by where
 your code runs:
 
 | Your context | Surface | Install |
 |---|---|---|
-| Rust app / service | [`qrcode-barcode-scanner`](/api/rust) | `cargo add qrcode-ai-scanner@0.10.1` |
-| Shell scripts, CI gates | [CLI `qrscan`](/api/cli) | `cargo install qrcode-ai-scanner-cli@0.10.1` |
-| Node server (Nuxt/Next/worker) | [`@qrcode-ai-com/qrcode-barcode-scanner`](/api/node) | `npm i @supernovae-st/qrcode-ai-scanner@0.10.1` |
-| Browser | [`…-wasm`](/api/wasm) | `npm i @supernovae-st/qrcode-ai-scanner-wasm@0.10.1` |
-| Python | [`qrcode-barcode-scanner`](/api/python) | from source |
+| Rust app / service | [`qrcode-barcode-scanner`](/api/rust) | `cargo add qrcode-barcode-scanner@=0.11.0` |
+| Shell scripts, CI gates | [CLI `qrscan`](/api/cli) | `cargo install qrcode-barcode-scanner-cli --version 0.11.0 --locked` |
+| Node server (Nuxt/Next/worker) | [`@qrcode-ai-com/qrcode-barcode-scanner`](/api/node) | `npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0` |
+| Browser | [`…-wasm`](/api/wasm) | `npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0` |
+| Python | [`qrcode-barcode-scanner`](/api/python) | `python -m pip install qrcode-barcode-scanner==0.11.0` |
 | Native Android / iOS | [Kotlin / Swift](/api/mobile) | from source |
 | Cross-platform app | [Flutter](/api/flutter) | from source, not yet on pub.dev |
 
 <Note>
-The surface names are those of the 0.11.0 packages, **pending publication**.
-Until a registry serves 0.11.0, the install column gives the release it serves
-now: 0.10.1 under the previous names on crates.io and npm. Python builds from
-source until its PyPI release. The
-[migration guide](/guides/migrate-to-qrcode-barcode-scanner) maps each name.
+The five runtime packages are public in 0.11.0 under these names. Node selects
+one matching native platform dependency automatically; the browser package
+contains one portable WASM plus its included camera and overlay modules.
+The [migration guide](/guides/migrate-to-qrcode-barcode-scanner) keeps old
+packages separate. Flutter, Kotlin and Swift retain their source-build and
+qualification limits; a binding is not a mobile application.
 </Note>
 
 ## What each surface needs to *install*
 
-Most surfaces ship **prebuilt** — your build needs nothing but the package:
+- **Rust / Cargo CLI** — a Rust toolchain. The release also provides prebuilt
+  CLI archives, which need no Rust compiler at installation.
+- **Node / WASM** — the published native dependency or portable `.wasm`.
+  No Rust toolchain is needed to consume these packages.
+- **Python** — a matching published `abi3` wheel needs no Rust toolchain;
+  a source build does. See the [wheel platforms and tested interpreter](/api/python).
+- **Kotlin/Android** — source build; no qualified JitPack release is claimed.
+  Building needs Rust and the Android NDK.
+- **Swift/iOS** — source build of the `.xcframework`; the package cannot be
+  added by repository URL. Rust and the platform SDK are needed to build it.
+- **Flutter** — unpublished on pub.dev. Its source binding compiles Rust at
+  application build time through cargokit and needs the relevant platform toolchain.
 
-- **Rust / CLI** — a Rust toolchain (you already have it).
-- **Node / WASM** — prebuilt native binary (Node) / `.wasm` (browser). No Rust.
-- **Python** — one prebuilt `abi3` wheel. No Rust.
-- **Kotlin/Android** — the AAR bundles the per-ABI `.so` (built on JitPack). **No Rust.**
-- **Swift/iOS** — a prebuilt `.xcframework` binary target. **No Rust.**
-
-Until those packages are published, three of them build from source and need
-the Rust toolchain as well: Python until `qrcode-barcode-scanner` is on PyPI;
-Kotlin, as no JitPack build of the binding is qualified yet (the AAR build also
-needs the Android NDK); and Swift, whose package cannot be added by repository
-URL (the `.xcframework` is built locally). Each API page shows its source build.
-
-The one exception:
-
-- **Flutter** — compiles the Rust core at *your app's* build time (cargokit), so the
-  building machine needs the **Rust toolchain + Android NDK**. A one-time `rustup`
-  install; no Rust knowledge required. (A prebuilt-binary distribution that removes
-  this is on the roadmap — see the binding plan.)
+Container and agent adapters reuse these runtimes but keep separate publication
+and consumer evidence. A prepared integration is not another published SDK.
 
 ## Picking a profile
 
@@ -57,3 +53,9 @@ points). Bound the worst case with a budget (see each surface's API page).
 Whatever you pick, the result is the **same versioned [`ScanReport`](/api/report)** —
 machine-validated against the [normative spec](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec)
 in CI, so you can prototype on one surface and ship on another.
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
