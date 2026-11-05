@@ -912,6 +912,23 @@ AlmaLinux 8 containers). Every consumer receipt lists the cases it leaves
 out, among them exit 3, which depends on the budget and the machine, and a
 panic inside the engine, which no fixture triggers deterministically.
 
+## OCI 0.11 preparation — unchanged public CLI inputs
+
+The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the
+public `v0.11.0` Linux CLI archives without recompilation. Its input manifest pins
+both binaries, the public SHA256SUMS, corresponding source and official Debian
+runtime index. The unprivileged `distribution-checks` native AMD64/ARM64 matrix
+prepares a minimal context, executes the exact shared truth and mixed QR/Code 128
+profiles, then exports the tested image once as `qrscan-oci011-<architecture>`.
+A local emulated run is recorded as such and cannot qualify the native matrix.
+
+The image target is `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner`; no Docker Hub
+upload is selected. A candidate export is not a frozen publication BOM. Record
+the successful native producer run, official artifact IDs and digests first;
+review a new 0.11 frozen BOM and publisher contract before creating its independent
+OCI tag. The engine `v0.11.0` tag and release assets remain immutable. The 0.10
+recipe/BOM/publisher and historical Docker Hub consumer below stay unchanged.
+
 ## Docker publishing — a separate qualified distribution tag
 
 `oci-publish.yml` publishes the already-tested 0.10.0 CLI images to
