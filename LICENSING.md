@@ -33,11 +33,13 @@ Unsure? The AGPL is always the safe free option — reach out if you need the co
 
 ## Portable consumer skill
 
-The original instructions and helpers under [`skills/qr-image-scanner/`](skills/qr-image-scanner/)
+The original instructions and helpers under [`skills/qrcode-barcode-scanner/`](skills/qrcode-barcode-scanner/)
 are separately licensed **MIT-0**, as declared in that directory's LICENSE.
 They do not bundle or relicense the engine. Installing the scanner as a separate
 dependency retains its AGPL-3.0-or-later or agreed commercial terms. The MCP
 adapter and CLI container retain the engine's AGPL source/license materials.
+The portable bundle metadata and setup helpers under `integrations/openclaw/`
+are also MIT-0. Their separately installed MCP adapter and engine retain AGPL.
 
 ## Prebuilt `qrscan` archives
 

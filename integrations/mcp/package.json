@@ -1,6 +1,6 @@
 {
-  "name": "@supernovae-st/qrcode-ai-scanner-mcp",
-  "version": "0.1.0",
+  "name": "@qrcode-ai-com/qrcode-barcode-scanner-mcp",
+  "version": "0.2.0",
   "description": "Local stdio MCP adapter for exact QR and barcode decoding and scannability reports",
   "type": "module",
   "license": "AGPL-3.0-or-later",
@@ -19,13 +19,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/supernovae-st/qrcode-barcode-scanner.git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
     "directory": "integrations/mcp"
   },
-  "homepage": "https://qrcode-ai.com",
-  "mcpName": "io.github.supernovae-st/qrcode-ai-scanner",
+  "homepage": "https://qrcode-ai.com/",
+  "mcpName": "io.github.qrcode-ai-com/qrcode-barcode-scanner",
   "bugs": {
-    "url": "https://github.com/supernovae-st/qrcode-barcode-scanner/issues"
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues"
   },
   "keywords": [
     "mcp",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",
-    "@supernovae-st/qrcode-ai-scanner": "0.10.0",
+    "@qrcode-ai-com/qrcode-barcode-scanner": "0.11.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

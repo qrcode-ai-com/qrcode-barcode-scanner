@@ -1,5 +1,23 @@
 # Use the scanner with Docker, MCP or Agent Skills
 
+## Agent integrations 0.2.0
+
+The [portable skill](../skills/qrcode-barcode-scanner/),
+[npm MCP adapter](../integrations/mcp/) and
+[OpenClaw bundle](../integrations/openclaw/) target the published
+`@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` engine. They are separate
+deliveries: source and local archive qualification do not establish publication.
+The Official MCP Registry metadata lives beside the npm adapter in `server.json`;
+it must match the published npm package and its `mcpName`.
+
+The adapter and skill are versioned 0.2.0 independently of the engine. The bundle
+reuses that adapter and its one native engine through explicit setup before use.
+See each directory's install instructions and qualification limits.
+
+[QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
+
+## Historical 0.1.0 agent artifacts
+
 > The source repository is now `qrcode-ai-com/qrcode-barcode-scanner`, transferred
 > from `supernovae-st/qrcode-barcode-scanner`; the release links below were
 > published at the earlier address, which redirects.

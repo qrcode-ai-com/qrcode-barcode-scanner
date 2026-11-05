@@ -1,0 +1,26 @@
+{
+  "name": "@qrcode-ai-com/qrcode-barcode-scanner",
+  "version": "0.2.0",
+  "private": true,
+  "description": "ClawHub Agent Plugins bundle for local QR and barcode scanning",
+  "type": "module",
+  "license": "MIT-0",
+  "homepage": "https://qrcode-ai.com/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
+    "directory": "integrations/openclaw"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "files": [
+    ".codex-plugin/plugin.json",
+    ".mcp.json",
+    "skills",
+    "scripts/setup.mjs",
+    "README.md",
+    "LICENSE",
+    "ENGINE-LICENSE"
+  ]
+}

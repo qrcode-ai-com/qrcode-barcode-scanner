@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT-0
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { isAbsolute, relative } from "node:path";
+
+const MCP = "@qrcode-ai-com/qrcode-barcode-scanner-mcp";
+const ENGINE = "@qrcode-ai-com/qrcode-barcode-scanner";
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+assert.ok(!process.env.NAPI_RS_NATIVE_LIBRARY_PATH && !process.env.NAPI_RS_FORCE_WASI, "Native library and WASI overrides are unsupported");
+process.env.NAPI_RS_ENFORCE_VERSION_CHECK = "1";
+const args = process.argv.slice(2);
+// A supplied local archive is for a pre-publication rehearsal of the same package.
+assert.ok(args.length === 0 || (args.length === 2 && args[0] === "--mcp-archive"), "Usage: node scripts/setup.mjs [--mcp-archive inspected-package.tgz]");
+const operand = args.length ? resolve(args[1]) : `${MCP}@0.2.0`;
+const runtime = join(root, "runtime");
+mkdirSync(runtime, { recursive: true });
+const manifest = join(runtime, "package.json");
+if (existsSync(manifest)) assert.equal(JSON.parse(readFileSync(manifest)).name, "qrscan-bundle-runtime", "Refusing an unrelated existing runtime directory");
+else writeFileSync(manifest, JSON.stringify({ name: "qrscan-bundle-runtime", private: true, version: "0.2.0" }) + "\n");
+const nodeRoot = dirname(realpathSync(process.execPath));
+const npmCli = [join(nodeRoot, "node_modules/npm/bin/npm-cli.js"), join(nodeRoot, "../lib/node_modules/npm/bin/npm-cli.js")].find(existsSync);
+assert.ok(npmCli, "Use Node with its matching npm installation");
+execFileSync(process.execPath, [npmCli, "install", "--prefix", runtime, "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", operand], { stdio: "inherit" });
+const packageFile = (name) => join(runtime, "node_modules", name, "package.json");
+assert.equal(JSON.parse(readFileSync(packageFile(MCP))).version, "0.2.0");
+assert.equal(JSON.parse(readFileSync(packageFile(ENGINE))).version, "0.11.0");
+const require = createRequire(manifest);
+const engine = require(ENGINE);
+assert.equal(engine.version(), "0.11.0");
+assert.deepEqual(engine.capabilities().versions, { scanner: "0.11.0", pipeline: 5, score_contract: 5 });
+const native = Object.keys(require.cache).filter((path) => path.endsWith(".node"));
+assert.equal(native.length, 1, "One native engine is loaded");
+const nativeTail = relative(realpathSync(runtime), realpathSync(native[0]));
+assert.ok(nativeTail !== ".." && !nativeTail.startsWith("../") && !nativeTail.startsWith("..\\") && !isAbsolute(nativeTail), "The native engine belongs to this runtime");
+const lock = JSON.parse(readFileSync(join(runtime, "package-lock.json")));
+assert.ok(!Object.keys(lock.packages).some((path) => path.includes("@supernovae-st")), "No previous engine scope in the installed runtime");
+const receipt = { adapter: "0.2.0", scanner: engine.version(), node: process.version, platform: process.platform, arch: process.arch, localArchive: args.length > 0, loadedNative: { path: native[0], sha256: createHash("sha256").update(readFileSync(native[0])).digest("hex") } };
+writeFileSync(join(runtime, "setup-receipt.json"), JSON.stringify(receipt, null, 2) + "\n");
+console.log(JSON.stringify(receipt));

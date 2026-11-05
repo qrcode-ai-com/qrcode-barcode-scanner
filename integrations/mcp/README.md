@@ -1,7 +1,7 @@
-# QR Code AI Scanner MCP
+# QR Code & Barcode Scanner MCP
 
-Local stdio adapter **0.1.0** for the published
-[`@supernovae-st/qrcode-ai-scanner` 0.10.0](https://www.npmjs.com/package/@supernovae-st/qrcode-ai-scanner).
+Local stdio adapter **0.2.0** for the published
+[`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
 It exposes one `scan_image` tool and two read-only resources. The adapter
 reuses the async native engine; it does not implement another decoder or score.
 
@@ -20,11 +20,11 @@ which it runs; the engine's wider qualification does not substitute for an
 adapter test on each claimed target. ARMv7 and musl ARM64 are unsupported.
 
 ```sh
-npm install --prefix ./qrscan-mcp-install --ignore-scripts ./supernovae-st-qrcode-ai-scanner-mcp-0.1.0.tgz
+npm install --prefix ./qrscan-mcp-install --ignore-scripts ./qrcode-ai-com-qrcode-barcode-scanner-mcp-0.2.0.tgz
 ```
 
 The server entry is
-`qrscan-mcp-install/node_modules/@supernovae-st/qrcode-ai-scanner-mcp/src/cli.mjs`.
+`qrscan-mcp-install/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs`.
 Use its absolute path and your absolute Node executable in a client config:
 
 ```json
@@ -32,7 +32,7 @@ Use its absolute path and your absolute Node executable in a client config:
   "mcpServers": {
     "qrscan": {
       "command": "/absolute/path/to/node",
-      "args": ["/absolute/path/to/qrscan-mcp-install/node_modules/@supernovae-st/qrcode-ai-scanner-mcp/src/cli.mjs"]
+      "args": ["/absolute/path/to/qrscan-mcp-install/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs"]
     }
   }
 }
@@ -61,8 +61,9 @@ Example arguments (replace the short placeholder with actual image bytes):
 ```
 
 Success returns the **unchanged engine report** in `structuredContent`, and
-the same report as JSON in the text content. Read `qrscan://scan-report-schema`
-for the packaged normative schema, pipeline **3** and score contract **5**.
+the same report as JSON in the text content. Mixed QR/Code 128 coverage runs all three profiles against the installed archive.
+Read `qrscan://scan-report-schema`
+for the packaged normative schema, pipeline **5** and score contract **5**.
 The adapter does not summarize, normalize or replace values:
 
 - `content.raw` retains exact payload bytes in base64, including binary data.
@@ -71,6 +72,9 @@ The adapter does not summarize, normalize or replace values:
 - Opaque images retain the engine's omitted `alpha` field.
 - `trace.budget_exhausted: true` marks an incomplete report. Empty detections
   then do not prove that the image contains no QR code.
+- `trace.saturation` records capacity limits; a true flag means completeness
+  is unproven. Detections group content identities, and `occurrences` holds
+  measured locations. Neither count proves the total symbols in an image.
 
 Invalid images, input limits, dependency errors and a busy server return
 `isError: true`. Engine errors retain their `QRS-xxx` code. Invalid base64 uses
@@ -126,8 +130,9 @@ No generated archive, node_modules, tests, image fixtures or private reports
 are published in the npm archive. The source, runtime entry, schema and
 AGPL license are included.
 
-Source: [scanner repository](https://github.com/supernovae-st/qrcode-barcode-scanner/tree/main/integrations/mcp).
-Product: [QR Code AI](https://qrcode-ai.com).
+Source engine: [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0).
+The adapter is versioned separately from the engine.
+Product: [QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 License: **AGPL-3.0-or-later**, including the adapter; see [LICENSE](LICENSE).
 
 SDK API sources:

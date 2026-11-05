@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "qrscan": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "runtime/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs"
+      ]
+    }
+  }
+}
