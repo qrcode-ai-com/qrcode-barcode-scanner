@@ -1,17 +1,19 @@
 # QR Code & Barcode Scanner MCP
 
-Local stdio adapter **0.2.0** for the published
+Local stdio adapter **0.2.1** for the published
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
 It exposes one `scan_image` tool and two read-only resources. The adapter
 reuses the async native engine; it does not implement another decoder or score.
 
-**Distribution status:** this directory prepares an installable npm archive.
-Its manifest and `server.json` are publication metadata, not evidence of npm
-publication, MCP Registry admission or client catalogue acceptance. Before
-publication, install the produced local archive. Check registry availability
-before using a registry installation command.
+[Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
 
-## Install a produced archive
+| Component | Version | Purpose |
+| --- | --- | --- |
+| MCP adapter | 0.2.1 | Local stdio transport, tool validation and read-only resources |
+| Scanner engine | 0.11.0 | Native QR, barcode and matrix-code decoding and QR diagnostics |
+| Report | Pipeline 5 · score contract 5 | The unchanged engine report and packaged JSON schema |
+
+## Install
 
 Use Node.js **22.19+ on the 22 line, or 24+**. The engine has six native
 targets: macOS ARM64/x64, Linux GNU ARM64/x64, Linux musl x64 and Windows x64
@@ -19,9 +21,29 @@ MSVC. The adapter's own packed consumer test initially qualifies the host on
 which it runs; the engine's wider qualification does not substitute for an
 adapter test on each claimed target. ARMv7 and musl ARM64 are unsupported.
 
+Archive qualification for this patch covers **macOS ARM64 on Node.js 22.22.2
+and 24.22.1**, with modern and legacy official SDK clients. Other platforms and
+product-client integrations need their own installed-consumer checks.
+
+Install the exact adapter version from the public npm registry:
+
 ```sh
-npm install --prefix ./qrscan-mcp-install --ignore-scripts ./qrcode-ai-com-qrcode-barcode-scanner-mcp-0.2.0.tgz
+npm install --prefix ./qrscan-mcp-install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1
 ```
+
+The published 0.2.0 package remains available. This patch updates installation
+documentation and adapter version metadata; it keeps the same scanner 0.11.0
+and scanning behavior. Repository source may precede a release: check the
+[exact npm version](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1)
+before using its installation command. A checked-in manifest, `server.json` or
+successful build does not establish that a version has been published.
+
+The package installs its declared dependencies explicitly. Starting the server
+does not run a package manager or download missing dependencies. For a reviewed
+offline archive, replace the package spec above with its absolute `.tgz` path;
+installing that archive alone is not proof of registry availability.
+
+## Connect a client
 
 The server entry is
 `qrscan-mcp-install/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs`.
@@ -38,11 +60,21 @@ Use its absolute path and your absolute Node executable in a client config:
 }
 ```
 
+The `mcpServers` shape is a common client convention. Use your client's current
+configuration location and check that it discovers `scan_image`,
+`qrscan://scan-report-schema` and `qrscan://limits`. The installed executable
+also appears as `qrscan-mcp`; the explicit Node and script paths above make the
+selected runtime and installed copy unambiguous.
+
 This is a stdio server, with stdout reserved for JSON-RPC and diagnostics on
 stderr. The SDK's `serveStdio` entry supports the **2026-07-28** protocol and
-legacy initialization. A successful SDK test is not a receipt in Cursor, Cline
-or Gemini CLI; each real client still needs installation, discovery and a
-fixture call from this archive.
+legacy initialization. No HTTP service or hosted MCP endpoint is included.
+The packaged [Registry metadata](server.json) identifies
+`io.github.qrcode-ai-com/qrcode-barcode-scanner`; an actual Official MCP Registry
+listing is a separate publication step. SDK qualification does not establish
+installation or catalogue acceptance in Cursor, Cline, Gemini CLI or another
+product client; each needs discovery and a fixture call from the installed
+package.
 
 ## Tool contract
 
@@ -130,8 +162,11 @@ No generated archive, node_modules, tests, image fixtures or private reports
 are published in the npm archive. The source, runtime entry, schema and
 AGPL license are included.
 
+Adapter source: [integrations/mcp](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp).
 Source engine: [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0).
-The adapter is versioned separately from the engine.
+The adapter is versioned separately from the engine. A local packed-consumer
+pass qualifies the tested archive and host; public registry installation and
+additional platforms retain separate checks.
 Product: [QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 License: **AGPL-3.0-or-later**, including the adapter; see [LICENSE](LICENSE).
 

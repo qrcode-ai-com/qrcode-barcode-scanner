@@ -282,9 +282,17 @@ cargo build --release --locked -p qrcode-barcode-scanner-cli
 <details>
 <summary><strong>Containers, MCP, skills and other bindings</strong></summary>
 
-- [ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner): documentation-only 0.1.1, still referencing engine 0.10.0.
-- Agent integrations 0.2.0 on engine 0.11.0 are tested and available in [source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations), pending registry publication. The [0.1.0 MCP and skill archives](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.1.0) remain historical. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md).
-- Historical 0.10.0 containers on [GHCR](https://github.com/orgs/supernovae-st/packages/container/package/qrcode-ai-scanner) and [Docker Hub](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner). The 0.11 image was uploaded to `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner`; anonymous access and public pulls remain unverified. Its [frozen image manifest](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/54fe03f78fa4b2aa0293994fe7ab27e065016603/distribution/docker/v0.11/release-0.11.0.json) and native producer checks are separate from public registry consumption. Docker Hub stays historical.
+The following agent integrations are published on scanner engine **0.11.0**:
+
+| Integration | Published version | Install or configure |
+| --- | --- | --- |
+| [MCP stdio adapter](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.0) | 0.2.0 | [npm installation and client configuration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp) |
+| [ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner) | 0.2.0 | `clawhub install qrcode-barcode-scanner --version 0.2.0` |
+| [OpenClaw plugin bundle](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner) | 0.2.0 | `openclaw plugins install clawhub:@qrcode-ai-com/qrcode-barcode-scanner@0.2.0` |
+
+The npm adapter passed fresh registry installations on Node 22/24, macOS ARM64. The skill and bundle passed registry installation and real OpenClaw 2026.11.1 runtime calls on macOS ARM64. Each integration reuses the published scanner. Additional product clients and the Official MCP Registry have separate qualification and publication steps. The [0.1.0 MCP and skill archives](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.1.0) remain historical. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md).
+
+- Historical 0.10.0 containers remain on [GHCR](https://github.com/orgs/supernovae-st/packages/container/package/qrcode-ai-scanner) and [Docker Hub](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner). The 0.11 image at `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner` is currently **private**. Its [frozen image manifest](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/54fe03f78fa4b2aa0293994fe7ab27e065016603/distribution/docker/v0.11/release-0.11.0.json) and native producer checks are separate from anonymous image pulls, which have not been qualified. Docker Hub stays historical.
 - [Flutter](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/flutter/), [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.
 
 </details>

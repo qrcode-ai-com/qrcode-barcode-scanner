@@ -496,7 +496,7 @@ ci › packaging runs its self-test on every pull request.
 
 **What a publishing job may run.** A job holding `id-token: write` exposes
 the OIDC token request to every one of its steps, and ios-release and
-cli-archives › attach hold `contents: write`. In these seven jobs (the policy
+cli-archives › attach hold `contents: write`. In these privileged jobs (the policy
 check reads each point):
 - every action by commit SHA, first-party actions included, and no local
   action; container and service images by digest; the checkout keeps no
@@ -911,6 +911,90 @@ Server 2016 to 2022, and older Linux kernels (glibc 2.28 itself runs, in the
 AlmaLinux 8 containers). Every consumer receipt lists the cases it leaves
 out, among them exit 3, which depends on the budget and the machine, and a
 panic inside the engine, which no fixture triggers deterministically.
+
+## Independent MCP npm releases
+
+The MCP adapter has its own SemVer in `integrations/mcp/package.json`, its lock
+and `server.json`. It uses the published scanner `0.11.0`; publishing an adapter
+version does not rebuild or republish the Rust, Node, Python or WASM engine.
+Published versions and tags are immutable.
+
+`npm-mcp-publish.yml` runs on a pull request affecting its inputs, a manual
+dispatch, or an `agents-v*` tag. Pull requests and the default manual `inspect`
+mode pack and consume only: no environment, OIDC permission or upload. Rehearse
+the reviewed branch before integrating it:
+
+```bash
+python3 scripts/test-mcp-release.py
+python3 scripts/check-publish-guards.py --self-test
+actionlint .github/workflows/npm-mcp-publish.yml
+gh workflow run npm-mcp-publish.yml --ref <reviewed-branch> -f mode=inspect
+```
+
+A new workflow must first reach the default branch for manual dispatch. Its
+pull-request jobs provide the pre-merge rehearsal. Neither rehearsal establishes
+an npm trusted-publisher configuration or an exercised upload.
+
+Before the first automated upload, an owner must create and verify the protected
+GitHub environment **`npm-agents`**. Require `ThibautMelen` as the sole release
+reviewer and allow exactly the custom **tag** pattern `agents-v*`, with no branch
+pattern. This is separate from the engine's existing `npm` environment. The
+workflow checks this real configuration through GitHub's public metadata API
+before scheduling the privileged job, then checks it again as that job's first
+gate. Both gates and the upload condition require the canonical repository name
+and immutable repository ID `1126991539`, so a copied workflow in a fork cannot
+use the canonical repository's environment as proof of its own protection.
+A missing, unprotected or differently scoped environment fails closed;
+declaring `environment: npm-agents` in YAML alone is insufficient because GitHub
+can create an unknown environment without protection.
+
+For the already-existing npm package, the owner registers this exact trusted
+publisher:
+
+| Field | Required value |
+| --- | --- |
+| Package | `@qrcode-ai-com/qrcode-barcode-scanner-mcp` |
+| GitHub organization | `qrcode-ai-com` |
+| Repository | `qrcode-barcode-scanner` |
+| Workflow | `npm-mcp-publish.yml` |
+| Environment | `npm-agents` |
+| Allowed operation | `npm publish` |
+
+New npm names still need the owner's initial archive upload before a trust
+relationship can be configured. Configure new trust near an actual qualified
+release: npm expires a configuration that has not published successfully within
+two days. Do not mint a meaningless version or alter a public archive to validate
+authentication. Keep the account passkey for administration; routine releases
+use OIDC rather than a permanent publishing token. See
+[npm's trusted-publisher documentation](https://docs.npmjs.com/trusted-publishers/).
+
+On the reviewed independent tag `agents-v<adapter-version>`, the workflow:
+
+1. Checks package, lock and Registry metadata identities, the exact engine pin
+   and its schema; rejects an engine tag or a mismatched adapter tag.
+2. Packs once without lifecycle scripts, checks the seven allowed files and
+   their modes against source, and records the tarball and producer receipt
+   digests. No scanner compilation or second decoder is involved.
+3. Installs that artifact outside the checkout with an empty npm cache and no
+   inherited npm configuration. Actual modern and legacy MCP clients run on
+   Node22 and24. A separate check proves npm interprets the upload operand as a
+   file, with the same exact Node/npm as the publisher.
+4. Waits on the protected environment, rechecks its protection, downloads the
+   same artifact with digest mismatches refused, then rechecks all source bytes
+   and the producer receipt before uploading. The OIDC job installs nothing,
+   reads no persistent registry credential and runs no package lifecycle script.
+5. Compares both registry integrity and public tarball bytes. An existing equal
+   version records **`EXISTING_MATCH_NO_UPLOAD`**; different bytes or a failed
+   registry probe stop the job. A new successful upload requires provenance
+   metadata and records **`PUBLISHED_OIDC_AND_PUBLIC_BYTES`**. This checks the
+   metadata's presence, not a separate cryptographic attestation verification.
+6. Installs the public npm spec in fresh Node22/24 consumers and compares the
+   installed adapter bytes with the qualified artifact before exercising the
+   MCP protocols. A green skip-only job does not establish an OIDC exchange.
+
+This workflow publishes only the npm MCP adapter. ClawHub skills/plugins,
+Official MCP Registry admission and product-client acceptance retain their own
+publication and qualification steps.
 
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
