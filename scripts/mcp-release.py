@@ -199,7 +199,14 @@ def pack(out: Path, cli: str | None, github_output: Path | None) -> None:
     print(json.dumps({"archive": str(archive), "receiptSha256": digest, "version": receipt["version"]}))
 
 
+class RegistryManifestPending(ValueError):
+    """The exact public version still returns HTTP 404 after an accepted upload."""
+
+
 def registry_probe(archive: Path, out: Path, uploaded: bool = False, get=fetch) -> str:
+    if uploaded:
+        require(os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL") and os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN"), "OIDC-only upload receipt requires a GitHub OIDC job")
+        require(not os.environ.get("NODE_AUTH_TOKEN") and not os.environ.get("NPM_TOKEN"), "static npm credentials are not allowed")
     measured = archive_info(archive)
     version = measured["version"]
     url = f"https://registry.npmjs.org/{urllib.parse.quote(PACKAGE, safe='@')}/{version}"
@@ -209,7 +216,8 @@ def registry_probe(archive: Path, out: Path, uploaded: bool = False, get=fetch) 
         error.close()
         if error.code != 404:
             raise
-        require(not uploaded, "successful publication is not publicly served yet")
+        if uploaded:
+            raise RegistryManifestPending("successful publication is not publicly served yet") from error
         write_json(out, {**measured, "outcome": "MISSING", "oidcUploadExercised": False})
         return "missing"
     require(manifest.get("name") == PACKAGE and manifest.get("version") == version, "registry identity/version differs")
@@ -219,11 +227,21 @@ def registry_probe(archive: Path, out: Path, uploaded: bool = False, get=fetch) 
     require(sha(get(tarball)) == measured["archiveSha256"], "public registry tarball differs from the qualified archive")
     attestations = manifest["dist"].get("attestations")
     if uploaded:
-        require(os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL") and os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN"), "OIDC-only upload receipt requires a GitHub OIDC job")
-        require(not os.environ.get("NODE_AUTH_TOKEN") and not os.environ.get("NPM_TOKEN"), "static npm credentials are not allowed")
         require(isinstance(attestations, dict) and attestations.get("provenance"), "new OIDC upload must expose npm provenance metadata")
     write_json(out, {**measured, "outcome": "PUBLISHED_OIDC_AND_PUBLIC_BYTES" if uploaded else "EXISTING_MATCH_NO_UPLOAD", "oidcUploadExercised": uploaded, "provenanceMetadata": attestations, "cryptographicAttestationVerification": "NOT_CLAIMED"})
     return "present"
+
+
+def registry_after_upload(archive: Path, out: Path, *, get=fetch, clock=time.monotonic, sleep=time.sleep) -> str:
+    deadline = clock() + 7 * 60
+    while clock() < deadline:
+        try:
+            return registry_probe(archive, out, uploaded=True, get=get)
+        except RegistryManifestPending:
+            remaining = deadline - clock()
+            if remaining > 0:
+                sleep(min(10, remaining))
+    raise ValueError("npm accepted the upload, but its version manifest still returned HTTP 404 after 7 minutes. Verify public bytes before rerunning.")
 
 
 def consume(archive: Path, receipt: Path, expected: str, out: Path, registry: bool, cli: str | None) -> None:
@@ -305,14 +323,8 @@ def main() -> None:
     elif args.command == "inspect":
         inspect(args.archive, args.receipt, args.expected_receipt, args.record)
     elif args.command == "registry":
-        for attempt in range(12 if args.uploaded else 1):
-            try:
-                print(registry_probe(args.archive, args.out, args.uploaded))
-                break
-            except (urllib.error.URLError, ValueError):
-                if attempt == (11 if args.uploaded else 0):
-                    raise
-                time.sleep(5)
+        readback = registry_after_upload if args.uploaded else registry_probe
+        print(readback(args.archive, args.out))
     elif args.command == "consume":
         consume(args.archive, args.receipt, args.expected_receipt, args.out.resolve(), args.registry, args.npm_cli)
 

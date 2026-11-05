@@ -241,6 +241,81 @@ class ReleaseBoundaries(unittest.TestCase):
         with patch.dict(os.environ, {**identity, "NODE_AUTH_TOKEN": "fixture"}, clear=True), self.assertRaisesRegex(ValueError, "static npm credentials"):
             release.registry_probe(self.archive, self.directory / "out", True, self.getter(manifest))
 
+    def test_accepted_upload_can_become_visible_after_old_deadline(self):
+        elapsed = 0
+        attempts = []
+        manifest = self.manifest()
+        manifest["dist"]["attestations"] = {"provenance": {"predicateType": "https://slsa.dev/provenance/v1"}}
+        published = self.getter(manifest)
+
+        def get(url):
+            if not url.endswith(".tgz"):
+                attempts.append(elapsed)
+                if elapsed < 90:
+                    raise urllib.error.HTTPError(url, 404, "fixture", {}, io.BytesIO())
+            return published(url)
+
+        def sleep(seconds):
+            nonlocal elapsed
+            elapsed += seconds
+
+        out = self.directory / "public.json"
+        identity = {"ACTIONS_ID_TOKEN_REQUEST_URL": "fixture", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "fixture"}
+        with patch.dict(os.environ, identity, clear=True):
+            self.assertEqual(release.registry_after_upload(self.archive, out, get=get, clock=lambda: elapsed, sleep=sleep), "present")
+        self.assertEqual(attempts, list(range(0, 91, 10)))
+        self.assertEqual(json.loads(out.read_text())["outcome"], "PUBLISHED_OIDC_AND_PUBLIC_BYTES")
+
+    def test_accepted_upload_grace_expires_without_a_success_receipt(self):
+        elapsed = 0
+        attempts = []
+
+        def get(url):
+            attempts.append(elapsed)
+            raise urllib.error.HTTPError(url, 404, "fixture", {}, io.BytesIO())
+
+        def sleep(seconds):
+            nonlocal elapsed
+            elapsed += seconds
+
+        out = self.directory / "public.json"
+        identity = {"ACTIONS_ID_TOKEN_REQUEST_URL": "fixture", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "fixture"}
+        with patch.dict(os.environ, identity, clear=True), self.assertRaisesRegex(ValueError, "npm accepted.*7 minutes"):
+            release.registry_after_upload(self.archive, out, get=get, clock=lambda: elapsed, sleep=sleep)
+        self.assertEqual(attempts, list(range(0, 420, 10)))
+        self.assertEqual(elapsed, 420)
+        self.assertFalse(out.exists())
+
+    def test_accepted_upload_readback_fails_immediately_on_inconsistent_evidence(self):
+        wrong = self.manifest()
+        wrong["dist"]["integrity"] = "sha512-wrong"
+        valid = self.manifest()
+        valid["dist"]["attestations"] = {"provenance": {"predicateType": "https://slsa.dev/provenance/v1"}}
+
+        def tarball_missing(url):
+            if url.endswith(".tgz"):
+                error = urllib.error.HTTPError(url, 404, "fixture", {}, io.BytesIO())
+                error.close()
+                raise error
+            return json.dumps(valid).encode()
+
+        def changed_tarball(url):
+            return b"wrong archive" if url.endswith(".tgz") else json.dumps(valid).encode()
+
+        def server_error(url):
+            raise urllib.error.HTTPError(url, 503, "fixture", {}, io.BytesIO())
+
+        identity = {"ACTIONS_ID_TOKEN_REQUEST_URL": "fixture", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "fixture"}
+        for get, error, message in (
+            (self.getter(wrong), ValueError, "different integrity"),
+            (self.getter(self.manifest()), ValueError, "provenance"),
+            (changed_tarball, ValueError, "public registry tarball differs"),
+            (tarball_missing, urllib.error.HTTPError, "404"),
+            (server_error, urllib.error.HTTPError, "503"),
+        ):
+            with self.subTest(message=message), patch.dict(os.environ, identity, clear=True), self.assertRaisesRegex(error, message):
+                release.registry_after_upload(self.archive, self.directory / "out", get=get, clock=lambda: 0, sleep=lambda _: self.fail("inconsistent evidence must fail without waiting"))
+
 
 if __name__ == "__main__":
     unittest.main()
