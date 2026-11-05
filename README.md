@@ -7,7 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 
-Decode QR codes, linear barcodes and other supported 2D formats from images or camera frames with one Rust engine. [QR Code AI](https://qrcode-ai.com/) uses it to verify QR designs and decode imported images.
+Decode QR codes, linear barcodes and other supported 2D formats from images or camera frames with one Rust engine. [QR Code AI](https://qrcode-ai.com/) uses this engine family to check generated QR designs before export.
 
 **0.11.0 is released** for Rust, CLI, Node.js, browser WASM and Python.
 [Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)

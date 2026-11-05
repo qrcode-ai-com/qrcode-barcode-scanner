@@ -5,7 +5,7 @@ One portable browser WASM build of the
 QR decoding + scannability scoring for artistic / AI-generated QR codes.
 Decoding is fully client-side; optional destination checks use only the transport you supply.
 
-[QR Code AI](https://qrcode-ai.com/) uses the engine for QR verification and image import. To decode a
+[QR Code AI](https://qrcode-ai.com/) uses the engine family for QR verification. To decode a
 saved QR image or a barcode label in the browser, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
 The product's [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) pages are planned.
 

@@ -14,7 +14,7 @@ Use the original helper at `scripts/scan.mjs` relative to this skill's directory
 prints the engine's unchanged JSON report. It does not upload images or access
 QR destinations.
 
-The helper uses the same engine as [QR Code AI](https://qrcode-ai.com/)'s QR verification and image import.
+The helper uses the same engine as [QR Code AI](https://qrcode-ai.com/)'s QR verification workflows.
 The [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) are planned browser pages.
 
 ## Dependency and invocation

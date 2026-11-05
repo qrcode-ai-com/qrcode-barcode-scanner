@@ -4,7 +4,7 @@ A portable plugin bundle for local QR and barcode scanning. It contains
 one scanner skill and one stdio MCP configuration. The MCP adapter 0.2.0 uses
 the published `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` engine. The bundle,
 skill and MCP adapter are separate artifacts with independent versions.
-The engine also powers QR verification and image import in [QR Code AI](https://qrcode-ai.com/).
+The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
 
 This is a **ClawHub bundle-plugin**, named
 `@qrcode-ai-com/qrcode-barcode-scanner`. The same name on npm belongs to the

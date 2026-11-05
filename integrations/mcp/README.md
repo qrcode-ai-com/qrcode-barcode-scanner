@@ -3,8 +3,7 @@
 Local stdio adapter **0.2.1** for the published
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
 It exposes one `scan_image` tool and two read-only resources. The adapter
-reuses the async native engine. That same engine powers QR verification
-and image import in [QR Code AI](https://qrcode-ai.com/).
+reuses the async native engine. The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
 
 [Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
 

@@ -1,6 +1,6 @@
 # Use the scanner with Docker, MCP or Agent Skills
 
-The local packages and agents here use the engine behind [QR Code AI](https://qrcode-ai.com/)'s QR verification and image import. For a single image, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) runs from the installed WASM package. Dedicated [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) pages are planned.
+The local packages and agents here use the engine behind [QR Code AI](https://qrcode-ai.com/)'s QR verification workflows. For a single image, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) runs from the installed WASM package. Dedicated [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) pages are planned.
 
 ## Published agent integrations
 
