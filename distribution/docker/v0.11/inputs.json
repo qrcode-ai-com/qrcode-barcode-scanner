@@ -12,12 +12,14 @@
     "amd64": {
       "target": "x86_64-unknown-linux-gnu",
       "archive": "qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-gnu.tar.gz",
-      "sha256": "b7c6669e332c7cc688228077b70d87f52154052e345992bd358aad6d6c7d3298"
+      "sha256": "b7c6669e332c7cc688228077b70d87f52154052e345992bd358aad6d6c7d3298",
+      "binarySha256": "77965589784699138d2b512f94067528eba552536160560daed191de824ea01c"
     },
     "arm64": {
       "target": "aarch64-unknown-linux-gnu",
       "archive": "qrcode-barcode-scanner-cli-0.11.0-aarch64-unknown-linux-gnu.tar.gz",
-      "sha256": "d5b5eff8ed336ef82a76865fd16e9a087afd5b1574b537747aea6d105ae7c5aa"
+      "sha256": "d5b5eff8ed336ef82a76865fd16e9a087afd5b1574b537747aea6d105ae7c5aa",
+      "binarySha256": "d010a03064011f8775fc6f0add357cbbc634366d4b96dc0b892ab2c6047b271a"
     }
   },
   "sources": {

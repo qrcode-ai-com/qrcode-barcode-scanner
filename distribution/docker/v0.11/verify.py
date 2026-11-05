@@ -76,6 +76,19 @@ def main():
         labels["org.opencontainers.image.source"]
         == "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
     )
+    assert labels["org.opencontainers.image.title"] == "QR Code & Barcode Scanner"
+    assert labels["org.opencontainers.image.url"] == "https://qrcode-ai.com/"
+    assert (
+        labels["org.opencontainers.image.documentation"]
+        == INPUTS["repository"] + "/tree/main/distribution/docker/v0.11"
+    )
+    assert (
+        labels["org.opencontainers.image.description"]
+        == "Local QR code, barcode and matrix-code scanning. Mount input read-only and run qrscan without network access."
+    )
+    assert image["Config"]["WorkingDir"] == "/data"
+    assert image["Config"]["Cmd"] == ["--help"]
+    assert "RAYON_NUM_THREADS=2" in image["Config"]["Env"]
     assert image["Architecture"] in ("amd64", "arm64")
     actual_platform = image["Os"] + "/" + image["Architecture"]
     if args.expected_platform:
@@ -326,6 +339,27 @@ def main():
             text=True,
             timeout=30,
         ).split()[0]
+        assert binary_hash == INPUTS["platforms"][image["Architecture"]]["binarySha256"]
+        build_info = json.loads(
+            subprocess.check_output(
+                prefix[:-1]
+                + [
+                    "--entrypoint",
+                    "cat",
+                    args.image,
+                    "/usr/share/doc/qrscan/build-info.json",
+                ],
+                text=True,
+                timeout=30,
+            )
+        )
+        assert build_info["binary"]["sha256"] == binary_hash
+        assert build_info["source"]["commit"] == INPUTS["engineSource"]
+        assert build_info["source"]["dirty"] is False
+        assert (
+            build_info["target"] == INPUTS["platforms"][image["Architecture"]]["target"]
+        )
+        assert build_info["version"] == "0.11.0"
     recipe = Path(__file__).with_name("Dockerfile").read_text()
     base_images = re.findall(r"^FROM (\S+)", recipe, re.MULTILINE)
     assert base_images == [INPUTS["baseImage"]]
