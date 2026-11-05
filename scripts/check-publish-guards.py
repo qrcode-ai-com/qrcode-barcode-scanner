@@ -120,6 +120,12 @@ mint registry tokens). Every privileged job must:
                tag deployment rule), contents read/actions read/packages write,
                the exact OCI tag/BOM gate and in-job frozen artifact reinspection.
                No old registry job gains this permission or tag exception.
+  MCP          npm-mcp-publish.yml > publish uses agents-v* tags, npm-agents,
+               an independent metadata/environment gate, its own seven-file
+               archive inspector and the same inspected-operand discipline.
+               Its preflight must prove the protected environment exists before
+               scheduling publication. Other registry jobs keep v* and their
+               existing environment/inspector rules.
   concurrency  join publish-${{ github.workflow }}-${{ github.ref }}, never
                cancelling, so a re-run on the tag waits instead of racing
 
@@ -223,6 +229,14 @@ import tomllib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 ENVIRONMENTS = {"crates-io", "npm", "release", "pub"}
+MCP_JOB = ("npm-mcp-publish.yml", "publish")
+MCP_GUARD = "startsWith(github.ref, 'refs/tags/agents-v')"
+MCP_GATE_RUN = 'python3 scripts/mcp-release.py gate --ref "$GITHUB_REF" --environment npm-agents'
+MCP_PREFLIGHT_RUN = ('python3 scripts/mcp-release.py preflight --ref "$GITHUB_REF" --event '
+                     '"$GITHUB_EVENT_NAME" --mode "$MCP_MODE" --github-output "$GITHUB_OUTPUT"')
+MCP_REINSPECT_RUN = ('python3 scripts/mcp-release.py inspect "$PWD"/npm-mcp/*.tgz --strict '
+                    '--receipt "$PWD/npm-mcp/receipt.json" --expected-receipt "$MCP_RECEIPT_SHA256" '
+                    '--record "$RUNNER_TEMP/npm-inspected.sha256"')
 GUARD = "startsWith(github.ref, 'refs/tags/v')"
 CONCURRENCY = "publish-${{ github.workflow }}-${{ github.ref }}"
 OCI_JOB = ("oci-publish.yml", "publish")
@@ -330,6 +344,23 @@ NPM_OPERAND_CHECK = (
     "exit 1",
     "}",
 )
+MCP_PUBLISH_LINES = (
+    "set -euo pipefail", "shopt -s nullglob", *NPM_OPERAND_CHECK,
+    'tarballs=("$PWD"/npm-mcp/*.tgz)',
+    'if [ "${#tarballs[@]}" -ne 1 ]; then exit 1; fi',
+    'tgz=${tarballs[0]}',
+    'state=$(python3 scripts/mcp-release.py registry "$tgz" --out "$RUNNER_TEMP/mcp-publication.json")',
+    'case "$state" in',
+    'present) echo "Existing matching bytes; no OIDC upload was exercised." ;;',
+    'missing)',
+    'inspected "$tgz"',
+    'npm publish "$tgz" --access public --ignore-scripts --provenance --registry=https://registry.npmjs.org',
+    'python3 scripts/mcp-release.py registry "$tgz" --out "$RUNNER_TEMP/mcp-publication.json" --uploaded',
+    ';;',
+    '*) echo "::error::unknown registry state"; exit 1 ;;',
+    'esac',
+    'cat "$RUNNER_TEMP/mcp-publication.json" >> "$GITHUB_STEP_SUMMARY"',
+)
 # How a publishing step, its re-inspection and OPERAND_PROOF spell a tarball
 # path (shell words, quotes kept): from "$PWD" (or GITHUB_WORKSPACE,
 # RUNNER_TEMP) or a literal /…, never relative, and the same in all three.
@@ -362,6 +393,18 @@ OPERAND_PROOF_RUN = "\n".join((
     "  process.exit(wrong ? 1 : 0);",
     """' "$(npm root -g)/npm/node_modules/npm-package-arg" "${native[@]}" "${wasm[@]}\"""",
 ))
+MCP_OPERAND_PROOF_RUN = "\n".join((
+    "set -euo pipefail",
+    "shopt -s nullglob",
+    'tarballs=("$PWD"/npm-mcp/*.tgz)',
+    'if [ "${#tarballs[@]}" -ne 1 ]; then exit 1; fi',
+    "node -e '",
+    '  const npa = require(process.argv[1]);',
+    '  for (const operand of process.argv.slice(2)) {',
+    '    if (npa(operand).type !== "file") process.exit(1);',
+    '  }',
+    '''' "$(npm root -g)/npm/node_modules/npm-package-arg" "${tarballs[@]}"''',
+))
 
 # Steps that can restore a cache into a job whose outputs are published: these
 # actions whatever their inputs (mlugg/setup-zig restores its Zig tarball under
@@ -377,6 +420,7 @@ NOT_ON_TAG = {"!startsWith(github.ref, 'refs/tags/')", "!startsWith(github.ref, 
 # The job each publishing job must need: the one that inspects (for the iOS
 # zip, builds) what it uploads. A publishing job missing here fails.
 INSPECTION = {
+    MCP_JOB: "pack",
     OCI_JOB: "inspect",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
@@ -389,6 +433,7 @@ INSPECTION = {
 
 # Archive shape and installed runtime are separate release gates.
 CONSUMERS = {
+    MCP_JOB: {"preflight", "consume", "operand-proof"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
@@ -848,20 +893,22 @@ def _operand_check_problems(lines: list) -> list:
     return problems
 
 
-def _records_operands(line: str) -> bool:
+def _records_operands(line: str, mcp: bool = False) -> bool:
     """LINE re-inspects archives under --strict and writes the record the operand check reads."""
     words = _words(line)
-    if not re.search(r"package-inspect\.py\s+archive\b", line) or "--strict" not in words or "--record" not in words:
+    inspector = r"mcp-release\.py\s+inspect\b" if mcp else r"package-inspect\.py\s+archive\b"
+    if not re.search(inspector, line) or "--strict" not in words or "--record" not in words:
         return False
     return words[words.index("--record") + 1:][:1] == [NPM_RECORD]
 
 
-def _recorded_paths(line: str) -> list:
+def _recorded_paths(line: str, mcp: bool = False) -> list:
     """The archives a re-inspection LINE names, as spelled (quotes kept): the
     words after `package-inspect.py archive` up to its first option."""
     words = line.split()
     for i, word in enumerate(words[:-1]):
-        if word.endswith("package-inspect.py") and words[i + 1] == "archive":
+        inspector, command = ("mcp-release.py", "inspect") if mcp else ("package-inspect.py", "archive")
+        if word.endswith(inspector) and words[i + 1] == command:
             return list(itertools.takewhile(lambda w: not w.startswith("-"), words[i + 2:]))
     return []
 
@@ -1087,7 +1134,7 @@ def _artifact_lineage(wf: dict, job_id: str) -> list:
     return lineage
 
 
-def _operand_spelling_problems(steps: list, needs: list, wf: dict) -> list:
+def _operand_spelling_problems(steps: list, needs: list, wf: dict, mcp: bool = False) -> list:
     """Why an npm publishing job does not spell its tarball paths absolute and
     identically where its publishing step takes them, where its re-inspection
     records them and where OPERAND_PROOF parses them, or does not need that
@@ -1102,8 +1149,8 @@ def _operand_spelling_problems(steps: list, needs: list, wf: dict) -> list:
                         "the npm that publishes it (npm reads a relative dir/file.tgz as a GitHub repository)")
     taken = sorted({path for step in steps if _runs_npm_publish({"steps": [step]})
                     for path in _tarball_paths(_code_lines(step.get("run")))})
-    recorded = sorted({path for step in steps for line in _code_lines(step.get("run")) if _records_operands(line)
-                       for path in _recorded_paths(line)})
+    recorded = sorted({path for step in steps for line in _code_lines(step.get("run")) if _records_operands(line, mcp)
+                       for path in _recorded_paths(line, mcp)})
     parsed = sorted({path for step in _steps(proof) for path in _tarball_paths(_code_lines(step.get("run")))}) \
         if isinstance(proof, dict) else []
     if not taken:
@@ -1121,7 +1168,7 @@ def _operand_spelling_problems(steps: list, needs: list, wf: dict) -> list:
     return problems
 
 
-def _operand_proof_problems(wf: dict, publishers: list) -> list:
+def _operand_proof_problems(wf: dict, publishers: list, mcp: bool = False) -> list:
     """(message, step index or -1) for each way OPERAND_PROOF falls short of
     parsing every operand of PUBLISHERS with their npm, hermetically; [] when it
     does not, or when the workflow has no such job (each publisher's `needs`
@@ -1160,8 +1207,9 @@ def _operand_proof_problems(wf: dict, publishers: list) -> list:
             out.append((f"does not download {missing} as {publisher} does: the proof reads their files at their "
                         "paths", -1))
     node = max((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/setup-node"), default=None)
+    expected_proof = MCP_OPERAND_PROOF_RUN if mcp else OPERAND_PROOF_RUN
     run = [i for i, step in enumerate(steps) if set(step) <= {"name", "run"} and
-           _block(step.get("run")) == OPERAND_PROOF_RUN]
+           _block(step.get("run")) == expected_proof]
     printed = [i for i, step in enumerate(steps) if set(step) <= {"name", "run"} and
                _block(step.get("run")) == PRINTED["actions/setup-node"]]
     if not run:
@@ -1493,6 +1541,77 @@ def _cli_problems(job_id: str, job: dict, wf: dict) -> list:
     return out
 
 
+def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> list:
+    """One independent adapter publisher; no other job gains its tag or environment."""
+    out = []
+
+    def fail(message, index=-1):
+        out.append(("mcp-contract", message, index))
+
+    jobs, steps = wf["jobs"], _steps(publisher)
+    expected_env = {
+        "MCP_RECEIPT_SHA256": "${{ needs.pack.outputs.receipt_sha256 }}",
+        "NPM_CONFIG_USERCONFIG": "${{ github.workspace }}/.mcp-empty-user.npmrc",
+        "NPM_CONFIG_GLOBALCONFIG": "${{ github.workspace }}/.mcp-empty-global.npmrc",
+    }
+    if publisher.get("env") != expected_env:
+        fail("bind the receipt to pack's digest and use only the empty npm credential configurations")
+    if _conjunct(publisher.get("if"), {"needs.preflight.outputs.publish_allowed == 'true'"}):
+        fail("publication must require the protected-environment preflight output")
+    for condition in ("github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'",
+                      "github.repository_id == '1126991539'"):
+        if _conjunct(publisher.get("if"), {condition}):
+            fail("publication must bind both the canonical repository name and immutable repository ID")
+    for job_name in ("preflight", "pack", "consume", "operand-proof"):
+        job = jobs.get(job_name, {})
+        if "if" in job or "continue-on-error" in job:
+            fail(f"{job_name} may not skip or ignore its release gate")
+        for step in _steps(job):
+            if "if" in step or "continue-on-error" in step:
+                fail(f"{job_name} steps may not skip or ignore release checks")
+    preflight = jobs.get("preflight", {})
+    if preflight.get("outputs") != {"publish_allowed": "${{ steps.preflight.outputs.publish_allowed }}"} or not any(
+            step.get("id") == "preflight" and _block(step.get("run")) == MCP_PREFLIGHT_RUN and
+            step.get("env") == {"MCP_MODE": "${{ inputs.mode || 'inspect' }}"}
+            for step in _steps(preflight)):
+        fail("preflight must check the real environment before the privileged job can be scheduled")
+    pack = jobs.get("pack", {})
+    if pack.get("outputs") != {"receipt_sha256": "${{ steps.pack.outputs.receipt_sha256 }}"} or not any(
+            step.get("id") == "pack" and _block(step.get("run")) ==
+            'python3 scripts/mcp-release.py pack --out "$RUNNER_TEMP/npm-mcp" --github-output "$GITHUB_OUTPUT"'
+            for step in _steps(pack)):
+        fail("pack must emit the digest of the one inspected producer receipt")
+    if not any(set(step) <= {"name", "run"} and _block(step.get("run")) == MCP_REINSPECT_RUN
+               for step in steps[:first_publish]):
+        fail("re-inspect the seven source files and producer receipt before any npm upload")
+    upload_steps = [step for step in steps if _runs_npm_publish({"steps": [step]})]
+    if len(upload_steps) != 1 or tuple(_code_lines(upload_steps[0].get("run"))) != MCP_PUBLISH_LINES:
+        fail("publish exactly the inspected missing archive; existing bytes never claim an OIDC upload")
+    empty_config = '\n'.join((
+        'test "$(npm --version)" = 11.19.1',
+        'test -z "${NODE_AUTH_TOKEN:-}"', 'test -z "${NPM_TOKEN:-}"',
+        ': > "$NPM_CONFIG_USERCONFIG"', ': > "$NPM_CONFIG_GLOBALCONFIG"',
+    ))
+    if not any(set(step) <= {"name", "run"} and _block(step.get("run")) == empty_config
+               for step in steps[:first_publish]):
+        fail("pin npm11.19.1 and refuse static credentials before publishing")
+    uploads = [(name, step.get("with", {})) for name, job in jobs.items() for step in _steps(job)
+               if _uses(step)[0] == "actions/upload-artifact" and
+               (step.get("with") or {}).get("name") == "npm-mcp-qualified"]
+    if uploads != [("pack", {"name": "npm-mcp-qualified", "path": "${{ runner.temp }}/npm-mcp/",
+                             "if-no-files-found": "error", "retention-days": "14"})]:
+        fail("only pack may upload the qualified MCP archive and receipt, without overwrite")
+    for name, job in jobs.items():
+        for step in _steps(job):
+            given = step.get("with", {})
+            if _uses(step)[0] == "actions/download-artifact" and given.get("name") == "npm-mcp-qualified" and \
+                    given != {"name": "npm-mcp-qualified", "path": "npm-mcp", "digest-mismatch": "error"}:
+                fail(f"{name} must download the same qualified archive with digest mismatch refused")
+            if _uses(step)[0] == "actions/upload-artifact" and "overwrite" in given:
+                fail(f"{name} may not overwrite an artifact")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1504,7 +1623,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
         out.append(Finding(workflow, job_id, code, message, step))
 
     oci = (workflow, job_id) == OCI_JOB
-    condition_check = _conjunct(job.get("if"), {OCI_GUARD}) if oci else guarded(job.get("if"))
+    mcp = (workflow, job_id) == MCP_JOB
+    condition_check = _conjunct(job.get("if"), {MCP_GUARD if mcp else OCI_GUARD}) if (oci or mcp) else guarded(job.get("if"))
     if condition_check:
         flag("guard", condition_check)
     needs = job.get("needs")
@@ -1519,7 +1639,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("needs", f"needs {needs}: must include {consumer!r}, the clean installed-package gate")
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
-    allowed_environments = {"container"} if oci else ENVIRONMENTS
+    allowed_environments = {"npm-agents"} if mcp else {"container"} if oci else ENVIRONMENTS
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1612,12 +1732,15 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("floating-rust", f"{level} env RUST_TOOLCHAIN {value!r} is not an exact x.y.z")
     checkout = next((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/checkout"), None)
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
-    required_gate = OCI_GATE_RUN if oci else GATE_RUN
+    required_gate = MCP_GATE_RUN if mcp else OCI_GATE_RUN if oci else GATE_RUN
     if set(gate) - {"run", "name", "working-directory"} or str(gate.get("run", "")).strip() != required_gate:
         flag("gate", f"the first step after the checkout must be exactly `{required_gate}`, with no other key")
     first_publish = min((i for i, _ in publishing), default=len(steps))
     if oci:
         for code, message, index in _oci_contract_problems(wf, job, first_publish):
+            flag(code, message, index)
+    if mcp:
+        for code, message, index in _mcp_contract_problems(wf, job, first_publish):
             flag(code, message, index)
     if (workflow, job_id) in REINSPECT_JOBS and not any(
             re.search(r"package-inspect\.py\s+archive\b", line) and "--strict" in _words(line)
@@ -1625,11 +1748,11 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
         flag("reinspect", "must run `package-inspect.py archive … --strict` on the downloaded artifact before the "
                           "first publishing step (the versions gate does not prove the bytes a sibling job built)")
     if any(_invokes(line, "npm", NPM_UPLOAD) for step in steps for line in _code_lines(step.get("run"))) and not any(
-            _records_operands(line) for step in steps[:first_publish] for line in _code_lines(step.get("run"))):
+            _records_operands(line, mcp) for step in steps[:first_publish] for line in _code_lines(step.get("run"))):
         flag("npm-operand", f"re-inspect with `package-inspect.py archive … --strict --record \"{NPM_RECORD}\"` "
                             "before the first publishing step: the operand check reads that record")
     if _runs_npm_publish(job):
-        for message in _operand_spelling_problems(steps, needs, wf):
+        for message in _operand_spelling_problems(steps, needs, wf, mcp):
             flag("npm-operand", message)
     if (workflow, job_id) == CLI_JOB:
         out += [Finding(workflow, where, code, message, index)
@@ -1709,7 +1832,7 @@ def check(workflows: pathlib.Path) -> tuple:
             findings += found
         if publishers:
             findings += [Finding(name, OPERAND_PROOF, "operand-proof", message, step)
-                         for message, step in _operand_proof_problems(wf, publishers)]
+                         for message, step in _operand_proof_problems(wf, publishers, name == MCP_JOB[0])]
         for job_id in privileged:
             for producer in _artifact_lineage(wf, job_id):
                 for i, step in enumerate(_steps(wf["jobs"][producer])):
@@ -2064,6 +2187,63 @@ LINE_CASES = (
 # the needle printed.
 P, T = "publish", "toolchains"
 MUTATIONS = (
+    # The independently versioned MCP publisher gets one exact exception only.
+    ("MCP uses an engine tag", P, [(MCP_JOB[0], MCP_GUARD, "startsWith(github.ref, 'refs/tags/v')")], {}, 1,
+     "npm-mcp-publish.yml › publish [guard]"),
+    ("MCP guard under OR", P, [(MCP_JOB[0], "    if: " + MCP_GUARD,
+                               "    if: github.event_name == 'workflow_dispatch' || " + MCP_GUARD)], {}, 1,
+     "npm-mcp-publish.yml › publish [guard]"),
+    ("MCP wrong environment", P, [(MCP_JOB[0], "    environment: npm-agents", "    environment: npm")], {}, 1,
+     "npm-mcp-publish.yml › publish [environment]"),
+    ("MCP ignores canonical repository", P, [(MCP_JOB[0], " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'", "")], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP ignores immutable repository ID", P, [(MCP_JOB[0], " && github.repository_id == '1126991539'", "")], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP ignores environment preflight", P, [(MCP_JOB[0], "[preflight, pack, consume, operand-proof]",
+                                             "[pack, consume, operand-proof]")], {}, 1,
+     "npm-mcp-publish.yml › publish [needs]"),
+    ("MCP ignores installed consumer", P, [(MCP_JOB[0], "[preflight, pack, consume, operand-proof]",
+                                          "[preflight, pack, operand-proof]")], {}, 1,
+     "npm-mcp-publish.yml › publish [needs]"),
+    ("MCP ignores archive producer", P, [(MCP_JOB[0], "[preflight, pack, consume, operand-proof]",
+                                         "[preflight, consume, operand-proof]")], {}, 1,
+     "npm-mcp-publish.yml › publish [needs]"),
+    ("MCP gate omitted", P, [(MCP_JOB[0], "      - run: " + MCP_GATE_RUN + "\n", "")], {}, 1,
+     "npm-mcp-publish.yml › publish [gate]"),
+    ("MCP reinspection omitted", P, [(MCP_JOB[0], "        run: " + MCP_REINSPECT_RUN,
+                                     "        run: echo skipped")], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP receipt replaced", P, [(MCP_JOB[0], '    env:\n      MCP_RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}',
+                                 '    env:\n      MCP_RECEIPT_SHA256: arbitrary')], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP preflight output faked", P, [(MCP_JOB[0], 'publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}',
+                                      "publish_allowed: 'true'")], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP existing version claims upload", P, [(MCP_JOB[0], 'Existing matching bytes; no OIDC upload was exercised.',
+                                              'OIDC upload succeeded.')], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP removes npm provenance", P, [(MCP_JOB[0], '--ignore-scripts --provenance --registry=',
+                                       '--ignore-scripts --registry=')], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP publishes relative path", P, [(MCP_JOB[0], 'npm publish "$tgz"', 'npm publish npm-mcp/file.tgz')], {}, 1,
+     "npm-mcp-publish.yml › publish [npm-publish]"),
+    ("MCP skips operand check", P, [(MCP_JOB[0], '              inspected "$tgz"\n', '')], {}, 1,
+     "npm-mcp-publish.yml › publish [npm-operand]"),
+    ("MCP proof parses a different archive", P, [(MCP_JOB[0], 'tarballs=("$PWD"/npm-mcp/*.tgz)',
+                                                'tarballs=("$PWD"/unqualified/*.tgz)')], {}, 1,
+     "npm-mcp-publish.yml › operand-proof [operand-proof]"),
+    ("MCP public artifact digest ignored", P, [(MCP_JOB[0], '          digest-mismatch: error',
+                                              '          digest-mismatch: ignore')], {}, 1,
+     "npm-mcp-publish.yml › publish [mcp-contract]"),
+    ("MCP grants package write", P, [(MCP_JOB[0], '      id-token: write\n',
+                                    '      id-token: write\n      packages: write\n')], {}, 1,
+     "npm-mcp-publish.yml › publish [permissions]"),
+    ("MCP reads persistent token", P, [(MCP_JOB[0], '      id-token: write\n',
+                                      '      id-token: write\n    token: ${{ secrets.NPM_TOKEN }}\n')], {}, 1,
+     "npm-mcp-publish.yml › publish [secrets]"),
+    ("MCP installs while privileged", P, [(MCP_JOB[0], "      - run: " + MCP_GATE_RUN,
+                                         "      - run: npm install\n      - run: " + MCP_GATE_RUN)], {}, 1,
+     "npm-mcp-publish.yml › publish [unlocked-install]"),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),

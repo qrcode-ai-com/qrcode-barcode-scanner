@@ -1,0 +1,257 @@
+name: npm-mcp-publish
+
+# Independent adapter tags. No engine build, lifecycle script or static npm token.
+# Untrusted event fields enter scripts through env, never shell interpolation.
+on:
+  push:
+    tags: ["agents-v*"]
+  pull_request:
+    paths:
+      - "integrations/mcp/**"
+      - "scripts/mcp-release.py"
+      - "scripts/test-mcp-release.py"
+      - "scripts/check-publish-guards.py"
+      - ".github/workflows/npm-mcp-publish.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect only, or publish from an exact agents-v tag
+        type: choice
+        options: [inspect, publish]
+        default: inspect
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: validate metadata and require an existing protected environment before scheduling publication
+        id: preflight
+        env:
+          MCP_MODE: ${{ inputs.mode || 'inspect' }}
+        run: python3 scripts/mcp-release.py preflight --ref "$GITHUB_REF" --event "$GITHUB_EVENT_NAME" --mode "$MCP_MODE" --github-output "$GITHUB_OUTPUT"
+
+  pack:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      receipt_sha256: ${{ steps.pack.outputs.receipt_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          package-manager-cache: false
+      - name: exact release npm
+        run: test "$(npm --version)" = 11.19.1
+      - name: negative release boundary tests and workflow guard
+        run: |
+          python3 scripts/test-mcp-release.py
+          python3 scripts/check-publish-guards.py
+      - name: pack once and compare all seven files with source
+        id: pack
+        run: python3 scripts/mcp-release.py pack --out "$RUNNER_TEMP/npm-mcp" --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: npm-mcp-qualified
+          path: ${{ runner.temp }}/npm-mcp/
+          if-no-files-found: error
+          retention-days: 14
+
+  consume:
+    needs: pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22.22.2, 24.22.2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-mcp-qualified
+          path: npm-mcp
+          digest-mismatch: error
+      - name: installed archive in a fresh host with actual modern and legacy MCP clients
+        env:
+          MCP_RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+        run: python3 scripts/mcp-release.py consume "$PWD"/npm-mcp/*.tgz --receipt "$PWD/npm-mcp/receipt.json" --expected-receipt "$MCP_RECEIPT_SHA256" --out "$RUNNER_TEMP/mcp-consumer"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: npm-mcp-consumer-${{ matrix.node }}
+          path: ${{ runner.temp }}/mcp-consumer/
+          if-no-files-found: error
+
+  operand-proof:
+    needs: pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          package-manager-cache: false
+      - name: node + npm versions (npm >= 11.5.1 for trusted publishing)
+        run: |
+          node --version
+          v=$(npm --version)
+          echo "npm $v"
+          if [ "$(printf '%s\n' 11.5.1 "$v" | sort -V | head -n1)" != 11.5.1 ]; then
+            echo "::error::npm $v cannot publish through trusted publishing (needs >= 11.5.1)"
+            exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-mcp-qualified
+          path: npm-mcp
+          digest-mismatch: error
+      - name: npm reads the publication operand as the qualified tarball file
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=("$PWD"/npm-mcp/*.tgz)
+          if [ "${#tarballs[@]}" -ne 1 ]; then exit 1; fi
+          node -e '
+            const npa = require(process.argv[1]);
+            for (const operand of process.argv.slice(2)) {
+              if (npa(operand).type !== "file") process.exit(1);
+            }
+          ' "$(npm root -g)/npm/node_modules/npm-package-arg" "${tarballs[@]}"
+
+  publish:
+    needs: [preflight, pack, consume, operand-proof]
+    if: startsWith(github.ref, 'refs/tags/agents-v') && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner' && github.repository_id == '1126991539' && needs.preflight.outputs.publish_allowed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: npm-agents
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MCP_RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+      NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.mcp-empty-user.npmrc
+      NPM_CONFIG_GLOBALCONFIG: ${{ github.workspace }}/.mcp-empty-global.npmrc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/mcp-release.py gate --ref "$GITHUB_REF" --environment npm-agents
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          package-manager-cache: false
+      - name: node + npm versions (npm >= 11.5.1 for trusted publishing)
+        run: |
+          node --version
+          v=$(npm --version)
+          echo "npm $v"
+          if [ "$(printf '%s\n' 11.5.1 "$v" | sort -V | head -n1)" != 11.5.1 ]; then
+            echo "::error::npm $v cannot publish through trusted publishing (needs >= 11.5.1)"
+            exit 1
+          fi
+      - name: exact release npm and empty traditional credential configuration
+        run: |
+          test "$(npm --version)" = 11.19.1
+          test -z "${NODE_AUTH_TOKEN:-}"
+          test -z "${NPM_TOKEN:-}"
+          : > "$NPM_CONFIG_USERCONFIG"
+          : > "$NPM_CONFIG_GLOBALCONFIG"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-mcp-qualified
+          path: npm-mcp
+          digest-mismatch: error
+      - name: re-inspect the exact archive and producer receipt
+        run: python3 scripts/mcp-release.py inspect "$PWD"/npm-mcp/*.tgz --strict --receipt "$PWD/npm-mcp/receipt.json" --expected-receipt "$MCP_RECEIPT_SHA256" --record "$RUNNER_TEMP/npm-inspected.sha256"
+      - name: publish only missing bytes; existing bytes do not exercise OIDC
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          inspected() {
+            if [[ "$1" == /* ]] && [ -f "$1" ] && [ ! -L "$1" ] && [[ "$1" == *.tgz ]] &&
+              grep -qxF "$(sha256sum -- "$1")" "$RUNNER_TEMP/npm-inspected.sha256"; then
+              return 0
+            fi
+            echo "::error::$1 is not an absolute path to a regular .tgz file the re-inspection recorded (path and sha256)"
+            exit 1
+          }
+          tarballs=("$PWD"/npm-mcp/*.tgz)
+          if [ "${#tarballs[@]}" -ne 1 ]; then exit 1; fi
+          tgz=${tarballs[0]}
+          state=$(python3 scripts/mcp-release.py registry "$tgz" --out "$RUNNER_TEMP/mcp-publication.json")
+          case "$state" in
+            present) echo "Existing matching bytes; no OIDC upload was exercised." ;;
+            missing)
+              inspected "$tgz"
+              npm publish "$tgz" --access public --ignore-scripts --provenance --registry=https://registry.npmjs.org
+              python3 scripts/mcp-release.py registry "$tgz" --out "$RUNNER_TEMP/mcp-publication.json" --uploaded
+              ;;
+            *) echo "::error::unknown registry state"; exit 1 ;;
+          esac
+          cat "$RUNNER_TEMP/mcp-publication.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: npm-mcp-publication-receipt
+          path: ${{ runner.temp }}/mcp-publication.json
+          if-no-files-found: error
+
+  registry-consume:
+    needs: [pack, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22.22.2, 24.22.2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-mcp-qualified
+          path: npm-mcp
+          digest-mismatch: error
+      - name: fresh installation from the public npm version, never the local tarball
+        env:
+          MCP_RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+        run: python3 scripts/mcp-release.py consume "$PWD"/npm-mcp/*.tgz --receipt "$PWD/npm-mcp/receipt.json" --expected-receipt "$MCP_RECEIPT_SHA256" --out "$RUNNER_TEMP/mcp-registry-consumer" --registry
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: npm-mcp-registry-consumer-${{ matrix.node }}
+          path: ${{ runner.temp }}/mcp-registry-consumer/
+          if-no-files-found: error
