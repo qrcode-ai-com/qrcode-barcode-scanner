@@ -7,7 +7,8 @@ description: "Decode the undecodable — and know your margin."
 *grades* QR codes that break standard scanners: artistic and AI-generated
 symbols with damaged finders, low module contrast, art texture over data,
 logos over the center. It powers the [qrcode-ai.com](https://qrcode-ai.com)
-verify flow and ships as four artifacts off one Rust core.
+verify flow. Five runtime entry points are published from one Rust core:
+Rust, CLI, Node native, browser WASM and Python.
 
 <Frame caption="An AI-art QR, decoded and scored 70/100 — see clean, artistic, occluded and retail codes scored end-to-end in the gallery.">
   <img src="/images/gallery-artistic.png" alt="AI-generated artistic QR code, decoded and scored by the scanner" width="220" />
@@ -90,16 +91,16 @@ Plus **GS1 awareness** (element strings + Digital Link with a per-criterion
 | `qrcode-barcode-scanner-cli` (`qrscan`) | crates.io | scripts, CI gates |
 | `@qrcode-ai-com/qrcode-barcode-scanner` | npm | Node servers (async, libuv pool) |
 | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | npm | browsers (one portable WASM, no SIMD) |
-| `qrcode-barcode-scanner` | PyPI | Python — one abi3 wheel, 3.8 → 3.14 |
+| `qrcode-barcode-scanner` | PyPI | Python — abi3 wheels, declared CPython 3.8 → 3.14 compatibility |
 | Kotlin/Android · Swift/iOS | built from source | native mobile (UniFFI) |
 | Flutter package | pub.dev, not yet published | Flutter — typed `ScanReport` (flutter_rust_bridge) |
 
 <Note>
-These are the names of the 0.11.0 packages, **pending publication**. Until a
-registry serves them, its latest release keeps its previous name: 0.10.1 as
-`qrcode-ai-scanner` and `qrcode-ai-scanner-cli` on crates.io and as
-`@supernovae-st/qrcode-ai-scanner` and `@supernovae-st/qrcode-ai-scanner-wasm`
-on npm, and 0.9.0 as `qrcode-ai-scanner` on PyPI. The
+The Rust core, CLI, Node native, browser WASM and Python packages are public in
+**0.11.0**. The six native npm platform packages are automatic dependencies of
+the Node parent. Mobile bindings, JSR, agent adapters and container images have
+separate publication and qualification gates. Old package versions remain
+available under their historical names; the
 [migration guide](/guides/migrate-to-qrcode-barcode-scanner) maps each name.
 </Note>
 
@@ -120,3 +121,9 @@ License: **AGPL-3.0-or-later** © SuperNovae Studio. The qrcode-ai.com
 product consumes this library; so can you, under the AGPL's share-alike
 terms.
 </Note>
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
