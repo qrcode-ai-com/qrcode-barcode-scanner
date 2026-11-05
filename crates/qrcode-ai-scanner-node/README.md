@@ -11,6 +11,10 @@ thread. Node.js 18 or later is required.
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
 [TypeScript declarations](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-node/index.d.ts)
 
+This engine checks QR designs and decodes imported images in [QR Code AI](https://qrcode-ai.com/).
+Use the Node package for images already in your server or worker. The planned
+[QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) serve the matching browser use cases.
+
 ## Scan an image
 
 ```js
@@ -102,10 +106,6 @@ separate from a `[QRS-xxx]` scan fault. There is no WASI fallback.
 [Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
 
 Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.
-
-Part of [QR Code AI](https://qrcode-ai.com/).
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
 
 License: [AGPL-3.0-or-later](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE).
 Commercial licensing is described in the

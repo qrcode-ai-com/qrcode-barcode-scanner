@@ -7,11 +7,15 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 
+Decode QR codes, linear barcodes and other supported 2D formats from images or camera frames with one Rust engine. [QR Code AI](https://qrcode-ai.com/) uses it to verify QR designs and decode imported images.
+
 **0.11.0 is released** for Rust, CLI, Node.js, browser WASM and Python.
 [Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)
 · [Explore the examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md).
 
 ## Examples
+
+To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line). QR Code AI plans dedicated pages for its [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 
 ### Different codes. One image.
 
@@ -73,6 +77,10 @@ qrscan design.png -s --budget-ms 0
 Read a label, return the JSON report or inspect a QR design's quality.
 The command remains `qrscan` across the package-name migration.
 [CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/cli.mdx)
+
+For a custom test label, create a Code 128 symbol with the
+[QR Code AI barcode generator](https://qrcode-ai.com/en-US/barcode-generator)
+and scan the exported PNG with `qrscan`.
 
 <details>
 <summary><strong>Rust example</strong></summary>
@@ -300,15 +308,6 @@ The npm adapter passed fresh registry installations on Node 22/24 on Linux x64 a
 ## QR Code AI
 
 Built for [QR Code AI](https://qrcode-ai.com/) by [SuperNovae Studio](https://github.com/supernovae-st).
-
-<table>
-  <tr><th><a href="https://qrcode-ai.com/">QR Code AI</a></th><th><a href="https://qrcode-ai.com/en-US/qr-code-scanner">QR code scanner</a></th><th><a href="https://qrcode-ai.com/en-US/barcode-scanner">Barcode scanner</a></th></tr>
-  <tr>
-    <td align="center"><a href="https://qrcode-ai.com/"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/qr-website.png" alt="QR code for the QR Code AI website" width="140"></a></td>
-    <td align="center"><a href="https://qrcode-ai.com/en-US/qr-code-scanner"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/qr-scanner.png" alt="QR code for the QR scanner page" width="140"></a></td>
-    <td align="center"><a href="https://qrcode-ai.com/en-US/barcode-scanner"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/barcode-scanner.png" alt="QR code for the barcode scanner page" width="140"></a></td>
-  </tr>
-</table>
 
 AGPL-3.0-or-later or a separate commercial license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 · [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/SECURITY.md)

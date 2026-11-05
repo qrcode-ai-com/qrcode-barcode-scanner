@@ -12,6 +12,9 @@ It runs locally, with no network requests.
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
 [Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
 
+For a one-off image check, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) uses the same engine.
+QR Code AI plans a [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) for saved designs and a [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) for label photos.
+
 ## Scan an image
 
 ```rust
@@ -87,10 +90,6 @@ limits and which results can be absent.
 [Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
 
 Releases up to 0.10.1 were published as `qrcode-ai-scanner`.
-
-[QR Code AI](https://qrcode-ai.com/) ·
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
 
 License: [AGPL-3.0-or-later](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE).
 Commercial licensing is described in the

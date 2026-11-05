@@ -7,8 +7,14 @@ The separately installed scanner engine
 `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` retains **AGPL-3.0-or-later**. Installing
 this wrapper does not relicense that engine or exempt a consumer from its terms.
 
-Copy this entire directory into your host's skill directory, keeping the scripts
-and license with `SKILL.md`. In OpenClaw, a project installation is
+The local helper uses the engine that checks QR designs and imports images
+in [QR Code AI](https://qrcode-ai.com/). For occasional browser checks, QR Code AI plans a
+[QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and a [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+
+Install the [published skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
+with `clawhub install qrcode-barcode-scanner --version 0.2.0`. For a manual
+installation, copy the entire directory with the scripts and license. In OpenClaw,
+a project installation is
 `<workspace>/skills/qrcode-barcode-scanner`; in Hermes it is
 `<HERMES_HOME>/skills/qrcode-barcode-scanner`. Refer to the host documentation for
 remote Git/registry installation. The runtime is installed separately as described
@@ -41,5 +47,3 @@ copying this directory.
 [Agent Skills format](https://agentskills.io/specification)
 · [Hermes skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)
 · [OpenClaw skills](https://docs.openclaw.ai/tools/skills)
-
-[QR Code AI](https://qrcode-ai.com/) · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)

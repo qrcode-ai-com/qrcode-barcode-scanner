@@ -12,6 +12,10 @@ returns the same versioned `ScanReport` as the Rust, Node.js and browser binding
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec) ·
 [Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
 
+The scanner used by [QR Code AI](https://qrcode-ai.com/) can also check batches of saved QR designs and
+barcode photos from a Python workflow. Its planned [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) are
+for one-off browser checks.
+
 ## Scan an image
 
 ```python
@@ -91,10 +95,6 @@ covers the runtime-specific steps.
 [Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/SECURITY.md) ·
 [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner) ·
 [Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
-
-Part of [QR Code AI](https://qrcode-ai.com/).
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner)
 
 License: [AGPL-3.0-or-later](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE).
 Commercial licensing is described in the
