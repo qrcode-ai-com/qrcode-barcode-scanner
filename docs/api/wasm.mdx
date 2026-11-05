@@ -4,17 +4,15 @@ description: "One portable WASM for verify flows and live camera, with checked l
 ---
 
 <Note>
-The `@qrcode-ai-com/qrcode-barcode-scanner-wasm` package is **pending
-publication** on npm, and the samples on this page target its 0.11.0 release.
-Until npm serves it, the line below installs 0.10.1 under the package's
-previous name, `@supernovae-st/qrcode-ai-scanner-wasm`, imported under that
-name too. 0.10.1 has no `/camera`, `/camera-overlay`, `/destination` or
-`/destination-node` entry and ships no examples. The
-[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+[`@qrcode-ai-com/qrcode-barcode-scanner-wasm` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0)
+is public on npm. It ships one portable WASM module plus the included camera,
+overlay and optional destination modules. The old `@supernovae-st` 0.10.1
+package remains historical and does not provide those new entries. See the
+[migration guide](/guides/migrate-to-qrcode-barcode-scanner).
 </Note>
 
 ```bash
-npm i @supernovae-st/qrcode-ai-scanner-wasm@0.10.1
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0
 ```
 
 `wasm-pack` web target: the `.wasm` resolves via `import.meta.url`.
@@ -1020,8 +1018,7 @@ runtime at every call.
 <AccordionGroup>
   <Accordion title="Vite / Nuxt">
     Exclude from dependency pre-bundling — esbuild breaks the
-    `import.meta.url` wasm resolution. Name the package you installed
-    (`@supernovae-st/qrcode-ai-scanner-wasm` for 0.10.1):
+    `import.meta.url` wasm resolution. Name the installed 0.11 package:
 
     ```ts
     vite: { optimizeDeps: { exclude: ["@qrcode-ai-com/qrcode-barcode-scanner-wasm"] } }
@@ -1051,3 +1048,9 @@ runtime at every call.
 
 Failures throw `JsError` with `[QRS-xxx]`-tagged messages
 ([catalog](/api/errors)).
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

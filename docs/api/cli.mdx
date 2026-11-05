@@ -4,16 +4,16 @@ description: "The scanner in scripts and CI."
 ---
 
 <Note>
-From 0.11.0, `qrscan` ships in the `qrcode-barcode-scanner-cli` crate,
-**pending publication** on crates.io; this page describes that release. Until
-crates.io serves it, the line below installs 0.10.1 from the crate's previous
-name, `qrcode-ai-scanner-cli`. Both crates install the same `qrscan` command:
-uninstall `qrcode-ai-scanner-cli` before installing the new crate. The
-[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+[`qrcode-barcode-scanner-cli` 0.11.0](https://crates.io/crates/qrcode-barcode-scanner-cli/0.11.0)
+is public and installs `qrscan`. The old `qrcode-ai-scanner-cli` crate installs
+the same command: uninstall that old crate first if it is installed. Prebuilt
+CLI archives and `SHA256SUMS` are also available in the
+[public v0.11.0 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0).
+See the [migration guide](/guides/migrate-to-qrcode-barcode-scanner).
 </Note>
 
 ```bash
-cargo install qrcode-ai-scanner-cli@0.10.1
+cargo install qrcode-barcode-scanner-cli --version 0.11.0 --locked
 ```
 
 ## Usage
@@ -133,3 +133,9 @@ qrscan hard.png | jq '.trace.stages[] | select(.detections_found>0).stage'
 bidi/zero-width injection — QR text is attacker-controlled. The JSON mode
 is serde-escaped by construction.
 </Note>
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

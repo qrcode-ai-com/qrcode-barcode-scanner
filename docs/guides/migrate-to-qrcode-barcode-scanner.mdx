@@ -4,11 +4,11 @@ description: "From 0.11.0 the scanner's packages carry new names. What changed, 
 ---
 
 <Note>
-The 0.11.0 packages under the new names are **pending publication**. Until a
-registry serves them, this page names them without install lines: each
-registry's install and dependency lines are added here once its packages are
-published, and [Publication status](#publication-status) shows where each one
-stands. Releases up to 0.10.x stay installable under their previous names.
+The five runtime entry points are public in **0.11.0** under the new names:
+Rust core, CLI, Node native, browser WASM and Python. The
+[publication status](#publication-status) below records their separate upload
+and consumer evidence. Releases through 0.10.x remain installable under their
+historical names; PyPI's old project stops at 0.9.0.
 </Note>
 
 ## What changed
@@ -61,7 +61,7 @@ name.
 | Kotlin | a JitPack coordinate under the former repository owner, never qualified | com.github.qrcode-ai-com:qrcode-barcode-scanner, once a JitPack build of the release tag succeeds |
 | Swift | built from source | built from source |
 | MCP server | adapter 0.1.0 on engine 0.10.0, a GitHub release asset, never on npm | `@qrcode-ai-com/qrcode-barcode-scanner-mcp` with its own version and the MCP Registry name `io.github.qrcode-ai-com/qrcode-barcode-scanner`, announced when published |
-| Agent skill | ClawHub `@thibautmelen/qr-image-scanner` 0.1.0, on engine 0.10.0 | the skill `qrcode-barcode-scanner` under the `qrcode-ai-com` publisher, with its own version, announced when published |
+| Agent skill | ClawHub `@thibautmelen/qr-image-scanner` 0.1.0, on engine 0.10.0 | [qrcode-ai-com/qrcode-barcode-scanner](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner), wrapper 0.1.1 on engine 0.10.0; upgrade to engine 0.11 still pending |
 | Container | `ghcr.io/supernovae-st/qrcode-ai-scanner:0.10.0` and `docker.io/thibautmelen/qrcode-ai-scanner:0.10.0` | ghcr.io/qrcode-ai-com/qrcode-barcode-scanner, announced when published; no Docker Hub image for 0.11 |
 
 ## Steps
@@ -69,8 +69,7 @@ name.
 For each runtime you use:
 
 1. Remove the previous package.
-2. Add the new one once its row in [Publication status](#publication-status)
-   says it is published.
+2. Add the published 0.11.0 package for that runtime using the pinned command below.
 3. Change the imports.
 4. Rebuild your lockfiles, and clear CI caches that hold the previous package.
 5. Run one scan and check that the report's `versions.scanner` is `"0.11.0"`.
@@ -88,8 +87,18 @@ python -m pip uninstall qrcode-ai-scanner
 
 Change `use qrcode_ai_scanner::` to `use qrcode_barcode_scanner::`. The rename
 changes no type, function or feature name: only the crate name and its import
-path change. Once the crate is published, this page also shows how to keep the
-previous import path by renaming the dependency in your own manifest.
+path change.
+
+```bash
+cargo add qrcode-barcode-scanner@=0.11.0
+```
+
+```rust
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
+```
+
+Cargo dependency renaming in a consumer manifest can retain an import path;
+it does not create another published package or an alias release.
 
 ### CLI
 
@@ -97,15 +106,34 @@ Both crates install the same `qrscan` command, so Cargo refuses to install the
 new crate while the previous one is installed: uninstall the previous crate
 first, and check with `qrscan --version` which one runs. The flags, the output
 and the exit codes are unchanged, so scripts that call `qrscan` need no edit.
-Once the 0.11.0 GitHub release is published, it also carries prebuilt archives,
-`qrcode-barcode-scanner-cli-0.11.0-<target>`, with their checksums in
-`qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS`.
+Install the published crate:
+
+```bash
+cargo install qrcode-barcode-scanner-cli --version 0.11.0 --locked
+qrscan --version
+```
+
+The [public 0.11.0 GitHub release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)
+also carries prebuilt `qrcode-barcode-scanner-cli-0.11.0-<target>` archives and
+`qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS`. Use the matching native archive
+and verify its checksum before running it.
 
 ### Node
 
 The platform packages keep their six suffixes: `darwin-arm64`, `darwin-x64`,
 `linux-arm64-gnu`, `linux-x64-gnu`, `linux-x64-musl` and `win32-x64-msvc`. The
-addon file inside each is now `qrcode-barcode-scanner.<suffix>.node`. The
+addon file inside each is now `qrcode-barcode-scanner.<suffix>.node`. Install
+the parent; its optional dependencies select the host's addon automatically:
+
+```bash
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0
+```
+
+```js
+import { scan } from "@qrcode-ai-com/qrcode-barcode-scanner";
+```
+
+The
 package has no WebAssembly or WASI fallback: on a host without its addon,
 loading throws `Cannot find native binding`. Remove the previous package, so
 that one engine is loaded.
@@ -116,13 +144,32 @@ Change every import, `/auto` included, to
 `@qrcode-ai-com/qrcode-barcode-scanner-wasm`. The root and `/auto` exports work
 as before, and the Wasm file is now `qrcode-barcode-scanner_bg.wasm`. The
 `compatible/*` subpaths were removed: import the root export instead, and the
-loader option `variant: 'compatible'` still selects the same module.
+loader option `variant: 'compatible'` still selects the same module. There is
+one physical portable WASM module, without SIMD, not two runtime variants.
+
+```bash
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0
+```
+
+```js
+import { loadScanner } from "@qrcode-ai-com/qrcode-barcode-scanner-wasm/auto";
+```
 
 ### Python
 
 Change `import qrcode_ai_scanner` to `import qrcode_barcode_scanner`; the
-functions and the report they return are the same. Until the package is on
-PyPI, build it from source as the [Python page](/api/python) shows.
+functions and the report they return are the same. Install the public package:
+
+```bash
+python -m pip install qrcode-barcode-scanner==0.11.0
+```
+
+```python
+import qrcode_barcode_scanner
+```
+
+A matching wheel needs no Rust compiler; see the [Python page](/api/python)
+for API and compatibility details.
 
 ### Flutter, Kotlin and Swift
 
@@ -135,9 +182,12 @@ imports `QrcodeAiScanner`.
 
 ### MCP server, agent skill and container
 
-Each one is announced when it is published under its new name. The `qrscan-mcp`
-command and its settings keep their names. The 0.1.0 skill and the 0.10.0
-container images stay as they are, with their digests.
+The [current ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
+is wrapper 0.1.1 on engine 0.10.0. Its engine update, the plugin and the npm MCP
+executable remain separate, pending deliveries. The existing GitHub MCP adapter
+0.1.0 and container images 0.10.0 keep their bytes and digests. The `qrscan-mcp`
+command and its settings retain their names. Publishing the five runtime
+packages does not update these adapters or publish the new GHCR image.
 
 ## Things that bite
 
@@ -157,7 +207,7 @@ container images stay as they are, with their digests.
   names and two engines: uninstall the previous one.
 - **Python requirements on `qrcode-ai-scanner` 0.10 or later.** They never
   resolved: PyPI has no 0.10.x under that name. Point them at
-  `qrcode-barcode-scanner` once it is published.
+  `qrcode-barcode-scanner==0.11.0`.
 
 ## Retained spellings in 0.11
 
@@ -184,21 +234,32 @@ These keep their earlier spelling in 0.11. None of them is an install name:
 
 ## Publication status
 
-| Registry | Packages | 0.11.0 |
-|---|---|---|
-| crates.io | `qrcode-barcode-scanner`, `qrcode-barcode-scanner-cli` | pending publication |
-| npm | `@qrcode-ai-com/qrcode-barcode-scanner`, its six platform packages, `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | pending publication |
-| PyPI | `qrcode-barcode-scanner` | pending publication |
-| GitHub release | the `qrcode-barcode-scanner-cli-0.11.0-*` CLI archives | pending publication |
-| pub.dev | the Flutter package | not yet published |
-| JitPack | com.github.qrcode-ai-com:qrcode-barcode-scanner | not yet qualified |
+Public readbacks and consumer checks recorded on **5 November 2026**:
 
-When a registry serves 0.11.0, its row gains the date the published files were
-checked, a link, and whether the upload carries provenance, and this page gains
-that registry's install lines. The MCP server, the agent skill and the container
-image have versions of their own: each is listed here when it is published.
+| Destination | Public 0.11.0 | Scope and upload provenance |
+|---|---|---|
+| crates.io | [Rust core](https://crates.io/crates/qrcode-barcode-scanner/0.11.0), [CLI](https://crates.io/crates/qrcode-barcode-scanner-cli/0.11.0) | Exact public archives and actual macOS registry consumers verified. Trusted Publishers configured and OIDC exchange exercised; a new OIDC upload remains for a future qualified version. |
+| npm | [Node](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner/v/0.11.0), six automatic native dependencies, [WASM](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0) | All eight archives match the qualified tag. Actual macOS Node consumers and pinned Chromium checks retained. Initial uploads were manual, without npm provenance or OIDC publication. |
+| PyPI | [qrcode-barcode-scanner](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) | Seven exact public files and seven verified attestations. Actual GitHub OIDC upload and macOS ARM64/Python 3.14.5 registry consumer verified. |
+| GitHub release | [CLI archives and SHA256SUMS](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0) | Exact assets and anonymous download consumers: five native hosts and four containers, 315 truth executions and 591 command cases. No code-signing claim. |
+| pub.dev | Flutter package | Not yet published. |
+| JitPack | com.github.qrcode-ai-com:qrcode-barcode-scanner | Not yet qualified. |
+| Swift | Local source package | No hosted binary package qualified by these runtime publications. |
+| JSR | Separate publication route | Not published or qualified by the npm release. |
+
+These are five runtime installation choices, not one SDK for every platform
+package, archive, document or index. The browser package contains one WASM;
+physical cameras, Safari and mobile devices retain their own qualification.
+The skill, plugin, MCP adapter and container image keep separate versions and
+release checks.
 
 ## Questions and issues
 
 Open an issue in the
 [repository's issue tracker](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues).
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

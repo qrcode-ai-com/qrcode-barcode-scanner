@@ -13,29 +13,31 @@ QR/barcode modes and SEO pages do not authorize
 separate scanner engines, product extractions or alias/wrapper packages.
 
 The source repository is `qrcode-ai-com/qrcode-barcode-scanner`. Its repository
-identity, history and tags are retained from its previous names. Releases up to
-0.10.x keep their former names: `qrcode-ai-scanner` and `qrcode-ai-scanner-cli`
-on crates.io, the `@supernovae-st` scope on npm, and `qrcode-ai-scanner` on PyPI
-(last release 0.9.0); never rename, edit or republish them. From 0.11.0 every
-package is published under the `qrcode-barcode-scanner` family: the crates
-`qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` (which installs
-`qrscan`), the npm packages `@qrcode-ai-com/qrcode-barcode-scanner`, its six
-platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, and
-`qrcode-barcode-scanner` on PyPI (imported as `qrcode_barcode_scanner`). No
-registry serves these names yet: they are pending publication. Nothing from
-0.11.0 on is published under a former name, and there are no alias or wrapper
-packages. The Flutter package is not yet published: it ships on
-pub.dev only as `qr_barcode_scanner`, never as `qrcode_ai_scanner`. Until a
-registry serves a new name, documents present that name as pending publication
-and give no copyable install line for it: they install the 0.10.1 release
-under its former name (crates.io and npm) or build from source (Python and the
-mobile bindings). Take install coordinates from README.md and the
-documentation, not from the repository name; the
-[migration guide](docs/guides/migrate-to-qrcode-barcode-scanner.mdx) maps each
-former name to its new one. QR Code AI's SaaS and its creation engine have
-separate sources and release qualification. A mobile scanner binding is not a
-consumer app. Component licenses do not by themselves determine the SaaS's
-license.
+identity, history and tags are retained from its previous names. The 0.11.0
+release is public: `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli`
+on crates.io (`qrscan` remains the command), `@qrcode-ai-com/qrcode-barcode-scanner`
+with six automatic native platform dependencies and
+`@qrcode-ai-com/qrcode-barcode-scanner-wasm` on npm, and
+`qrcode-barcode-scanner` on PyPI (import `qrcode_barcode_scanner`). Use these
+published coordinates in current installation instructions. The six native npm
+packages are optional dependencies selected by the Node parent, not separate SDKs.
+The browser package contains one portable WASM module.
+
+Releases through 0.10.x retain the old Rust and `@supernovae-st` npm names;
+PyPI's old `qrcode-ai-scanner` project stops at 0.9.0. Keep their versions,
+coordinates and bytes historical; do not rename or republish them. The
+[migration guide](docs/guides/migrate-to-qrcode-barcode-scanner.mdx) separates
+current installs from those old packages. Source/tag, registry installation and
+browser/device qualification keep distinct evidence. PyPI's exercised OIDC
+publication does not establish npm provenance; the initial npm uploads were
+manual. A repository rename or documentation edit does not publish a future version.
+
+Flutter remains unpublished on pub.dev; its selected future name is
+`qr_barcode_scanner`. Kotlin/JitPack remains unqualified and Swift uses a local
+source build. JSR, agent adapters and containers retain their own publication
+and qualification gates. QR Code AI's SaaS and creation engine have separate
+sources and release qualification. A mobile scanner binding is not a consumer
+app. Component licenses do not determine the SaaS's license.
 
 These spellings are retained in 0.11 and are not install names: the repository
 directories (`crates/qrcode-ai-scanner*`, `bindings/kotlin/qrcodeaiscanner`,
@@ -57,7 +59,8 @@ rename or a documentation change does not publish or retire any artifact.
 
 ## Current implementation
 
-A Rust workspace producing EIGHT publish surfaces off one core —
+A Rust workspace with five published runtime entry points and separate mobile
+bindings off one core —
 QR/barcode decoding + scannability scoring, specialty: artistic/
 AI-generated codes. The Rust core and WASM run **locally** with no network
 calls; the optional `./destination` module sends requests only through a
@@ -65,11 +68,11 @@ transport the caller supplies.
 
 | Path | Artifact | Registry |
 |---|---|---|
-| `crates/qrcode-ai-scanner` | `qrcode-barcode-scanner`, the core library, pending publication | crates.io |
-| `crates/qrcode-ai-scanner-cli` | `qrcode-barcode-scanner-cli`, the `qrscan` binary, pending publication | crates.io |
-| `crates/qrcode-ai-scanner-node` | `@qrcode-ai-com/qrcode-barcode-scanner` (napi) and its six platform packages, pending publication | npm |
-| `crates/qrcode-ai-scanner-wasm` | `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, pending publication | npm |
-| `crates/qrcode-ai-scanner-py` | `qrcode-barcode-scanner` (PyO3, workspace-excluded), pending publication | PyPI |
+| `crates/qrcode-ai-scanner` | `qrcode-barcode-scanner`, the core library, 0.11.0 published | crates.io |
+| `crates/qrcode-ai-scanner-cli` | `qrcode-barcode-scanner-cli`, the `qrscan` binary, 0.11.0 published | crates.io |
+| `crates/qrcode-ai-scanner-node` | `@qrcode-ai-com/qrcode-barcode-scanner` (napi) and six automatic platform dependencies, 0.11.0 published | npm |
+| `crates/qrcode-ai-scanner-wasm` | `@qrcode-ai-com/qrcode-barcode-scanner-wasm`, 0.11.0 published | npm |
+| `crates/qrcode-ai-scanner-py` | `qrcode-barcode-scanner` (PyO3, workspace-excluded), 0.11.0 published | PyPI |
 | `bindings/flutter` | Flutter plugin (FRB + cargokit), not yet published | pub.dev |
 | `bindings/kotlin` | com.github.qrcode-ai-com:qrcode-barcode-scanner, not yet qualified | JitPack |
 | `bindings/swift` | `QrcodeAiScanner` (xcframework), built from source: SwiftPM cannot add it by repository URL | SwiftPM (local package) |
@@ -216,3 +219,9 @@ Conventional commits, lowercase descriptions.
 - qrcode-ai.com landing (Nuxt): verify flow + import flow consume the
   wasm package — integration pattern in `docs/guides/nuxt-verify.mdx`.
 - Future: Nika vision workflows consume the core crate.
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

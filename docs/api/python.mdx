@@ -4,24 +4,22 @@ description: "Native PyO3 binding — one abi3 wheel for CPython 3.8 → 3.14, G
 ---
 
 <Note>
-The `qrcode-barcode-scanner` package is **pending publication** on PyPI, and
-this page describes its 0.11.0 release. The previous distribution,
-`qrcode-ai-scanner`, stops at 0.9.0. Until PyPI serves the new package, build
-it from a checkout of the repository as below; this needs a Rust toolchain. If
-`qrcode-ai-scanner` is installed in the same environment, uninstall it first
-(`python -m pip uninstall qrcode-ai-scanner`). The
-[migration guide](/guides/migrate-to-qrcode-barcode-scanner) covers the move.
+[`qrcode-barcode-scanner` 0.11.0](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/)
+is public on PyPI; import it as `qrcode_barcode_scanner`. A matching prebuilt
+wheel needs no Rust toolchain. The old `qrcode-ai-scanner` distribution stops at
+0.9.0 and remains separate; uninstall it if you are replacing it in the same
+environment. See the [migration guide](/guides/migrate-to-qrcode-barcode-scanner).
 </Note>
 
 ```bash
-git clone https://github.com/qrcode-ai-com/qrcode-barcode-scanner
-cd qrcode-barcode-scanner
-python -m pip install ./crates/qrcode-ai-scanner-py
+python -m pip install qrcode-barcode-scanner==0.11.0
 ```
 
-One `abi3` wheel covers CPython 3.8 → 3.14. Prebuilt for macOS (arm64/x64),
-Linux (manylinux + musllinux, x64/aarch64), and Windows (x64). The scan releases
-the GIL, so it never blocks other Python threads.
+The published `abi3` wheel tags declare CPython 3.8 → 3.14 compatibility.
+Prebuilt wheels cover macOS (arm64/x64), Linux manylinux (x64/aarch64),
+Linux musllinux (x64), and Windows (x64). A wheel tag is not an executed test of every
+interpreter version; the public-package consumer was checked on Python 3.14.5
+on macOS ARM64. The scan releases the GIL while decoding.
 
 ## API
 
@@ -100,3 +98,9 @@ check, alpha background, palette color, preset) or a palette above 32
 colors raises `ValueError` without a code; a negative or non-integer limit
 or budget is refused by the conversion (`OverflowError` / `TypeError`). The
 report shape is the [one contract](/api/report).
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).

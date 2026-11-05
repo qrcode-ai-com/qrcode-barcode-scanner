@@ -15,11 +15,19 @@ under them. From 0.11.0 the packages carry the `qrcode-barcode-scanner` family
 names: `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` on crates.io,
 `qrcode-barcode-scanner` on PyPI, and `@qrcode-ai-com/qrcode-barcode-scanner`,
 its six platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm` on
-npm. Nothing from 0.11.0 on is published under a former name, and there are no
-alias or wrapper packages. The `qrscan` command keeps its name. The Flutter
-package is not yet published. Container images, the agent skill and the MCP
-adapter already published keep their names; their next releases take names
-from the new family.
+npm. These five runtime entry points are public in 0.11.0, as are the prebuilt
+CLI archives in the [v0.11.0 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0).
+The six native npm platform packages are automatic optional dependencies of the
+Node parent, not six additional SDKs. The browser package ships one portable
+WASM module. No 0.11.0 package uses a former name or an alias/wrapper package;
+`qrscan` remains the CLI command.
+
+Flutter is still unpublished, Kotlin/JitPack is unqualified, and Swift requires
+a local source build. JSR has no qualified publication here. ClawHub's current
+skill is separately versioned 0.1.1 on engine 0.10.0; the MCP adapter and
+historical container images also retain their own versions and qualification.
+A public runtime package does not publish those other destinations. Initial npm
+uploads were manual, without npm provenance/OIDC; PyPI's OIDC upload is separate.
 
 These spellings stay as they were in 0.11; none of them is an install name:
 
@@ -63,3 +71,9 @@ The filename is retained for existing links. Earlier two-engine extraction
 proposals are superseded; no extraction or alias/wrapper package is required.
 Private operating plans and account data do not belong in this repository or
 its distributable archives.
+
+## QR Code AI
+
+[QR Code AI](https://qrcode-ai.com/) ·
+[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
+[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
