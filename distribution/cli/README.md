@@ -157,7 +157,7 @@ one-off browser workflows.
 ```sh
 ./qrscan --version                # qrscan X.Y.Z
 ./qrscan image.png                # the JSON scan report on stdout
-./qrscan image.png --pretty       # a summary for people
+./qrscan image.png --pretty       # a terminal summary of the first detection
 ./qrscan image.png --score-only   # only the score, from 0 to 100
 ./qrscan --capabilities           # the readers compiled into this program, as JSON
 ./qrscan --help                   # every option and its default

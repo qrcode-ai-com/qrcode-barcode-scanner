@@ -29,7 +29,7 @@ decode.
 | Output | Use |
 |---|---|
 | Default JSON | Pass the versioned `ScanReport` to a script or store it for inspection. |
-| `--pretty` | Read the report in the terminal. |
+| `--pretty` | Show the first detection in the terminal. Use the default JSON report for all detections. |
 | `--score-only` or `-s` | Print the score alone. A missing score is not zero. |
 
 The report distinguishes decoded contents from physical occurrences. Multiple

@@ -1,9 +1,10 @@
 # QR Code & Barcode Scanner MCP
 
-Local stdio adapter **0.2.1** for the published
-[`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
-It exposes one `scan_image` tool and two read-only resources. The adapter
-reuses the async native engine. The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
+Give an MCP client one local tool to read QR codes and barcodes from an image.
+`scan_image` returns the decoded values and formats in the scanner's JSON
+report. It uses the same
+[`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0 engine](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner)
+that [QR Code AI](https://qrcode-ai.com/) uses for QR verification.
 
 [Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
 
@@ -71,12 +72,11 @@ selected runtime and installed copy unambiguous.
 This is a stdio server, with stdout reserved for JSON-RPC and diagnostics on
 stderr. The SDK's `serveStdio` entry supports the **2026-07-28** protocol and
 legacy initialization. No HTTP service or hosted MCP endpoint is included.
-The packaged [Registry metadata](server.json) identifies
-`io.github.qrcode-ai-com/qrcode-barcode-scanner`; an actual Official MCP Registry
-listing is a separate publication step. SDK qualification does not establish
-installation or catalogue acceptance in Cursor, Cline, Gemini CLI or another
-product client; each needs discovery and a fixture call from the installed
-package.
+Find version 0.2.1 in the
+[Official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1)
+under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. The entry points to the
+same npm package and stdio transport described here. For a specific product
+client, verify tool discovery and a fixture call after installation.
 
 ## Tool contract
 

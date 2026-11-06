@@ -7,7 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 
-Decode QR codes, linear barcodes and other supported 2D formats from images or camera frames with one Rust engine. [QR Code AI](https://qrcode-ai.com/) uses this engine family to check generated QR designs before export.
+Scan QR codes and barcodes from images or camera frames, entirely on your device. One Rust engine reads mixed formats in the same image and reports each code's value and format, plus its position when available. It also scores how reliably a QR design can be read, a check [QR Code AI](https://qrcode-ai.com/) uses before export.
 
 **0.11.0 is released** for Rust, CLI, Node.js, browser WASM and Python.
 [Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)
@@ -17,7 +17,7 @@ Decode QR codes, linear barcodes and other supported 2D formats from images or c
 
 To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line). QR Code AI plans dedicated pages for its [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 
-### Different codes. One image.
+### Scan a QR code and a Code 128 barcode in one image
 
 [![Selecting two QR copies and a Code 128 from a recorded scan](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/scan-replay.gif?v=d7ca463cf1ff)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/scan-replay.mp4)
 
@@ -67,20 +67,33 @@ Choose the runtime your application uses. All five packages are published as 0.1
 
 ### Command line
 
+Install the prebuilt `qrscan` 0.11.0 binary on macOS or GNU/Linux with the
+[QR Code AI Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap).
+
 ```sh
-cargo install qrcode-barcode-scanner-cli@0.11.0 --locked
-qrscan label.png --pretty
-qrscan label.png --profile fast
-qrscan design.png -s --budget-ms 0
+brew install qrcode-ai-com/tap/qrscan
 ```
 
-Read a label, return the JSON report or inspect a QR design's quality.
-The command remains `qrscan` across the package-name migration.
-[CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/cli.mdx)
+You can also build with Cargo or download a
+[checksum-verified release archive](distribution/cli/README.md#download-and-verify).
+
+```sh
+cargo install qrcode-barcode-scanner-cli@0.11.0 --locked
+```
+
+Try a [sample image with a QR code and a Code 128 barcode](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png).
+The JSON report includes the QR URL and Code 128 `STOCK-4827`.
+
+```sh
+curl -fsSL -o mixed-codes.png \
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+qrscan mixed-codes.png --profile fast
+```
 
 For a custom test label, create a Code 128 symbol with the
 [QR Code AI barcode generator](https://qrcode-ai.com/en-US/barcode-generator)
-and scan the exported PNG with `qrscan`.
+and scan the exported PNG with `qrscan`. Use the [CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/cli.mdx)
+for QR quality checks, scan profiles and JSON output.
 
 <details>
 <summary><strong>Rust example</strong></summary>
@@ -298,7 +311,7 @@ The following agent integrations are published on scanner engine **0.11.0**:
 | [ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner) | 0.2.0 | `clawhub install qrcode-barcode-scanner --version 0.2.0` |
 | [OpenClaw plugin bundle](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner) | 0.2.0 | `openclaw plugins install clawhub:@qrcode-ai-com/qrcode-barcode-scanner@0.2.0` |
 
-The npm adapter passed fresh registry installations on Node 22/24 on Linux x64 and macOS ARM64. Its [0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1) was published from GitHub Actions with signed npm provenance. The skill and bundle passed registry installation and real OpenClaw 2026.11.1 runtime calls on macOS ARM64; the bundle still pins adapter 0.2.0. Additional clients and the Official MCP Registry have separate qualification and publication steps. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md) for current and historical installs.
+The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1) points clients to the same local stdio adapter published on npm. The [0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1) has signed npm provenance and passed fresh installs on Node 22/24 on Linux x64 and macOS ARM64. The skill and bundle passed runtime calls in OpenClaw 2026.11.1 on macOS ARM64. The bundle pins adapter 0.2.0. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md) for install commands and tested clients.
 
 - The [public GHCR image](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) ships `qrscan` 0.11.0 for Linux AMD64 and ARM64. Pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner:0.11.0` and follow the [offline container example](distribution/docker/v0.11/README.md#run-the-public-image). Anonymous pulls and exact scan checks passed on [both native architectures](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42208687356).
 - [Flutter](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/flutter/), [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.

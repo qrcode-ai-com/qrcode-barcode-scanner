@@ -23,11 +23,12 @@ WASM module. No 0.11.0 package uses a former name or an alias/wrapper package;
 `qrscan` remains the CLI command.
 
 Flutter is still unpublished, Kotlin/JitPack is unqualified, and Swift requires
-a local source build. JSR has no qualified publication here. ClawHub's current
-skill is separately versioned 0.1.1 on engine 0.10.0; the MCP adapter and
-historical container images also retain their own versions and qualification.
-A public runtime package does not publish those other destinations. Initial npm
-uploads were manual, without npm provenance/OIDC; PyPI's OIDC upload is separate.
+a local source build. JSR has no qualified publication here. The public ClawHub
+skill and OpenClaw bundle are 0.2.0 on engine 0.11.0. The MCP adapter is 0.2.1
+on npm and in the Official MCP Registry. Homebrew and GHCR distribute the CLI
+0.11.0. See the [distribution guide](distribution/README.md) for coordinates
+and platform evidence. The initial engine npm uploads were manual. The adapter
+0.2.1 and PyPI uploads have their own trusted publishing evidence.
 
 These spellings stay as they were in 0.11; none of them is an install name:
 

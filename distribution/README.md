@@ -29,10 +29,17 @@ its exact adapter dependency (MCP 0.2.0) through explicit setup. The adapter, sk
 bundle are versioned separately from the engine; adapter patch releases need
 not change the other integration versions.
 
-The Official MCP Registry metadata lives beside the adapter in `server.json`
-and must match its npm package and `mcpName`. A published npm package does not
-establish admission to that Registry, Glama, Smithery or another catalogue.
-Additional product clients retain their own discovery and fixture-call checks.
+The [Official MCP Registry lists adapter 0.2.1](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1)
+under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. Its entry points to the
+npm package above. Each additional client or catalogue has its own acceptance
+checks.
+
+## CLI and containers
+
+Install `qrscan` 0.11.0 with `brew install qrcode-ai-com/tap/qrscan`. The
+[Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap) distributes
+checksum-pinned binaries for macOS and GNU/Linux on ARM64 and x86-64. The
+[CLI archive guide](cli/README.md) covers direct downloads, including Windows.
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)
