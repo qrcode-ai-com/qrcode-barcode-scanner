@@ -44,6 +44,8 @@ if (Get-Command qrscan.exe -CommandType Application -ErrorAction SilentlyContinu
 
 # This setting applies only inside the disposable Windows test host.
 & $winget settings --enable LocalManifestFiles
+# The local manifest has no Microsoft Store dependency. Limit discovery to WinGet.
+& $winget source remove --name msstore --disable-interactivity
 & $winget validate --manifest $manifest
 & $winget install --manifest $manifest --scope user --architecture x64 --silent --disable-interactivity
 
