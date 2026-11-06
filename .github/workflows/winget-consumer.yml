@@ -1,0 +1,27 @@
+name: WinGet Windows consumer
+
+on:
+  push:
+    branches: [codex/winget-consumer]
+
+permissions:
+  contents: read
+
+jobs:
+  install-scan-uninstall:
+    runs-on: windows-2025
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate, install, scan and uninstall
+        shell: pwsh
+        run: ./scripts/test-winget-consumer.ps1
+      - name: Save qualification receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: winget-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/winget-consumer-receipt.json
+          if-no-files-found: error
+          retention-days: 30
