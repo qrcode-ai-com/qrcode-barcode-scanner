@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>qrcode-barcode-scanner</id>
+    <version>0.11.0</version>
+    <title>QR Code &amp; Barcode Scanner</title>
+    <authors>QR Code AI</authors>
+    <projectUrl>https://qrcode-ai.com/</projectUrl>
+    <projectSourceUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner</projectSourceUrl>
+    <packageSourceUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/distribution/chocolatey</packageSourceUrl>
+    <docsUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/distribution/cli/README.md</docsUrl>
+    <bugTrackerUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>qr-code barcode code128 data-matrix scanner cli portable windows x64</tags>
+    <summary>Read QR codes and barcodes from local images with the qrscan CLI.</summary>
+    <description><![CDATA[
+qrscan reads QR codes, linear barcodes, and supported 2D codes from PNG,
+JPEG, WebP, and GIF files. It returns a structured JSON report with decoded
+content, format, and available QR quality diagnostics. Scans run locally.
+
+This portable package contains the official Windows x64 executable, source
+references, and licenses. Chocolatey puts qrscan on PATH.
+
+    qrscan .\label.png --profile full
+
+Use the CLI for scripts and repeatable checks. [QR Code AI](https://qrcode-ai.com/)
+makes the same scanner engine available to web and application developers.
+Dedicated [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and
+[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) web pages are planned.
+]]></description>
+    <releaseNotes>https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
