@@ -5,10 +5,22 @@ It runs locally and supports QR codes, linear barcodes and matrix codes. It
 includes the mixed QR + Code 128 regression, physical-occurrence geometry and
 pipeline 5 reports. There is no scanner HTTP service and no runtime download.
 
-**Publication target:** `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner`.
-This directory prepares that distribution; a prepared image is not a public
-registry release. The historical `distribution/docker/` 0.10 recipe, frozen
-BOM, verifier, publisher and Docker Hub consumer remain unchanged.
+## Run the public image
+
+The [GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
+supports Linux AMD64 and ARM64. The digest below names the verified multi-platform
+index. Put an input image named `label.png` in the current directory before
+running the command.
+
+```sh
+image=ghcr.io/qrcode-ai-com/qrcode-barcode-scanner@sha256:fd0433f29b0dabd469ce6a8fdcfc7bf6554960301b5bc57b5fca97928fd7cb96
+docker pull "$image"
+docker run --rm --network none --read-only --cap-drop ALL \
+  --mount type=bind,src="$PWD",dst=/input,readonly "$image" /input/label.png --pretty
+```
+
+[Anonymous public pulls](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42208687356)
+and exact scans passed on both native architectures.
 
 ## Build and verify
 
