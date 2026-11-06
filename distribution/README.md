@@ -34,6 +34,26 @@ under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. Its entry points to the
 npm package above. Each additional client or catalogue has its own acceptance
 checks.
 
+### Connect the published MCP adapter to OpenCode
+
+From your working directory, install the pinned adapter and register it as a
+[local OpenCode MCP server](https://opencode.ai/docs/mcp-servers/#local). Keep
+the install directory in place because OpenCode stores its absolute path.
+
+```sh
+npm install --prefix ./.qrscan-mcp --save-exact --ignore-scripts \
+  @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1
+opencode mcp add qrscan -- "$(command -v node)" \
+  "$PWD/.qrscan-mcp/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs"
+opencode mcp list
+```
+
+On OpenCode 1.18.15 with Node.js 22.22.2 on macOS ARM64, `qrscan` reported
+`connected` and the client discovered `scan_image`. A separate direct MCP
+call on the same adapter version returned the QR payload and Code 128
+`STOCK-4827` in `fast`, `frame`, and `full` with engine 0.11.0. To remove
+the connection, delete `qrscan` from your OpenCode configuration.
+
 ### Install the portable skill from Git in a Codex project
 
 From the project directory, install all five files of the 0.2.0 skill from
