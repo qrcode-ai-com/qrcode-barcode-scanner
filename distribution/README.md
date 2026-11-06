@@ -34,11 +34,12 @@ and must match its npm package and `mcpName`. A published npm package does not
 establish admission to that Registry, Glama, Smithery or another catalogue.
 Additional product clients retain their own discovery and fixture-call checks.
 
-For containers, the **0.11 GHCR image remains private** by the owner's current
-choice; no public pull is claimed. The public **0.10** GHCR and Docker Hub
-images and the original **0.1** agent archives are retained below as history.
-Their installation names, versions, hashes and qualification receipts do not
-qualify the current 0.11 integrations.
+For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
+on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)
+shows how to scan an image locally using the verified index digest. Both
+[native public consumers](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42208687356)
+pulled anonymously and ran the exact-content regression checks. The public
+0.10 GHCR and Docker Hub images and 0.1 agent archives remain available below.
 
 <details>
 <summary>Historical installations: agent 0.1.0 and engine 0.10.0</summary>

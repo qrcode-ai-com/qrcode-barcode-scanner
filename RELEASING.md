@@ -1000,6 +1000,30 @@ This workflow publishes only the npm MCP adapter. ClawHub skills/plugins,
 Official MCP Registry admission and product-client acceptance retain their own
 publication and qualification steps.
 
+### Official MCP Registry listing
+
+`mcp-registry-publish.yml` lists the already published npm adapter 0.2.1 as
+`io.github.qrcode-ai-com/qrcode-barcode-scanner`. It runs only by manual
+dispatch from canonical `main`. It checks the exact npm archive and the
+`server.json` from `agents-v0.2.1`, whose commit and digests are pinned in the
+helper. A matching active version is a successful read-only result. A
+conflicting or inactive version stops the workflow for review.
+
+Before dispatch, confirm that the reviewed `mcp-registry` environment admits
+only the `main` branch, requires `ThibautMelen` as its sole reviewer and
+disables administrator bypass. The verifier proves those settings before
+the protected job can start. That job rechecks the inputs, listing and
+environment, verifies the pinned upstream publisher archive, uses GitHub
+OIDC, clears the short-lived publisher token file, then reads back the
+public Registry record.
+
+```bash
+gh workflow run mcp-registry-publish.yml --ref main --repo qrcode-ai-com/qrcode-barcode-scanner
+```
+
+Review the protected deployment and verify the active public record in the
+run summary. Future adapter versions need their own reviewed pins.
+
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
 The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the

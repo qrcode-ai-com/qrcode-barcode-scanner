@@ -126,6 +126,11 @@ mint registry tokens). Every privileged job must:
                Its preflight must prove the protected environment exists before
                scheduling publication. Other registry jobs keep v* and their
                existing environment/inspector rules.
+  MCP Registry  mcp-registry-publish.yml > publish is a manual main-only
+               exception to list the inspected, already published npm
+               adapter. It requires its separate protected environment,
+               canonical repository, read-only preflight and the exact
+               rechecking helper. No other job inherits this exception.
   concurrency  join publish-${{ github.workflow }}-${{ github.ref }}, never
                cancelling, so a re-run on the tag waits instead of racing
 
@@ -237,6 +242,13 @@ MCP_PREFLIGHT_RUN = ('python3 scripts/mcp-release.py preflight --ref "$GITHUB_RE
 MCP_REINSPECT_RUN = ('python3 scripts/mcp-release.py inspect "$PWD"/npm-mcp/*.tgz --strict '
                     '--receipt "$PWD/npm-mcp/receipt.json" --expected-receipt "$MCP_RECEIPT_SHA256" '
                     '--record "$RUNNER_TEMP/npm-inspected.sha256"')
+MCP_REGISTRY_JOB = ("mcp-registry-publish.yml", "publish")
+MCP_REGISTRY_GUARD = "github.ref == 'refs/heads/main'"
+MCP_REGISTRY_CONTEXT = (MCP_REGISTRY_GUARD + " && github.event_name == 'workflow_dispatch'"
+                        " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'"
+                        " && github.repository_id == '1126991539'")
+MCP_REGISTRY_INSPECT_RUN = "python3 scripts/mcp-registry-publish.py inspect"
+MCP_REGISTRY_PUBLISH_RUN = "python3 scripts/mcp-registry-publish.py publish"
 GUARD = "startsWith(github.ref, 'refs/tags/v')"
 CONCURRENCY = "publish-${{ github.workflow }}-${{ github.ref }}"
 OCI_JOB = ("oci-publish.yml", "publish")
@@ -421,6 +433,7 @@ NOT_ON_TAG = {"!startsWith(github.ref, 'refs/tags/')", "!startsWith(github.ref, 
 # zip, builds) what it uploads. A publishing job missing here fails.
 INSPECTION = {
     MCP_JOB: "pack",
+    MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
@@ -1612,6 +1625,49 @@ def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> lis
     return out
 
 
+def _mcp_registry_contract_problems(wf: dict) -> list:
+    """Bind the manual exception to two jobs and the exact rechecking helper."""
+    workflow, publish_name = MCP_REGISTRY_JOB
+    out = []
+
+    def fail(job, message):
+        out.append(Finding(workflow, job, "mcp-registry-contract", message))
+
+    if wf.get("on") != "workflow_dispatch" or wf.get("permissions") != {} or "env" in wf:
+        fail("(workflow)", "require a manual dispatch with no inputs, inherited permissions or environment variables")
+    jobs = wf["jobs"]
+    if set(jobs) != {"verify", publish_name}:
+        fail("(workflow)", "require exactly the read-only verifier and protected publisher")
+    checkout = {
+        "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "with": {"persist-credentials": "false"},
+    }
+    verifier = jobs.get("verify", {})
+    expected_verify = {
+        "if": MCP_REGISTRY_CONTEXT,
+        "runs-on": "ubuntu-24.04",
+        "timeout-minutes": "5",
+        "permissions": {"contents": "read"},
+        "outputs": {"missing": "${{ steps.inspect.outputs.missing }}"},
+        "steps": [checkout, {"id": "inspect", "run": MCP_REGISTRY_INSPECT_RUN}],
+    }
+    if verifier != expected_verify:
+        fail("verify", "inspect the pinned adapter and prove the protected environment before scheduling publication")
+    expected_publish = {
+        "needs": ["verify"],
+        "if": MCP_REGISTRY_CONTEXT + " && needs.verify.outputs.missing == 'true'",
+        "runs-on": "ubuntu-24.04",
+        "timeout-minutes": "6",
+        "environment": "mcp-registry",
+        "concurrency": {"group": CONCURRENCY, "cancel-in-progress": "false"},
+        "permissions": {"contents": "read", "id-token": "write"},
+        "steps": [checkout, {"run": MCP_REGISTRY_PUBLISH_RUN}],
+    }
+    if jobs.get(publish_name) != expected_publish:
+        fail(publish_name, "publish only from canonical main after the verifier, rechecking the listing and environment before OIDC")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1624,7 +1680,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
 
     oci = (workflow, job_id) == OCI_JOB
     mcp = (workflow, job_id) == MCP_JOB
-    condition_check = _conjunct(job.get("if"), {MCP_GUARD if mcp else OCI_GUARD}) if (oci or mcp) else guarded(job.get("if"))
+    mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
+    guard = MCP_REGISTRY_GUARD if mcp_registry else MCP_GUARD if mcp else OCI_GUARD if oci else GUARD
+    condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
     needs = job.get("needs")
@@ -1639,7 +1697,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("needs", f"needs {needs}: must include {consumer!r}, the clean installed-package gate")
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
-    allowed_environments = {"npm-agents"} if mcp else {"container"} if oci else ENVIRONMENTS
+    allowed_environments = ({"mcp-registry"} if mcp_registry else {"npm-agents"} if mcp
+                            else {"container"} if oci else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1650,6 +1709,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif oci:
         if perms != {"contents": "read", "actions": "read", "packages": "write"}:
             flag("permissions", "OCI publisher needs exactly contents read, actions read and packages write; no id-token")
+    elif mcp_registry:
+        if perms != {"contents": "read", "id-token": "write"}:
+            flag("permissions", "Official MCP publisher needs exactly contents read and id-token write")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -1732,7 +1794,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("floating-rust", f"{level} env RUST_TOOLCHAIN {value!r} is not an exact x.y.z")
     checkout = next((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/checkout"), None)
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
-    required_gate = MCP_GATE_RUN if mcp else OCI_GATE_RUN if oci else GATE_RUN
+    required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
+                     else OCI_GATE_RUN if oci else GATE_RUN)
     if set(gate) - {"run", "name", "working-directory"} or str(gate.get("run", "")).strip() != required_gate:
         flag("gate", f"the first step after the checkout must be exactly `{required_gate}`, with no other key")
     first_publish = min((i for i, _ in publishing), default=len(steps))
@@ -1798,6 +1861,8 @@ def check(workflows: pathlib.Path) -> tuple:
     findings += [Finding(name, "(directory)", "workflow-file", "not a *.yml or *.yaml workflow: GitHub reads both, "
                          "and nothing else belongs here") for name in workflow_files(workflows)[1]]
     for name, wf in load_workflows(workflows):
+        if name == MCP_REGISTRY_JOB[0]:
+            findings += _mcp_registry_contract_problems(wf)
         top = wf.get("permissions")
         if not (isinstance(top, dict) and not _write_permissions(top)) and top != "read-all":
             findings.append(Finding(name, "(workflow)", "permissions",
@@ -2244,6 +2309,30 @@ MUTATIONS = (
     ("MCP installs while privileged", P, [(MCP_JOB[0], "      - run: " + MCP_GATE_RUN,
                                          "      - run: npm install\n      - run: " + MCP_GATE_RUN)], {}, 1,
      "npm-mcp-publish.yml › publish [unlocked-install]"),
+    # Official Registry is a separate manual exception, never an npm upload.
+    ("Official MCP Registry permits an automatic trigger", P,
+     [(MCP_REGISTRY_JOB[0], "on: workflow_dispatch", "on: push")], {}, 1,
+     "mcp-registry-publish.yml › (workflow) [mcp-registry-contract]"),
+    ("Official MCP Registry accepts another ref", P,
+     [(MCP_REGISTRY_JOB[0], MCP_REGISTRY_CONTEXT + " && needs.verify.outputs.missing == 'true'",
+       "github.ref != '' && needs.verify.outputs.missing == 'true'")], {}, 1,
+     "mcp-registry-publish.yml › publish [guard]"),
+    ("Official MCP Registry ignores canonical repository ID", P,
+     [(MCP_REGISTRY_JOB[0], MCP_REGISTRY_CONTEXT + " && needs.verify.outputs.missing == 'true'",
+       MCP_REGISTRY_CONTEXT.rsplit(" && ", 1)[0] + " && needs.verify.outputs.missing == 'true'")], {}, 1,
+     "mcp-registry-publish.yml › publish [mcp-registry-contract]"),
+    ("Official MCP Registry fakes verifier output", P,
+     [(MCP_REGISTRY_JOB[0], "missing: ${{ steps.inspect.outputs.missing }}", "missing: 'true'")], {}, 1,
+     "mcp-registry-publish.yml › verify [mcp-registry-contract]"),
+    ("Official MCP Registry skips the protected environment", P,
+     [(MCP_REGISTRY_JOB[0], "    environment: mcp-registry\n", "")], {}, 1,
+     "mcp-registry-publish.yml › publish [environment]"),
+    ("Official MCP Registry grants package write", P,
+     [(MCP_REGISTRY_JOB[0], "      id-token: write\n", "      id-token: write\n      packages: write\n")], {}, 1,
+     "mcp-registry-publish.yml › publish [permissions]"),
+    ("Official MCP Registry replaces the rechecking helper", P,
+     [(MCP_REGISTRY_JOB[0], MCP_REGISTRY_PUBLISH_RUN, "mcp-publisher publish server.json")], {}, 1,
+     "mcp-registry-publish.yml › publish [gate]"),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),
