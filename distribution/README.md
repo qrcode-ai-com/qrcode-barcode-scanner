@@ -34,6 +34,23 @@ under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. Its entry points to the
 npm package above. Each additional client or catalogue has its own acceptance
 checks.
 
+### Install the portable skill from Git in a Codex project
+
+From the project directory, install all five files of the 0.2.0 skill from
+the pinned GitHub tree:
+
+```sh
+DISABLE_TELEMETRY=1 npx --yes skills@1.7.6 add \
+  https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/610879c31302337a2b409b21bd18324e2fece178/skills/qrcode-barcode-scanner \
+  --skill qrcode-barcode-scanner --agent codex --copy --yes
+```
+
+The [pinned skill README](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/610879c31302337a2b409b21bd18324e2fece178/skills/qrcode-barcode-scanner/README.md)
+shows how to install the native engine and run the helper. On macOS ARM64 with
+Node.js 22.22.2, this install matched all five source files. Its helper used
+engine 0.11.0 and returned the QR payload and Code 128 `STOCK-4827` together
+in `fast`, `frame`, and `full`. This route installs directly from GitHub.
+
 ## CLI and containers
 
 Install `qrscan` 0.11.0 with `brew install qrcode-ai-com/tap/qrscan`. The
