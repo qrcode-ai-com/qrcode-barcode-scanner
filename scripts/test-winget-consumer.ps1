@@ -75,7 +75,14 @@ $results = foreach ($profile in 'fast', 'frame', 'full') {
     }
     [ordered]@{ profile = $profile; detections = $found }
 }
-& $winget uninstall --manifest $manifest --scope user --silent --disable-interactivity --purge
+$registration = @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' |
+    Get-ItemProperty |
+    Where-Object { $_.WinGetPackageIdentifier -ceq $id -and $_.DisplayVersion -ceq $scannerVersion })
+if ($registration.Count -ne 1) { throw "Expected exactly one portable WinGet registration for $id." }
+# A local manifest has no public source entry. WinGet registers its uninstall
+# command by product code for this case.
+& $winget uninstall --product-code $registration[0].PSChildName --scope user --silent --disable-interactivity --purge
+if (Test-Path -LiteralPath $registration[0].PSPath) { throw 'WinGet uninstall left its portable registration.' }
 if ((Test-Path -LiteralPath $cli) -or (Get-Command qrscan.exe -CommandType Application -ErrorAction SilentlyContinue)) {
     throw 'WinGet uninstall left the scanner command on PATH.'
 }
