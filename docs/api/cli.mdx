@@ -61,8 +61,10 @@ renders the flatten verdict plus the placement-envelope strip
 | Mode | Output |
 |---|---|
 | default | the full `ScanReport` JSON, pretty-printed, on stdout |
-| `--pretty` | human summary: content, payload, symbol, score + axes, UEC, ISO grade card, hints — or why the score is missing (`not computed`, `not judged`, `unavailable`) |
+| `--pretty` | terminal summary of the first detection, with content, payload, symbol, QR score and diagnostics when available |
 | `--score-only` | the bare composite value (`87`) — for shell gates; a complete judgment, never a deflated one |
+
+Use the default JSON output to read every detection in a mixed image.
 
 ## Example (`--pretty`)
 
