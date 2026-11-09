@@ -4,7 +4,8 @@
 #
 # Consumer (after JitPack builds a tag vX.Y.Z):
 #   repositories { maven { url = uri("https://jitpack.io") } }
-#   JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:vX.Y.Z
+#   JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:X.Y.Z (no v prefix:
+#   JitPack keeps X.Y.Z and vX.Y.Z as two separate builds of the same tag)
 #
 # Because the AAR embeds NDK-cross-compiled .so's, JitPack's build box must have
 # the Rust toolchain + Android NDK + cargo-ndk, plus the per-ABI .so and the

@@ -18,11 +18,50 @@ Contact `studio.supernovae@gmail.com`.
 
 ## Install
 
-No JitPack build of this module has been qualified yet, so there is no
-dependency line to copy: build the AAR from source as shown in
-[Build locally](#build-locally).
+JitPack builds the AAR from a release tag. Version 0.11.0 was installed from
+jitpack.io by a clean Android project
+([`tests/consumers/jitpack-android`](../../tests/consumers/jitpack-android/)) and
+scanned on an emulator, in a debug build and in an R8-minified build.
 
-JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:v0.11.0
+JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:0.11.0
+
+With 0.11.0, add JNA's Android AAR yourself. The module metadata published with
+that version names JNA without its AAR, so Gradle would resolve the plain jar,
+which has no Android native library, and the first scan would fail with an
+`UnsatisfiedLinkError`:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+
+// app/build.gradle.kts
+dependencies {
+    implementation("com.github.qrcode-ai-com:qrcode-barcode-scanner:0.11.0") {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
+}
+```
+
+Use JNA 5.17.0 or later: its native library is aligned for Android devices with
+16 KB memory pages on every 64-bit ABI. JNA 5.13.0, the version the published
+POM names, is aligned to 4 KB on x86_64. The scanner's own 64-bit libraries in
+the 0.11.0 AAR are aligned to 16 KB.
+
+For a minified build with 0.11.0, also add this line to your ProGuard rules:
+
+```
+-dontwarn java.awt.*
+```
+
+Use the version string `0.11.0`, without a `v`. JitPack treats `v0.11.0` as
+another build of the same tag.
 
 ## Usage
 

@@ -1,0 +1,163 @@
+name: Binding consumers
+
+# Clean consumers of binding artifacts as a public registry serves them. Nothing here builds
+# the engine or publishes: each job installs from the public source into a project created
+# outside bindings/, scans the shared mixed fixture and uploads a receipt.
+on:
+  workflow_dispatch:
+    inputs:
+      jitpack_version:
+        description: Exact JitPack version string to consume
+        default: "0.11.0"
+  pull_request:
+    paths:
+      - .github/workflows/binding-consumers.yml
+      - tests/consumers/**
+      - scripts/elf-load-alignment.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binding-consumers-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JITPACK_VERSION: ${{ inputs.jitpack_version || '0.11.0' }}
+  JITPACK_PATH: com/github/qrcode-ai-com/qrcode-barcode-scanner
+  FIXTURE: fixtures/symbology/mixed-code128-qr.png
+  FIXTURE_SHA256: c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8
+
+jobs:
+  jitpack-android:
+    name: JitPack AAR · ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # The 16 KB leg records a limit of the published artifact; it must not hide the main result.
+    # Each leg first tries the one-line dependency and records the outcome, then runs with JNA's
+    # Android AAR added explicitly: 5.13.0 as the POM asks, 5.17.0 where 16 KB pages need it.
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android 14, 4 KB pages
+            api: 34
+            target: default
+            jna: "5.13.0"
+            experimental: false
+          - name: Android 15, 16 KB pages
+            api: 35
+            target: google_apis_ps16k
+            jna: "5.17.0"
+            experimental: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the JitPack build state
+        run: |
+          # Only the builds API is read here: a request for an artifact of a version that was
+          # never built would start a build.
+          curl -fsS "https://jitpack.io/api/builds/com.github.qrcode-ai-com/qrcode-barcode-scanner" -o builds.json
+          python3 - <<'PY'
+          import json, os, sys
+          version = os.environ['JITPACK_VERSION']
+          builds = json.load(open('builds.json'))['com.github.qrcode-ai-com']['qrcode-barcode-scanner']
+          state = builds.get(version)
+          print(f'JitPack build {version}: {state}')
+          sys.exit(0 if state == 'ok' else 1)
+          PY
+      - name: Record the published artifact
+        run: |
+          mkdir receipt
+          base="https://jitpack.io/$JITPACK_PATH/$JITPACK_VERSION/qrcode-barcode-scanner-$JITPACK_VERSION"
+          curl -fsSL "$base.aar" -o receipt/scanner.aar
+          curl -fsSL "$base.pom" -o receipt/scanner.pom
+          (cd receipt && sha256sum scanner.aar scanner.pom | tee artifact.sha256)
+          test "$(unzip -l receipt/scanner.aar | grep -c 'jni/.*/libqrcode_ai_scanner_uniffi\.so$')" -eq 4
+          python3 scripts/elf-load-alignment.py receipt/scanner.aar --json receipt/scanner-alignment.json
+          jna=$(sed -n '/<artifactId>jna<\/artifactId>/{n;s/.*<version>\(.*\)<\/version>.*/\1/p;}' receipt/scanner.pom)
+          echo "JNA version in the POM: $jna"
+          curl -fsSL "https://repo1.maven.org/maven2/net/java/dev/jna/jna/$jna/jna-$jna.aar" -o receipt/jna.aar
+          # JNA's own alignment is reported, not judged: the 16 KB leg below measures its effect.
+          python3 scripts/elf-load-alignment.py receipt/jna.aar --json receipt/jna-alignment.json || true
+      - name: Stage the shared fixture
+        run: |
+          echo "$FIXTURE_SHA256  $FIXTURE" | sha256sum -c -
+          mkdir -p tests/consumers/jitpack-android/app/src/main/assets
+          cp "$FIXTURE" tests/consumers/jitpack-android/app/src/main/assets/
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          gradle-version: "8.9"
+          # A cold cache: the AAR must resolve from jitpack.io in this run.
+          cache-disabled: true
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # Debug: the instrumented test. Minified: the release app judges itself and logs a verdict.
+      - name: Scan on the emulator, debug and minified
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          JNA_AAR: ${{ matrix.jna }}
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb shell getconf PAGE_SIZE | tee receipt/page-size.txt
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" > receipt/one-line-dependency.log 2>&1 && echo passed > receipt/one-line-dependency.result || echo failed > receipt/one-line-dependency.result
+            cat receipt/one-line-dependency.result
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
+            gradle -p tests/consumers/jitpack-android :app:assembleRelease -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
+            adb install -r tests/consumers/jitpack-android/app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.qrcodeai.consumer.jitpack/.SelfTestActivity
+            for attempt in $(seq 1 45); do adb logcat -d -s SCANNER_SELFTEST:I | grep -q 'SCANNER_SELFTEST: ' && break; sleep 2; done
+            adb logcat -d -s SCANNER_SELFTEST:I | grep 'SCANNER_SELFTEST: ' | tee receipt/minified-selftest.txt
+            grep -q 'SCANNER_SELFTEST: ok$' receipt/minified-selftest.txt
+      - name: Build without the binding
+        if: ${{ !matrix.experimental }}
+        run: gradle -p tests/consumers/jitpack-android :app:assembleDebug -PwithScanner=false
+      - name: Write the receipt
+        if: always()
+        env:
+          LEG: ${{ matrix.name }}
+          JNA_AAR: ${{ matrix.jna }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          rm -f receipt/scanner.aar receipt/jna.aar
+          cp -R tests/consumers/jitpack-android/app/build/outputs/androidTest-results receipt/ 2>/dev/null || true
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = pathlib.Path('receipt')
+          read = lambda name: (receipt / name).read_text().strip() if (receipt / name).exists() else None
+          json.dump({
+              'destination': 'map-6 JitPack',
+              'coordinate': 'com.github.qrcode-ai-com:qrcode-barcode-scanner:' + os.environ['JITPACK_VERSION'],
+              'leg': os.environ['LEG'],
+              'job_status': os.environ['JOB_STATUS'],
+              'device_page_size': read('page-size.txt'),
+              'one_line_dependency': read('one-line-dependency.result'),
+              'minified_selftest': read('minified-selftest.txt'),
+              'explicit_jna_aar': os.environ['JNA_AAR'],
+              'artifact_sha256': read('artifact.sha256'),
+              'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'commit': os.environ['GITHUB_SHA'],
+          }, open(receipt / 'receipt.json', 'w'), indent=2)
+          print(open(receipt / 'receipt.json').read())
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: jitpack-consumer-${{ matrix.api }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
