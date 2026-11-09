@@ -1,6 +1,6 @@
 # qrcode_ai_scanner_example
 
-Demonstrates how to use the qrcode_ai_scanner plugin.
+Demonstrates how to use the qr_barcode_scanner plugin.
 
 ## Getting Started
 

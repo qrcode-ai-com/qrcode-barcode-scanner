@@ -3,7 +3,7 @@
 /// core via flutter_rust_bridge.
 ///
 /// ```dart
-/// import 'package:qrcode_ai_scanner/qrcode_ai_scanner.dart';
+/// import 'package:qr_barcode_scanner/qr_barcode_scanner.dart';
 ///
 /// await QrcodeAiScanner.init();                 // once, before any scan
 /// final report = await QrcodeAiScanner.scan(pngBytes);
