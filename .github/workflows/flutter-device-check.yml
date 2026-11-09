@@ -1,0 +1,137 @@
+name: Flutter candidate device check
+
+# Extra evidence for the candidate on codex/flutter-public-identity, on this branch only: the
+# staged package scans on an Android emulator, and its native libraries are aligned for 16 KB
+# memory pages. It stages the same tree as the qualification workflow and publishes nothing.
+on:
+  push:
+    branches: [claude/flutter-device-check]
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  FLUTTER_VERSION: "3.47.9"
+
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Stage the portable Flutter package
+        run: |
+          mkdir flutter-artifact
+          python3 scripts/stage-flutter-package.py \
+            --output /tmp/flutter-validation/bindings/flutter \
+            --archive flutter-artifact/flutter-stage.tar.gz \
+            --receipt flutter-artifact/flutter-stage.json
+          (cd flutter-artifact && shasum -a 256 flutter-stage.tar.gz | tee flutter-stage.sha256)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: flutter-stage
+          path: flutter-artifact/
+          if-no-files-found: error
+
+  android-device:
+    name: Android · NDK ${{ matrix.ndk }}
+    needs: stage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # The NDK r27 leg measures the floor the package README states; it must not hide the main result.
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ndk: "28.2.13676358"
+            experimental: false
+          - ndk: "27.0.12077973"
+            experimental: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flutter-stage
+          path: flutter-artifact
+      - name: Verify and extract the staged archive
+        run: |
+          (cd flutter-artifact && shasum -a 256 -c flutter-stage.sha256)
+          python3 scripts/stage-flutter-package.py \
+            --extract flutter-artifact/flutter-stage.tar.gz \
+            --output /tmp/flutter-validation/bindings/flutter
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build the Android example
+        working-directory: /tmp/flutter-validation/bindings/flutter/example
+        env:
+          NDK: ${{ matrix.ndk }}
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK"
+          sed -i "s/ndkVersion = flutter.ndkVersion/ndkVersion = \"$NDK\"/" android/app/build.gradle.kts
+          grep -n ndkVersion android/app/build.gradle.kts
+          flutter build apk --debug
+      - name: Read the load alignment of the native libraries
+        run: |
+          mkdir receipt
+          python3 scripts/elf-load-alignment.py \
+            /tmp/flutter-validation/bindings/flutter/example/build/app/outputs/flutter-apk/app-debug.apk \
+            --json receipt/apk-alignment.json
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Scan on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          disable-animations: true
+          working-directory: /tmp/flutter-validation/bindings/flutter/example
+          script: flutter test integration_test --reporter expanded
+      - name: Write the receipt
+        if: always()
+        env:
+          NDK: ${{ matrix.ndk }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p receipt
+          cp flutter-artifact/flutter-stage.sha256 flutter-artifact/flutter-stage.json receipt/
+          python3 - <<'PY'
+          import json, os
+          json.dump({
+              'destination': 'map-5 pub.dev',
+              'package': 'qr_barcode_scanner 0.11.0 (staged candidate, not published)',
+              'ndk': os.environ['NDK'],
+              'job_status': os.environ['JOB_STATUS'],
+              'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'commit': os.environ['GITHUB_SHA'],
+          }, open('receipt/receipt.json', 'w'), indent=2)
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: flutter-device-check-ndk-${{ matrix.ndk }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
