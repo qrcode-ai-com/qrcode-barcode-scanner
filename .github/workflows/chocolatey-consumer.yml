@@ -1,8 +1,13 @@
 name: Chocolatey Windows consumer
 
-# Local package qualification only. No registry uploads or secrets.
+# Local candidate qualification and opt-in public consumer verification.
 on:
   workflow_dispatch:
+    inputs:
+      public_catalogue:
+        description: Install the approved 0.11.0 from the public Chocolatey catalogue
+        type: boolean
+        default: false
   push:
     branches: [codex/chocolatey-consumer]
 
@@ -17,10 +22,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Pack, install, scan and uninstall
+      - name: Install, scan and uninstall
         shell: pwsh
-        run: ./distribution/chocolatey/test.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'Chocolatey consumer')
-      - name: Save the qualified candidate and receipt
+        env:
+          CHOCOLATEY_PUBLIC_CATALOGUE: ${{ inputs.public_catalogue }}
+        run: |
+          ./distribution/chocolatey/test.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'Chocolatey consumer') -PublicCatalogue:($env:CHOCOLATEY_PUBLIC_CATALOGUE -ceq 'true')
+      - name: Save the qualified package and receipt
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chocolatey-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
