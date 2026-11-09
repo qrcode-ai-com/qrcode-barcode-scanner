@@ -1,0 +1,135 @@
+name: Flutter candidate qualification
+
+# Qualification on the candidate branch only. The release workflow owns the
+# tagged build and first-upload procedure.
+on:
+  push:
+    branches: [codex/flutter-public-identity]
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  FLUTTER_VERSION: "3.47.9"
+
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Stage the portable Flutter package
+        run: |
+          mkdir flutter-artifact
+          python3 scripts/stage-flutter-package.py --self-test
+          python3 scripts/stage-flutter-package.py \
+            --output /tmp/flutter-validation/bindings/flutter \
+            --archive flutter-artifact/flutter-stage.tar.gz \
+            --receipt flutter-artifact/flutter-stage.json
+          (cd flutter-artifact && shasum -a 256 flutter-stage.tar.gz > flutter-stage.sha256)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: flutter-stage
+          path: flutter-artifact/
+          if-no-files-found: error
+          retention-days: 14
+
+  qualify:
+    name: ${{ matrix.check }}
+    needs: stage
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: Dart host and pub.dev dry run
+            platform: host
+            runner: ubuntu-24.04
+            targets: ""
+          - check: Android APK build
+            platform: android
+            runner: ubuntu-24.04
+            targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          - check: Unsigned iOS build
+            platform: ios
+            runner: macos-15
+            targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+          targets: ${{ matrix.targets }}
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flutter-stage
+          path: flutter-artifact
+      - name: Verify and extract the staged archive
+        run: |
+          (cd flutter-artifact && shasum -a 256 -c flutter-stage.sha256)
+          python3 scripts/stage-flutter-package.py \
+            --extract flutter-artifact/flutter-stage.tar.gz \
+            --output /tmp/flutter-validation/bindings/flutter
+          flutter --version
+      - name: Verify the portable library and pub.dev file set
+        if: matrix.platform == 'host'
+        run: |
+          package=/tmp/flutter-validation/bindings/flutter
+          cargo check --locked --manifest-path "$package/rust/Cargo.toml" --lib
+          (cd "$package" && flutter pub get)
+          python3 scripts/package-inspect.py flutter --package-root "$package" \
+            --strict --release-set --record "$RUNNER_TEMP/flutter-pub-qualification.sha256"
+          git archive HEAD spec/examples | tar -x -C /tmp/flutter-validation
+      - name: Analyze Dart and verify report contracts
+        if: matrix.platform == 'host'
+        working-directory: /tmp/flutter-validation/bindings/flutter
+        run: |
+          flutter analyze
+          test -f ../../spec/examples/clean-url.json
+          flutter test
+      - name: Verify Flutter Rust Bridge generation
+        if: matrix.platform == 'host'
+        working-directory: /tmp/flutter-validation/bindings/flutter
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+          cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
+          cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
+          flutter_rust_bridge_codegen generate
+          diff -ru "$RUNNER_TEMP/frb-dart-before" lib/src/rust
+          diff -u "$RUNNER_TEMP/frb-rust-before.rs" rust/src/frb_generated.rs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: matrix.platform == 'host'
+        with:
+          name: flutter-pub-qualification
+          path: ${{ runner.temp }}/flutter-pub-qualification.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        if: matrix.platform == 'android'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Build the Android example
+        if: matrix.platform == 'android'
+        working-directory: /tmp/flutter-validation/bindings/flutter/example
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          flutter build apk --debug
+      - name: Build the iOS example without signing
+        if: matrix.platform == 'ios'
+        working-directory: /tmp/flutter-validation/bindings/flutter/example
+        run: flutter build ios --debug --no-codesign
