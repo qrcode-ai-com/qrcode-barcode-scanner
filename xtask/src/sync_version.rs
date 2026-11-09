@@ -29,9 +29,9 @@ struct Surface {
 }
 
 /// The Kotlin README's coordinate line up to its version. The version has
-/// no `v` prefix: JitPack keeps `0.11.0` and `v0.11.0` as two separate
-/// builds, and the string without the prefix is the one the consumer job
-/// (`binding-consumers.yml`) installs and tests.
+/// no `v` prefix: the build service keeps `0.11.0` and `v0.11.0` as two
+/// separate builds, and the string without the prefix is the one the
+/// consumer job (`binding-consumers.yml`) installs and tests.
 const JITPACK_LINE: &str = "JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:";
 
 const SURFACES: &[Surface] = &[
