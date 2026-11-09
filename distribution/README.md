@@ -116,6 +116,7 @@ in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 | [Scoop bucket](https://github.com/qrcode-ai-com/scoop-bucket) | 0.11.0 | Windows x64 |
 | [GitHub Debian packages](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0) | 0.11.0-1 | Debian 12 and Ubuntu 24.04, amd64 and arm64 |
 | [AUR · qrcode-barcode-scanner-bin](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin) | 0.11.0-1 | Arch Linux x86_64 |
+| [GitHub Fedora RPMs](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/rpm-packages-v0.11.0) | 0.11.0-1.fc44 | Fedora 44, x86_64 and aarch64 |
 | [GitHub Container Registry](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) | 0.11.0 | Linux AMD64 and ARM64 |
 
 Install `qrscan` through Homebrew.
@@ -150,6 +151,13 @@ and run `makepkg -si`. The [Arch install guide](aur/README.md) covers the
 existing `qrscan` command conflict. A clean Arch x86_64 container built from
 the public recipe, installed the scanner, read both codes in all three profiles,
 and removed the package. The container ran under x86-64 emulation.
+
+On Fedora 44, download the [RPM release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/rpm-packages-v0.11.0),
+verify its SHA-256, then run
+`sudo dnf install ./qrcode-barcode-scanner-0.11.0-1.fc44.x86_64.rpm` or use the
+aarch64 file. The [Fedora recipe](rpm/README.md) documents how to rebuild it.
+Fresh Fedora 44 installs from the public downloads passed the mixed scan and
+removal on both architectures. COPR follows its own publication process.
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)

@@ -108,6 +108,11 @@ On Arch Linux x86_64, install
 The [Arch install guide](distribution/aur/README.md) shows the commands and
 explains the conflict with packages that already provide `qrscan`.
 
+On Fedora 44, download the [RPM 0.11.0-1.fc44](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/rpm-packages-v0.11.0)
+for x86_64 or aarch64, verify its SHA-256 and install it with
+`sudo dnf install ./qrcode-barcode-scanner-0.11.0-1.fc44.x86_64.rpm`
+(use the aarch64 file on ARM64).
+
 You can also build with Cargo or download a
 [checksum-verified 0.11.0 release archive](distribution/cli/README.md#download-and-verify).
 
