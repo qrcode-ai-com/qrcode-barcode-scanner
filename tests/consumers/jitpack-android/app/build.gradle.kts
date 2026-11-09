@@ -30,6 +30,7 @@ android {
             // R8 runs with the consumer rules shipped inside the AAR.
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            testProguardFiles("proguard-test-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
     }
