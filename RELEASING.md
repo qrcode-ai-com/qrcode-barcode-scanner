@@ -724,14 +724,23 @@ performs them):
    One recorded exception, decided by the owner on 10 November 2026: the
    first upload of `qr_barcode_scanner` 0.11.0 may use the `flutter-stage`
    artifact of the `Flutter candidate qualification` workflow,
-   [run 42683345981](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42683345981),
-   on revision `1695072619256972995c1f3a15643b98ef919fe5`. Its four jobs
+   [run 42717410740](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42717410740),
+   on revision `1fa0813c1465f7b180ca883cb266bbc45e1fe1c6`. Its four jobs
    passed: stage, Dart host and pub.dev dry run, Android APK build, unsigned
    iOS build. The archive SHA-256 is
-   `7012c5f4033091b5dda07157a32d842673fb2cd32c4be88cf8513dc6c58ec53d`. Check
+   `0649680ff62cf27c1a072a61b11a8fcf726a6e097a15391e5ee8a70d82ab5eba`. Check
    that hash and re-inspect the extracted root as above before the upload.
    The exception covers that one archive. Every later version follows the
    rule of this step.
+
+   This replaces the stage of revision `1695072` named here first. A device
+   check of those sources
+   ([run 42715677751](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42715677751))
+   passed the example's integration test on an Android emulator with NDK 28.2
+   and found both 64-bit libraries aligned for 16 KB memory pages, but
+   aligned to 4 KB when built with NDK 27.0. The package README of `1695072`
+   stated r27 as its floor. Revision `1fa0813` changes that statement to r28
+   and nothing else in the package.
 7. Branch protection: the matrix check `ci / test (ubuntu-latest)` is now
    `test (ubuntu-24.04)`; if it is a required check, update the rule (and
    add `node-smoke`, `wasm-smoke` and `packaging` if they should be).
