@@ -34,6 +34,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     # The 16 KB leg records a limit of the published artifact; it must not hide the main result.
+    # Each leg first tries the one-line dependency and records the outcome, then runs with JNA's
+    # Android AAR added explicitly: 5.13.0 as the POM asks, 5.17.0 where 16 KB pages need it.
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
@@ -42,7 +44,7 @@ jobs:
           - name: Android 14, 4 KB pages
             api: 34
             target: default
-            jna: ""
+            jna: "5.13.0"
             experimental: false
           - name: Android 15, 16 KB pages
             api: 35
@@ -102,7 +104,7 @@ jobs:
       - name: Scan on the emulator, debug and minified
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:
-          JNA_OVERRIDE: ${{ matrix.jna }}
+          JNA_AAR: ${{ matrix.jna }}
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
@@ -110,9 +112,10 @@ jobs:
           disable-animations: true
           script: |
             adb shell getconf PAGE_SIZE | tee receipt/page-size.txt
-            if [ -n "$JNA_OVERRIDE" ]; then gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" > receipt/published-jna.log 2>&1 && echo passed > receipt/published-jna.result || echo failed > receipt/published-jna.result; fi
-            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" ${JNA_OVERRIDE:+-PjnaOverride=$JNA_OVERRIDE}
-            gradle -p tests/consumers/jitpack-android :app:connectedReleaseAndroidTest -PminifiedTest=true -PscannerVersion="$JITPACK_VERSION" ${JNA_OVERRIDE:+-PjnaOverride=$JNA_OVERRIDE}
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" > receipt/one-line-dependency.log 2>&1 && echo passed > receipt/one-line-dependency.result || echo failed > receipt/one-line-dependency.result
+            cat receipt/one-line-dependency.result
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
+            gradle -p tests/consumers/jitpack-android :app:connectedReleaseAndroidTest -PminifiedTest=true -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
       - name: Build without the binding
         if: ${{ !matrix.experimental }}
         run: gradle -p tests/consumers/jitpack-android :app:assembleDebug -PwithScanner=false
@@ -120,7 +123,7 @@ jobs:
         if: always()
         env:
           LEG: ${{ matrix.name }}
-          JNA_OVERRIDE: ${{ matrix.jna }}
+          JNA_AAR: ${{ matrix.jna }}
           JOB_STATUS: ${{ job.status }}
         run: |
           rm -f receipt/scanner.aar receipt/jna.aar
@@ -135,8 +138,8 @@ jobs:
               'leg': os.environ['LEG'],
               'job_status': os.environ['JOB_STATUS'],
               'device_page_size': read('page-size.txt'),
-              'jna_override': os.environ['JNA_OVERRIDE'] or None,
-              'published_jna_on_this_device': read('published-jna.result'),
+              'one_line_dependency': read('one-line-dependency.result'),
+              'explicit_jna_aar': os.environ['JNA_AAR'],
               'artifact_sha256': read('artifact.sha256'),
               'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               'commit': os.environ['GITHUB_SHA'],

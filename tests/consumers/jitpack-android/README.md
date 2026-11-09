@@ -14,7 +14,7 @@ contents each time: the QR code `https://qrc-ai.com/76xMa` and the Code 128 `STO
 | `-PscannerVersion=0.11.0` | The exact JitPack version string to consume. |
 | `-PminifiedTest=true` | Run the test against the R8-minified build, with the rules shipped in the AAR. |
 | `-PwithScanner=false` | The removal check: the app builds without the dependency. |
-| `-PjnaOverride=5.17.0` | Replace the JNA version the binding's POM asks for. |
+| `-PjnaAar=5.13.0` | Add JNA's Android AAR explicitly and drop the transitive JNA jar. |
 
 To run it by hand, copy the fixture into `app/src/androidTest/assets/`, start an emulator and
 run `gradle :app:connectedDebugAndroidTest` with Gradle 8.9 and JDK 17. No Gradle wrapper is

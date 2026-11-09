@@ -9,14 +9,8 @@ plugins {
 val scannerVersion = providers.gradleProperty("scannerVersion").orElse("0.11.0")
 val withScanner = providers.gradleProperty("withScanner").map { it.toBoolean() }.orElse(true)
 val minifiedTest = providers.gradleProperty("minifiedTest").map { it.toBoolean() }.orElse(false)
-// -PjnaOverride=<version>      replace the JNA version the binding's POM asks for
-val jnaOverride = providers.gradleProperty("jnaOverride").orNull
-
-if (jnaOverride != null) {
-    configurations.configureEach {
-        resolutionStrategy.force("net.java.dev.jna:jna:$jnaOverride")
-    }
-}
+// -PjnaAar=<version>           add JNA's Android AAR explicitly and drop the transitive JNA jar
+val jnaAar = providers.gradleProperty("jnaAar").orNull
 
 android {
     namespace = "com.qrcodeai.consumer.jitpack"
@@ -57,7 +51,12 @@ android {
 
 dependencies {
     if (withScanner.get()) {
-        implementation("com.github.qrcode-ai-com:qrcode-barcode-scanner:${scannerVersion.get()}")
+        implementation("com.github.qrcode-ai-com:qrcode-barcode-scanner:${scannerVersion.get()}") {
+            // The published module metadata of 0.11.0 names JNA without its AAR, so Gradle
+            // resolves the plain jar, which carries no Android native dispatcher.
+            if (jnaAar != null) exclude(group = "net.java.dev.jna", module = "jna")
+        }
+        if (jnaAar != null) implementation("net.java.dev.jna:jna:$jnaAar@aar")
     }
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
