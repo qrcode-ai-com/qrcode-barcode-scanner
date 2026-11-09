@@ -92,7 +92,7 @@ jobs:
           cargo check --locked --manifest-path "$package/rust/Cargo.toml" --lib
           (cd "$package" && flutter pub get)
           python3 scripts/package-inspect.py flutter --package-root "$package" \
-            --strict --release-set --record "$RUNNER_TEMP/flutter-pub-qualification.json"
+            --strict --release-set --record "$RUNNER_TEMP/flutter-pub-qualification.sha256"
           git archive HEAD spec/examples | tar -x -C /tmp/flutter-validation
       - name: Analyze Dart and verify report contracts
         if: matrix.platform == 'host'
@@ -115,7 +115,7 @@ jobs:
         if: matrix.platform == 'host'
         with:
           name: flutter-pub-qualification
-          path: ${{ runner.temp }}/flutter-pub-qualification.json
+          path: ${{ runner.temp }}/flutter-pub-qualification.sha256
           if-no-files-found: error
           retention-days: 14
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
