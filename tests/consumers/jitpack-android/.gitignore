@@ -1,0 +1,5 @@
+.gradle/
+build/
+local.properties
+# The workflow copies the tagged fixture here before the test runs.
+app/src/androidTest/assets/

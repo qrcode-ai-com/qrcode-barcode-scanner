@@ -1,0 +1,64 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+// -PscannerVersion=<version>   the exact JitPack version string under test
+// -PwithScanner=false          the removal check: the app must still build without the binding
+// -PminifiedTest=true          run the instrumented test against the R8-minified build
+val scannerVersion = providers.gradleProperty("scannerVersion").orElse("0.11.0")
+val withScanner = providers.gradleProperty("withScanner").map { it.toBoolean() }.orElse(true)
+val minifiedTest = providers.gradleProperty("minifiedTest").map { it.toBoolean() }.orElse(false)
+// -PjnaOverride=<version>      replace the JNA version the binding's POM asks for
+val jnaOverride = providers.gradleProperty("jnaOverride").orNull
+
+if (jnaOverride != null) {
+    configurations.configureEach {
+        resolutionStrategy.force("net.java.dev.jna:jna:$jnaOverride")
+    }
+}
+
+android {
+    namespace = "com.qrcodeai.consumer.jitpack"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.qrcodeai.consumer.jitpack"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            // R8 runs with the consumer rules shipped inside the AAR.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+    testBuildType = if (minifiedTest.get()) "release" else "debug"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        // The only code that names the binding lives here, so removing the dependency is one flag.
+        if (withScanner.get()) getByName("main").kotlin.srcDir("src/scanner/kotlin")
+    }
+}
+
+dependencies {
+    if (withScanner.get()) {
+        implementation("com.github.qrcode-ai-com:qrcode-barcode-scanner:${scannerVersion.get()}")
+    }
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
