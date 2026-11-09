@@ -114,6 +114,8 @@ in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 | [GitHub Releases](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0) | 0.11.0 | macOS ARM64/x64, GNU/Linux ARM64/x64, [Windows x64](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip), and source |
 | [Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap) | 0.11.0 | macOS and GNU/Linux on ARM64/x64 |
 | [Scoop bucket](https://github.com/qrcode-ai-com/scoop-bucket) | 0.11.0 | Windows x64 |
+| [GitHub Debian packages](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0) | 0.11.0-1 | Debian 12 and Ubuntu 24.04, amd64 and arm64 |
+| [AUR · qrcode-barcode-scanner-bin](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin) | 0.11.0-1 | Arch Linux x86_64 |
 | [GitHub Container Registry](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) | 0.11.0 | Linux AMD64 and ARM64 |
 
 Install `qrscan` through Homebrew.
@@ -133,6 +135,21 @@ The [Scoop Windows run](https://github.com/qrcode-ai-com/scoop-bucket/actions/ru
 installed the public package, read the QR and Code 128 `STOCK-4827` together
 in `fast`, `frame` and `full`, and uninstalled the CLI.
 For direct downloads, follow the [CLI archive and checksum guide](cli/README.md#download-and-verify).
+
+For Debian or Ubuntu, download the `.deb` for your architecture from the
+[Linux package release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0).
+Check the accompanying SHA-256, then run
+`sudo apt install ./qrcode-barcode-scanner_0.11.0-1_amd64.deb` or substitute
+the arm64 file. The [Debian package recipe](debian/README.md) documents the
+build and removal. Fresh installs from the public assets passed the mixed
+scan and removal on Debian 12 and Ubuntu 24.04 for both architectures.
+
+On Arch Linux x86_64, clone the
+[`qrcode-barcode-scanner-bin` AUR recipe](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin)
+and run `makepkg -si`. The [Arch install guide](aur/README.md) covers the
+existing `qrscan` command conflict. A clean Arch x86_64 container built from
+the public recipe, installed the scanner, read both codes in all three profiles,
+and removed the package. The container ran under x86-64 emulation.
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)

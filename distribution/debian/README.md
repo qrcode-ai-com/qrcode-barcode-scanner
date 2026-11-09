@@ -26,8 +26,9 @@ named in the installed documentation. Its SHA-256 is
 
 ## Install and test
 
-After checking the distribution release's published SHA-256, install the
-file for your architecture and check its scanner version:
+Download the file for your architecture and check its SHA-256 from the
+[public Linux package release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0).
+Install the file and check the scanner version:
 
 ```sh
 sudo apt install ./qrcode-barcode-scanner_0.11.0-1_amd64.deb

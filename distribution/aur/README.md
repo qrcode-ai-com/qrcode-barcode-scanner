@@ -6,7 +6,15 @@ x86_64 Arch Linux. The recipe verifies the official
 and keeps the executable bytes unchanged. It conflicts with other packages
 providing `qrscan`, including the unrelated AUR `qrscan-bin`.
 
-Use `makepkg -si` from this directory to build and install the package.
+Install from the [public AUR package](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin)
+on Arch Linux x86_64.
+
+```sh
+git clone https://aur.archlinux.org/qrcode-barcode-scanner-bin.git
+cd qrcode-barcode-scanner-bin
+makepkg -si
+```
+
 Check `qrscan --version` and scan the
 [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png)
 to exercise both formats.
