@@ -720,6 +720,23 @@ performs them):
    hashes. Inspect that same root and run the native example builds before
    claiming readiness; source-only checks are insufficient. See
    `bindings/flutter/README.md` for the staging and inspection commands.
+
+   **First upload of 0.11.0, owner decision of 10 November 2026.** Tag
+   `v0.11.0` predates the public package name, so no `flutter.yml` run on
+   that tag can stage `qr_barcode_scanner`. For this one version the first
+   upload is made from the `flutter-stage` artifact of the
+   `flutter-qualification.yml` run 42717410740 on revision
+   `1fa0813c1465f7b180ca883cb266bbc45e1fe1c6`, whose stage, Dart host,
+   Android and unsigned iOS jobs passed. The archive SHA-256 is
+   `0649680ff62cf27c1a072a61b11a8fcf726a6e097a15391e5ee8a70d82ab5eba`. Check
+   that hash, extract the archive with
+   `scripts/stage-flutter-package.py --extract`, re-inspect it as above, then
+   publish from the extracted root. GitHub deletes that artifact on
+   23 November 2026. The same sources passed the example's integration test
+   on an Android emulator with NDK 28.2, where both 64-bit libraries are
+   aligned for 16 KB pages (run 42715677751). Every later version follows the
+   rule above: the `flutter-stage` artifact of the `flutter.yml` run on its
+   release tag.
 7. Branch protection: the matrix check `ci / test (ubuntu-latest)` is now
    `test (ubuntu-24.04)`; if it is a required check, update the rule (and
    add `node-smoke`, `wasm-smoke` and `packaging` if they should be).
