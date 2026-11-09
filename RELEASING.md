@@ -720,6 +720,18 @@ performs them):
    hashes. Inspect that same root and run the native example builds before
    claiming readiness; source-only checks are insufficient. See
    `bindings/flutter/README.md` for the staging and inspection commands.
+
+   One recorded exception, decided by the owner on 10 November 2026: the
+   first upload of `qr_barcode_scanner` 0.11.0 may use the `flutter-stage`
+   artifact of the `Flutter candidate qualification` workflow,
+   [run 42683345981](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42683345981),
+   on revision `1695072619256972995c1f3a15643b98ef919fe5`. Its four jobs
+   passed: stage, Dart host and pub.dev dry run, Android APK build, unsigned
+   iOS build. The archive SHA-256 is
+   `7012c5f4033091b5dda07157a32d842673fb2cd32c4be88cf8513dc6c58ec53d`. Check
+   that hash and re-inspect the extracted root as above before the upload.
+   The exception covers that one archive. Every later version follows the
+   rule of this step.
 7. Branch protection: the matrix check `ci / test (ubuntu-latest)` is now
    `test (ubuntu-24.04)`; if it is a required check, update the rule (and
    add `node-smoke`, `wasm-smoke` and `packaging` if they should be).
