@@ -89,9 +89,6 @@ the connection, delete `qrscan` from your OpenCode configuration.
 
 ### Install the portable skill from Git in a Codex project
 
-The [skills.sh listing](https://skills.sh/qrcode-ai-com/qrcode-barcode-scanner/qrcode-barcode-scanner)
-points to the repository. Use the pinned GitHub tree below for version 0.2.0.
-
 From the project directory, install all five files of the 0.2.0 skill from
 the pinned GitHub tree:
 
