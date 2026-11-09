@@ -1,6 +1,39 @@
-# Use the scanner with Docker, MCP or Agent Skills
+# Scanner downloads and package registries
 
-The local packages and agents here use the engine behind [QR Code AI](https://qrcode-ai.com/)'s QR verification workflows. For a single image, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) runs from the installed WASM package. Dedicated [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) pages are planned.
+Choose an installation route for scanner engine 0.11.0. These packages run the
+same local engine that [QR Code AI](https://qrcode-ai.com/) uses to verify QR designs.
+QR Code AI web links · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
+· [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+To try the engine locally in a browser, use the [WASM image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
+
+[Runtime packages](#published-runtime-packages) · [CLI and containers](#cli-and-containers)
+· [Browser CDNs and indexes](#browser-cdns-and-package-indexes) · [Agent integrations](#published-agent-integrations)
+
+## Published runtime packages
+
+| Runtime | Package | Version |
+| --- | --- | --- |
+| Rust | [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner/0.11.0) | 0.11.0 |
+| CLI | [`qrcode-barcode-scanner-cli`](https://crates.io/crates/qrcode-barcode-scanner-cli/0.11.0) | 0.11.0 |
+| Node.js | [`@qrcode-ai-com/qrcode-barcode-scanner`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner/v/0.11.0) | 0.11.0 |
+| Browser WASM | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0) | 0.11.0 |
+| Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) | 0.11.0 |
+
+See the [runtime quick starts](../README.md#get-started) for install commands
+and examples. The Node.js package selects the matching native dependency
+automatically from these six packages, all at **0.11.0**.
+
+- macOS · [`darwin-arm64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-arm64/v/0.11.0) · [`darwin-x64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-x64/v/0.11.0)
+- Linux · [`linux-arm64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-arm64-gnu/v/0.11.0) · [`linux-x64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-gnu/v/0.11.0) · [`linux-x64-musl`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-musl/v/0.11.0)
+- Windows · [`win32-x64-msvc`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-win32-x64-msvc/v/0.11.0)
+
+## Browser CDNs and package indexes
+
+- Browser WASM **0.11.0** from npm · [jsDelivr](https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto.js) · [UNPKG](https://unpkg.com/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto.js) · [esm.sh](https://esm.sh/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto).
+- API documentation and package metadata for **0.11.0** · [docs.rs](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [deps.dev](https://deps.dev/npm/%40qrcode-ai-com%2Fqrcode-barcode-scanner/0.11.0) · [Libraries.io](https://libraries.io/npm/@qrcode-ai-com%2Fqrcode-barcode-scanner) · [Lib.rs](https://lib.rs/crates/qrcode-barcode-scanner).
+
+The CDNs serve the npm browser package. The indexes describe the packages
+published to npm or crates.io.
 
 ## Published agent integrations
 
@@ -56,6 +89,9 @@ the connection, delete `qrscan` from your OpenCode configuration.
 
 ### Install the portable skill from Git in a Codex project
 
+The [skills.sh listing](https://skills.sh/qrcode-ai-com/qrcode-barcode-scanner/qrcode-barcode-scanner)
+points to the repository. Use the pinned GitHub tree below for version 0.2.0.
+
 From the project directory, install all five files of the 0.2.0 skill from
 the pinned GitHub tree:
 
@@ -73,10 +109,30 @@ in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 
 ## CLI and containers
 
-Install `qrscan` 0.11.0 with `brew install qrcode-ai-com/tap/qrscan`. The
-[Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap) distributes
-checksum-pinned binaries for macOS and GNU/Linux on ARM64 and x86-64. The
-[CLI archive guide](cli/README.md) covers direct downloads, including Windows.
+| Destination | Version | Platforms |
+| --- | --- | --- |
+| [GitHub Releases](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0) | 0.11.0 | macOS ARM64/x64, GNU/Linux ARM64/x64, [Windows x64](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-x86_64-pc-windows-msvc.zip), and source |
+| [Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap) | 0.11.0 | macOS and GNU/Linux on ARM64/x64 |
+| [Scoop bucket](https://github.com/qrcode-ai-com/scoop-bucket) | 0.11.0 | Windows x64 |
+| [GitHub Container Registry](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) | 0.11.0 | Linux AMD64 and ARM64 |
+
+Install `qrscan` through Homebrew.
+
+```sh
+brew install qrcode-ai-com/tap/qrscan
+```
+
+On Windows, install through Scoop.
+
+```powershell
+scoop bucket add qrcode-ai https://github.com/qrcode-ai-com/scoop-bucket
+scoop install qrcode-ai/qrcode-barcode-scanner
+```
+
+The [Scoop Windows run](https://github.com/qrcode-ai-com/scoop-bucket/actions/runs/42226107417)
+installed the public package, read the QR and Code 128 `STOCK-4827` together
+in `fast`, `frame` and `full`, and uninstalled the CLI.
+For direct downloads, follow the [CLI archive and checksum guide](cli/README.md#download-and-verify).
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)

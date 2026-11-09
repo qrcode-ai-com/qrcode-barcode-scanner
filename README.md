@@ -2,7 +2,7 @@
 
 [![QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/hero.png?v=d6458e19d08a)](https://qrcode-ai.com/)
 
-[Get started](#get-started) · [Examples](#examples) · [Camera scanning](#camera-scanning) · [Documentation](#documentation)
+[Get started](#get-started) · [Examples](#examples) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
@@ -15,7 +15,8 @@ Scan QR codes and barcodes from images or camera frames, entirely on your device
 
 ## Examples
 
-To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line). QR Code AI plans dedicated pages for its [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
+QR Code AI web links · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 
 ### Scan a QR code and a Code 128 barcode in one image
 
@@ -65,6 +66,21 @@ Choose the runtime your application uses. All five packages are published as 0.1
 | Browser WASM | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0) | 0.11.0 |
 | Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) | 0.11.0 |
 
+<details>
+<summary><strong>Native npm packages, browser CDNs and package indexes · 0.11.0</strong></summary>
+
+npm selects the native package automatically when you install the Node.js package.
+
+- macOS · [`darwin-arm64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-arm64/v/0.11.0) · [`darwin-x64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-x64/v/0.11.0)
+- Linux · [`linux-arm64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-arm64-gnu/v/0.11.0) · [`linux-x64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-gnu/v/0.11.0) · [`linux-x64-musl`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-musl/v/0.11.0)
+- Windows · [`win32-x64-msvc`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-win32-x64-msvc/v/0.11.0)
+
+Browser WASM from npm · [jsDelivr](https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto.js) · [UNPKG](https://unpkg.com/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto.js) · [esm.sh](https://esm.sh/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/auto).
+
+Rust API and package metadata · [docs.rs](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [deps.dev](https://deps.dev/npm/%40qrcode-ai-com%2Fqrcode-barcode-scanner/0.11.0) · [Libraries.io](https://libraries.io/npm/@qrcode-ai-com%2Fqrcode-barcode-scanner) · [Lib.rs](https://lib.rs/crates/qrcode-barcode-scanner).
+
+</details>
+
 ### Command line
 
 Install the prebuilt `qrscan` 0.11.0 binary on macOS or GNU/Linux with the
@@ -74,8 +90,16 @@ Install the prebuilt `qrscan` 0.11.0 binary on macOS or GNU/Linux with the
 brew install qrcode-ai-com/tap/qrscan
 ```
 
+On Windows x64, install `qrscan` 0.11.0 from the
+[QR Code AI Scoop bucket](https://github.com/qrcode-ai-com/scoop-bucket).
+
+```powershell
+scoop bucket add qrcode-ai https://github.com/qrcode-ai-com/scoop-bucket
+scoop install qrcode-ai/qrcode-barcode-scanner
+```
+
 You can also build with Cargo or download a
-[checksum-verified release archive](distribution/cli/README.md#download-and-verify).
+[checksum-verified 0.11.0 release archive](distribution/cli/README.md#download-and-verify).
 
 ```sh
 cargo install qrcode-barcode-scanner-cli@0.11.0 --locked
@@ -314,6 +338,8 @@ The following agent integrations are published on scanner engine **0.11.0**:
 The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1) points clients to the same local stdio adapter published on npm. The [0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1) has signed npm provenance and passed fresh installs on Node 22/24 on Linux x64 and macOS ARM64. The skill and bundle passed runtime calls in OpenClaw 2026.11.1 on macOS ARM64. The bundle pins adapter 0.2.0. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md) for install commands and tested clients.
 
 - The [public GHCR image](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) ships `qrscan` 0.11.0 for Linux AMD64 and ARM64. Pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner:0.11.0` and follow the [offline container example](distribution/docker/v0.11/README.md#run-the-public-image). Anonymous pulls and exact scan checks passed on [both native architectures](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42208687356).
+- The portable skill has a [skills.sh listing](https://skills.sh/qrcode-ai-com/qrcode-barcode-scanner/qrcode-barcode-scanner). For a version-pinned install of 0.2.0, use the [GitHub route for Codex](distribution/README.md#install-the-portable-skill-from-git-in-a-codex-project). [OpenCode setup](distribution/README.md#connect-the-published-mcp-adapter-to-opencode) uses the published npm adapter 0.2.1.
+- The [Docker Hub image](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner) is a historical mirror for 0.10.0. Its pinned digest is in the [historical installation guide](distribution/README.md#docker-run-the-local-cli).
 - [Flutter](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/flutter/), [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.
 
 </details>
