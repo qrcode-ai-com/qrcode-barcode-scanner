@@ -1,10 +1,10 @@
-name: qrcode_ai_scanner
+name: qr_barcode_scanner
 description: >-
-  QR decoding + scannability scoring for artistic / AI-generated QR codes — the
-  codes that break standard scanners. Native Rust core via flutter_rust_bridge.
+  Decode QR codes and barcodes and score QR scannability with the native Rust
+  scanner engine via flutter_rust_bridge.
 version: 0.11.0
 repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner
-homepage: https://github.com/qrcode-ai-com/qrcode-barcode-scanner
+homepage: https://qrcode-ai.com/
 topics:
   - qr
   - barcode

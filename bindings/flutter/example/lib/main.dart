@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:qrcode_ai_scanner/qrcode_ai_scanner.dart';
+import 'package:qr_barcode_scanner/qr_barcode_scanner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +43,7 @@ class _DemoAppState extends State<DemoApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: const Text('qrcode_ai_scanner demo')),
+        appBar: AppBar(title: const Text('qr_barcode_scanner demo')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),

@@ -9,7 +9,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qrcode_ai_scanner/report.dart';
+import 'package:qr_barcode_scanner/report.dart';
 
 void main() {
   final examples = Directory('../../spec/examples');

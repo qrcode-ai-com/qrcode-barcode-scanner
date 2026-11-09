@@ -1,28 +1,35 @@
-# qrcode_ai_scanner — Flutter / Dart
+# qr_barcode_scanner — Flutter / Dart
 
 QR decoding **+ scannability scoring** for artistic / AI-generated QR codes —
 the codes that break standard scanners. The native Rust core of
-[`qrcode-ai-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner),
-bound to Flutter via [flutter_rust_bridge](https://pub.dev/packages/flutter_rust_bridge).
+[`qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner)
+also decodes barcodes and connects to Flutter via
+[flutter_rust_bridge](https://pub.dev/packages/flutter_rust_bridge).
 Returns the same versioned `ScanReport` as the Python / Node / WASM / Kotlin /
 Swift bindings (one serde wire contract).
 
+[QR Code AI](https://qrcode-ai.com/) · [QR Code Scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
+· [Barcode Scanner](https://qrcode-ai.com/en-US/barcode-scanner)
+
 ## Install
 
-Not yet published on pub.dev, so there is no dependency line to copy: build it
-from source as shown in
+To build the binding from source, follow
 [Packaging from a candidate checkout](#packaging-from-a-candidate-checkout) below.
 
 > **Toolchain prerequisite.** This package compiles the Rust core at *your* app's
 > build time (via cargokit) — the building machine needs the **Rust toolchain
-> (≥1.88)** and, for Android, the **NDK (r27+)**. No Rust knowledge required;
+> (≥1.88)** and, for Android, the **NDK (r28+)**. No Rust knowledge required;
 > it's a one-time `rustup` install. (A precompiled-binary distribution is a
 > future option if this friction is reported.)
+>
+> NDK r28 aligns the native library for Android devices with 16 KB memory
+> pages. A build with NDK r27 is aligned to 4 KB and does not meet that
+> requirement.
 
 ## Usage
 
 ```dart
-import 'package:qrcode_ai_scanner/qrcode_ai_scanner.dart';
+import 'package:qr_barcode_scanner/qr_barcode_scanner.dart';
 
 await QrcodeAiScanner.init();                       // once, before any scan
 
