@@ -32,8 +32,7 @@ struct Surface {
 /// no `v` prefix: JitPack keeps `0.11.0` and `v0.11.0` as two separate
 /// builds, and the string without the prefix is the one the consumer job
 /// (`binding-consumers.yml`) installs and tests.
-const JITPACK_LINE: &str =
-    "JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:";
+const JITPACK_LINE: &str = "JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:";
 
 const SURFACES: &[Surface] = &[
     Surface {
