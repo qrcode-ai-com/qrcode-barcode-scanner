@@ -104,6 +104,29 @@ Node.js 22.22.2, this install matched all five source files. Its helper used
 engine 0.11.0 and returned the QR payload and Code 128 `STOCK-4827` together
 in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 
+### Install the portable skill in Hermes
+
+Hermes Agent installs the skill from its GitHub path. No account is needed:
+
+```sh
+hermes skills install qrcode-ai-com/qrcode-barcode-scanner/skills/qrcode-barcode-scanner
+```
+
+Hermes follows the default branch: this form has no way to pin a commit. It
+copies `SKILL.md`, `README.md`, `LICENSE`, `scripts/scan.mjs` and
+`scripts/test.mjs` into `<HERMES_HOME>/skills/qrcode-barcode-scanner`. The
+skill does not install the engine: follow its `SKILL.md` to install
+`@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` into a project-local runtime
+directory.
+
+With Hermes 0.18.2 in a new, empty `HERMES_HOME` on macOS ARM64 and Node.js
+22.22.2, the install passed Hermes' security scan without `--force`, the five
+files matched this repository at `a91ad8f`, and the installed helper returned
+the QR payload and Code 128 `STOCK-4827` together in `fast`, `frame`, and
+`full`. `hermes skills uninstall qrcode-barcode-scanner` removed the
+directory. `hermes skills search qrcode-barcode-scanner` also finds the
+ClawHub listing of the same skill.
+
 ## CLI and containers
 
 | Destination | Version | Platforms |
