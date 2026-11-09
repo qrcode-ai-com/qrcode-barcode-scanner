@@ -18,9 +18,13 @@ To build the binding from source, follow
 
 > **Toolchain prerequisite.** This package compiles the Rust core at *your* app's
 > build time (via cargokit) — the building machine needs the **Rust toolchain
-> (≥1.88)** and, for Android, the **NDK (r27+)**. No Rust knowledge required;
+> (≥1.88)** and, for Android, the **NDK (r28+)**. No Rust knowledge required;
 > it's a one-time `rustup` install. (A precompiled-binary distribution is a
 > future option if this friction is reported.)
+>
+> NDK r28 aligns the native library for Android devices with 16 KB memory
+> pages. A build with NDK r27 is aligned to 4 KB and does not meet that
+> requirement.
 
 ## Usage
 
