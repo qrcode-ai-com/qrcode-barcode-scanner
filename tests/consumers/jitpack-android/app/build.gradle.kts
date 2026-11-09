@@ -5,10 +5,8 @@ plugins {
 
 // -PscannerVersion=<version>   the exact JitPack version string under test
 // -PwithScanner=false          the removal check: the app must still build without the binding
-// -PminifiedTest=true          run the instrumented test against the R8-minified build
 val scannerVersion = providers.gradleProperty("scannerVersion").orElse("0.11.0")
 val withScanner = providers.gradleProperty("withScanner").map { it.toBoolean() }.orElse(true)
-val minifiedTest = providers.gradleProperty("minifiedTest").map { it.toBoolean() }.orElse(false)
 // -PjnaAar=<version>           add JNA's Android AAR explicitly and drop the transitive JNA jar
 val jnaAar = providers.gradleProperty("jnaAar").orNull
 
@@ -30,12 +28,9 @@ android {
             // R8 runs with the consumer rules shipped inside the AAR.
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            testProguardFiles("proguard-test-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-    testBuildType = if (minifiedTest.get()) "release" else "debug"
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

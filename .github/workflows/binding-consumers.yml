@@ -85,8 +85,8 @@ jobs:
       - name: Stage the shared fixture
         run: |
           echo "$FIXTURE_SHA256  $FIXTURE" | sha256sum -c -
-          mkdir -p tests/consumers/jitpack-android/app/src/androidTest/assets
-          cp "$FIXTURE" tests/consumers/jitpack-android/app/src/androidTest/assets/
+          mkdir -p tests/consumers/jitpack-android/app/src/main/assets
+          cp "$FIXTURE" tests/consumers/jitpack-android/app/src/main/assets/
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
@@ -101,6 +101,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # Debug: the instrumented test. Minified: the release app judges itself and logs a verdict.
       - name: Scan on the emulator, debug and minified
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:
@@ -115,7 +116,13 @@ jobs:
             gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" > receipt/one-line-dependency.log 2>&1 && echo passed > receipt/one-line-dependency.result || echo failed > receipt/one-line-dependency.result
             cat receipt/one-line-dependency.result
             gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
-            gradle -p tests/consumers/jitpack-android :app:connectedReleaseAndroidTest -PminifiedTest=true -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
+            gradle -p tests/consumers/jitpack-android :app:assembleRelease -PscannerVersion="$JITPACK_VERSION" -PjnaAar="$JNA_AAR"
+            adb install -r tests/consumers/jitpack-android/app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.qrcodeai.consumer.jitpack/.SelfTestActivity
+            for attempt in $(seq 1 45); do adb logcat -d -s SCANNER_SELFTEST:I | grep -q 'SCANNER_SELFTEST: ' && break; sleep 2; done
+            adb logcat -d -s SCANNER_SELFTEST:I | grep 'SCANNER_SELFTEST: ' | tee receipt/minified-selftest.txt
+            grep -q 'SCANNER_SELFTEST: ok$' receipt/minified-selftest.txt
       - name: Build without the binding
         if: ${{ !matrix.experimental }}
         run: gradle -p tests/consumers/jitpack-android :app:assembleDebug -PwithScanner=false
@@ -139,6 +146,7 @@ jobs:
               'job_status': os.environ['JOB_STATUS'],
               'device_page_size': read('page-size.txt'),
               'one_line_dependency': read('one-line-dependency.result'),
+              'minified_selftest': read('minified-selftest.txt'),
               'explicit_jna_aar': os.environ['JNA_AAR'],
               'artifact_sha256': read('artifact.sha256'),
               'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
