@@ -525,13 +525,14 @@ check reads each point):
   GitHub API, no release action. The owner creates the one draft before the
   tag and publishes it once (§ 5, § 7);
 - no exception. flutter › publish names exact Flutter and Dart SDKs and
-  resolves only the tracked `bindings/flutter/pubspec.lock` of the staged
-  candidate (`flutter pub get --enforce-lockfile`). pub does not publish that
-  file, and the inspection fails if it is rewritten or listed. To move to
-  another Flutter SDK, change it in every job of flutter.yml and in
+  resolves only the tracked lockfiles of the staged candidate (`flutter pub
+  get --enforce-lockfile`): `bindings/flutter/pubspec.lock` and the example
+  app's, which the same command resolves. pub does not publish the package's
+  lockfile, and the inspection fails if it is rewritten or listed. To move
+  to another Flutter SDK, change it in every job of flutter.yml and in
   flutter-qualification.yml, set the publish job's Dart SDK to the one it
   bundles, then run `flutter pub get` in `bindings/flutter` with that SDK
-  and commit the reviewed lockfile.
+  and commit both reviewed lockfiles.
 
 The jobs whose outputs the publishing jobs upload (build-native,
 pack-native, build-wasm, wheels, sdist, ios, and cli-archives' build and

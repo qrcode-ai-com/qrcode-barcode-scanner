@@ -112,7 +112,8 @@ jobs:
           python3 scripts/stage-flutter-package.py --extract flutter-artifact/flutter-stage.tar.gz --output /tmp/flutter-validation/bindings/flutter
       - name: portable Rust library with the committed binding lockfile
         run: cargo check --locked --manifest-path rust/Cargo.toml --lib
-      # The staged candidate carries the tracked pubspec.lock: resolve exactly it.
+      # The staged candidate carries the tracked lockfiles of the package and of
+      # its example, which this command resolves too: resolve exactly them.
       - run: flutter pub get --enforce-lockfile
       - name: inspect the pub.dev package
         working-directory: .
