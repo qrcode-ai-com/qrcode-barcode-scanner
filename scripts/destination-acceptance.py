@@ -2,7 +2,8 @@
 """Judge one installed scanner against the destination acceptance contract.
 
   destination-acceptance.py cli --qrscan COMMAND --destination NAME --version X.Y.Z --url URL
-      [--identifier ID] [--install "COMMAND LINE"] [--run-url URL] [--fixtures DIR] --receipt FILE
+      [--kind cli|container] [--identifier ID] [--install "COMMAND LINE"] [--run-url URL]
+      [--fixtures DIR] --receipt FILE
   destination-acceptance.py stage DIR [--fixtures DIR]
   destination-acceptance.py reports --kind package --produced-by "COMMAND LINE" --fast FILE
       --frame FILE --full FILE --destination NAME --version X.Y.Z --url URL
@@ -17,6 +18,9 @@ fixture with the fast, frame and full profiles and no budget, and writes the rec
 (qrscan-destination-acceptance/1). Each report must hold the QR code and the Code 128, each once and
 nothing else, uncut and with no engine panic; the full report must also meet the shared truth case
 (scripts/consumer_truth.py: geometry, primary detection, score).
+
+A container image is judged as a command too: COMMAND is then a wrapper that runs qrscan inside
+the image (distribution/acceptance/drivers/qrscan-in-container.sh), with --kind container.
 
 A surface that is not a command (a language package) scans through its own small program: `stage`
 copies the checked fixture outside the checkout, that program writes one JSON report per profile,
@@ -50,7 +54,7 @@ SCHEMA = "qrscan-destination-acceptance/1"
 SCHEMA_FILE = ROOT / "distribution/acceptance/receipt.schema.json"
 CASE = "qr-and-code128"
 PROFILES = ("fast", "frame", "full")
-KINDS = ("cli", "package")
+KINDS = ("cli", "package", "container")
 REMOVAL = ("pending", "removed", "still_present", "not_applicable")
 TIMEOUT = 120
 
@@ -246,14 +250,17 @@ def cli(args, run=subprocess.run, now=None):
         return 2
     truth, case, image = inputs
     executable = resolve(args.qrscan)
-    receipt = new_receipt(args, truth, case, "cli", args.qrscan, now)
+    receipt = new_receipt(args, truth, case, args.kind, args.qrscan, now)
     if executable is None:
         receipt["problems"].append(f"{args.qrscan!r} is not an installed command")
     versions = []
     # The fixture is read from a copy outside the checkout, as an installed user's file would be.
+    # The copy is readable by every user: a container reads it as the image's own user.
     with tempfile.TemporaryDirectory(prefix="qrscan-acceptance-") as box:
         staged = pathlib.Path(box) / image.name
         shutil.copyfile(image, staged)
+        os.chmod(box, 0o755)
+        os.chmod(staged, 0o644)
         for profile in PROFILES if executable else ():
             code, report, problem = scan(executable, staged, profile, run)
             version = record_scan(receipt, truth, case, profile, code, report, problem)
@@ -387,9 +394,10 @@ def self_test():
         binary.write_text("#!/bin/sh\nexit 0\n")
         binary.chmod(0o755)
 
-        def attempt(name, defect, want_exit, want_verdict, needle, version="9.9.9", command=None):
+        def attempt(name, defect, want_exit, want_verdict, needle, version="9.9.9", command=None, kind="cli"):
             receipt = box / f"{name}.json"
-            args = argparse.Namespace(qrscan=command or str(binary), destination="Self-test", version=version,
+            args = argparse.Namespace(qrscan=command or str(binary), kind=kind, destination="Self-test",
+                                      version=version,
                                       url="https://example.test/qrscan", identifier=None, install=None,
                                       run_url=None, fixtures=ROOT / "fixtures", receipt=str(receipt))
             with open(os.devnull, "w") as quiet:
@@ -416,6 +424,7 @@ def self_test():
         attempt("other-engine", "other-engine", 1, "FAIL", "do not name one engine version")
         attempt("other-version", None, 1, "FAIL", "the artifact is '9.9.8'", version="9.9.8")
         attempt("absent", None, 1, "FAIL", "is not an installed command", command=str(box / "nowhere"))
+        attempt("container", None, 0, "INCOMPLETE", '"kind": "container"', kind="container")
 
         def close(name, source, remove, want_exit, want_verdict, **options):
             receipt = box / f"{name}.json"
@@ -534,7 +543,7 @@ def self_test():
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
     if schema["properties"]["route"]["properties"]["kind"].get("enum") != list(KINDS):
         failures.append("receipt.schema.json and the validator disagree on route.kind")
-    print(f"self-test: {'FAILED' if failures else 'ok'} (11 command scenarios, 3 report-file scenarios, 6 removal "
+    print(f"self-test: {'FAILED' if failures else 'ok'} (12 command scenarios, 3 report-file scenarios, 6 removal "
           "scenarios, the staging, 2 refused receipts, the schema file)")
     return 1 if failures else 0
 
@@ -547,6 +556,8 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     one = commands.add_parser("cli", help="scan with the installed command and write the receipt")
     one.add_argument("--qrscan", required=True, help="the installed command: a name on PATH or a path")
+    one.add_argument("--kind", default="cli", choices=["cli", "container"],
+                     help="container when COMMAND runs qrscan inside an image")
     one.add_argument("--destination", required=True, help="the destination's name, as its page shows it")
     one.add_argument("--version", required=True, help="the engine version the artifact states, X.Y.Z")
     one.add_argument("--url", required=True, help="the public page or artifact the install came from")
@@ -559,7 +570,7 @@ def main(argv=None):
     staging.add_argument("directory")
     staging.add_argument("--fixtures", type=pathlib.Path, default=ROOT / "fixtures")
     files = commands.add_parser("reports", help="judge three report files and write the receipt")
-    files.add_argument("--kind", required=True, choices=[kind for kind in KINDS if kind != "cli"])
+    files.add_argument("--kind", required=True, choices=["package"])
     files.add_argument("--produced-by", required=True, help="the command line that wrote the three reports")
     for profile in PROFILES:
         files.add_argument(f"--{profile}", required=True, help=f"the JSON report of the {profile} profile")
