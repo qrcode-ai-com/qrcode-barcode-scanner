@@ -9,13 +9,18 @@ pluginManagement {
     }
 }
 
+// -PscannerRepo=<directory>   resolve the binding from a local Maven directory instead, to
+//                             judge a publication before its tag. JitPack is then not used.
+// Declared here because pluginManagement must stay the first block of a settings script.
+val scannerRepo = providers.gradleProperty("scannerRepo").orNull
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
         maven {
-            url = uri("https://jitpack.io")
+            url = uri(scannerRepo ?: "https://jitpack.io")
             // Only this group may resolve from JitPack, so a typo cannot start another build.
             content { includeGroup("com.github.qrcode-ai-com") }
         }

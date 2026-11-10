@@ -1,0 +1,170 @@
+name: Kotlin publication
+
+# Judges what a Gradle consumer resolves from the Kotlin binding's publication, before a tag.
+# It builds the binding for the emulator ABI only, publishes it to a Maven directory on the
+# runner and installs it in tests/consumers/jitpack-android with the one-line dependency.
+# This is a check of the publication metadata, not a release build: nothing leaves the runner.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/kotlin-publication.yml
+      - bindings/kotlin/**
+      - crates/qrcode-ai-scanner-uniffi/**
+      - tests/consumers/jitpack-android/**
+      - jitpack.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kotlin-publication-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain).
+  RUST_TOOLCHAIN: "1.99.1"
+  COORDINATE: com/github/qrcode-ai-com/qrcode-barcode-scanner
+  FIXTURE: fixtures/symbology/mixed-code128-qr.png
+  FIXTURE_SHA256: c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8
+
+jobs:
+  one-line-dependency:
+    name: Local publication · one-line dependency
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-linux-android
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: crates/qrcode-ai-scanner-uniffi
+      - uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
+        with:
+          ndk-version: r27
+      - run: cargo install cargo-ndk --version 4.1.2 --locked
+      - name: Build the emulator ABI and generate the Kotlin bindings
+        run: |
+          cargo ndk -t x86_64 \
+            -o bindings/kotlin/qrcodeaiscanner/src/main/jniLibs \
+            build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          cargo build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen -- \
+            generate --library crates/qrcode-ai-scanner-uniffi/target/release/libqrcode_ai_scanner_uniffi.so \
+            --language kotlin \
+            --out-dir bindings/kotlin/qrcodeaiscanner/src/main/kotlin
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          gradle-version: "8.9"
+          cache-disabled: true
+      - name: Publish to a Maven directory on the runner
+        run: |
+          gradle -p bindings/kotlin :qrcodeaiscanner:publishReleasePublicationToMavenLocal \
+            -Dmaven.repo.local="$RUNNER_TEMP/m2"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' bindings/kotlin/qrcodeaiscanner/build.gradle.kts)
+          test -n "$version"
+          test -d "$RUNNER_TEMP/m2/$COORDINATE/$version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          mkdir receipt
+          find "$RUNNER_TEMP/m2/$COORDINATE/$version" -maxdepth 1 -type f -printf '%f\n' \
+            | sort | tee receipt/published-files.txt
+      # The POM read here was written by the Gradle build of this same job, from this checkout.
+      - name: Judge the published metadata
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, sys
+          import xml.etree.ElementTree as ET
+          version = os.environ['VERSION']
+          folder = pathlib.Path(os.environ['RUNNER_TEMP']) / 'm2' / os.environ['COORDINATE'] / version
+          stem = f'qrcode-barcode-scanner-{version}'
+          problems = []
+          if (folder / f'{stem}.module').exists():
+              problems.append('Gradle module metadata is published; it cannot name the JNA AAR')
+          ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+          pom = ET.parse(folder / f'{stem}.pom').getroot()
+          jna = [d for d in pom.findall('m:dependencies/m:dependency', ns)
+                 if d.findtext('m:artifactId', namespaces=ns) == 'jna']
+          if len(jna) != 1:
+              problems.append(f'expected one JNA dependency in the POM, found {len(jna)}')
+          else:
+              kind = jna[0].findtext('m:type', namespaces=ns)
+              number = jna[0].findtext('m:version', namespaces=ns)
+              print(f'POM: jna {number}, type {kind}')
+              if kind != 'aar':
+                  problems.append(f'the POM names JNA with type {kind!r}, not aar')
+              if tuple(int(part) for part in number.split('.')[:2]) < (5, 17):
+                  problems.append(f'JNA {number} predates the 16 KB page alignment of 5.17.0')
+          for problem in problems:
+              print(f'::error::{problem}')
+          sys.exit(1 if problems else 0)
+          PY
+      - name: Stage the shared fixture
+        run: |
+          echo "$FIXTURE_SHA256  $FIXTURE" | sha256sum -c -
+          mkdir -p tests/consumers/jitpack-android/app/src/main/assets
+          cp "$FIXTURE" tests/consumers/jitpack-android/app/src/main/assets/
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # The dependency is the one line a consumer writes: no JNA added by hand.
+      - name: Scan on the emulator, debug and minified
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb shell getconf PAGE_SIZE | tee receipt/page-size.txt
+            gradle -p tests/consumers/jitpack-android :app:dependencies --configuration debugRuntimeClasspath -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2" | grep -i -E 'qrcode-barcode-scanner|jna' | tee receipt/resolved-dependencies.txt
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2"
+            gradle -p tests/consumers/jitpack-android :app:assembleRelease -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2"
+            adb install -r tests/consumers/jitpack-android/app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.qrcodeai.consumer.jitpack/.SelfTestActivity
+            for attempt in $(seq 1 45); do adb logcat -d -s SCANNER_SELFTEST:I | grep -q 'SCANNER_SELFTEST: ' && break; sleep 2; done
+            adb logcat -d -s SCANNER_SELFTEST:I | grep 'SCANNER_SELFTEST: ' | tee receipt/minified-selftest.txt
+            grep -q 'SCANNER_SELFTEST: ok$' receipt/minified-selftest.txt
+      - name: Write the receipt
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = pathlib.Path('receipt')
+          receipt.mkdir(exist_ok=True)
+          read = lambda name: (receipt / name).read_text().strip() if (receipt / name).exists() else None
+          json.dump({
+              'check': 'Kotlin publication, one-line dependency from a local Maven directory',
+              'version': os.environ.get('VERSION'),
+              'job_status': os.environ['JOB_STATUS'],
+              'abis_built': ['x86_64'],
+              'published_files': (read('published-files.txt') or '').split(),
+              'resolved_dependencies': read('resolved-dependencies.txt'),
+              'device_page_size': read('page-size.txt'),
+              'minified_selftest': read('minified-selftest.txt'),
+              'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'commit': os.environ['GITHUB_SHA'],
+          }, open(receipt / 'receipt.json', 'w'), indent=2)
+          print(open(receipt / 'receipt.json').read())
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: kotlin-publication
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90

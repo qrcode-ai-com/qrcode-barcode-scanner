@@ -27,3 +27,10 @@ wrapper is committed.
 Read the state of a JitPack build only through
 `https://jitpack.io/api/builds/com.github.qrcode-ai-com/qrcode-barcode-scanner`. A request for an
 artifact of a version that was never built starts a build.
+
+## Judging a publication before its tag
+
+[`kotlin-publication.yml`](../../../.github/workflows/kotlin-publication.yml) builds the binding
+for the emulator ABI, publishes it to a Maven directory on the runner and runs this same app
+against it with `-PscannerRepo=<directory>`. It uses the one-line dependency, without
+`-PjnaAar`, so it fails if the publication stops naming JNA's Android AAR.
