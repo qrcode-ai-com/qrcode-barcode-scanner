@@ -1,0 +1,101 @@
+name: Destination acceptance
+
+# The acceptance contract of distribution/acceptance/README.md, run for real: the driver's
+# self-test, then one installed qrscan judged by the driver. That consumer downloads the public CLI
+# archive of a release anonymously, checks it against the release's checksum list, unpacks it and
+# scans. Nothing is built and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/destination-acceptance.yml
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - scripts/packed-cli-consumer.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - distribution/acceptance/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: destination-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The public release the consumer installs, and the sha256 of its checksum list.
+  RELEASE_REPOSITORY: qrcode-ai-com/qrcode-barcode-scanner
+  RELEASE_TAG: v0.11.0
+  RELEASE_VERSION: 0.11.0
+  SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+
+jobs:
+  self-test:
+    name: Driver self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/destination-acceptance.py --self-test
+
+  released-cli:
+    name: Released CLI · ${{ matrix.target }}
+    needs: self-test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the public archive without a token and check it
+        run: |
+          python3 scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+      - name: Unpack it outside the checkout
+        run: |
+          asset="qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET"
+          mkdir "$RUNNER_TEMP/install" receipt
+          tar -xzf "$RUNNER_TEMP/download/$asset.tar.gz" -C "$RUNNER_TEMP/install"
+          test -x "$RUNNER_TEMP/install/$asset/qrscan"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          python3 scripts/destination-acceptance.py cli \
+            --qrscan "$RUNNER_TEMP/install/$ASSET/qrscan" \
+            --destination "GitHub Releases" \
+            --identifier "$ASSET.tar.gz" \
+            --version "$RELEASE_VERSION" \
+            --url "https://github.com/$RELEASE_REPOSITORY/releases/tag/$RELEASE_TAG" \
+            --install "tar -xzf $ASSET.tar.gz" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-$TARGET.json"
+      - name: Remove it and close the receipt
+        run: |
+          rm -r "$RUNNER_TEMP/install/$ASSET"
+          python3 scripts/destination-acceptance.py removed \
+            --qrscan "$RUNNER_TEMP/install/$ASSET/qrscan" \
+            --uninstall "rm -r $ASSET" \
+            --receipt "receipt/acceptance-$TARGET.json"
+          python3 scripts/destination-acceptance.py check "receipt/acceptance-$TARGET.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90

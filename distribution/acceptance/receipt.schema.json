@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/acceptance/receipt.schema.json",
+  "title": "Destination acceptance receipt",
+  "description": "What one installed scanner returned for the mixed fixture, written by scripts/destination-acceptance.py. The contract is distribution/acceptance/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "verdict",
+    "checked_at",
+    "destination",
+    "route",
+    "artifact",
+    "engine",
+    "contract",
+    "host",
+    "scans",
+    "removal",
+    "run",
+    "problems"
+  ],
+  "properties": {
+    "schema": { "const": "qrscan-destination-acceptance/1" },
+    "verdict": {
+      "description": "PASS: three conforming scans and the removal step closed. INCOMPLETE: three conforming scans, removal not yet recorded. FAIL: anything else.",
+      "enum": ["PASS", "INCOMPLETE", "FAIL"]
+    },
+    "checked_at": {
+      "description": "UTC time of the scans.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "description": "The destination, as its own page names it.", "type": "string" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "command", "install"],
+      "properties": {
+        "kind": { "description": "The kind of surface that was judged.", "enum": ["cli"] },
+        "command": { "description": "The installed command that was run.", "type": "string" },
+        "install": { "description": "The install command line, as it was run.", "type": ["string", "null"] }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identifier", "version", "url"],
+      "properties": {
+        "identifier": { "description": "Package, formula or image name.", "type": ["string", "null"] },
+        "version": { "description": "The engine version the artifact states.", "type": "string" },
+        "url": { "description": "The public page or file the install came from.", "type": "string" }
+      }
+    },
+    "engine": {
+      "description": "The versions object of the reports, when the three reports agree on it.",
+      "type": ["object", "null"]
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "case", "fixture_sha256", "truth_sha256"],
+      "properties": {
+        "commit": { "description": "Commit of the checkout that supplied the driver and the fixture.", "type": ["string", "null"] },
+        "case": { "const": "qr-and-code128" },
+        "fixture_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "truth_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "machine"],
+      "properties": {
+        "system": { "type": "string" },
+        "machine": { "type": "string" }
+      }
+    },
+    "scans": {
+      "description": "One row per profile, in the order fast, frame, full.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile", "exit", "contents", "budget_exhausted", "engine_panics", "problems"],
+        "properties": {
+          "profile": { "enum": ["fast", "frame", "full"] },
+          "exit": { "type": ["integer", "null"] },
+          "contents": {
+            "description": "Every detection as [symbology, text], sorted.",
+            "type": "array",
+            "items": { "type": "array", "minItems": 2, "maxItems": 2 }
+          },
+          "budget_exhausted": { "type": ["boolean", "null"] },
+          "engine_panics": { "type": ["integer", "null"] },
+          "problems": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "removal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "uninstall"],
+      "properties": {
+        "state": { "enum": ["pending", "removed", "still_present", "not_applicable"] },
+        "uninstall": { "description": "The uninstall command line, as it was run.", "type": ["string", "null"] }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": { "description": "The hosted run that produced the receipt.", "type": ["string", "null"] }
+      }
+    },
+    "problems": { "type": "array", "items": { "type": "string" } }
+  }
+}
