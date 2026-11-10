@@ -4,8 +4,9 @@ name: Destination acceptance
 # self-test, then real consumers judged by the driver. One downloads the public CLI archive of a
 # release anonymously, checks it against the release's checksum list, unpacks it and scans. Two
 # install the public npm and PyPI packages in a new project and scan through them. One pulls the
-# public container image by digest and scans inside it. Nothing is built and nothing is
-# published.
+# public container image by digest and scans inside it. One builds and installs the public AUR
+# recipe in a new Arch Linux container. Nothing is built from this repository's source and
+# nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -292,6 +293,39 @@ jobs:
         if: always()
         with:
           name: destination-acceptance-container-${{ matrix.machine }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The package of the Arch User Repository, taken as its users take it: the public recipe is
+  # cloned signed out, built with makepkg and installed with pacman in a new Arch Linux
+  # container. The recipe must equal the copy recorded in distribution/aur/.
+  aur-package:
+    name: AUR package · Arch Linux x86_64
+    needs: self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, install, scan and uninstall in a new Arch Linux container
+        run: |
+          set -euo pipefail
+          mkdir receipt
+          docker pull --quiet archlinux:latest
+          docker image inspect --format '{{index .RepoDigests 0}}' archlinux:latest | tee receipt/aur-host-image.txt
+          docker run --rm \
+            --mount "type=bind,src=$PWD,dst=/engine,readonly" \
+            --mount "type=bind,src=$PWD/receipt,dst=/receipt" \
+            archlinux:latest sh /engine/distribution/acceptance/drivers/aur-on-arch.sh /receipt \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Validate the receipt on the runner
+        run: python3 scripts/destination-acceptance.py check receipt/acceptance-aur.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-aur
           path: receipt/
           if-no-files-found: error
           retention-days: 90
