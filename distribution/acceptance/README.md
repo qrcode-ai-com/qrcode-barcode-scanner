@@ -85,6 +85,29 @@ python3 scripts/destination-acceptance.py removed \
 
 The wrapper mounts the fixture's directory read-only at the same path and runs without network.
 
+## Run it for an AppImage on a clean host
+
+An AppImage is a command in one file. On the machine that holds it, pass the file as `--qrscan`.
+To judge it on a host that has nothing installed, a wrapper runs the file inside a bare image of
+that host, with no network:
+
+```sh
+export QRSCAN_APPIMAGE=$PWD/qrcode-barcode-scanner-0.11.0-x86_64.AppImage
+export QRSCAN_HOST_IMAGE=almalinux@sha256:...
+python3 scripts/destination-acceptance.py cli \
+  --qrscan distribution/acceptance/drivers/appimage-in-container.sh \
+  --destination AppImage --identifier "$(basename "$QRSCAN_APPIMAGE")" --version 0.11.0 \
+  --url https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases \
+  --install "docker run --network none $QRSCAN_HOST_IMAGE, the file mounted read-only" \
+  --receipt receipt.json
+python3 scripts/destination-acceptance.py removed --not-applicable --receipt receipt.json
+```
+
+The wrapper mounts the file and the fixture's directory read-only. A container has no FUSE, so
+the file unpacks itself and runs (`APPIMAGE_EXTRACT_AND_RUN=1`): the receipt covers that route,
+not the FUSE mount. The [AppImage recipe](../appimage/README.md) is judged this way on three
+hosts by the `AppImage` workflow.
+
 ## Run it for a language package
 
 A package is not a command, so it scans through a small program of its own language. The driver

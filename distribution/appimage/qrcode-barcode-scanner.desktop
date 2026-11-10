@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=qrcode-barcode-scanner
+GenericName=QR Code and Barcode Scanner
+Comment=Read QR codes and barcodes from image files, on this computer
+Exec=qrscan
+Icon=qrcode-barcode-scanner
+Terminal=true
+Categories=Utility;
+Keywords=qr;qrcode;barcode;scanner;decode;
+X-AppImage-Version=0.11.0
