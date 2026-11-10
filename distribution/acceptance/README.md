@@ -186,9 +186,65 @@ nothing. `--channel chrome` runs an installed Chrome in place of Playwright's Ch
 The workflow [`demos.yml`](../../.github/workflows/demos.yml) runs this on
 [`examples/web-vite`](../../examples/web-vite/), built and served on the runner.
 
+## Run it in a notebook session
+
+A notebook host such as Binder starts a session from a public repository, with the package
+already installed. The session is judged as a language package: the Python program above runs
+inside it. [`drivers/binder-session.mjs`](drivers/binder-session.mjs) launches the session and
+carries the commands, from an ordinary machine with Node.js 22 or later.
+
+```sh
+tools=/path/to/distribution/acceptance/drivers
+
+# 1. Launch the session. session.json then holds its address and its access token.
+node $tools/binder-session.mjs launch https://mybinder.org \
+  gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0 session.json --log build.log
+
+# 2. Run the notebook from top to bottom in the session, bring the result back and judge it.
+node $tools/binder-session.mjs run session.json -- jupyter nbconvert --to notebook --execute \
+  examples/notebooks/scan-images.ipynb --output executed.ipynb --output-dir acceptance-out
+node $tools/binder-session.mjs fetch session.json acceptance-out/executed.ipynb executed.ipynb
+python3 /path/to/scripts/check-demo-notebook.py executed executed.ipynb
+
+# 3. Scan the checked fixture with the three profiles, with the session's own copy of this kit.
+node $tools/binder-session.mjs run session.json -- python scripts/destination-acceptance.py \
+  stage /tmp/acceptance-input
+node $tools/binder-session.mjs run session.json -- python \
+  distribution/acceptance/drivers/python-package.py \
+  /tmp/acceptance-input/mixed-code128-qr.png acceptance-out/reports
+for profile in fast frame full; do
+  node $tools/binder-session.mjs fetch session.json acceptance-out/reports/$profile.json \
+    reports/$profile.json
+done
+
+# 4. Judge the three reports on this machine and write the receipt.
+python3 /path/to/scripts/destination-acceptance.py reports --kind package \
+  --produced-by "python python-package.py, in the session" \
+  --fast reports/fast.json --frame reports/frame.json --full reports/full.json \
+  --destination Binder --identifier qrcode-barcode-scanner --version 0.11.0 \
+  --url https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0 \
+  --install "pip install -r binder/requirements.txt, by the host" --receipt receipt.json
+
+# 5. Uninstall in the session, then close the receipt with an import that must now fail there.
+node $tools/binder-session.mjs run session.json -- python -m pip uninstall --yes \
+  qrcode-barcode-scanner
+python3 /path/to/scripts/destination-acceptance.py removed \
+  --gone "node $tools/binder-session.mjs run session.json -- python -I -c 'import qrcode_barcode_scanner'" \
+  --uninstall "python -m pip uninstall --yes qrcode-barcode-scanner, in the session" \
+  --receipt receipt.json
+```
+
+`session.json` holds the session's token: keep it out of any repository. `run` executes one
+command in the repository's folder of the session and exits with its exit code. The receipt's
+`host` is the machine that judged the reports, not the session: the build log and the notebook's
+own output name the session's platform. mybinder.org limits launches from most cloud providers,
+so this does not run on a hosted CI runner. A session ends by itself after about ten minutes of
+inactivity.
+
 ## What is covered today
 
 Four kinds of surface: an installed `qrscan` command, a container image, a language package, with
-programs for Node.js and Python, and a web page that follows the page contract. Other bindings,
-host integrations and agent clients keep their own consumers, listed in
+programs for Node.js and Python, and a web page that follows the page contract. A notebook
+session is judged as a language package, through `binder-session.mjs`. Other bindings, host
+integrations and agent clients keep their own consumers, listed in
 [`RELEASING.md`](../../RELEASING.md), until a program of this contract exists for each.

@@ -6,6 +6,7 @@ Barcode Scanner, at an exact version, and scans a sample image.
 | Example | What it shows |
 | --- | --- |
 | [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. |
+| [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. |
 
 Other examples live with the package they belong to:
 

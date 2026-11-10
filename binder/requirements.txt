@@ -1,0 +1,10 @@
+# What a notebook host such as Binder installs before it opens examples/notebooks/: the
+# published package at an exact version. Each --hash is the SHA-256 of one wheel published on
+# PyPI for that version, so pip refuses any other file. The package has no dependency.
+qrcode-barcode-scanner==0.11.0 \
+    --hash=sha256:67a7f03b90dff3685d213d5377856656f7c1a26dc253b7aaf3048b18d576b98a \
+    --hash=sha256:400e8173f91ecaa54cd160c94c3e487c533e97f4915e6956071a0417ff6fe822 \
+    --hash=sha256:dca71ac3beb4d4b85a21e7d8fe8a3493850fde7e0c3b425e30037991df7fa6df \
+    --hash=sha256:3046df24c36a3a677b506733e990b4f0d59f5bf7117fcf197d5355e732a133a7 \
+    --hash=sha256:346f7ea57a31c0b034e8a4ddc1c6c67604e0ebcfb1336401119c10b2248515bb \
+    --hash=sha256:d5377cc3c9f6e492014d7df44c84d60cc7fbe68327542aef5bcad2b7659868ae

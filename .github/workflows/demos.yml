@@ -9,9 +9,11 @@ on:
     paths:
       - .github/workflows/demos.yml
       - examples/**
+      - binder/**
       - distribution/acceptance/**
       - scripts/destination-acceptance.py
       - scripts/check-demo-page.py
+      - scripts/check-demo-notebook.py
       - scripts/consumer_truth.py
       - fixtures/consumer-truth.json
       - fixtures/symbology/mixed-code128-qr.png
@@ -90,4 +92,50 @@ jobs:
           path: |
             ${{ runner.temp }}/reports
             ${{ runner.temp }}/preview.log
+          if-no-files-found: error
+
+  notebook:
+    name: Notebook · Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The session's Python (binder/runtime.txt) and the newest one.
+        python: ["3.12", "3.14"]
+    env:
+      # What runs the notebook from top to bottom, as Run All does.
+      NBCLIENT_VERSION: 0.11.0
+      IPYKERNEL_VERSION: 7.4.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: The committed notebook is clean and pins what the session installs
+        run: |
+          python scripts/check-demo-notebook.py --self-test
+          python scripts/check-demo-notebook.py source examples/notebooks/scan-images.ipynb \
+            --requirements binder/requirements.txt
+          test "$(cat binder/runtime.txt)" = "python-3.12"
+      # As a notebook host does: the hashed requirements first, then the notebook.
+      - name: Install the session's environment in a new one
+        run: |
+          python -m venv "$RUNNER_TEMP/session"
+          "$RUNNER_TEMP/session/bin/python" -m pip install --no-cache-dir -r binder/requirements.txt
+          "$RUNNER_TEMP/session/bin/python" -m pip install "nbclient==$NBCLIENT_VERSION" "ipykernel==$IPYKERNEL_VERSION"
+      - name: Run the notebook from top to bottom and judge the result
+        run: |
+          mkdir "$RUNNER_TEMP/notebook"
+          cp examples/notebooks/scan-images.ipynb "$RUNNER_TEMP/notebook/"
+          cd "$RUNNER_TEMP/notebook"
+          "$RUNNER_TEMP/session/bin/jupyter-execute" scan-images.ipynb --output executed.ipynb
+          python "$GITHUB_WORKSPACE/scripts/check-demo-notebook.py" executed executed.ipynb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: demo-notebook-python-${{ matrix.python }}
+          path: ${{ runner.temp }}/notebook/executed.ipynb
           if-no-files-found: error
