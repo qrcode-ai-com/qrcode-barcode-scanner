@@ -119,10 +119,13 @@ const require = createRequire(join(consumer, 'package.json'));
 const { chromium, firefox, webkit } = require('playwright');
 if (process.env.QRSCAN_INSTALL_BROWSERS === '1') {
   phase('browser install');
+  // A download, not a test: on the hosted Linux runner the system packages and the two browsers
+  // took 188 s in a passing run of 10 November 2026, and a slower package mirror took more than
+  // 240 s twice that day. The limit leaves room for that and still ends a stalled download.
   runNode([join(dirname(require.resolve('playwright/package.json')), 'cli.js'), 'install',
     ...(process.platform === 'linux' ? ['--with-deps'] : []), 'chromium',
     ...(process.env.QRSCAN_TEST_FIREFOX === '1' ? ['firefox'] : []),
-    ...(process.env.QRSCAN_TEST_WEBKIT === '1' ? ['webkit'] : [])], { label: 'browser install', timeout: 240_000 });
+    ...(process.env.QRSCAN_TEST_WEBKIT === '1' ? ['webkit'] : [])], { label: 'browser install', timeout: 600_000 });
 }
 phase('installed files');
 const vite = await import(pathToFileURL(require.resolve('vite')));
