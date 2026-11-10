@@ -65,9 +65,9 @@ with `python3 scripts/destination-acceptance.py check receipt.json`. The driver 
 and nothing else.
 
 The workflow [`destination-acceptance.yml`](../../.github/workflows/destination-acceptance.yml)
-runs the driver's self-test and one real consumer: it downloads the public 0.11.0 archive
-anonymously, checks it against the release's checksum list, unpacks it and judges the unpacked
-`qrscan`.
+runs the driver's self-test and one real consumer on Linux x64, Linux arm64, macOS arm64 and
+Windows x64: it downloads the public 0.11.0 archive anonymously, checks it against the release's
+checksum list, unpacks it and judges the unpacked `qrscan`.
 
 ## What is covered today
 
