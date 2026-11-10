@@ -1,10 +1,10 @@
 name: Flutter candidate qualification
 
-# Qualification on the candidate branch only. The release workflow owns the
+# Qualification on a candidate branch only. The release workflow owns the
 # tagged build and first-upload procedure.
 on:
   push:
-    branches: [codex/flutter-public-identity]
+    branches: [codex/flutter-public-identity, "claude/flutter-*"]
 
 permissions:
   contents: read
@@ -90,7 +90,7 @@ jobs:
         run: |
           package=/tmp/flutter-validation/bindings/flutter
           cargo check --locked --manifest-path "$package/rust/Cargo.toml" --lib
-          (cd "$package" && flutter pub get)
+          (cd "$package" && flutter pub get --enforce-lockfile)
           python3 scripts/package-inspect.py flutter --package-root "$package" \
             --strict --release-set --record "$RUNNER_TEMP/flutter-pub-qualification.sha256"
           git archive HEAD spec/examples | tar -x -C /tmp/flutter-validation

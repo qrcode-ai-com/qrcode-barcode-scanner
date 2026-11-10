@@ -2178,6 +2178,8 @@ def check_flutter_sources(art: Artifact, root: pathlib.Path, listing: list, snap
     missing, extra = sorted(required - set(published)), sorted(set(published) - set(files))
     art.check("pub includes the complete bundled core and binding sources", not missing, ", ".join(missing))
     art.check("pub includes only candidate files and staging output", not extra, ", ".join(extra))
+    art.check("pub does not publish the package's pubspec.lock: it serves the release jobs, a consumer resolves its own",
+              "pubspec.lock" not in published)
     staging.validate_paths(published)
     art.sha256 = staging.digest(published)
     art.size = sum(len(data) for data in published.values())
@@ -4737,6 +4739,7 @@ def flutter_self_test():
     for name in ("analysis_options.yaml", "example/analysis_options.yaml"):
         snapshot[f"{staging.BINDING}/{name}"] = b'include: package:flutter_lints/flutter.yaml\n'
     snapshot[f"{staging.BINDING}/example/pubspec.lock"] = b"packages: {}\n"
+    snapshot[f"{staging.BINDING}/pubspec.lock"] = b"packages: {}\n"
     snapshot[f"{staging.BINDING}/rust/Cargo.toml"] += b'\n[profile.release.package.rxing]\noverflow-checks = true\n'
     pubspec = f"{staging.BINDING}/pubspec.yaml"
     snapshot[pubspec] = f"name: {FLUTTER_NAME}\n".encode() + snapshot[pubspec]
@@ -4744,7 +4747,7 @@ def flutter_self_test():
     core[".cargo_vcs_info.json"] = json.dumps({"git": {"sha1": revision}, "path_in_vcs": staging.CORE}).encode()
     packed = staging.archive_bytes({f"qrcode-barcode-scanner-{version}/{name}": data for name, data in core.items()})
     clean, _ = staging.bundle(packed, snapshot, revision)
-    names = sorted(name for name in clean if name not in (".pubignore", "example/pubspec.lock"))
+    names = sorted(name for name in clean if name not in (".pubignore", "example/pubspec.lock", "pubspec.lock"))
     # Candidates that differ from the clean one in their pub name or README:
     # each is staged from its own snapshot, so only the name or the text differs.
     variants = {}
@@ -4781,6 +4784,9 @@ def flutter_self_test():
         ("published example lock tampered", clean | {"example/pubspec.lock": b"changed"},
          names + ["example/pubspec.lock"], 0, "", FAIL),
         ("published example lock unchanged", clean, names + ["example/pubspec.lock"], 0, "", PASS),
+        ("package lock rewritten by an unlocked resolution", clean | {"pubspec.lock": b"resolved by pub\n"}, names, 0, "",
+         FAIL),
+        ("package lock published", clean, names + ["pubspec.lock"], 0, "", FAIL),
         ("binding analyzer migrated", clean | {"analysis_options.yaml": b"analyzer: {}\n"}, names, 0, "", FAIL),
         ("example analyzer migrated", clean | {"example/analysis_options.yaml": b"analyzer: {}\n"}, names, 0, "", FAIL),
         ("recursive target escape", clean | {"nested/Cargo.toml": b'[target.x.dependencies]\nbad = { path = "../../outside" }\n'},

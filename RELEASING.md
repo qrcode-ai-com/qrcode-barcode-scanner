@@ -524,9 +524,14 @@ check reads each point):
   upload --clobber`, no `gh api` call naming a release, nothing naming the
   GitHub API, no release action. The owner creates the one draft before the
   tag and publishes it once (§ 5, § 7);
-- one named exception, keyed to three exact steps of flutter › publish: its
-  setup-dart and flutter-action steps (stable-channel SDKs) and its `flutter
-  pub get` (no lockfile), while the job is dormant (owner step 6 ends it).
+- no exception. flutter › publish names exact Flutter and Dart SDKs and
+  resolves only the tracked `bindings/flutter/pubspec.lock` of the staged
+  candidate (`flutter pub get --enforce-lockfile`). pub does not publish that
+  file, and the inspection fails if it is rewritten or listed. To move to
+  another Flutter SDK, change it in every job of flutter.yml and in
+  flutter-qualification.yml, set the publish job's Dart SDK to the one it
+  bundles, then run `flutter pub get` in `bindings/flutter` with that SDK
+  and commit the reviewed lockfile.
 
 The jobs whose outputs the publishing jobs upload (build-native,
 pack-native, build-wasm, wheels, sdist, ios, and cli-archives' build and
@@ -702,15 +707,13 @@ performs them):
    tag whose `test`, `build-android` and `build-ios` jobs passed,
    re-inspected first with `scripts/package-inspect.py flutter --package-root …
    --strict --release-set`. The package then moves to the verified publisher
-   `qrcode-ai.com`; that transfer cannot be undone. Before its trusted
-   publisher is configured, in one change: pin the Flutter and Dart SDKs of
-   flutter › publish to exact versions, take the lockfile decision for its
-   `flutter pub get` (a tracked pubspec.lock with `--enforce-lockfile`, or a
-   recorded no), and delete the named exception from
-   scripts/check-publish-guards.py (the check fails on a waiver left with
-   nothing to waive). Then Admin › Automated publishing › enable GitHub
-   Actions: repository `qrcode-ai-com/qrcode-barcode-scanner`, tag pattern
-   `v{{version}}`, require environment `pub`.
+   `qrcode-ai.com`; that transfer cannot be undone. The publish job is ready
+   for its trusted publisher: its Flutter and Dart SDKs are exact versions,
+   its `flutter pub get` enforces the tracked pubspec.lock, and
+   scripts/check-publish-guards.py excepts no job. Then Admin › Automated
+   publishing › enable GitHub Actions: repository
+   `qrcode-ai-com/qrcode-barcode-scanner`, tag pattern `v{{version}}`,
+   require environment `pub`.
    The `flutter-stage` artifact is the archive `scripts/stage-flutter-package.py`
    builds from the tagged commit; never publish `bindings/flutter` directly.
    The stage vendors that candidate's normalized Cargo archive, verifies its

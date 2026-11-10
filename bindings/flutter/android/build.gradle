@@ -33,7 +33,7 @@ android {
     compileSdk = 34
 
     // NDK from the consuming app's /android/app/build.gradle. cargokit links the
-    // .so 16 KB-page-aligned with NDK r27+ (Android 15+) — pin r27 in CI.
+    // .so with it: r28 or newer aligns it for 16 KB pages (Android 15+), r27 aligns it to 4 KB.
     ndkVersion = android.ndkVersion
 
     compileOptions {
