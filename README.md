@@ -18,6 +18,10 @@ Scan QR codes and barcodes from images or camera frames, entirely on your device
 To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
 QR Code AI web links · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
 
+To try the scanner in your browser with nothing to install, open the [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/web-vite) in StackBlitz. It installs the published WebAssembly package 0.11.0 from npm and scans on your device.
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0/examples/web-vite)
+
 ### Scan a QR code and a Code 128 barcode in one image
 
 [![Selecting two QR copies and a Code 128 from a recorded scan](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/scan-replay.gif?v=d7ca463cf1ff)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/scan-replay.mp4)
