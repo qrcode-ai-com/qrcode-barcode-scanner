@@ -36,14 +36,17 @@ if (!url || !image || !out || !Number.isFinite(flags.wait) || flags.wait <= 0) {
 }
 const { chromium } = createRequire(join(process.cwd(), 'package.json'))('playwright');
 
-// The frame that holds the four parts of the page contract, or null.
+// The frame that holds the four parts of the page contract, or null. Every frame is asked at the
+// same time and has five seconds to answer: a frame that is still loading may stay silent, and
+// must not hold up the others.
 async function scannerFrame(page) {
-  for (const frame of page.frames()) {
-    const found = await frame.evaluate(() => ['file', 'profile', 'result', 'report-json']
-      .every((id) => document.getElementById(id) !== null)).catch(() => false);
-    if (found) return frame;
-  }
-  return null;
+  const frames = page.frames();
+  const answers = await Promise.all(frames.map((frame) => Promise.race([
+    frame.evaluate(() => ['file', 'profile', 'result', 'report-json']
+      .every((id) => document.getElementById(id) !== null)).catch(() => false),
+    new Promise((resolve) => { setTimeout(() => resolve(false), 5000); }),
+  ])));
+  return frames[answers.indexOf(true)] ?? null;
 }
 
 const state = (frame) => frame.evaluate(() => {
