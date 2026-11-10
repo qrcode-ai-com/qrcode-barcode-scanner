@@ -1,0 +1,194 @@
+name: AppImage
+
+# The AppImage recipe of distribution/appimage/, built and judged on each change. The build wraps
+# the public 0.11.0 CLI archive: nothing is compiled from this repository's Rust source. The file
+# is then inspected, run as a user who just downloaded it, and judged with the destination
+# acceptance contract on this runner and on three clean hosts without network. The result is a
+# workflow artifact. Nothing is attached to a release and nothing is published.
+# Untrusted event fields are never interpolated into shell scripts.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/appimage.yml
+      - distribution/appimage/**
+      - distribution/acceptance/drivers/appimage-in-container.sh
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RELEASE: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v0.11.0
+  VERSION: 0.11.0
+  APPIMAGETOOL: https://github.com/AppImage/appimagetool/releases/download/1.9.1
+  RUNTIME: https://github.com/AppImage/type2-runtime/releases/download/20251108
+
+jobs:
+  appimage:
+    name: AppImage · ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            architecture: x86_64
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            architecture: aarch64
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      ARCHITECTURE: ${{ matrix.architecture }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Driver self-test
+        run: python3 scripts/destination-acceptance.py --self-test
+      - name: Download the public inputs, signed out
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "$ARCHITECTURE"
+          mkdir -p "$RUNNER_TEMP/inputs" "$RUNNER_TEMP/out" "$RUNNER_TEMP/again" receipts
+          fetch() {
+            env -u GH_TOKEN -u GITHUB_TOKEN curl --fail --silent --show-error --location \
+              --retry 3 --max-time 300 --output "$RUNNER_TEMP/inputs/$1" "$2/$1"
+          }
+          fetch "qrcode-barcode-scanner-cli-$VERSION-SHA256SUMS" "$RELEASE"
+          fetch "qrcode-barcode-scanner-cli-$VERSION-$TARGET.tar.gz" "$RELEASE"
+          fetch "appimagetool-$ARCHITECTURE.AppImage" "$APPIMAGETOOL"
+          fetch "runtime-$ARCHITECTURE" "$RUNTIME"
+      - name: Build the AppImage
+        run: |
+          set -euo pipefail
+          bash distribution/appimage/build.sh "$ARCHITECTURE" "$RUNNER_TEMP/inputs" "$RUNNER_TEMP/out"
+          echo "APPIMAGE=$RUNNER_TEMP/out/qrcode-barcode-scanner-$VERSION-$ARCHITECTURE.AppImage" >> "$GITHUB_ENV"
+      - name: A second build gives the same file
+        run: |
+          set -euo pipefail
+          bash distribution/appimage/build.sh "$ARCHITECTURE" "$RUNNER_TEMP/inputs" "$RUNNER_TEMP/again"
+          first=$(sha256sum "$APPIMAGE" | cut -d' ' -f1)
+          second=$(sha256sum "$RUNNER_TEMP/again/$(basename "$APPIMAGE")" | cut -d' ' -f1)
+          echo "first build  $first"
+          echo "second build $second"
+          test "$first" = "$second"
+      - name: Validate the desktop entry and the AppStream description
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends desktop-file-utils
+          desktop-file-validate distribution/appimage/qrcode-barcode-scanner.desktop
+          # The description uses the developer element of AppStream 1.0: validate it with a
+          # validator of that generation, which the runner's own release does not ship.
+          docker run --rm --mount "type=bind,src=$PWD/distribution/appimage,dst=/recipe,readonly" \
+            ubuntu:24.04 sh -euc '
+              apt-get update --quiet --quiet
+              apt-get install --yes --quiet --quiet --no-install-recommends appstream >/dev/null
+              appstreamcli --version
+              appstreamcli validate --no-net /recipe/qrcode-barcode-scanner.appdata.xml'
+      - name: Inspect what the file holds
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/out"
+          "$APPIMAGE" --appimage-extract >/dev/null
+          tree=squashfs-root
+          # The rules of the AppImage catalogue for an application directory.
+          test -x "$tree/AppRun"
+          test "$(find "$tree" -maxdepth 1 -name '*.desktop' | wc -l)" = 1
+          desktop-file-validate "$tree/qrcode-barcode-scanner.desktop"
+          test "$(grep -c '^Icon=' "$tree/qrcode-barcode-scanner.desktop")" = 1
+          test "$(head -c 8 "$tree/.DirIcon" | od -An -tx1 | tr -d ' \n')" = 89504e470d0a1a0a
+          cmp "$tree/.DirIcon" "$GITHUB_WORKSPACE/distribution/appimage/qrcode-barcode-scanner.png"
+          cmp "$tree/usr/share/metainfo/qrcode-barcode-scanner.appdata.xml" \
+            "$GITHUB_WORKSPACE/distribution/appimage/qrcode-barcode-scanner.appdata.xml"
+          # The executable is the one of the public archive, byte for byte.
+          tar -xOzf "$RUNNER_TEMP/inputs/qrcode-barcode-scanner-cli-$VERSION-$TARGET.tar.gz" \
+            "qrcode-barcode-scanner-cli-$VERSION-$TARGET/qrscan" > "$RUNNER_TEMP/qrscan.published"
+          cmp "$tree/usr/bin/qrscan" "$RUNNER_TEMP/qrscan.published"
+          cmp "$tree/AppRun" "$RUNNER_TEMP/qrscan.published"
+          # The licence, the notices and the pointer to the source are inside.
+          for file in LICENSE LICENSING.md SOURCE.md THIRD-PARTY.md THIRD-PARTY-LICENSES.txt build-info.json; do
+            test -s "$tree/usr/share/doc/qrcode-barcode-scanner/$file"
+          done
+          find "$tree" -depth -delete
+      - name: Run it as a user who just downloaded it
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/downloaded"
+          cp "$APPIMAGE" "$RUNNER_TEMP/downloaded/"
+          file="$RUNNER_TEMP/downloaded/$(basename "$APPIMAGE")"
+          chmod +x "$file"
+          echo "DOWNLOADED=$file" >> "$GITHUB_ENV"
+          # Without FUSE: the file unpacks itself and runs. This route works on every host.
+          test "$(APPIMAGE_EXTRACT_AND_RUN=1 "$file" --version)" = "qrscan $VERSION"
+          APPIMAGE_EXTRACT_AND_RUN=1 "$file" --help >/dev/null
+          # With FUSE, when this runner offers it: the file mounts itself. Reported, not required.
+          if mounted=$("$file" --version 2>"$RUNNER_TEMP/fuse.log") && test "$mounted" = "qrscan $VERSION"; then
+            echo "fuse=ran" | tee "$GITHUB_WORKSPACE/receipts/fuse-$ARCHITECTURE.txt"
+          else
+            echo "fuse=not available on this runner" | tee "$GITHUB_WORKSPACE/receipts/fuse-$ARCHITECTURE.txt"
+            head -n 5 "$RUNNER_TEMP/fuse.log" || true
+          fi
+      - name: Judge it on this runner with the acceptance contract
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -euo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          python3 scripts/destination-acceptance.py cli --qrscan "$DOWNLOADED" \
+            --destination "AppImage (recipe build, not published)" \
+            --identifier "$(basename "$DOWNLOADED")" --version "$VERSION" \
+            --url "$run_url" --run-url "$run_url" \
+            --install "chmod +x $(basename "$DOWNLOADED")" \
+            --receipt "receipts/runner-$ARCHITECTURE.json"
+          rm "$DOWNLOADED"
+          python3 scripts/destination-acceptance.py removed --qrscan "$DOWNLOADED" \
+            --uninstall "rm $(basename "$DOWNLOADED")" --receipt "receipts/runner-$ARCHITECTURE.json"
+          python3 scripts/destination-acceptance.py check "receipts/runner-$ARCHITECTURE.json"
+      - name: Judge it on clean hosts without network
+        run: |
+          set -euo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          export QRSCAN_APPIMAGE="$APPIMAGE"
+          # The oldest C library the executable supports (2.28), a long-term desktop and a recent one.
+          for host in almalinux:8 ubuntu:22.04 fedora:latest; do
+            docker pull --quiet "$host"
+            QRSCAN_HOST_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' "$host")
+            export QRSCAN_HOST_IMAGE
+            name=$(printf '%s' "$host" | tr ':.' '--')
+            echo "== $host as $QRSCAN_HOST_IMAGE"
+            docker run --rm --network none "$QRSCAN_HOST_IMAGE" sh -c 'ldd --version | head -n 1'
+            python3 scripts/destination-acceptance.py cli \
+              --qrscan distribution/acceptance/drivers/appimage-in-container.sh \
+              --destination "AppImage (recipe build, not published)" \
+              --identifier "$(basename "$APPIMAGE")" --version "$VERSION" \
+              --url "$run_url" --run-url "$run_url" \
+              --install "docker run --network none $QRSCAN_HOST_IMAGE, the file mounted read-only" \
+              --receipt "receipts/$name-$ARCHITECTURE.json"
+            python3 scripts/destination-acceptance.py removed --not-applicable \
+              --receipt "receipts/$name-$ARCHITECTURE.json"
+            python3 scripts/destination-acceptance.py check "receipts/$name-$ARCHITECTURE.json"
+          done
+      - name: Gather the file, its checksum and the receipts
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          cp "$APPIMAGE" artifact/
+          (cd artifact && sha256sum "$(basename "$APPIMAGE")" | tee "$(basename "$APPIMAGE").sha256")
+          cp -R receipts artifact/receipts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: appimage-${{ matrix.architecture }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14
