@@ -44,8 +44,14 @@
       "additionalProperties": false,
       "required": ["kind", "command", "install"],
       "properties": {
-        "kind": { "description": "The kind of surface that was judged.", "enum": ["cli"] },
-        "command": { "description": "The installed command that was run.", "type": "string" },
+        "kind": {
+          "description": "The kind of surface that was judged: an installed command, or a language package scanned through its own small program.",
+          "enum": ["cli", "package"]
+        },
+        "command": {
+          "description": "The installed command that was run, or the command line that wrote the three reports of a package.",
+          "type": "string"
+        },
         "install": { "description": "The install command line, as it was run.", "type": ["string", "null"] }
       }
     },
@@ -92,7 +98,10 @@
         "required": ["profile", "exit", "contents", "budget_exhausted", "engine_panics", "problems"],
         "properties": {
           "profile": { "enum": ["fast", "frame", "full"] },
-          "exit": { "type": ["integer", "null"] },
+          "exit": {
+            "description": "Exit code of the command. Null for a report read from a file.",
+            "type": ["integer", "null"]
+          },
           "contents": {
             "description": "Every detection as [symbology, text], sorted.",
             "type": "array",

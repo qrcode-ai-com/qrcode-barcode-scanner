@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Judge one installed qrscan against the destination acceptance contract.
+"""Judge one installed scanner against the destination acceptance contract.
 
   destination-acceptance.py cli --qrscan COMMAND --destination NAME --version X.Y.Z --url URL
       [--identifier ID] [--install "COMMAND LINE"] [--run-url URL] [--fixtures DIR] --receipt FILE
-  destination-acceptance.py removed --qrscan COMMAND --receipt FILE [--uninstall "COMMAND LINE"]
+  destination-acceptance.py stage DIR [--fixtures DIR]
+  destination-acceptance.py reports --kind package --produced-by "COMMAND LINE" --fast FILE
+      --frame FILE --full FILE --destination NAME --version X.Y.Z --url URL
+      [--identifier ID] [--install "COMMAND LINE"] [--run-url URL] [--fixtures DIR] --receipt FILE
+  destination-acceptance.py removed (--qrscan COMMAND | --gone "COMMAND LINE") --receipt FILE
+      [--uninstall "COMMAND LINE"] [--not-applicable]
   destination-acceptance.py check FILE
   destination-acceptance.py --self-test
 
@@ -11,9 +16,16 @@ The contract is distribution/acceptance/README.md. `cli` runs the installed comm
 fixture with the fast, frame and full profiles and no budget, and writes the receipt
 (qrscan-destination-acceptance/1). Each report must hold the QR code and the Code 128, each once and
 nothing else, uncut and with no engine panic; the full report must also meet the shared truth case
-(scripts/consumer_truth.py: geometry, primary detection, score). `removed` is run after the route's
-own uninstall: it records whether the command is gone and closes the verdict. `check` validates a
-receipt's shape and that its verdict follows from its own content.
+(scripts/consumer_truth.py: geometry, primary detection, score).
+
+A surface that is not a command (a language package) scans through its own small program: `stage`
+copies the checked fixture outside the checkout, that program writes one JSON report per profile,
+and `reports` judges the three files by the same rules and writes the same receipt.
+
+`removed` is run after the route's own uninstall and closes the verdict: with --qrscan the command
+must no longer resolve, with --gone the given command line must fail (an import of the removed
+package, for instance). `check` validates a receipt's shape and that its verdict follows from its
+own content.
 
 The driver installs nothing and removes nothing: the caller does both the way a user of that
 destination would. COMMAND is a name looked up on PATH or a path to the executable. Stdlib only.
@@ -27,6 +39,7 @@ import json
 import os
 import pathlib
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -37,6 +50,7 @@ SCHEMA = "qrscan-destination-acceptance/1"
 SCHEMA_FILE = ROOT / "distribution/acceptance/receipt.schema.json"
 CASE = "qr-and-code128"
 PROFILES = ("fast", "frame", "full")
+KINDS = ("cli", "package")
 REMOVAL = ("pending", "removed", "still_present", "not_applicable")
 TIMEOUT = 120
 
@@ -88,7 +102,7 @@ def judge_scan(truth, case, profile, code, report):
     if report is None:
         return []
     problems = []
-    if code != 0:
+    if code is not None and code != 0:  # a report read from a file has no exit code
         problems.append(f"{profile}: exit {code}, a found code exits 0")
     trace = report.get("trace", {})
     if trace.get("budget_exhausted") is not False:
@@ -159,8 +173,8 @@ def validate(receipt):
         return problems
     if receipt["removal"]["state"] not in REMOVAL:
         problems.append(f"removal.state is {receipt['removal']['state']!r}")
-    if receipt["route"]["kind"] != "cli":
-        problems.append(f"route.kind is {receipt['route']['kind']!r}; this driver writes cli receipts")
+    if receipt["route"]["kind"] not in KINDS:
+        problems.append(f"route.kind is {receipt['route']['kind']!r}, not one of {', '.join(KINDS)}")
     if receipt["verdict"] != verdict(receipt):
         problems.append(f"verdict {receipt['verdict']} does not follow from the receipt, which gives {verdict(receipt)}")
     return problems
@@ -178,18 +192,12 @@ def write(receipt, path):
     print(json.dumps(receipt, indent=2, ensure_ascii=False))
 
 
-def cli(args, run=subprocess.run, now=None):
-    try:
-        truth, case, image = contract(args.fixtures)
-    except (OSError, AssertionError, StopIteration) as error:
-        print(f"destination-acceptance: the contract inputs are not usable: {error}", file=sys.stderr)
-        return 2
-    executable = resolve(args.qrscan)
-    receipt = {
+def new_receipt(args, truth, case, kind, command, now=None):
+    return {
         "schema": SCHEMA, "verdict": "FAIL",
         "checked_at": (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "destination": {"name": args.destination},
-        "route": {"kind": "cli", "command": args.qrscan, "install": args.install},
+        "route": {"kind": kind, "command": command, "install": args.install},
         "artifact": {"identifier": args.identifier, "version": args.version, "url": args.url},
         "engine": None,
         "contract": {"commit": git_commit(), "case": CASE, "fixture_sha256": case["sha256"],
@@ -198,32 +206,98 @@ def cli(args, run=subprocess.run, now=None):
         "scans": [], "removal": {"state": "pending", "uninstall": None},
         "run": {"url": args.run_url}, "problems": [],
     }
+
+
+def record_scan(receipt, truth, case, profile, code, report, problem):
+    """Add one profile's row; the report's versions object, or None."""
+    problems = ([problem] if problem else []) + judge_scan(truth, case, profile, code, report)
+    detections = report.get("detections", []) if report else []
+    trace = report.get("trace", {}) if report else {}
+    receipt["scans"].append({
+        "profile": profile, "exit": code,
+        "contents": sorted([d.get("symbology"), d.get("content", {}).get("text")] for d in detections),
+        "budget_exhausted": trace.get("budget_exhausted"), "engine_panics": trace.get("engine_panics"),
+        "problems": problems})
+    return report["versions"] if report and isinstance(report.get("versions"), dict) else None
+
+
+def close_engine(receipt, versions, version, scanned=True):
+    """Record the engine the three reports agree on, and hold it to the artifact's version."""
+    if len(versions) == len(PROFILES) and all(row == versions[0] for row in versions):
+        receipt["engine"] = versions[0]
+        if versions[0].get("scanner") != version:
+            receipt["problems"].append(f"the reports name engine {versions[0].get('scanner')!r}, the artifact is "
+                                       f"{version!r}")
+    elif scanned:
+        receipt["problems"].append("the three reports do not name one engine version")
+
+
+def usable_contract(fixtures):
+    try:
+        return contract(fixtures)
+    except (OSError, AssertionError, StopIteration) as error:
+        print(f"destination-acceptance: the contract inputs are not usable: {error}", file=sys.stderr)
+        return None
+
+
+def cli(args, run=subprocess.run, now=None):
+    inputs = usable_contract(args.fixtures)
+    if inputs is None:
+        return 2
+    truth, case, image = inputs
+    executable = resolve(args.qrscan)
+    receipt = new_receipt(args, truth, case, "cli", args.qrscan, now)
     if executable is None:
         receipt["problems"].append(f"{args.qrscan!r} is not an installed command")
+    versions = []
     # The fixture is read from a copy outside the checkout, as an installed user's file would be.
     with tempfile.TemporaryDirectory(prefix="qrscan-acceptance-") as box:
         staged = pathlib.Path(box) / image.name
         shutil.copyfile(image, staged)
-        versions = []
         for profile in PROFILES if executable else ():
             code, report, problem = scan(executable, staged, profile, run)
-            problems = ([problem] if problem else []) + judge_scan(truth, case, profile, code, report)
-            detections = report.get("detections", []) if report else []
-            trace = report.get("trace", {}) if report else {}
-            receipt["scans"].append({
-                "profile": profile, "exit": code,
-                "contents": sorted([d.get("symbology"), d.get("content", {}).get("text")] for d in detections),
-                "budget_exhausted": trace.get("budget_exhausted"), "engine_panics": trace.get("engine_panics"),
-                "problems": problems})
-            if report and isinstance(report.get("versions"), dict):
-                versions.append(report["versions"])
-    if versions and all(row == versions[0] for row in versions) and len(versions) == len(PROFILES):
-        receipt["engine"] = versions[0]
-        if versions[0].get("scanner") != args.version:
-            receipt["problems"].append(f"the reports name engine {versions[0].get('scanner')!r}, the artifact is "
-                                       f"{args.version!r}")
-    elif executable:
-        receipt["problems"].append("the three reports do not name one engine version")
+            version = record_scan(receipt, truth, case, profile, code, report, problem)
+            if version is not None:
+                versions.append(version)
+    close_engine(receipt, versions, args.version, scanned=executable is not None)
+    write(receipt, args.receipt)
+    return 0 if receipt["verdict"] == "INCOMPLETE" else 1
+
+
+def stage(args):
+    inputs = usable_contract(args.fixtures)
+    if inputs is None:
+        return 2
+    target = pathlib.Path(args.directory)
+    if ROOT == target.resolve() or ROOT in target.resolve().parents:
+        print("destination-acceptance: stage the fixture outside the checkout", file=sys.stderr)
+        return 2
+    target.mkdir(parents=True, exist_ok=True)
+    staged = target / inputs[2].name
+    shutil.copyfile(inputs[2], staged)
+    print(staged)
+    return 0
+
+
+def reports(args, now=None):
+    inputs = usable_contract(args.fixtures)
+    if inputs is None:
+        return 2
+    truth, case, _ = inputs
+    receipt = new_receipt(args, truth, case, args.kind, args.produced_by, now)
+    versions = []
+    for profile in PROFILES:
+        report, problem = None, None
+        try:
+            report = json.loads(pathlib.Path(getattr(args, profile)).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            problem = f"{profile}: the report file is not readable JSON ({type(error).__name__})"
+        if report is not None and not isinstance(report, dict):
+            report, problem = None, f"{profile}: the file does not hold one JSON report"
+        version = record_scan(receipt, truth, case, profile, None, report, problem)
+        if version is not None:
+            versions.append(version)
+    close_engine(receipt, versions, args.version)
     write(receipt, args.receipt)
     return 0 if receipt["verdict"] == "INCOMPLETE" else 1
 
@@ -239,7 +313,21 @@ def removed(args):
         print("destination-acceptance: the receipt is not one that waits for its removal step: "
               + "; ".join(problems or [f"removal is already {receipt['removal']['state']}"]), file=sys.stderr)
         return 2
-    state = "not_applicable" if args.not_applicable else "still_present" if resolve(args.qrscan) else "removed"
+    if args.not_applicable:
+        state = "not_applicable"
+    elif args.gone:
+        # The command line must fail now, as an import of a removed package does.
+        try:
+            still = subprocess.run(shlex.split(args.gone, posix=os.name != "nt"), capture_output=True,
+                                   timeout=TIMEOUT).returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            still = False
+        state = "still_present" if still else "removed"
+    elif args.qrscan:
+        state = "still_present" if resolve(args.qrscan) else "removed"
+    else:
+        print("destination-acceptance: removed needs --qrscan, --gone or --not-applicable", file=sys.stderr)
+        return 2
     receipt["removal"] = {"state": state, "uninstall": args.uninstall}
     write(receipt, args.receipt)
     return 0 if receipt["verdict"] == "PASS" else 1
@@ -334,7 +422,8 @@ def self_test():
             shutil.copyfile(source, receipt)
             if remove:
                 binary.rename(box / "qrscan.removed")
-            args = argparse.Namespace(qrscan=str(binary), receipt=str(receipt), uninstall="rm qrscan",
+            args = argparse.Namespace(qrscan=options.get("qrscan", str(binary)), gone=options.get("gone"),
+                                      receipt=str(receipt), uninstall="rm qrscan",
                                       not_applicable=options.get("not_applicable", False))
             with open(os.devnull, "w") as quiet:
                 stdout, sys.stdout = sys.stdout, quiet
@@ -355,12 +444,65 @@ def self_test():
         with open(os.devnull, "w") as quiet:
             stderr, sys.stderr = sys.stderr, quiet
             try:
-                again = removed(argparse.Namespace(qrscan=str(binary), receipt=str(passed), uninstall=None,
-                                                   not_applicable=False))
+                again = removed(argparse.Namespace(qrscan=str(binary), gone=None, receipt=str(passed),
+                                                   uninstall=None, not_applicable=False))
             finally:
                 sys.stderr = stderr
         if again != 2:
             failures.append("a closed receipt accepted a second removal step")
+        # A package: three report files judged by the same rules, then a command that must fail.
+        def from_files(name, defect, want_exit, want_verdict, needle):
+            files = {}
+            for profile in PROFILES:
+                report = json.loads(json.dumps(good))
+                if profile != "full":
+                    report["score"] = None
+                if defect == "missing-barcode" and profile == "fast":
+                    report["detections"] = [d for d in report["detections"] if d["symbology"] != "code128"]
+                files[profile] = box / f"{name}-{profile}.json"
+                files[profile].write_text("not json" if defect == "unreadable" and profile == "frame"
+                                          else json.dumps(report))
+            receipt = box / f"{name}.json"
+            args = argparse.Namespace(kind="package", produced_by="node scan.mjs", destination="Self-test",
+                                      version="9.9.9", url="https://example.test/package", identifier="pkg",
+                                      install="npm install pkg", run_url=None, fixtures=ROOT / "fixtures",
+                                      receipt=str(receipt), **{key: str(value) for key, value in files.items()})
+            with open(os.devnull, "w") as quiet:
+                stdout, sys.stdout = sys.stdout, quiet
+                try:
+                    code = reports(args)
+                finally:
+                    sys.stdout = stdout
+            written = json.loads(receipt.read_text())
+            if (code, written["verdict"], written["route"]["kind"]) != (want_exit, want_verdict, "package") \
+                    or needle not in json.dumps(written) or validate(written):
+                failures.append(f"{name}: exit {code} verdict {written['verdict']}, want {want_exit} "
+                                f"{want_verdict} with {needle!r}; format {validate(written)}")
+            return receipt
+
+        package = from_files("package", None, 0, "INCOMPLETE", '"exit": null')
+        from_files("package-missing", "missing-barcode", 1, "FAIL", "fast: code128 'STOCK-4827' found 0 times")
+        from_files("package-unreadable", "unreadable", 1, "FAIL", "frame: the report file is not readable JSON")
+        fails = f'"{sys.executable}" -c "raise SystemExit(1)"'
+        works = f'"{sys.executable}" -c "pass"'
+        close("package-gone", package, False, 0, "PASS", qrscan=None, gone=fails)
+        close("package-still-there", package, False, 1, "FAIL", qrscan=None, gone=works)
+        staged_to = box / "staged"
+        with open(os.devnull, "w") as quiet:
+            stdout, stderr, sys.stdout, sys.stderr = sys.stdout, sys.stderr, quiet, quiet
+            try:
+                staged_code = stage(argparse.Namespace(directory=str(staged_to), fixtures=ROOT / "fixtures"))
+                inside_code = stage(argparse.Namespace(directory=str(ROOT / "target" / "staged"),
+                                                       fixtures=ROOT / "fixtures"))
+            finally:
+                sys.stdout, sys.stderr = stdout, stderr
+        staged_file = staged_to / "mixed-code128-qr.png"
+        if staged_code != 0 or not staged_file.is_file() \
+                or hashlib.sha256(staged_file.read_bytes()).hexdigest() != case["sha256"]:
+            failures.append("stage did not copy the checked fixture")
+        if inside_code != 2:
+            failures.append("stage accepted a directory inside the checkout")
+
         # A receipt whose verdict does not follow from its content, or with a stray field, is refused.
         tampered = json.loads(passed.read_text())
         tampered["scans"][0]["problems"] = ["fast: edited"]
@@ -390,8 +532,10 @@ def self_test():
 
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'FAILED' if failures else 'ok'} (11 scan scenarios, 4 removal scenarios, 2 refused "
-          "receipts, the schema file)")
+    if schema["properties"]["route"]["properties"]["kind"].get("enum") != list(KINDS):
+        failures.append("receipt.schema.json and the validator disagree on route.kind")
+    print(f"self-test: {'FAILED' if failures else 'ok'} (11 command scenarios, 3 report-file scenarios, 6 removal "
+          "scenarios, the staging, 2 refused receipts, the schema file)")
     return 1 if failures else 0
 
 
@@ -411,8 +555,26 @@ def main(argv=None):
     one.add_argument("--run-url", help="the hosted run that produced this receipt")
     one.add_argument("--fixtures", type=pathlib.Path, default=ROOT / "fixtures")
     one.add_argument("--receipt", required=True)
-    two = commands.add_parser("removed", help="after the uninstall: record that the command is gone")
-    two.add_argument("--qrscan", required=True)
+    staging = commands.add_parser("stage", help="copy the checked fixture outside the checkout")
+    staging.add_argument("directory")
+    staging.add_argument("--fixtures", type=pathlib.Path, default=ROOT / "fixtures")
+    files = commands.add_parser("reports", help="judge three report files and write the receipt")
+    files.add_argument("--kind", required=True, choices=[kind for kind in KINDS if kind != "cli"])
+    files.add_argument("--produced-by", required=True, help="the command line that wrote the three reports")
+    for profile in PROFILES:
+        files.add_argument(f"--{profile}", required=True, help=f"the JSON report of the {profile} profile")
+    files.add_argument("--destination", required=True)
+    files.add_argument("--version", required=True)
+    files.add_argument("--url", required=True)
+    files.add_argument("--identifier")
+    files.add_argument("--install")
+    files.add_argument("--run-url")
+    files.add_argument("--fixtures", type=pathlib.Path, default=ROOT / "fixtures")
+    files.add_argument("--receipt", required=True)
+    two = commands.add_parser("removed", help="after the uninstall: record that the scanner is gone")
+    gone = two.add_mutually_exclusive_group()
+    gone.add_argument("--qrscan", help="the command that must no longer resolve")
+    gone.add_argument("--gone", help="a command line that must now fail, such as an import of the package")
     two.add_argument("--receipt", required=True)
     two.add_argument("--uninstall", help="the uninstall command line, as it was run")
     two.add_argument("--not-applicable", action="store_true",
@@ -420,7 +582,7 @@ def main(argv=None):
     three = commands.add_parser("check", help="validate a receipt")
     three.add_argument("file")
     args = parser.parse_args(argv)
-    return {"cli": cli, "removed": removed, "check": check}[args.command](args)
+    return {"cli": cli, "stage": stage, "reports": reports, "removed": removed, "check": check}[args.command](args)
 
 
 if __name__ == "__main__":
