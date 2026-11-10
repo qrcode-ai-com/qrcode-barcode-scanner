@@ -3,12 +3,9 @@
 Small projects you can run as they are. Each one installs a published package of the QR Code &
 Barcode Scanner, at an exact version, and scans a sample image.
 
-| Example | What it shows | Run it online |
-| --- | --- | --- |
-| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0/examples/web-vite) |
-
-The online links open the tag `demos-v0.11.0`, so they keep running the same files while `main`
-changes.
+| Example | What it shows |
+| --- | --- |
+| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. |
 
 Other examples live with the package they belong to:
 
