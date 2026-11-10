@@ -85,6 +85,25 @@ python3 scripts/destination-acceptance.py removed \
 
 The wrapper mounts the fixture's directory read-only at the same path and runs without network.
 
+## Run it for the AUR package
+
+The package of the Arch User Repository is built on the user's machine from a public recipe. A
+small program does what that user does, inside a new Arch Linux container: it clones the recipe
+signed out, checks that it equals the copy in [`distribution/aur/`](../aur/README.md), builds it
+with `makepkg`, installs it with `pacman`, runs the check above on the installed `qrscan`, then
+uninstalls it and closes the receipt.
+
+```sh
+mkdir receipt
+docker run --rm \
+  --mount "type=bind,src=$PWD,dst=/engine,readonly" \
+  --mount "type=bind,src=$PWD/receipt,dst=/receipt" \
+  archlinux:latest sh /engine/distribution/acceptance/drivers/aur-on-arch.sh /receipt
+```
+
+Run it on an x86_64 machine: the package has no other architecture. `receipt/` then holds
+`acceptance-aur.json`, the installed package version and the commit of the recipe.
+
 ## Run it for an AppImage on a clean host
 
 An AppImage is a command in one file. On the machine that holds it, pass the file as `--qrscan`.
