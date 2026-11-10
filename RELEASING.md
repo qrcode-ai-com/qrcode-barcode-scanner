@@ -36,6 +36,26 @@ Only an exercised publisher proves the binding. Until a name's publisher is
 configured, a publishing job that would upload under it stops at
 authentication with nothing uploaded; pub.dev follows owner step 6.
 
+### Website address in package metadata
+
+Since 10 November 2026 the `homepage` field of each package manifest is that package's guide on
+the QR Code AI site, on the QR journey: `https://qrcode-ai.com/en-US/qr-code-scanner/<guide>`.
+
+| Package | Guide | Where it is set |
+| --- | --- | --- |
+| Rust core crate | `sdk/rust` | `crates/qrcode-ai-scanner/Cargo.toml` |
+| `qrscan` crate | `cli` | `crates/qrcode-ai-scanner-cli/Cargo.toml` |
+| Node package and its platform packages | `sdk/nodejs` | `crates/qrcode-ai-scanner-node/package.json` |
+| Python package | `sdk/python` | `crates/qrcode-ai-scanner-py/pyproject.toml` |
+| Browser package | `sdk/javascript` | `scripts/patch-wasm-pkg.mjs` |
+| Flutter package | `sdk/flutter` | `bindings/flutter/pubspec.yaml` |
+| MCP adapter, with its `websiteUrl` | `mcp` | `integrations/mcp/`, pinned by `scripts/mcp-release.py` |
+| OpenClaw bundle | `integrations/openclaw` | `integrations/openclaw/` |
+
+The workspace default in `Cargo.toml` is the SDK hub, `sdk`. The packaging recipes of a published
+version keep their text. Before a release, open each address: a registry shows it as the
+package's website, so a page that does not answer is what its visitors get.
+
 The proven runbook — three releases shipped with it on 2026-07-08 alone
 (0.6.0 · 0.7.0 · 0.7.1). Every step exists because skipping it bit us once;
 the dates in parentheses point at the incident.

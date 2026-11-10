@@ -28,7 +28,7 @@ dynamic = ["version"]
 test = ["pytest", "jsonschema", "pillow"]
 
 [project.urls]
-Homepage = "https://qrcode-ai.com/"
+Homepage = "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python"
 Repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
 Documentation = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/docs"
 

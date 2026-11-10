@@ -39,7 +39,7 @@ async function connect(era, settings = {}) {
   await client.connect(transport);
   const onmessage = transport.onmessage;
   transport.onmessage = (message, extra) => { wire.push({ direction: "received", message }); return onmessage(message, extra); };
-  assert.deepEqual(client.getServerVersion(), { name: "io.github.qrcode-ai-com/qrcode-barcode-scanner", version: "0.2.1", websiteUrl: "https://qrcode-ai.com/" });
+  assert.deepEqual(client.getServerVersion(), { name: "io.github.qrcode-ai-com/qrcode-barcode-scanner", version: "0.2.1", websiteUrl: "https://qrcode-ai.com/en-US/qr-code-scanner/mcp" });
   if (modern) assert.equal(client.getNegotiatedProtocolVersion(), "2026-07-28");
   else assert.equal(wire[0].message.method, "initialize");
   const pid = transport.pid;

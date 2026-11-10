@@ -63,7 +63,7 @@ def metadata(root: Path = ROOT) -> dict:
     require(package.get("license") == "AGPL-3.0-or-later", "wrong adapter license")
     require(package.get("engines") == {"node": "^22.19.0 || >=24.0.0"}, "adapter runtime floor differs from the consumer matrix")
     require(package.get("repository") == {"type": "git", "url": f"https://github.com/{REPOSITORY}.git", "directory": "integrations/mcp"}, "wrong source repository")
-    require(package.get("homepage") == "https://qrcode-ai.com/", "wrong homepage")
+    require(package.get("homepage") == "https://qrcode-ai.com/en-US/qr-code-scanner/mcp", "wrong homepage")
     require(package.get("publishConfig") == {"access": "public"}, "adapter must be public")
     require(package.get("dependencies") == {"@modelcontextprotocol/server": "2.3.1", ENGINE: ENGINE_VERSION, "zod": "4.6.7"}, "runtime dependencies must remain exact qualified pins")
     require(package.get("devDependencies") == {"@modelcontextprotocol/client": "2.3.1", "@modelcontextprotocol/sdk": "1.32.1"}, "consumer SDK pins differ")
