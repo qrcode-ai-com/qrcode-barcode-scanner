@@ -64,13 +64,56 @@ python3 scripts/destination-acceptance.py removed \
 with `python3 scripts/destination-acceptance.py check receipt.json`. The driver needs Python 3
 and nothing else.
 
+## Run it for a language package
+
+A package is not a command, so it scans through a small program of its own language. The driver
+then judges the three reports that program wrote, by the same rules.
+
+```sh
+# 1. Install the package the way a user would, in a new project.
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0
+
+# 2. Copy the checked fixture outside the checkout. The command prints the copy's path.
+image=$(python3 /path/to/scripts/destination-acceptance.py stage /tmp/acceptance-input)
+
+# 3. Scan with the three profiles, from the project that installed the package.
+node /path/to/distribution/acceptance/drivers/node-package.mjs "$image" /tmp/acceptance-reports
+
+# 4. Judge the three reports and write the receipt.
+python3 /path/to/scripts/destination-acceptance.py reports --kind package \
+  --produced-by "node node-package.mjs" \
+  --fast /tmp/acceptance-reports/fast.json \
+  --frame /tmp/acceptance-reports/frame.json \
+  --full /tmp/acceptance-reports/full.json \
+  --destination npm --identifier @qrcode-ai-com/qrcode-barcode-scanner --version 0.11.0 \
+  --url https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner/v/0.11.0 \
+  --install "npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0" \
+  --receipt receipt.json
+
+# 5. Uninstall, then close the receipt with a command that must now fail.
+npm uninstall @qrcode-ai-com/qrcode-barcode-scanner
+python3 /path/to/scripts/destination-acceptance.py removed \
+  --gone "node -e \"require.resolve('@qrcode-ai-com/qrcode-barcode-scanner')\"" \
+  --uninstall "npm uninstall @qrcode-ai-com/qrcode-barcode-scanner" \
+  --receipt receipt.json
+```
+
+The programs are in [`drivers/`](drivers/): `node-package.mjs` for the Node.js package and
+`python-package.py` for the Python package. Each one only scans and writes
+`fast.json`, `frame.json` and `full.json`; it judges nothing. A report read from a file has no
+exit code, so the receipt records `null` for it.
+
 The workflow [`destination-acceptance.yml`](../../.github/workflows/destination-acceptance.yml)
-runs the driver's self-test and one real consumer on Linux x64, Linux arm64, macOS arm64 and
-Windows x64: it downloads the public 0.11.0 archive anonymously, checks it against the release's
-checksum list, unpacks it and judges the unpacked `qrscan`.
+runs the driver's self-test and three real consumers of the public 0.11.0 artifacts:
+
+- the CLI archive, on Linux x64, Linux arm64, macOS arm64 and Windows x64: downloaded
+  anonymously, checked against the release's checksum list, unpacked and judged;
+- the npm package, under Node.js 22 and 24, installed in a new project;
+- the PyPI package, under Python 3.11 and 3.14, installed in a new environment.
 
 ## What is covered today
 
-This first version covers one kind of surface: an installed `qrscan` command. Language packages,
-browser pages, host integrations and agent clients keep their own consumers, listed in
-[`RELEASING.md`](../../RELEASING.md), until a driver of this contract exists for each.
+Two kinds of surface: an installed `qrscan` command, and a language package, with programs for
+Node.js and Python. Other bindings, browser pages, host integrations and agent clients keep their
+own consumers, listed in [`RELEASING.md`](../../RELEASING.md), until a program of this contract
+exists for each.

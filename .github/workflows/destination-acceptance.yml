@@ -1,9 +1,10 @@
 name: Destination acceptance
 
 # The acceptance contract of distribution/acceptance/README.md, run for real: the driver's
-# self-test, then one installed qrscan judged by the driver. That consumer downloads the public CLI
-# archive of a release anonymously, checks it against the release's checksum list, unpacks it and
-# scans. Nothing is built and nothing is published.
+# self-test, then real consumers judged by the driver. One downloads the public CLI archive of a
+# release anonymously, checks it against the release's checksum list, unpacks it and scans. Two
+# install the public npm and PyPI packages in a new project and scan through them. Nothing is
+# built and nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -11,10 +12,10 @@ on:
       - .github/workflows/destination-acceptance.yml
       - scripts/destination-acceptance.py
       - scripts/consumer_truth.py
+      - distribution/acceptance/**
       - scripts/packed-cli-consumer.py
       - fixtures/consumer-truth.json
       - fixtures/symbology/mixed-code128-qr.png
-      - distribution/acceptance/**
 
 permissions:
   contents: read
@@ -117,6 +118,123 @@ jobs:
         if: always()
         with:
           name: destination-acceptance-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  npm-package:
+    name: npm package · Node.js ${{ matrix.node }}
+    needs: self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    env:
+      PACKAGE: "@qrcode-ai-com/qrcode-barcode-scanner"
+      NODE_LINE: ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install the public package in a new project
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" receipt
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y > /dev/null
+          npm install --ignore-scripts --no-audit --no-fund --save-exact "$PACKAGE@$RELEASE_VERSION"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          (cd "$RUNNER_TEMP/consumer" &&
+            node "$GITHUB_WORKSPACE/distribution/acceptance/drivers/node-package.mjs" "$image" "$RUNNER_TEMP/reports")
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "node node-package.mjs" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "npm" \
+            --identifier "$PACKAGE" \
+            --version "$RELEASE_VERSION" \
+            --url "https://www.npmjs.com/package/$PACKAGE/v/$RELEASE_VERSION" \
+            --install "npm install --save-exact $PACKAGE@$RELEASE_VERSION" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-npm-node$NODE_LINE.json"
+      # The check that the package is gone resolves it from the consumer project.
+      - name: Uninstall it and close the receipt
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          npm uninstall "$PACKAGE"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "node -e \"require.resolve('$PACKAGE')\"" \
+            --uninstall "npm uninstall $PACKAGE" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-npm-node$NODE_LINE.json"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-npm-node$NODE_LINE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-npm-node${{ matrix.node }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  pypi-package:
+    name: PyPI package · Python ${{ matrix.python }}
+    needs: self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
+    env:
+      PACKAGE: qrcode-barcode-scanner
+      PYTHON_LINE: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the public package in a new environment
+        run: |
+          mkdir receipt
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --no-cache-dir "$PACKAGE==$RELEASE_VERSION"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          "$RUNNER_TEMP/venv/bin/python" distribution/acceptance/drivers/python-package.py "$image" "$RUNNER_TEMP/reports"
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "python python-package.py" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "PyPI" \
+            --identifier "$PACKAGE" \
+            --version "$RELEASE_VERSION" \
+            --url "https://pypi.org/project/$PACKAGE/$RELEASE_VERSION/" \
+            --install "python -m pip install $PACKAGE==$RELEASE_VERSION" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-pypi-python$PYTHON_LINE.json"
+      - name: Uninstall it and close the receipt
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" -m pip uninstall -y "$PACKAGE"
+          python3 scripts/destination-acceptance.py removed \
+            --gone "$RUNNER_TEMP/venv/bin/python -c 'import qrcode_barcode_scanner'" \
+            --uninstall "python -m pip uninstall -y $PACKAGE" \
+            --receipt "receipt/acceptance-pypi-python$PYTHON_LINE.json"
+          python3 scripts/destination-acceptance.py check "receipt/acceptance-pypi-python$PYTHON_LINE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-pypi-python${{ matrix.python }}
           path: receipt/
           if-no-files-found: error
           retention-days: 90
