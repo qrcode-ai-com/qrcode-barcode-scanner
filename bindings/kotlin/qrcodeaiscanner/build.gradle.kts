@@ -58,9 +58,8 @@ dependencies {
     // libjnidispatch.so per ABI. A plain `jna` jar compiles but crashes
     // at runtime with UnsatisfiedLinkError on device (uniffi plan §4.2 / §7 #1).
     // 5.17.0 is the first version whose x86_64 library is aligned for 16 KB pages.
-    // Known gap, measured by tests/consumers/jitpack-android on 0.11.0: the published
-    // Gradle module metadata drops this `@aar`, so a consumer still has to add the JNA
-    // AAR itself. Fix the publication and prove it with that consumer before the next tag.
+    // The published POM carries this as `<type>aar</type>`. Gradle module metadata cannot:
+    // see the publication block below.
     implementation("net.java.dev.jna:jna:5.17.0@aar") // >=5.12.0 required by UniFFI 0.31
 }
 
@@ -69,6 +68,13 @@ dependencies {
 // Consumer (per uniffi plan §4.3):
 //   repositories { maven { url = uri("https://jitpack.io") } }
 //   JitPack coordinate, not yet qualified: com.github.qrcode-ai-com:qrcode-barcode-scanner:vX.Y.Z
+// Gradle module metadata is not published. It has no field for the `@aar` of the JNA
+// dependency, and a Gradle consumer reads it in preference to the POM: with 0.11.0 the
+// one-line dependency resolved the plain JNA jar and the first scan failed with an
+// UnsatisfiedLinkError. Without that file a consumer reads the POM, which names the AAR.
+// .github/workflows/kotlin-publication.yml proves it on an emulator.
+tasks.withType<GenerateModuleMetadata>().configureEach { enabled = false }
+
 publishing {
     publications {
         register<MavenPublication>("release") {

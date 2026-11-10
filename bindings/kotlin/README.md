@@ -28,7 +28,10 @@ JitPack coordinate: com.github.qrcode-ai-com:qrcode-barcode-scanner:0.11.0
 With 0.11.0, add JNA's Android AAR yourself. The module metadata published with
 that version names JNA without its AAR, so Gradle would resolve the plain jar,
 which has no Android native library, and the first scan would fail with an
-`UnsatisfiedLinkError`:
+`UnsatisfiedLinkError`. The next version no longer publishes that metadata, so
+its one-line dependency is enough; a
+[check](../../.github/workflows/kotlin-publication.yml) installs it that way on
+an emulator. For 0.11.0:
 
 ```kotlin
 // settings.gradle.kts
