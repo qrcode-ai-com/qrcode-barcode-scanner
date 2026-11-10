@@ -179,18 +179,16 @@ jobs:
               --receipt "receipts/$name-$ARCHITECTURE.json"
             python3 scripts/destination-acceptance.py check "receipts/$name-$ARCHITECTURE.json"
           done
-      - name: Checksum
+      - name: Gather the file, its checksum and the receipts
         run: |
           set -euo pipefail
-          cd "$RUNNER_TEMP/out"
-          sha256sum "$(basename "$APPIMAGE")" | tee "$(basename "$APPIMAGE").sha256"
-          cp "$(basename "$APPIMAGE").sha256" "$GITHUB_WORKSPACE/receipts/"
+          mkdir -p artifact
+          cp "$APPIMAGE" artifact/
+          (cd artifact && sha256sum "$(basename "$APPIMAGE")" | tee "$(basename "$APPIMAGE").sha256")
+          cp -R receipts artifact/receipts
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: appimage-${{ matrix.architecture }}
-          path: |
-            ${{ runner.temp }}/out/*.AppImage
-            ${{ runner.temp }}/out/*.sha256
-            receipts/
+          path: artifact/
           if-no-files-found: error
           retention-days: 14
