@@ -2,7 +2,8 @@ name: Kotlin publication
 
 # Judges what a Gradle consumer resolves from the Kotlin binding's publication, before a tag.
 # It builds the binding for the emulator ABI only, publishes it to a Maven directory on the
-# runner and installs it in tests/consumers/jitpack-android with the one-line dependency.
+# runner and installs it in tests/consumers/jitpack-android with the one-line dependency, on a
+# device with 4 KB pages and on one with 16 KB pages.
 # This is a check of the publication metadata, not a release build: nothing leaves the runner.
 on:
   workflow_dispatch:
@@ -12,6 +13,7 @@ on:
       - bindings/kotlin/**
       - crates/qrcode-ai-scanner-uniffi/**
       - tests/consumers/jitpack-android/**
+      - scripts/elf-load-alignment.py
       - jitpack.yml
 
 permissions:
@@ -31,9 +33,21 @@ env:
 
 jobs:
   one-line-dependency:
-    name: Local publication · one-line dependency
+    name: Local publication · ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Android 14, 4 KB pages
+            api: 34
+            target: default
+            pages: "4096"
+          - name: Android 15, 16 KB pages
+            api: 35
+            target: google_apis_ps16k
+            pages: "16384"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,6 +122,10 @@ jobs:
               print(f'::error::{problem}')
           sys.exit(1 if problems else 0)
           PY
+          # The 64-bit libraries of the AAR must be aligned for 16 KB pages.
+          python3 scripts/elf-load-alignment.py \
+            "$RUNNER_TEMP/m2/$COORDINATE/$VERSION/qrcode-barcode-scanner-$VERSION.aar" \
+            --json receipt/alignment.json
       - name: Stage the shared fixture
         run: |
           echo "$FIXTURE_SHA256  $FIXTURE" | sha256sum -c -
@@ -121,13 +139,16 @@ jobs:
       # The dependency is the one line a consumer writes: no JNA added by hand.
       - name: Scan on the emulator, debug and minified
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          PAGES: ${{ matrix.pages }}
         with:
-          api-level: 34
-          target: default
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
           arch: x86_64
           disable-animations: true
           script: |
             adb shell getconf PAGE_SIZE | tee receipt/page-size.txt
+            test "$(cat receipt/page-size.txt)" = "$PAGES"
             gradle -p tests/consumers/jitpack-android :app:dependencies --configuration debugRuntimeClasspath -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2" | grep -i -E 'qrcode-barcode-scanner|jna' | tee receipt/resolved-dependencies.txt
             gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2"
             gradle -p tests/consumers/jitpack-android :app:assembleRelease -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/m2"
@@ -155,6 +176,7 @@ jobs:
               'published_files': (read('published-files.txt') or '').split(),
               'resolved_dependencies': read('resolved-dependencies.txt'),
               'device_page_size': read('page-size.txt'),
+              'library_alignment': json.loads(read('alignment.json')) if read('alignment.json') else None,
               'minified_selftest': read('minified-selftest.txt'),
               'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
               'commit': os.environ['GITHUB_SHA'],
@@ -164,7 +186,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         if: always()
         with:
-          name: kotlin-publication
+          name: kotlin-publication-${{ matrix.api }}
           path: receipt/
           if-no-files-found: error
           retention-days: 90
