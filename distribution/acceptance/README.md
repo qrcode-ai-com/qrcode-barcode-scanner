@@ -160,9 +160,10 @@ image=$(python3 /path/to/scripts/destination-acceptance.py stage /tmp/acceptance
 node /path/to/distribution/acceptance/drivers/web-page.mjs https://example.org/demo "$image" \
   /tmp/acceptance-reports
 
-# 3. Check what the page says about itself: the package, the engine and the three links.
+# 3. Check what the page says about itself: the package, the engine and the six links.
 python3 /path/to/scripts/check-demo-page.py /tmp/acceptance-reports/page.json \
-  --version 0.11.0 --wasm-sha256 a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68
+  --version 0.11.0 --wasm-sha256 a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68 \
+  --page-key sdk/javascript
 
 # 4. Judge the three reports and write the receipt.
 python3 /path/to/scripts/destination-acceptance.py reports --kind page \

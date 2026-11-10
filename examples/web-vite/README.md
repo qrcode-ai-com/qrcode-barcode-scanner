@@ -10,9 +10,11 @@ published WebAssembly package
 The button opens this folder in StackBlitz, which installs it and runs it in your browser. You
 need no account. The folder stands alone: it depends on nothing else in this repository.
 
-QR Code AI web links · [QR Code AI](https://qrcode-ai.com/) ·
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **JavaScript guide** | [QR code scanner for JavaScript](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript) | [Barcode scanner for JavaScript](https://qrcode-ai.com/en-US/barcode-scanner/sdk/javascript) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Run it on your machine
 
@@ -37,6 +39,8 @@ Three sample inputs, each with a different outcome, and your own images:
 | QR code and Code 128 sample | Two codes: the QR code `https://qrc-ai.com/76xMa` and the Code 128 `STOCK-4827`. |
 | Image without a code | No code found. A valid result, not an error. |
 | A file that is not an image | An input error, `QRS-001`: the scanner refuses bytes it cannot decode as an image. |
+
+Under its introduction the page shows the six QR Code AI links above, one line per pair.
 
 For each code the page lists its symbology, the kind of payload and the decoded text. A decoded
 link is shown as text and never opened. The `full` profile also scores how well the first code

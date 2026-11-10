@@ -17,9 +17,11 @@ Other examples live with the package they belong to:
   image or the camera from the installed package folder.
 - [Command line](../README.md#command-line): scan a file with `qrscan`.
 
-QR Code AI web links · [QR Code AI](https://qrcode-ai.com/) ·
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **SDK guides** | [QR code scanner SDKs](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) | [Barcode scanner SDKs](https://qrcode-ai.com/en-US/barcode-scanner/sdk) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Update the examples for a release
 

@@ -11,9 +11,11 @@ The badge opens the notebook on [mybinder.org](https://mybinder.org/), a free pu
 with no account. It prepares a session with the package already installed, which can take a few
 minutes, and the session ends after about ten minutes of inactivity.
 
-QR Code AI web links · [QR Code AI](https://qrcode-ai.com/) ·
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
-[Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Python guide** | [QR code scanner for Python](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) | [Barcode scanner for Python](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Run it on your machine
 
@@ -70,7 +72,7 @@ Commit the notebook without outputs.
 ## Checked on every change
 
 The workflow [`demos.yml`](../../.github/workflows/demos.yml) checks that the committed notebook
-has no stored output, carries the three links and pins the same version as
+has no stored output, carries the six QR Code AI links and pins the same version as
 `binder/requirements.txt`. It then installs that file in a new environment, runs the notebook
 from top to bottom and checks that every cell ran without an error.
 
