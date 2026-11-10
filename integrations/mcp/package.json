@@ -22,7 +22,7 @@
     "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
     "directory": "integrations/mcp"
   },
-  "homepage": "https://qrcode-ai.com/",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/mcp",
   "mcpName": "io.github.qrcode-ai-com/qrcode-barcode-scanner",
   "bugs": {
     "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues"

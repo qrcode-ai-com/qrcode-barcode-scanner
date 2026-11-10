@@ -9,7 +9,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
+homepage = "https://qrcode-ai.com/en-US/qr-code-scanner/cli"
 authors.workspace = true
 
 [[bin]]

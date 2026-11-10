@@ -5,7 +5,7 @@
   "description": "ClawHub Agent Plugins bundle for local QR and barcode scanning",
   "type": "module",
   "license": "MIT-0",
-  "homepage": "https://qrcode-ai.com/",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/openclaw",
   "repository": {
     "type": "git",
     "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
