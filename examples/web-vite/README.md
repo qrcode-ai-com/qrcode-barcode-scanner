@@ -5,7 +5,7 @@ published WebAssembly package
 [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0)
 0.11.0 from npm and runs it in a worker. The image stays on your device.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0/examples/web-vite)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0-r2/examples/web-vite)
 
 The button opens this folder in StackBlitz, which installs it and runs it in your browser. You
 need no account. The folder stands alone: it depends on nothing else in this repository.
