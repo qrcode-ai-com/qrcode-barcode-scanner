@@ -42,6 +42,9 @@ sudo apt purge qrcode-barcode-scanner
 
 The release fixture [mixed-code128-qr.png](../../fixtures/symbology/mixed-code128-qr.png)
 reports the QR URL `https://qrc-ai.com/76xMa` and Code 128 `STOCK-4827` together. The CLI runs locally.
-See [QR Code AI](https://qrcode-ai.com/), the
-[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the
-[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) for the web tools.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Command line guide** | [QR code scanner for the command line](https://qrcode-ai.com/en-US/qr-code-scanner/cli) | [Barcode scanner for the command line](https://qrcode-ai.com/en-US/barcode-scanner/cli) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
