@@ -8,8 +8,11 @@ also decodes barcodes and connects to Flutter via
 Returns the same versioned `ScanReport` as the Python / Node / WASM / Kotlin /
 Swift bindings (one serde wire contract).
 
-[QR Code AI](https://qrcode-ai.com/) · [QR Code Scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
-· [Barcode Scanner](https://qrcode-ai.com/en-US/barcode-scanner)
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Flutter guide** | [QR code scanner for Flutter](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/flutter) | [Barcode scanner for Flutter](https://qrcode-ai.com/en-US/barcode-scanner/sdk/flutter) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Install
 

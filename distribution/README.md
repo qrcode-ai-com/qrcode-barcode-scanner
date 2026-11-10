@@ -1,9 +1,14 @@
 # Scanner downloads and package registries
 
 Choose an installation route for scanner engine 0.11.0. These packages run the
-same local engine that [QR Code AI](https://qrcode-ai.com/) uses to verify QR designs.
-QR Code AI web links · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
-· [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+same local engine that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) uses to verify QR designs.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **SDK guides** | [QR code scanner SDKs](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) | [Barcode scanner SDKs](https://qrcode-ai.com/en-US/barcode-scanner/sdk) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
 To try the engine locally in a browser, use the [WASM image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
 
 [Runtime packages](#published-runtime-packages) · [CLI and containers](#cli-and-containers)

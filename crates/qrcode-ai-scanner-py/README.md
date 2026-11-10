@@ -12,9 +12,14 @@ returns the same versioned `ScanReport` as the Rust, Node.js and browser binding
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec) ·
 [Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
 
-The scanner used by [QR Code AI](https://qrcode-ai.com/) can also check batches of saved QR designs and
-barcode photos from a Python workflow. Its planned [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) are
-for one-off browser checks.
+The scanner used by [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) can also check batches of saved QR designs and
+barcode photos from a Python workflow.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Python guide** | [QR code scanner for Python](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) | [Barcode scanner for Python](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Scan an image
 

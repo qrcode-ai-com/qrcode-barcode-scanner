@@ -150,9 +150,14 @@ Set-Location "qrcode-barcode-scanner-cli-$V-x86_64-pc-windows-msvc"
 
 ## Run
 
-Use `qrscan` to inspect a QR design from [QR Code AI](https://qrcode-ai.com/) before printing or to read a
-barcode label from a saved photo. The planned [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) will cover these
-one-off browser workflows.
+Use `qrscan` to inspect a QR design from [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/cli) before printing or to read a
+barcode label from a saved photo.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Command line guide** | [QR code scanner for the command line](https://qrcode-ai.com/en-US/qr-code-scanner/cli) | [Barcode scanner for the command line](https://qrcode-ai.com/en-US/barcode-scanner/cli) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ```sh
 ./qrscan --version                # qrscan X.Y.Z

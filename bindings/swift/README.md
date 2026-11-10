@@ -4,6 +4,12 @@ SwiftPM package for `qrcode-barcode-scanner`, generated from the shared UniFFI c
 `crates/qrcode-ai-scanner-uniffi`. SwiftPM versions are the repo's git tags
 (`vX.Y.Z`) — no manifest version field to sync.
 
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **iOS guide** | [QR code scanner for iOS](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/ios) | [Barcode scanner for iOS](https://qrcode-ai.com/en-US/barcode-scanner/sdk/ios) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
 > **Generated, not committed.** `Sources/QrcodeAiScanner/*.swift`
 > (uniffi-bindgen-swift) and `build/QrcodeAiScannerFFI.xcframework` (CI) are
 > git-ignored — git is not the artifact store (architecture plan §1.3). A fresh

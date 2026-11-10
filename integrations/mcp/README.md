@@ -4,7 +4,7 @@ Give an MCP client one local tool to read QR codes and barcodes from an image.
 `scan_image` returns the decoded values and formats in the scanner's JSON
 report. It uses the same
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0 engine](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner)
-that [QR Code AI](https://qrcode-ai.com/) uses for QR verification.
+that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/mcp) uses for QR verification.
 
 [Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
 
@@ -81,8 +81,13 @@ client, verify tool discovery and a fixture call after installation.
 ## Tool contract
 
 Use `scan_image` when your client already has the image bytes, such as a QR
-design to check or a product label to read. QR Code AI plans a [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and a
-[barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) for people who need a browser tool.
+design to check or a product label to read.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **MCP server guide** | [QR code scanner MCP server](https://qrcode-ai.com/en-US/qr-code-scanner/mcp) | [Barcode scanner MCP server](https://qrcode-ai.com/en-US/barcode-scanner/mcp) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 `scan_image` accepts exactly these fields:
 

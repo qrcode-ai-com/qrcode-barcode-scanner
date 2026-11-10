@@ -7,8 +7,13 @@ The separately installed scanner engine
 `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` retains **AGPL-3.0-or-later**. Installing
 this wrapper does not relicense that engine or exempt a consumer from its terms.
 
-The local helper uses the engine developed for QR verification at [QR Code AI](https://qrcode-ai.com/). For occasional browser checks, QR Code AI plans a
-[QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and a [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+The local helper uses the engine developed for QR verification at [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/skills).
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Agent skills guide** | [QR code scanner agent skill](https://qrcode-ai.com/en-US/qr-code-scanner/skills) | [Barcode scanner agent skill](https://qrcode-ai.com/en-US/barcode-scanner/skills) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 Install the [published skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
 with `clawhub install qrcode-barcode-scanner --version 0.2.0`. For a manual
