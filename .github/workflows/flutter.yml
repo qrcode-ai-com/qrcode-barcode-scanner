@@ -38,6 +38,13 @@ env:
   # ships the sources, not those binaries.
   RUST_TOOLCHAIN: "1.99.1"
 
+# One Flutter SDK for every job that touches the candidate: each flutter-action
+# step names 3.47.9, the version flutter-qualification.yml qualifies, and the
+# publish job's setup-dart names the Dart it bundles (3.13.7). The values are
+# written out in each step because scripts/check-publish-guards.py reads the
+# publishing job's inputs literally. Bump them together, then regenerate
+# bindings/flutter/pubspec.lock with that SDK (RELEASING.md § Publishing).
+
 jobs:
   stage:
     runs-on: ubuntu-24.04
@@ -92,6 +99,7 @@ jobs:
           workspaces: bindings/flutter/rust
       - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
         with:
+          flutter-version: 3.47.9
           channel: stable
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -104,7 +112,9 @@ jobs:
           python3 scripts/stage-flutter-package.py --extract flutter-artifact/flutter-stage.tar.gz --output /tmp/flutter-validation/bindings/flutter
       - name: portable Rust library with the committed binding lockfile
         run: cargo check --locked --manifest-path rust/Cargo.toml --lib
-      - run: flutter pub get
+      # The staged candidate carries the tracked lockfiles of the package and of
+      # its example, which this command resolves too: resolve exactly them.
+      - run: flutter pub get --enforce-lockfile
       - name: inspect the pub.dev package
         working-directory: .
         run: python3 scripts/package-inspect.py flutter --package-root /tmp/flutter-validation/bindings/flutter --strict --release-set
@@ -139,15 +149,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: bindings/flutter/rust
-      # NDK r27 = 16 KB page-size safe for Android 15+ (cargokit links the .so).
-      - uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
-        with:
-          ndk-version: r27
       - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
         with:
+          flutter-version: 3.47.9
           channel: stable
-      - run: cargo install cargo-ndk --version 4.1.2 --locked
-        working-directory: .
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: flutter-stage
@@ -159,9 +164,15 @@ jobs:
           python3 scripts/stage-flutter-package.py --extract flutter-artifact/flutter-stage.tar.gz --output /tmp/flutter-validation/bindings/flutter
       # `flutter build apk` drives cargokit, which cross-compiles the Rust crate
       # per ABI and bundles the .so — the real end-to-end Android build.
+      # cargokit links with the NDK the app names (flutter.ndkVersion), not with
+      # one put on PATH: install exactly that one, as flutter-qualification.yml
+      # does. r28 aligns the 64-bit libraries for 16 KB pages (Android 15+);
+      # r27 aligns them to 4 KB.
       - name: build the example APK (exercises cargokit android path)
         working-directory: /tmp/flutter-validation/bindings/flutter/example
-        run: flutter build apk --debug
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          flutter build apk --debug
 
   build-ios:
     needs: stage
@@ -178,6 +189,7 @@ jobs:
           workspaces: bindings/flutter/rust
       - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
         with:
+          flutter-version: 3.47.9
           channel: stable
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -210,12 +222,9 @@ jobs:
     concurrency:
       group: publish-${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: false
-    # The one privileged job on floating tools: the Flutter and Dart SDKs come
-    # from the stable channel, and `flutter pub get` resolves without a
-    # lockfile. A named exception in scripts/check-publish-guards.py, keyed to
-    # exactly those three steps, while the job is dormant (pub.dev's first
-    # upload is manual); it ends before the pub.dev trusted publisher is configured
-    # (RELEASING.md § Publishing).
+    # No floating tool: the Flutter and Dart SDKs are exact versions and `flutter
+    # pub get` resolves only the tracked pubspec.lock of the staged candidate
+    # (RELEASING.md § Publishing). pub.dev's first upload stays manual.
     permissions:
       contents: read
       id-token: write # OIDC — pub.dev automated publishing, no token
@@ -250,10 +259,13 @@ jobs:
       # tag pattern v{{version}}, required environment `pub`) and every later
       # tag publishes hands-free.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: 3.13.7
       - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
         with:
+          flutter-version: 3.47.9
           channel: stable
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: inspect the pub.dev package about to be uploaded
         working-directory: .
         run: python3 scripts/package-inspect.py flutter --package-root /tmp/flutter-validation/bindings/flutter --strict --quiet --release-set --record "$RUNNER_TEMP/flutter-inspected.sha256"

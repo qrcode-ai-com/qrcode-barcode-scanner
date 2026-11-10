@@ -188,13 +188,10 @@ that very expression.
 --dry-run) uploads nothing (@napi-rs/cli 3.7.3, cli/src/api/pre-publish.ts):
 it only writes optionalDependencies, so it does not make a job privileged.
 
-ONE NAMED EXCEPTION, keyed to three exact steps of flutter.yml › publish:
-the setup-dart and flutter-action steps (stable-channel SDKs) and its
-`flutter pub get` (no lockfile). The job is dormant (pub.dev's first upload
-is manual and the package's crate still depends on a path outside it), and
-pub resolution runs no package code. Another step with the same finding is
-not waived; a waiver that matches nothing fails, so it is removed with the
-fix (RELEASING.md § Publishing).
+NO JOB IS EXCEPTED. flutter.yml › publish was the one job on floating tools;
+its Flutter and Dart SDKs are now exact versions and its `flutter pub get`
+enforces the tracked lockfile of the staged candidate (RELEASING.md §
+Publishing).
 
 The one-toolchain policy (--toolchains), over every workflow: every
 RUST_TOOLCHAIN assignment (workflow, job or step env) holds the same exact
@@ -466,18 +463,6 @@ PRINTED = {
         "fi",
     )),
     "actions/setup-python": "python --version\npip --version",
-}
-
-DORMANT = "dormant until pub.dev's manual first upload and the fix of the path dependency"
-# (workflow, job) -> the exact steps waived, each with the one finding it may
-# carry; nothing else is ever waived.
-EXCEPTIONS = {
-    ("flutter.yml", "publish"): (
-        ("floating-dart-sdk", {"uses": "dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d"}, DORMANT),
-        ("floating-flutter-sdk", {"uses": "subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046",
-                                  "with": {"channel": "stable"}}, DORMANT),
-        ("unlocked-pub-get", {"run": "flutter pub get"}, f"{DORMANT}; pub resolution runs no package code"),
-    ),
 }
 
 # A step publishes when it runs a tool with one of these subcommands as a later
@@ -810,7 +795,6 @@ class Finding:
     code: str
     message: str
     step: int = -1  # index in the job's steps; -1 for a job- or workflow-level finding
-    waived: str = ""
 
 
 def _text(node) -> str:
@@ -1856,8 +1840,8 @@ def _mentions_secrets(node) -> bool:
 
 
 def check(workflows: pathlib.Path) -> tuple:
-    """(findings, privileged jobs judged, stale waivers); a YamlError propagates."""
-    findings, judged, stale, visited = [], [], [], set()
+    """(findings, privileged jobs judged); a YamlError propagates."""
+    findings, judged = [], []
     findings += [Finding(name, "(directory)", "workflow-file", "not a *.yml or *.yaml workflow: GitHub reads both, "
                          "and nothing else belongs here") for name in workflow_files(workflows)[1]]
     for name, wf in load_workflows(workflows):
@@ -1884,17 +1868,7 @@ def check(workflows: pathlib.Path) -> tuple:
                 privileged.append(job_id)
             if _runs_npm_publish(job):
                 publishers.append(job_id)
-            found = check_job(name, job_id, job, wf)
-            steps = _steps(job)
-            visited.add((name, job_id))
-            for code, step, reason in EXCEPTIONS.get((name, job_id), ()):
-                hit = next((f for f in found if f.code == code and not f.waived and 0 <= f.step < len(steps)
-                            and steps[f.step] == step), None)
-                if hit:
-                    hit.waived = reason
-                else:
-                    stale.append(f"{name} › {job_id}: {code} on {step}")
-            findings += found
+            findings += check_job(name, job_id, job, wf)
         if publishers:
             findings += [Finding(name, OPERAND_PROOF, "operand-proof", message, step)
                          for message, step in _operand_proof_problems(wf, publishers, name == MCP_JOB[0])]
@@ -1906,13 +1880,12 @@ def check(workflows: pathlib.Path) -> tuple:
                         findings.append(Finding(name, producer, "tag-cache", f"{what} on a tag run, and {job_id} "
                                                 "publishes what this job builds: keep it off every tag (a top-level "
                                                 f"`{sorted(NOT_ON_TAG)[0]}` in its `if:`) or drop it", i))
-    stale += [f"{wf} › {job}: no such job" for wf, job in EXCEPTIONS if (wf, job) not in visited]
-    return findings, judged, stale
+    return findings, judged
 
 
 def report(workflows: pathlib.Path) -> int:
     try:
-        findings, judged, stale = check(workflows)
+        findings, judged = check(workflows)
     except YamlError as err:
         print(f"check-publish-guards: cannot judge — {err}", file=sys.stderr)
         return 2
@@ -1921,18 +1894,11 @@ def report(workflows: pathlib.Path) -> int:
     for finding in findings:
         where = f"{finding.workflow} › {finding.job}"
         step = f" (step {finding.step + 1})" if finding.step >= 0 else ""
-        if finding.waived:
-            print(f"  waived  {where} [{finding.code}]{step} {finding.message} — named exception: {finding.waived}")
-            continue
         print(f"  FAIL    {where} [{finding.code}]{step} {finding.message}")
         if annotate:
             print(f"::error file=.github/workflows/{finding.workflow},title=publish guard::{where}: {finding.message}")
-    for entry in stale:
-        print(f"  FAIL    stale named exception {entry}: nothing left to waive, delete it")
-    failed = [f for f in findings if not f.waived]
-    print(f"{len(failed)} violation(s) · {len(findings) - len(failed)} waived by the named exception · "
-          f"{len(stale)} stale exception(s)")
-    return 1 if failed or stale else 0
+    print(f"{len(findings)} violation(s)")
+    return 1 if findings else 0
 
 
 # ---------------------------------------------------------------- toolchain policy
@@ -2126,6 +2092,9 @@ PYPI_LIVE = ("      - name: compare the files PyPI already serves with the inspe
              f"        run: {PYPI_LIVE_RUN}\n")
 PYPI_END = "          skip-existing: true\n"
 FLUTTER_PUBLISH = "      - name: publish (OIDC)\n"
+# Only the publish job follows its Flutter SDK step with the locked resolution.
+FLUTTER_LOCKED_GET = ("          flutter-version: 3.47.9\n          channel: stable\n"
+                      "      - run: flutter pub get --enforce-lockfile\n")
 EXTRA_PUBLISHER = """\
 name: release
 on:
@@ -2761,17 +2730,17 @@ MUTATIONS = (
                                             'sccache: "true"')], {}, 1, "python.yml › wheels [tag-cache]"),
     ("rust-cache in the iOS build without its tag guard", P, [
         ("mobile.yml", RUST_CACHE, RUST_CACHE.split("\n", 1)[0] + "\n")], {}, 1, "mobile.yml › ios [tag-cache]"),
-    # -- the named exception: three exact steps, nothing else
-    ("the Flutter waiver claimed by another job", P, [("python.yml", PYPI, "      - run: flutter pub get\n" + PYPI)],
+    # -- the Flutter publish job: exact SDKs, the tracked lockfile, no exception
+    ("an unlocked pub get in another publishing job", P, [("python.yml", PYPI, "      - run: flutter pub get\n" + PYPI)],
      {}, 1, "FAIL    python.yml › release [unlocked-pub-get]"),
-    ("the Flutter job with a third violation", P, [("flutter.yml", "    concurrency:\n      group: publish-${{ "
+    ("the Flutter job without its concurrency group", P, [("flutter.yml", "    concurrency:\n      group: publish-${{ "
                                                     "github.workflow }}-${{ github.ref }}\n      cancel-in-progress: "
                                                     "false\n", "")], {}, 1, "FAIL    flutter.yml › publish "
                                                                             "[concurrency]"),
-    ("flutter pub add beside the waived pub get", P, [("flutter.yml", FLUTTER_PUBLISH, "      - run: flutter pub add "
+    ("flutter pub add beside the locked pub get", P, [("flutter.yml", FLUTTER_PUBLISH, "      - run: flutter pub add "
                                                        "some_package\n" + FLUTTER_PUBLISH)], {}, 1,
      "FAIL    flutter.yml › publish [unlocked-pub-get]"),
-    ("a second waived-looking pub get", P, [("flutter.yml", FLUTTER_PUBLISH, "      - run: flutter pub get\n"
+    ("a second pub get, without the lockfile", P, [("flutter.yml", FLUTTER_PUBLISH, "      - run: flutter pub get\n"
                                              + FLUTTER_PUBLISH)], {}, 1, "FAIL    flutter.yml › publish "
                                                                          "[unlocked-pub-get]"),
     ("a second Flutter SDK from the master channel", P, [(
@@ -2783,16 +2752,15 @@ MUTATIONS = (
      "FAIL    flutter.yml › publish [unlocked-install]"),
     ("dart run in the Flutter job", P, [("flutter.yml", FLUTTER_PUBLISH, "      - run: dart run build_runner build\n"
                                          + FLUTTER_PUBLISH)], {}, 1, "FAIL    flutter.yml › publish [unlocked-install]"),
-    ("the Flutter exception gone stale", P, [("flutter.yml", "      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f7"
-                                              "3cd65adc8cdfcb92d # v1.8.1\n      - uses: subosito/flutter-action@e938f"
-                                              "df56512cc96ef2f93601a5a40bde3801046 # v2.19.0\n        with:\n          "
-                                              "channel: stable\n      - run: flutter pub get\n",
-                                              "      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfc"
-                                              "b92d # v1.8.1\n        with:\n          sdk: 3.10.4\n      - uses: "
-                                              "subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # "
-                                              "v2.19.0\n        with:\n          flutter-version: 3.44.2\n      - run: "
-                                              "flutter pub get --enforce-lockfile\n")], {}, 1,
-     "stale named exception flutter.yml › publish"),
+    ("the Flutter SDK of the publish job back on the stable channel", P, [(
+        "flutter.yml", FLUTTER_LOCKED_GET, FLUTTER_LOCKED_GET.replace("          flutter-version: 3.47.9\n", ""))], {}, 1,
+     "FAIL    flutter.yml › publish [floating-flutter-sdk]"),
+    ("the Dart SDK of the publish job without an exact version", P, [(
+        "flutter.yml", "v1.8.1\n        with:\n          sdk: 3.13.7\n", "v1.8.1\n")], {}, 1,
+     "FAIL    flutter.yml › publish [floating-dart-sdk]"),
+    ("the publish job resolving without the lockfile", P, [(
+        "flutter.yml", FLUTTER_LOCKED_GET, FLUTTER_LOCKED_GET.replace(" --enforce-lockfile", ""))], {}, 1,
+     "FAIL    flutter.yml › publish [unlocked-pub-get]"),
     # -- the concurrency group
     ("concurrency removed", P, [("python.yml", "    concurrency:\n      group: publish-${{ github.workflow }}-${{ "
                                  "github.ref }}\n      cancel-in-progress: false\n    permissions:", "    permissions:")],
