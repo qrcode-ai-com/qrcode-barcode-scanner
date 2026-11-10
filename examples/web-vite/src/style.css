@@ -22,6 +22,12 @@ h2 { font-size: 1.15rem; margin: 2rem 0 0.75rem; }
 p { margin: 0.5rem 0; }
 a { color: var(--accent); }
 .muted { color: var(--muted); font-size: 0.9rem; }
+.links {
+  margin: 1rem 0 0; padding: 0.5rem 1rem; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 0.5rem;
+}
+.links p { display: flex; flex-wrap: wrap; gap: 0 0.5rem; margin: 0.35rem 0; }
+.links strong { min-width: 11rem; }
 label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 input, select, button { font: inherit; color: inherit; }
 input[type="file"] { max-width: 100%; }

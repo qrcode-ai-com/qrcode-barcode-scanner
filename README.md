@@ -16,7 +16,11 @@ Scan QR codes and barcodes from images or camera frames, entirely on your device
 ## Examples
 
 To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
-QR Code AI web links · [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) · [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **SDK guides** | [QR code scanner SDKs](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) | [Barcode scanner SDKs](https://qrcode-ai.com/en-US/barcode-scanner/sdk) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 Try it online, with nothing to install. The [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/web-vite) installs the published WebAssembly package 0.11.0 from npm and scans in your browser, on your device. The [notebook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/notebooks) installs the Python package 0.11.0 from PyPI and scans in a Jupyter session.
 
@@ -365,7 +369,7 @@ The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/
 
 ## QR Code AI
 
-Built for [QR Code AI](https://qrcode-ai.com/) by [SuperNovae Studio](https://github.com/supernovae-st).
+Built for [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) by [SuperNovae Studio](https://github.com/supernovae-st).
 
 AGPL-3.0-or-later or a separate commercial license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 · [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/SECURITY.md)

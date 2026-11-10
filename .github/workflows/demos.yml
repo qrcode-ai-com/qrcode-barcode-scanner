@@ -118,7 +118,7 @@ jobs:
         run: |
           python scripts/check-demo-notebook.py --self-test
           python scripts/check-demo-notebook.py source examples/notebooks/scan-images.ipynb \
-            --requirements binder/requirements.txt
+            --requirements binder/requirements.txt --page-key sdk/python
           test "$(cat binder/runtime.txt)" = "python-3.12"
       # As a notebook host does: the hashed requirements first, then the notebook.
       - name: Install the session's environment in a new one

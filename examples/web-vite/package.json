@@ -4,7 +4,7 @@
   "version": "0.11.0",
   "type": "module",
   "description": "Scan QR codes and barcodes in the browser: a Vite page that runs the published WebAssembly package in a worker.",
-  "homepage": "https://qrcode-ai.com/",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
