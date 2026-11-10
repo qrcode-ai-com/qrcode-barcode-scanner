@@ -199,7 +199,7 @@ tools=/path/to/distribution/acceptance/drivers
 
 # 1. Launch the session. session.json then holds its address and its access token.
 node $tools/binder-session.mjs launch https://mybinder.org \
-  gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0 session.json --log build.log
+  gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2 session.json --log build.log
 
 # 2. Run the notebook from top to bottom in the session, bring the result back and judge it.
 node $tools/binder-session.mjs run session.json -- jupyter nbconvert --to notebook --execute \
@@ -223,7 +223,7 @@ python3 /path/to/scripts/destination-acceptance.py reports --kind package \
   --produced-by "python python-package.py, in the session" \
   --fast reports/fast.json --frame reports/frame.json --full reports/full.json \
   --destination Binder --identifier qrcode-barcode-scanner --version 0.11.0 \
-  --url https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0 \
+  --url https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2 \
   --install "pip install -r binder/requirements.txt, by the host" --receipt receipt.json
 
 # 5. Uninstall in the session, then close the receipt with an import that must now fail there.

@@ -5,10 +5,10 @@ Barcode Scanner, at an exact version, and scans a sample image.
 
 | Example | What it shows | Run it online |
 | --- | --- | --- |
-| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0/examples/web-vite) |
-| [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. | [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) |
+| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0-r2/examples/web-vite) |
+| [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. | [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) |
 
-The online links open the tag `demos-v0.11.0`, so they keep running the same files while `main`
+The online links open the tag `demos-v0.11.0-r2`, so they keep running the same files while `main`
 changes. You need no account on either host.
 
 Other examples live with the package they belong to:
@@ -27,7 +27,9 @@ Other examples live with the package they belong to:
 
 1. Change the pinned version in each example, with its lockfile or hashes. Each example's README
    lists the places.
-2. Merge, then cut the tag `demos-vX.Y.Z` on that commit.
+2. Merge, then cut the tag `demos-vX.Y.Z` on that commit. When the examples change and the
+   version does not, add a revision to the tag of that version: `demos-vX.Y.Z-r2`, then `-r3`.
+   Never move a tag: a link that someone kept must keep opening the same files.
 3. Open each online link once before publishing it. The first time StackBlitz opens a revision
    it clones this whole repository, which took more than four minutes on 10 November 2026; later
    visits started in about half a minute. Binder builds one image per revision on each of its
