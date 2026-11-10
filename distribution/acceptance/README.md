@@ -133,9 +133,62 @@ runs the driver's self-test and three real consumers of the public 0.11.0 artifa
 - the PyPI package, under Python 3.11 and 3.14, installed in a new environment;
 - the container image, pulled by digest without a credential, on Linux amd64 and arm64.
 
+## Run it for a web page
+
+A page that scans in the browser is judged through its own controls, as a visitor uses it. The
+program [`drivers/web-page.mjs`](drivers/web-page.mjs) opens the page in Chromium, gives it the
+checked fixture through its file input, selects each profile and saves the report the page shows.
+The driver then judges the three reports by the same rules.
+
+The page must offer these four parts, which is the page contract:
+
+| Element | Role |
+| --- | --- |
+| `#file` | A file input. Choosing a file scans it with the selected profile. |
+| `#profile` | A list with the values `fast`, `frame` and `full`. Changing it scans the chosen file again. |
+| `#result` | `data-scan` counts the scans started. `data-state` is `loading` until the scanner has loaded, `scanning` during a scan, then `result`, `empty`, `inconclusive` or `error`. |
+| `#report-json` | The report of the last finished scan, as JSON text, with that scan's number in `data-scan` and its profile in `data-profile`. |
+
+Every scan runs with no time budget. The page may sit in a frame of the address that is opened,
+as a preview does on a hosted editor: the program searches every frame.
+
+```sh
+# 1. Copy the checked fixture outside the checkout.
+image=$(python3 /path/to/scripts/destination-acceptance.py stage /tmp/acceptance-input)
+
+# 2. From a project that installed Playwright, scan through the page with the three profiles.
+node /path/to/distribution/acceptance/drivers/web-page.mjs https://example.org/demo "$image" \
+  /tmp/acceptance-reports
+
+# 3. Check what the page says about itself: the package, the engine and the three links.
+python3 /path/to/scripts/check-demo-page.py /tmp/acceptance-reports/page.json \
+  --version 0.11.0 --wasm-sha256 a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68
+
+# 4. Judge the three reports and write the receipt.
+python3 /path/to/scripts/destination-acceptance.py reports --kind page \
+  --produced-by "node web-page.mjs https://example.org/demo" \
+  --fast /tmp/acceptance-reports/fast.json \
+  --frame /tmp/acceptance-reports/frame.json \
+  --full /tmp/acceptance-reports/full.json \
+  --destination "Example host" --identifier @qrcode-ai-com/qrcode-barcode-scanner-wasm \
+  --version 0.11.0 --url https://example.org/demo --receipt receipt.json
+
+# 5. A page installs nothing on the visitor's machine, so there is no removal to run.
+python3 /path/to/scripts/destination-acceptance.py removed --not-applicable --receipt receipt.json
+```
+
+Besides the three reports, the program writes `page.json`: the address that was opened, the
+frame the page was found in, the browser and its version, the package and engine the page names,
+and every link it shows. `scripts/check-demo-page.py` judges that file. The program itself judges
+nothing. `--channel chrome` runs an installed Chrome in place of Playwright's Chromium, and
+`--wait` sets how long the page may take to appear, 300 seconds by default.
+
+The workflow [`demos.yml`](../../.github/workflows/demos.yml) runs this on
+[`examples/web-vite`](../../examples/web-vite/), built and served on the runner.
+
 ## What is covered today
 
-Three kinds of surface: an installed `qrscan` command, a container image, and a language package,
-with programs for Node.js and Python. Other bindings, browser pages, host integrations and agent
-clients keep their own consumers, listed in [`RELEASING.md`](../../RELEASING.md), until a program
-of this contract exists for each.
+Four kinds of surface: an installed `qrscan` command, a container image, a language package, with
+programs for Node.js and Python, and a web page that follows the page contract. Other bindings,
+host integrations and agent clients keep their own consumers, listed in
+[`RELEASING.md`](../../RELEASING.md), until a program of this contract exists for each.

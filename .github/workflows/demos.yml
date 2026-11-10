@@ -1,0 +1,93 @@
+name: Demos
+
+# The runnable examples of examples/, checked the way a visitor uses them: installed from their
+# own lockfile, built, served and scanned in a browser. An example installs the released packages:
+# nothing is built from this repository's Rust source, and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/demos.yml
+      - examples/**
+      - distribution/acceptance/**
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - tests/wasm-browser/package.json
+      - tests/wasm-browser/package-lock.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-vite:
+    name: Browser example · Vite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Self-tests of the two judges
+        run: |
+          python3 scripts/destination-acceptance.py --self-test
+          python3 scripts/check-demo-page.py --self-test
+      # A hosted editor imports the example's folder alone, so the sample lives in it as a copy.
+      - name: The example's sample is the checked fixture
+        run: cmp fixtures/symbology/mixed-code128-qr.png examples/web-vite/public/samples/mixed-code128-qr.png
+      - name: Install the example from its lockfile and build it
+        working-directory: examples/web-vite
+        run: |
+          npm ci
+          npm run build
+      # The page driver takes Playwright from the project it runs in. It drives the Chrome of the
+      # runner image, so no browser is downloaded.
+      - name: Install Playwright for the page driver
+        working-directory: tests/wasm-browser
+        run: npm ci
+      - name: Serve the built page, scan through it and judge the reports
+        run: |
+          set -euo pipefail
+          (cd examples/web-vite && exec npm run preview -- --port 4173 --strictPort) >"$RUNNER_TEMP/preview.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail --output /dev/null http://localhost:4173/; then break; fi
+            if [ "$attempt" = 60 ]; then cat "$RUNNER_TEMP/preview.log"; exit 1; fi
+            sleep 0.5
+          done
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          driver="$PWD/distribution/acceptance/drivers/web-page.mjs"
+          (cd tests/wasm-browser && node "$driver" http://localhost:4173/ "$image" "$RUNNER_TEMP/reports" \
+            --wait 120 --channel chrome)
+          python3 scripts/check-demo-page.py "$RUNNER_TEMP/reports/page.json" --example examples/web-vite
+          python3 scripts/destination-acceptance.py reports --kind page \
+            --produced-by "node web-page.mjs http://localhost:4173/ --channel chrome" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "examples/web-vite, built and served on the runner" \
+            --identifier "@qrcode-ai-com/qrcode-barcode-scanner-wasm" --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/examples/web-vite" \
+            --install "npm ci" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "$RUNNER_TEMP/reports/receipt.json"
+          # A page installs nothing on the visitor's machine: there is no removal to record.
+          python3 scripts/destination-acceptance.py removed --not-applicable \
+            --receipt "$RUNNER_TEMP/reports/receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: demo-web-vite
+          path: |
+            ${{ runner.temp }}/reports
+            ${{ runner.temp }}/preview.log
+          if-no-files-found: error

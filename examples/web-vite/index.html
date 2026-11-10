@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Scan QR codes and barcodes in the browser with the QR Code &amp; Barcode Scanner WebAssembly package. The image stays on your device.">
+<title>QR Code &amp; Barcode Scanner: browser example</title>
+<link rel="icon" href="data:,">
+<script type="module" src="/src/main.js"></script>
+</head>
+<body>
+<main>
+  <h1>QR Code &amp; Barcode Scanner</h1>
+  <p>Scan a QR code or a barcode from an image, in your browser. The image is decoded on this
+    device by a WebAssembly module: it is never uploaded. Decoded links are shown as text and
+    never opened.</p>
+
+  <section aria-labelledby="input-title">
+    <h2 id="input-title">Choose an image</h2>
+    <div class="samples" role="group" aria-label="Sample inputs">
+      <button type="button" data-sample="mixed">QR code and Code 128 sample</button>
+      <button type="button" data-sample="blank">Image without a code</button>
+      <button type="button" data-sample="invalid">A file that is not an image</button>
+    </div>
+    <div id="drop-zone" class="drop-zone">
+      <label for="file">Or your own image (PNG, JPEG, WebP or GIF)</label>
+      <input id="file" type="file" accept="image/*" aria-describedby="drop-hint">
+      <p id="drop-hint" class="muted">You can also drop an image file on this box.</p>
+    </div>
+    <div class="field">
+      <label for="profile">Profile</label>
+      <select id="profile" aria-describedby="profile-hint">
+        <option value="full" selected>full</option>
+        <option value="fast">fast</option>
+        <option value="frame">frame</option>
+      </select>
+      <p id="profile-hint" class="muted">full runs every stage and scores how well a QR code
+        scans; fast skips the deep QR stages; frame only decodes, as for camera frames. Every
+        scan here runs to its end, without a time budget.</p>
+    </div>
+    <figure id="preview" hidden>
+      <img id="preview-image" alt="">
+      <figcaption id="preview-caption" class="muted"></figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="result-title">
+    <h2 id="result-title">Result</h2>
+    <div id="result" data-state="loading" data-scan="0">
+      <p id="summary" role="status" aria-live="polite">Loading the scanner…</p>
+      <p id="score" hidden></p>
+      <p id="timing" class="muted" hidden></p>
+      <ol id="detections"></ol>
+    </div>
+    <details id="report-details" hidden>
+      <summary>Full report (JSON)</summary>
+      <pre id="report-json" data-scan="0"></pre>
+    </details>
+  </section>
+
+  <section aria-labelledby="package-title">
+    <h2 id="package-title">What runs here</h2>
+    <dl class="facts">
+      <div><dt>npm package</dt><dd id="package-name" class="mono"></dd></div>
+      <div><dt>Package version</dt><dd id="package-version" class="mono"></dd></div>
+      <div><dt>WASM SHA-256</dt><dd id="wasm-sha256" class="mono"></dd></div>
+      <div><dt>Engine version</dt><dd id="engine-version" class="mono">not loaded yet</dd></div>
+    </dl>
+    <p class="muted">The package name, its version and the SHA-256 of its WebAssembly module
+      are read from the installed package. The engine version comes from the loaded module.</p>
+  </section>
+</main>
+<footer>
+  <p>Built for <a id="link-home" href="https://qrcode-ai.com/">QR Code AI</a>. Scan online:
+    <a id="link-qr" href="https://qrcode-ai.com/en-US/qr-code-scanner">QR code scanner</a> ·
+    <a id="link-barcode" href="https://qrcode-ai.com/en-US/barcode-scanner">Barcode scanner</a>.</p>
+  <p class="muted">Source:
+    <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/web-vite">examples/web-vite</a>
+    in the QR Code &amp; Barcode Scanner repository.</p>
+</footer>
+</body>
+</html>

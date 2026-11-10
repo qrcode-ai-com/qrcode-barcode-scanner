@@ -45,11 +45,11 @@
       "required": ["kind", "command", "install"],
       "properties": {
         "kind": {
-          "description": "The kind of surface that was judged: an installed command, a language package scanned through its own small program, or a container image run through a wrapper command.",
-          "enum": ["cli", "package", "container"]
+          "description": "The kind of surface that was judged: an installed command, a language package scanned through its own small program, a container image run through a wrapper command, or a web page that scans in the browser, driven through its own file input.",
+          "enum": ["cli", "package", "container", "page"]
         },
         "command": {
-          "description": "The installed command that was run, or the command line that wrote the three reports of a package.",
+          "description": "The installed command that was run, or the command line that wrote the three reports of a package or a page.",
           "type": "string"
         },
         "install": { "description": "The install command line, as it was run.", "type": ["string", "null"] }

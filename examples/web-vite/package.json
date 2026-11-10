@@ -1,0 +1,25 @@
+{
+  "name": "qrcode-barcode-scanner-web-vite-example",
+  "private": true,
+  "version": "0.11.0",
+  "type": "module",
+  "description": "Scan QR codes and barcodes in the browser: a Vite page that runs the published WebAssembly package in a worker.",
+  "homepage": "https://qrcode-ai.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
+    "directory": "examples/web-vite"
+  },
+  "license": "AGPL-3.0-or-later",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.7"
+  }
+}
