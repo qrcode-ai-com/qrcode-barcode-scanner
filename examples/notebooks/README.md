@@ -5,6 +5,12 @@ package [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scann
 and scans a sample image with it. The scanner is a local Rust engine: every image is decoded in
 the session that runs the notebook.
 
+[![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0?urlpath=lab/tree/examples/notebooks/scan-images.ipynb)
+
+The badge opens the notebook on [mybinder.org](https://mybinder.org/), a free public service
+with no account. It prepares a session with the package already installed, which can take a few
+minutes, and the session ends after about ten minutes of inactivity.
+
 QR Code AI web links · [QR Code AI](https://qrcode-ai.com/) ·
 [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) ·
 [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner).
