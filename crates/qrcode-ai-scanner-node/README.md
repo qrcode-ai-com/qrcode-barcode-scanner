@@ -11,9 +11,14 @@ thread. Node.js 18 or later is required.
 [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
 [TypeScript declarations](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-node/index.d.ts)
 
-The scanner grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
-Use the Node package for images already in your server or worker. The planned
-[QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) serve the matching browser use cases.
+The scanner grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/nodejs).
+Use the Node package for images already in your server or worker.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Node.js guide** | [QR code scanner for Node.js](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/nodejs) | [Barcode scanner for Node.js](https://qrcode-ai.com/en-US/barcode-scanner/sdk/nodejs) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Scan an image
 

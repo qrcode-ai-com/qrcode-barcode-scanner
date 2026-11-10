@@ -5,7 +5,7 @@ from local images or raw RGBA frames. Read decoded content and measured symbol
 positions from one structured report. QR scannability diagnostics add stress-test
 results and suggestions for improving artistic or photo-captured codes.
 
-`qrcode-barcode-scanner` is the Rust core of [QR Code AI](https://qrcode-ai.com/).
+`qrcode-barcode-scanner` is the Rust core of [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/rust).
 It runs locally, with no network requests.
 
 [API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/rust.mdx) ·
@@ -13,7 +13,12 @@ It runs locally, with no network requests.
 [Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
 
 For a one-off image check, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) uses the same engine.
-QR Code AI plans a [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) for saved designs and a [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) for label photos.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Rust guide** | [QR code scanner for Rust](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/rust) | [Barcode scanner for Rust](https://qrcode-ai.com/en-US/barcode-scanner/sdk/rust) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Scan an image
 

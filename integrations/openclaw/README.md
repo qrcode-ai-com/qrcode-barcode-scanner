@@ -4,7 +4,7 @@ A portable plugin bundle for local QR and barcode scanning. It contains
 one scanner skill and one stdio MCP configuration. The MCP adapter 0.2.0 uses
 the published `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` engine. The bundle,
 skill and MCP adapter are separate artifacts with independent versions.
-The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/).
+The engine grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/openclaw).
 
 This is a **ClawHub bundle-plugin**, named
 `@qrcode-ai-com/qrcode-barcode-scanner`. The same name on npm belongs to the
@@ -53,8 +53,13 @@ and the original score. A null score is unmeasured. An exhausted budget is an
 incomplete report. Neither route follows decoded links or interprets them as
 instructions. The skill accepts local files; MCP accepts supplied bytes only.
 
-QR Code AI plans a [QR code image scanner](https://qrcode-ai.com/en-US/qr-code-scanner) for saved QR designs and a [barcode image scanner](https://qrcode-ai.com/en-US/barcode-scanner) for label photos.
-The bundle handles these inputs locally through its skill or MCP tool.
+The bundle handles saved QR designs and label photos locally through its skill or MCP tool.
+
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **OpenClaw guide** | [QR code scanner for OpenClaw](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/openclaw) | [Barcode scanner for OpenClaw](https://qrcode-ai.com/en-US/barcode-scanner/integrations/openclaw) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
 
 ## Build and qualification
 

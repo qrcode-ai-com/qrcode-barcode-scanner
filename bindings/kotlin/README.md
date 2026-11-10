@@ -5,6 +5,12 @@ shared UniFFI crate `crates/qrcode-ai-scanner-uniffi` (the engine; this is the
 Gradle shell). One crate produces both this Kotlin binding and the Swift one in
 `../swift/`.
 
+| | QR codes | Barcodes |
+| --- | --- | --- |
+| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
+| **Android guide** | [QR code scanner for Android](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/android) | [Barcode scanner for Android](https://qrcode-ai.com/en-US/barcode-scanner/sdk/android) |
+| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
 > **Generated, not committed.** `src/main/kotlin/` (UniFFI `.kt`) and
 > `src/main/jniLibs/<abi>/*.so` (cargo-ndk) are produced in CI / JitPack and are
 > git-ignored — git is not the artifact store (architecture plan §1.3).
