@@ -45,8 +45,8 @@
       "required": ["kind", "command", "install"],
       "properties": {
         "kind": {
-          "description": "The kind of surface that was judged: an installed command, or a language package scanned through its own small program.",
-          "enum": ["cli", "package"]
+          "description": "The kind of surface that was judged: an installed command, a language package scanned through its own small program, or a container image run through a wrapper command.",
+          "enum": ["cli", "package", "container"]
         },
         "command": {
           "description": "The installed command that was run, or the command line that wrote the three reports of a package.",

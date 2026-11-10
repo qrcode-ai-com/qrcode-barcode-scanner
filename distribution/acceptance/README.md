@@ -64,6 +64,27 @@ python3 scripts/destination-acceptance.py removed \
 with `python3 scripts/destination-acceptance.py check receipt.json`. The driver needs Python 3
 and nothing else.
 
+## Run it for a container image
+
+An image is judged as a command, through a wrapper that runs `qrscan` inside it with the options
+the image's own page gives. Pull the image by digest, then:
+
+```sh
+export QRSCAN_IMAGE=ghcr.io/qrcode-ai-com/qrcode-barcode-scanner@sha256:...
+python3 scripts/destination-acceptance.py cli --kind container \
+  --qrscan distribution/acceptance/drivers/qrscan-in-container.sh \
+  --destination "GitHub Container Registry" --identifier "$QRSCAN_IMAGE" --version 0.11.0 \
+  --url https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner \
+  --install "docker pull $QRSCAN_IMAGE" --receipt receipt.json
+
+docker rmi "$QRSCAN_IMAGE"
+python3 scripts/destination-acceptance.py removed \
+  --gone "docker image inspect $QRSCAN_IMAGE" --uninstall "docker rmi $QRSCAN_IMAGE" \
+  --receipt receipt.json
+```
+
+The wrapper mounts the fixture's directory read-only at the same path and runs without network.
+
 ## Run it for a language package
 
 A package is not a command, so it scans through a small program of its own language. The driver
@@ -109,11 +130,12 @@ runs the driver's self-test and three real consumers of the public 0.11.0 artifa
 - the CLI archive, on Linux x64, Linux arm64, macOS arm64 and Windows x64: downloaded
   anonymously, checked against the release's checksum list, unpacked and judged;
 - the npm package, under Node.js 22 and 24, installed in a new project;
-- the PyPI package, under Python 3.11 and 3.14, installed in a new environment.
+- the PyPI package, under Python 3.11 and 3.14, installed in a new environment;
+- the container image, pulled by digest without a credential, on Linux amd64 and arm64.
 
 ## What is covered today
 
-Two kinds of surface: an installed `qrscan` command, and a language package, with programs for
-Node.js and Python. Other bindings, browser pages, host integrations and agent clients keep their
-own consumers, listed in [`RELEASING.md`](../../RELEASING.md), until a program of this contract
-exists for each.
+Three kinds of surface: an installed `qrscan` command, a container image, and a language package,
+with programs for Node.js and Python. Other bindings, browser pages, host integrations and agent
+clients keep their own consumers, listed in [`RELEASING.md`](../../RELEASING.md), until a program
+of this contract exists for each.

@@ -3,8 +3,9 @@ name: Destination acceptance
 # The acceptance contract of distribution/acceptance/README.md, run for real: the driver's
 # self-test, then real consumers judged by the driver. One downloads the public CLI archive of a
 # release anonymously, checks it against the release's checksum list, unpacks it and scans. Two
-# install the public npm and PyPI packages in a new project and scan through them. Nothing is
-# built and nothing is published.
+# install the public npm and PyPI packages in a new project and scan through them. One pulls the
+# public container image by digest and scans inside it. Nothing is built and nothing is
+# published.
 on:
   workflow_dispatch:
   pull_request:
@@ -235,6 +236,62 @@ jobs:
         if: always()
         with:
           name: destination-acceptance-pypi-python${{ matrix.python }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  container-image:
+    name: Container image · ${{ matrix.platform }}
+    needs: self-test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            machine: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            machine: arm64
+    env:
+      # The verified multi-platform index of distribution/docker/v0.11/README.md.
+      QRSCAN_IMAGE: ghcr.io/qrcode-ai-com/qrcode-barcode-scanner@sha256:fd0433f29b0dabd469ce6a8fdcfc7bf6554960301b5bc57b5fca97928fd7cb96
+      MACHINE: ${{ matrix.machine }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The runner's Docker holds no registry credential: the pull is anonymous.
+      - name: Pull the public image by digest
+        run: |
+          mkdir receipt
+          test ! -e "$HOME/.docker/config.json" || ! grep -q ghcr.io "$HOME/.docker/config.json"
+          docker pull "$QRSCAN_IMAGE"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          python3 scripts/destination-acceptance.py cli --kind container \
+            --qrscan distribution/acceptance/drivers/qrscan-in-container.sh \
+            --destination "GitHub Container Registry" \
+            --identifier "$QRSCAN_IMAGE" \
+            --version "$RELEASE_VERSION" \
+            --url "https://github.com/$RELEASE_REPOSITORY/pkgs/container/qrcode-barcode-scanner" \
+            --install "docker pull $QRSCAN_IMAGE" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-container-$MACHINE.json"
+      - name: Remove the image and close the receipt
+        run: |
+          docker rmi "$QRSCAN_IMAGE"
+          python3 scripts/destination-acceptance.py removed \
+            --gone "docker image inspect $QRSCAN_IMAGE" \
+            --uninstall "docker rmi $QRSCAN_IMAGE" \
+            --receipt "receipt/acceptance-container-$MACHINE.json"
+          python3 scripts/destination-acceptance.py check "receipt/acceptance-container-$MACHINE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-container-${{ matrix.machine }}
           path: receipt/
           if-no-files-found: error
           retention-days: 90
