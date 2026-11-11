@@ -48,8 +48,7 @@
             "/tests",
             "/phpunit.xml.dist",
             "/composer.lock",
-            "/.gitignore",
-            "/.gitattributes"
+            "/.gitignore"
         ]
     }
 }
