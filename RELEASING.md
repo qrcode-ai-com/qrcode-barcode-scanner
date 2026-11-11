@@ -1067,6 +1067,57 @@ This workflow publishes only the npm MCP adapter. ClawHub skills/plugins,
 Official MCP Registry admission and product-client acceptance retain their own
 publication and qualification steps.
 
+### Files attached to an agents release
+
+The page of an `agents-v*` release also carries the adapter and the skill as
+files, for people who install from a release page. No workflow attaches them.
+The owner attaches them, or gives an explicit go for it, once per release.
+They are copies of what the tag already published or holds, never a new
+build, and a file that is public is never replaced.
+
+| File | Source | How it is cut |
+| --- | --- | --- |
+| `qrcode-barcode-scanner-mcp-<adapter>.tgz` | The public npm archive of that adapter version | `npm pack @qrcode-ai-com/qrcode-barcode-scanner-mcp@<adapter>` in an empty directory |
+| `qrcode-barcode-scanner-skill-<skill>.zip` | `skills/qrcode-barcode-scanner` at the commit of the tag | `git archive --format=zip` of that tree |
+| `qrcode-barcode-scanner-skill-<skill>.tar.gz` | The same tree | `git archive --format=tar.gz` of that tree |
+| `qrcode-barcode-scanner-mcp-<adapter>-SHA256SUMS`, `qrcode-barcode-scanner-skill-<skill>-SHA256SUMS` | The files above | `shasum -a 256`, one file per family |
+
+Before attaching, compare the adapter file with the registry: its sha512 must
+equal `dist.integrity` of that version (`npm view <spec> dist.integrity`).
+Do not pack the adapter from the checkout: only the registry's bytes carry the
+provenance the release notes point to.
+
+Cut the skill archives from the commit, never from a working tree, and give
+every entry the date of that commit:
+
+```bash
+commit=$(git rev-parse 'agents-v<adapter>^{commit}')
+when=$(git show -s --format=%cI "$commit")
+TZ=UTC git archive --format=zip --mtime="$when" \
+  -o qrcode-barcode-scanner-skill-<skill>.zip "$commit:skills/qrcode-barcode-scanner"
+TZ=UTC git archive --format=tar.gz --mtime="$when" \
+  -o qrcode-barcode-scanner-skill-<skill>.tar.gz "$commit:skills/qrcode-barcode-scanner"
+```
+
+`TZ` matters: Git stores the date of a ZIP entry in local time, so the same
+command gives other bytes in another time zone. The tarball does not depend on
+it. Both archives hold the files at their root, with no top-level folder: the
+install lines extract them into a folder named `qrcode-barcode-scanner`.
+
+Then, in this order: extract each archive and compare it with the tag file by
+file, run its `scripts/test.mjs` against a fresh engine, attach the five files
+in one `gh release upload` without `--clobber`, download them signed out and
+compare the digests, install the adapter from its public address in empty
+Node 22 and 24 projects and run `integrations/mcp/test/protocol-consumer.mjs`
+of the tag beside it. Last, list the files and their digests in the release
+notes and in `distribution/README.md`.
+
+The files of `agents-v0.2.1` were attached this way on 11 November 2026,
+with Git 2.54.0. Its ZIP was cut on a machine at UTC+4, before this section
+fixed `TZ`: `TZ=Etc/GMT-4` rebuilds it byte for byte
+(`ef84d7a2e4d1c949371fc2d1aa242e101c0e79e85de88027f6a9f9656fe2884c`), while
+`TZ=UTC` gives the same five files under other entry dates.
+
 ### Official MCP Registry listing
 
 `mcp-registry-publish.yml` lists the already published npm adapter 0.2.1 as

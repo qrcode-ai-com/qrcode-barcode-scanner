@@ -109,6 +109,16 @@ Node.js 22.22.2, this install matched all five source files. Its helper used
 engine 0.11.0 and returned the QR payload and Code 128 `STOCK-4827` together
 in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 
+To remove the skill from the project:
+
+```sh
+DISABLE_TELEMETRY=1 npx --yes skills@1.7.6 remove qrcode-barcode-scanner --agent codex --yes
+```
+
+On 11 November 2026 the same install put the five files in
+`.agents/skills/qrcode-barcode-scanner`, and this command deleted that folder.
+It leaves `skills-lock.json` in the project, with no skill listed.
+
 ### Install the portable skill in Hermes
 
 Hermes Agent installs the skill from its GitHub path. No account is needed:
@@ -131,6 +141,53 @@ the QR payload and Code 128 `STOCK-4827` together in `fast`, `frame`, and
 `full`. `hermes skills uninstall qrcode-barcode-scanner` removed the
 directory. `hermes skills search qrcode-barcode-scanner` also finds the
 ClawHub listing of the same skill.
+
+### Install the adapter or the skill from the release files
+
+The [agents-v0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
+carries the adapter and the skill as files, for a project that installs from a
+release page instead of a registry. They are copies, not new versions:
+
+| File | What it is | SHA-256 |
+| --- | --- | --- |
+| [`qrcode-barcode-scanner-mcp-0.2.1.tgz`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-mcp-0.2.1.tgz) | The npm archive of adapter 0.2.1, byte for byte | `e948ef8bac8fb8c197cd8cabb1a3df3d3d5db60e1b90d965125308186c8797e2` |
+| [`qrcode-barcode-scanner-skill-0.2.0.zip`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.zip) | The five files of the skill at `610879c`, the commit of the tag | `ef84d7a2e4d1c949371fc2d1aa242e101c0e79e85de88027f6a9f9656fe2884c` |
+| [`qrcode-barcode-scanner-skill-0.2.0.tar.gz`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.tar.gz) | The same five files | `e73e7b5fe8c6da40ce5c1971e35d1f27d923aa8bf574eeb5c70b55e7a18899a8` |
+
+The release also lists these values in two `SHA256SUMS` files. They are assets
+of the same release, so they detect a damaged download, not a substituted
+release. For the adapter, the npm provenance of 0.2.1 is the independent check.
+
+Install the adapter from its file:
+
+```sh
+npm install --prefix ./.qrscan-mcp --save-exact --ignore-scripts \
+  https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-mcp-0.2.1.tgz
+```
+
+The file holds the adapter only. npm still fetches its dependencies from the
+npm registry, among them engine 0.11.0. The integrity npm writes in your lock
+file is the one the registry publishes for 0.2.1.
+
+The skill archives have no top-level folder. Extract one into a folder named
+`qrcode-barcode-scanner` inside the skill directory of your host:
+
+```sh
+curl -fsSLO https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.tar.gz
+mkdir -p skills/qrcode-barcode-scanner
+tar -xzf qrcode-barcode-scanner-skill-0.2.0.tar.gz -C skills/qrcode-barcode-scanner
+```
+
+The skill does not install the engine: follow its `SKILL.md`. To remove
+either install, delete its folder: `./.qrscan-mcp` for the adapter,
+`skills/qrcode-barcode-scanner` for the skill.
+
+On macOS ARM64, the three files were fetched signed out and used as written
+here. The adapter installed from its file in empty projects with Node.js
+22.22.2 and 24.22.1 and answered modern and legacy MCP clients. Each skill
+archive matched the five source files at `610879c` and passed its 26 checks
+with Node.js 22.22.2 against a fresh engine 0.11.0. Every run returned the QR
+payload and Code 128 `STOCK-4827` together in `fast`, `frame`, and `full`.
 
 ## CLI and containers
 
