@@ -1,8 +1,8 @@
 name: PHP adapter
 
 # The PHP package under bindings/php starts the installed qrscan command. This workflow runs its
-# tests against the public CLI of a release: on Linux, macOS and Windows with the PHP of each
-# hosted image, and on Linux with the oldest and the newest PHP line. It then installs the
+# tests against the public CLI of a release: on Linux and Windows with the PHP of the hosted
+# image, on macOS with Homebrew's, and on Linux with the oldest and the newest PHP line. It then installs the
 # package in an empty project through Composer and judges three real scans with the destination
 # acceptance driver. Nothing is built from the engine's Rust source and nothing is published.
 on:
@@ -80,7 +80,14 @@ jobs:
           fi
           test -f "$RUNNER_TEMP/install/$asset/$command"
           echo "QRSCAN_BINARY=$RUNNER_TEMP/install/$asset/$command" >> "$GITHUB_ENV"
-      # The PHP and the Composer of the hosted image, as a developer on that system has them.
+      # The Linux and Windows images carry PHP and Composer. The macOS image does not: install
+      # them the way a developer on a Mac does.
+      - name: Install PHP and Composer with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install php composer
       - name: Install the test dependencies from the lock file
         working-directory: bindings/php
         run: |
