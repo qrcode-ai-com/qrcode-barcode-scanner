@@ -111,6 +111,16 @@ code, files that are not images, awkward file names, a missing command, an engin
 version and a command that hangs. The workflow `PHP adapter` of the engine repository runs them
 on Linux, macOS and Windows against the released command.
 
+## Its own repository
+
+Packagist reads `composer.json` at the root of a repository, and Composer downloads that whole
+repository. The package is therefore served from a small repository of its own,
+`qrcode-ai-com/qrcode-barcode-scanner-php`. Nothing there is edited by hand:
+[`scripts/stage-php-package.py`](../../scripts/stage-php-package.py) writes its whole tree from
+one commit of the engine repository, with the workflow of [`mirror/`](mirror/), the two test
+images, the licence and a `SOURCE.json` that names the commit and the sha256 of every file. The
+same program checks that a tree is exactly that. Change the package here, then stage it again.
+
 ## Licence
 
 AGPL-3.0-or-later, like the engine it drives. See [LICENSE](../../LICENSE).

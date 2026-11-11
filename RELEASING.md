@@ -1167,6 +1167,35 @@ gh workflow run mcp-registry-publish.yml --ref main --repo qrcode-ai-com/qrcode-
 Review the protected deployment and verify the active public record in the
 run summary. Future adapter versions need their own reviewed pins.
 
+## PHP package — its own repository
+
+The PHP package of `bindings/php` is not published yet. Packagist reads
+`composer.json` at the root of a repository and Composer downloads that whole
+repository, so the package is served from
+`qrcode-ai-com/qrcode-barcode-scanner-php`. That repository holds nothing
+written by hand:
+
+```bash
+python3 scripts/stage-php-package.py stage --revision <commit> --out <empty directory>
+python3 scripts/stage-php-package.py verify <directory>
+```
+
+`stage` reads the package from git at that commit, never from the working
+tree, and writes the whole tree: the package, the workflow of
+`bindings/php/mirror/`, the two images its tests scan, the licence, a
+`.gitattributes` that keeps the tests out of the archive Composer downloads,
+and `SOURCE.json`, which names the commit and the sha256 of every file. This
+repository's own tree may carry no `export-ignore` entry, which is why that
+file is written by the stage. `verify` stages the commit `SOURCE.json` names
+and compares: same files, same bytes, nothing else. The mirror runs it on
+every push.
+
+To change the package, change `bindings/php` here, merge, stage the merged
+commit and replace the mirror's tree with the result in one commit. A version
+of the package is a tag `vX.Y.Z` in the mirror. Only the owner creates it, and
+Packagist reads it through its hook. The first listing needs the owner's
+sign-in on packagist.org.
+
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
 The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the
