@@ -64,7 +64,13 @@ python3 "$driver" removed --qrscan "$downloaded" --uninstall "rm $name" \
 python3 "$driver" check "$receipts/runner-$architecture.json"
 
 # The oldest C library the executable supports (2.28), a long-term desktop and a recent one.
-export QRSCAN_APPIMAGE="$appimage"
+# Each host gets its own executable copy, mounted read-only: a file that was just downloaded has
+# no executable bit, and the given file is not modified.
+mounted="$box/host/$name"
+mkdir -p "$box/host"
+cp -- "$appimage" "$mounted"
+chmod 0755 "$mounted"
+export QRSCAN_APPIMAGE="$mounted"
 for host in almalinux:8 ubuntu:22.04 fedora:latest; do
   docker pull --quiet "$host"
   QRSCAN_HOST_IMAGE=$(docker image inspect --format '{{index .RepoDigests 0}}' "$host")
