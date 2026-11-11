@@ -118,7 +118,12 @@ jobs:
           QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
         run: |
           go version
-          test -z "$(gofmt -l .)"
+          # A Windows checkout has CRLF line ends, which gofmt reports: the format is judged
+          # on the two other systems.
+          if [ "$RUNNER_OS" != Windows ]; then
+            unformatted=$(gofmt -l .)
+            if [ -n "$unformatted" ]; then echo "not formatted with gofmt: $unformatted"; exit 1; fi
+          fi
           go vet ./...
           go test -count=1 ./...
 
