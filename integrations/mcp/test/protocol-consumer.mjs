@@ -2,9 +2,10 @@
 // This file is copied outside the checkout, beside only installed dependencies.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join, relative } from "node:path";
+import { delimiter, join, relative, sep } from "node:path";
 import { Client as ModernClient, InMemoryTransport } from "@modelcontextprotocol/client";
 import { pathToFileURL } from "node:url";
 import { StdioClientTransport as ModernTransport } from "@modelcontextprotocol/client/stdio";
@@ -26,6 +27,26 @@ const untimed = ({ trace, ...report }) => ({ ...report, trace: { ...trace, total
 assert.equal(version(), "0.11.0");
 assert.ok(!relative(root, require.resolve("@qrcode-ai-com/qrcode-barcode-scanner")).startsWith(".."));
 for (const key of ["NODE_PATH", "NAPI_RS_NATIVE_LIBRARY_PATH"]) assert.equal(process.env[key], undefined, `${key} bypasses the installed consumer`);
+
+// Files for scan_file: one directory the operator allows, one it does not.
+const allowed = join(root, "allowed");
+const outside = join(root, "outside");
+mkdirSync(join(allowed, "folder"), { recursive: true });
+mkdirSync(outside);
+for (const [name, bytes] of [["clean.png", fixture], ["mixed.png", mixedFixture], ["white.png", white], ["garbage.png", Buffer.from("garbage")], ["empty.png", Buffer.alloc(0)], ["oversize.png", Buffer.concat([white, Buffer.of(0)])]]) writeFileSync(join(allowed, name), bytes);
+writeFileSync(join(outside, "secret.png"), fixture);
+// A directory whose name only starts like the allowed one is not inside it.
+mkdirSync(join(root, "allowed-other"));
+writeFileSync(join(root, "allowed-other", "secret.png"), fixture);
+// Symbolic links and a named pipe need a POSIX host; Windows runs the other checks.
+const links = process.platform !== "win32";
+if (links) {
+  symlinkSync(join(outside, "secret.png"), join(allowed, "escape.png"));
+  symlinkSync(outside, join(allowed, "escape-dir"));
+  symlinkSync(join(allowed, "mixed.png"), join(allowed, "inner-link.png"));
+  symlinkSync(allowed, join(root, "alias"));
+  execFileSync("mkfifo", [join(allowed, "pipe.png")]);
+}
 
 async function connect(era, settings = {}) {
   const modern = era === "modern";
@@ -58,6 +79,7 @@ function errorFrom(result, code) {
   assert.equal(error.code, code);
   return error;
 }
+const ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const receipts = [];
 for (const era of ["modern", "legacy"]) {
   const session = await connect(era);
@@ -66,7 +88,7 @@ for (const era of ["modern", "legacy"]) {
     assert.deepEqual(tools.tools.map(({ name }) => name), ["scan_image"]);
     assert.deepEqual(tools.tools[0].inputSchema.required, ["imageBase64"]);
     assert.equal(tools.tools[0].inputSchema.additionalProperties, false);
-    assert.deepEqual(tools.tools[0].annotations, { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+    assert.deepEqual(tools.tools[0].annotations, ANNOTATIONS);
     const resources = await session.client.listResources();
     assert.deepEqual(resources.resources.map(({ uri }) => uri).sort(), ["qrscan://limits", "qrscan://scan-report-schema"]);
     const schema = await session.client.readResource({ uri: "qrscan://scan-report-schema" });
@@ -75,6 +97,11 @@ for (const era of ["modern", "legacy"]) {
     assert.equal(limits.inputBytes, 8 * 1024 * 1024);
     assert.equal(limits.dimension, 4096);
     assert.equal(limits.pixels, 16_000_000);
+    assert.deepEqual(limits.allowedDirectories, [], "no directory is readable unless the operator names one");
+    assert.equal(limits.fileAccess, "no client paths");
+    const absent = await session.client.callTool({ name: "scan_file", arguments: { path: join(allowed, "mixed.png") } }).catch(() => ({ isError: true }));
+    assert.equal(absent.isError, true, "scan_file does not exist without allowed directories");
+    assert.equal(absent.structuredContent, undefined);
     const call = (image, options = {}) => session.client.callTool({ name: "scan_image", arguments: { imageBase64: image.toString("base64"), ...options } });
     const full = reportFrom(await call(fixture, { profile: "full", budgetMs: 0 }));
     assert.deepEqual(full.versions, { scanner: "0.11.0", pipeline: 5, score_contract: 5 });
@@ -125,6 +152,74 @@ for (const era of ["modern", "legacy"]) {
   } finally { await session.close(); }
 }
 
+// scan_file reads a local file by path, only inside the directories the operator allows.
+const mixedIdentities = [
+  { symbology: "code128", text: "STOCK-4827", raw: Buffer.from("STOCK-4827").toString("base64") },
+  { symbology: "qr_code", text: "https://qrc-ai.com/76xMa", raw: Buffer.from("https://qrc-ai.com/76xMa").toString("base64") },
+];
+const refusals = { QRSMCP_PATH_DENIED: 0, QRSMCP_FILE: 0, QRSMCP_PATH: 0 };
+for (const era of ["modern", "legacy"]) {
+  const session = await connect(era, { QRSCAN_MCP_ALLOWED_DIRECTORIES: allowed });
+  try {
+    const tools = await session.client.listTools();
+    assert.deepEqual(tools.tools.map(({ name }) => name), ["scan_image", "scan_file"]);
+    assert.deepEqual(tools.tools[1].inputSchema.required, ["path"]);
+    assert.equal(tools.tools[1].inputSchema.additionalProperties, false);
+    assert.deepEqual(tools.tools[1].annotations, ANNOTATIONS);
+    const limits = JSON.parse((await session.client.readResource({ uri: "qrscan://limits" })).contents[0].text);
+    assert.deepEqual(limits.allowedDirectories, [realpathSync(allowed)]);
+    assert.match(limits.fileAccess, /scan_file/);
+    const file = (path, options = {}) => session.client.callTool({ name: "scan_file", arguments: { path, ...options } });
+    const refused = async (path, code) => { const error = errorFrom(await file(path), code); refusals[code] += 1; return JSON.stringify(error); };
+    for (const profile of ["fast", "frame", "full"]) {
+      const mixed = reportFrom(await file(join(allowed, "mixed.png"), { profile, budgetMs: 0 }));
+      assert.deepEqual(mixed.detections.map(({ symbology, content }) => ({ symbology, text: content.text, raw: content.raw })).sort((a, b) => a.symbology.localeCompare(b.symbology)), mixedIdentities, `${era} ${profile} reads both exact identities from a file`);
+      assert.deepEqual(untimed(mixed), untimed(await scan(mixedFixture, { profile, budgetMs: 0, maxDimension: 4096, maxPixels: 16_000_000 })), `${era} ${profile} returns the complete report of the file's bytes`);
+      if (profile === "frame") assert.equal(mixed.score, null);
+    }
+    assert.equal(reportFrom(await file(join(allowed, "clean.png"))).score, null, "scan_file defaults to the frame profile");
+    assert.equal(reportFrom(await file(join(allowed, "clean.png"), { profile: "full", budgetMs: 0 })).score.value, 100);
+    assert.deepEqual(reportFrom(await file(join(allowed, "white.png"), { profile: "full", budgetMs: 0 })).detections, []);
+    errorFrom(await file(join(allowed, "garbage.png")), "QRS-001");
+    // Outside the allowed directory: one answer, whether the file exists or not.
+    const denied = [];
+    for (const path of [join(outside, "secret.png"), join(outside, "missing.png"), `${allowed}${sep}..${sep}outside${sep}secret.png`, join(root, "allowed-other", "secret.png"), allowed, root, join(root, "clean.png")]) denied.push(await refused(path, "QRSMCP_PATH_DENIED"));
+    if (links) {
+      // A link that stays inside is read; a link that leaves is refused like any outside path.
+      assert.deepEqual(reportFrom(await file(join(allowed, "inner-link.png"))).detections.map(({ symbology }) => symbology).sort(), ["code128", "qr_code"]);
+      assert.deepEqual(reportFrom(await file(join(root, "alias", "mixed.png"))).detections.map(({ symbology }) => symbology).sort(), ["code128", "qr_code"], "another spelling of an allowed directory is the same directory");
+      for (const path of [join(allowed, "escape.png"), join(allowed, "escape-dir", "secret.png"), join(allowed, "escape-dir", "missing.png")]) denied.push(await refused(path, "QRSMCP_PATH_DENIED"));
+      // A named pipe would block a plain read forever.
+      await refused(join(allowed, "pipe.png"), "QRSMCP_FILE");
+    }
+    assert.equal(new Set(denied).size, 1, "a refused path does not tell whether it exists");
+    for (const path of [join(allowed, "missing.png"), join(allowed, "folder"), join(allowed, "empty.png")]) await refused(path, "QRSMCP_FILE");
+    for (const path of ["allowed/mixed.png", "mixed.png", `${join(allowed, "mixed.png")}\0`]) await refused(path, "QRSMCP_PATH");
+    for (const args of [{}, { path: "" }, { path: "x".repeat(4097) }, { path: join(allowed, "mixed.png"), imageBase64: "AAAA" }, { path: join(allowed, "mixed.png"), url: "https://example.com/image.png" }, { path: join(allowed, "mixed.png"), profile: "typo" }]) {
+      const result = await session.client.callTool({ name: "scan_file", arguments: args });
+      assert.equal(result.isError, true, `unsupported scan_file input must reject: ${JSON.stringify(args).slice(0, 80)}`);
+    }
+  } finally { await session.close(); }
+}
+
+const fileBoundary = await connect("modern", { QRSCAN_MCP_ALLOWED_DIRECTORIES: [allowed, outside].join(delimiter), QRSCAN_MCP_MAX_INPUT_BYTES: String(white.length) });
+try {
+  const limits = JSON.parse((await fileBoundary.client.readResource({ uri: "qrscan://limits" })).contents[0].text);
+  assert.deepEqual(limits.allowedDirectories, [realpathSync(allowed), realpathSync(outside)], "several directories are separated like PATH");
+  const file = (path) => fileBoundary.client.callTool({ name: "scan_file", arguments: { path } });
+  assert.deepEqual(reportFrom(await file(join(allowed, "white.png"))).detections, [], "a file at the exact byte ceiling is read");
+  errorFrom(await file(join(allowed, "oversize.png")), "QRSMCP_INPUT_LIMIT");
+  errorFrom(await file(join(outside, "secret.png")), "QRSMCP_INPUT_LIMIT");
+} finally { await fileBoundary.close(); }
+
+const fileCapacity = await connect("modern", { QRSCAN_MCP_ALLOWED_DIRECTORIES: allowed, QRSCAN_MCP_MAX_CONCURRENT: "1" });
+try {
+  const pending = fileCapacity.client.callTool({ name: "scan_image", arguments: { imageBase64: fixture.toString("base64"), profile: "full", budgetMs: 0 } });
+  errorFrom(await fileCapacity.client.callTool({ name: "scan_file", arguments: { path: join(allowed, "clean.png"), profile: "full", budgetMs: 0 } }), "QRSMCP_BUSY");
+  assert.equal(reportFrom(await pending).score.value, 100);
+  assert.equal(reportFrom(await fileCapacity.client.callTool({ name: "scan_file", arguments: { path: join(allowed, "clean.png") } })).score, null, "both tools share one capacity, released after completion");
+} finally { await fileCapacity.close(); }
+
 for (const [settings, image, code] of [
   [{ QRSCAN_MCP_MAX_INPUT_BYTES: "8" }, fixture, "QRSMCP_INPUT_LIMIT"],
   [{ QRSCAN_MCP_MAX_DIMENSION: "16" }, white, "QRS-002"],
@@ -173,6 +268,6 @@ try {
 const loaded = Object.keys(require.cache).filter((file) => file.endsWith(".node"));
 assert.equal(loaded.length, 1);
 assert.ok(!relative(root, loaded[0]).startsWith(".."));
-const receipt = { verdict: "PASS", adapter: "0.2.1", scanner: version(), node: process.version, os: process.platform, arch: process.arch, installedEntry: entry, fixtureSha256: sha256(fixture), loadedNative: { path: loaded[0], sha256: sha256(readFileSync(loaded[0])) }, sessions: receipts, inputByteCap: true, dimensionCap: true, pixelCap: true, concurrencyCap: true, concurrencyAcrossFactories: true, realProductClients: "NOT VERIFIED" };
+const receipt = { verdict: "PASS", adapter: "0.2.1", scanner: version(), node: process.version, os: process.platform, arch: process.arch, installedEntry: entry, fixtureSha256: sha256(fixture), loadedNative: { path: loaded[0], sha256: sha256(readFileSync(loaded[0])) }, sessions: receipts, scanFile: { eras: ["modern", "legacy"], mixedProfiles: ["fast", "frame", "full"], mixedExactPayloads: ["STOCK-4827", "https://qrc-ai.com/76xMa"], refusals, symbolicLinksAndPipeChecked: links }, inputByteCap: true, dimensionCap: true, pixelCap: true, concurrencyCap: true, concurrencyAcrossFactories: true, realProductClients: "NOT VERIFIED" };
 writeFileSync(join(root, "protocol-receipt.json"), JSON.stringify(receipt, null, 2));
 console.log(JSON.stringify(receipt));
