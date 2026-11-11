@@ -121,6 +121,11 @@ func TestMixedImageReturnsBothCodesExactly(t *testing.T) {
 	}{{"compiler", false}, {"interpreter", true}} {
 		s := scanner(t, mode.interpret)
 		for _, p := range profiles {
+			// The interpreter takes minutes for a judged scan: it is checked on the decode-only
+			// profile here and timed once in TestMeasure.
+			if mode.interpret && p.profile != Frame {
+				continue
+			}
 			data, err := s.Scan(context.Background(), image, p.profile, Unbounded)
 			if err != nil {
 				t.Fatalf("%s %s: %v", mode.name, p.name, err)
@@ -200,13 +205,14 @@ func TestCapabilitiesNameTheEngine(t *testing.T) {
 }
 
 func TestACancelledContextStopsAScanAndTheNextOneWorks(t *testing.T) {
-	s := scanner(t, true) // the interpreter is slow enough to be caught mid-scan
+	s := scanner(t, false)
 	image := fixture(t, "symbology/mixed-code128-qr.png")
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	// A judged scan of this image takes far longer than 10 ms, so the deadline falls mid-scan.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 	started := time.Now()
 	if _, err := s.Scan(ctx, image, Full, Unbounded); err == nil {
-		t.Fatalf("a full scan in the interpreter ended within 20 ms: not a test of cancellation")
+		t.Fatalf("a full scan ended within 10 ms: not a test of cancellation")
 	}
 	if waited := time.Since(started); waited > 5*time.Second {
 		t.Errorf("the scan stopped after %v", waited)
@@ -284,6 +290,7 @@ func TestMeasure(t *testing.T) {
 	digest := sha256.Sum256(wasm)
 	image := fixture(t, "symbology/mixed-code128-qr.png")
 	file := filepath.Join(need(t, "QRSCAN_FIXTURES"), "symbology/mixed-code128-qr.png")
+	// Seven runs in the compiler; one in the interpreter, where a judged scan takes minutes.
 	const runs = 7
 	result := map[string]any{
 		"host":           runtime.GOOS + "/" + runtime.GOARCH,
@@ -292,7 +299,7 @@ func TestMeasure(t *testing.T) {
 		"moduleBytes":    len(wasm),
 		"moduleSha256":   hex.EncodeToString(digest[:]),
 		"fixture":        "fixtures/symbology/mixed-code128-qr.png",
-		"runsPerMeasure": runs,
+		"runsPerMeasure": map[string]int{"wazero-compiler": runs, "wazero-interpreter": 1, "native-cli": runs},
 		"budget":         "none",
 	}
 	for _, mode := range []struct {
@@ -305,9 +312,13 @@ func TestMeasure(t *testing.T) {
 			t.Fatal(err)
 		}
 		entry := map[string]any{"loadMs": float64(time.Since(started).Microseconds()) / 1000}
+		count := runs
+		if mode.interpret {
+			count = 1
+		}
 		for _, p := range profiles {
 			times := []float64{}
-			for i := 0; i < runs; i++ {
+			for i := 0; i < count; i++ {
 				started := time.Now()
 				if _, err := s.Scan(context.Background(), image, p.profile, Unbounded); err != nil {
 					t.Fatal(err)

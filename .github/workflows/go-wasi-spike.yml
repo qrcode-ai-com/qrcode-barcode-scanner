@@ -58,7 +58,7 @@ jobs:
     name: Go tests · ${{ matrix.target }}
     needs: module
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +87,15 @@ jobs:
           mkdir "$RUNNER_TEMP/install"
           tar -xzf "$RUNNER_TEMP/download/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET.tar.gz" -C "$RUNNER_TEMP/install"
           echo "QRSCAN_NATIVE=$RUNNER_TEMP/install/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET/qrscan" >> "$GITHUB_ENV"
-      # The Go of the hosted image fetches the toolchain go.mod names. No C compiler is used.
+      # The Linux images carry Go. The macOS image does not put one on PATH.
+      - name: Install Go with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install go
+      # That Go fetches the toolchain go.mod names. No C compiler is used. The interpreter is
+      # timed once per profile and takes minutes, hence the long test timeout.
       - name: Run the Go tests with wazero, compiler and interpreter
         working-directory: bindings/go
         env:
@@ -99,7 +107,7 @@ jobs:
           (cd "$GITHUB_WORKSPACE/module" && shasum -a 256 -c qrscan.wasm.sha256)
           go version
           go vet ./...
-          go test -count=1 -v ./...
+          go test -count=1 -v -timeout 50m ./...
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         if: always()
         with:
