@@ -1,0 +1,5 @@
+# Produced by the workflow from one commit, never checked in.
+/spike/generated/
+/spike/native/
+/spike/bin/
+/spike/obj/

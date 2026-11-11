@@ -1,0 +1,4 @@
+# Names of the generated C#, fixed here so the program does not depend on the generator's defaults.
+[bindings.csharp]
+namespace = "QRCodeAI.Scanner.Generated"
+global_methods_class_name = "NativeScanner"
