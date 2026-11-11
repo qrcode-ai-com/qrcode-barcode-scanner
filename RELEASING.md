@@ -1205,7 +1205,7 @@ serves it and a consumer installed from Packagist has passed.
 
 ## Go package — its own repository
 
-The Go package of `bindings/go` is not published yet. It starts the installed
+The Go package of `bindings/go` starts the installed
 `qrscan` command and holds no decoder: the owner chose that route on
 11 November 2026, after a WebAssembly build of the engine run inside the Go
 process gave the same reports about twenty times slower. A Go module is
@@ -1235,13 +1235,13 @@ the tag the first time someone asks for it, and pkg.go.dev lists the package
 from the proxy. A version the proxy has served cannot be replaced, so a tag
 is never moved or reused.
 
-The number of the first version is the owner's decision and is not taken.
-The proposal is the rule of the PHP package: follow the engine the package
-drives, so that 0.11.z is for `qrscan` 0.11.x. A package version is cut from
-a mirror commit whose `SOURCE.json` names a merged commit of this repository,
-after that mirror commit's workflow is green. `distribution/README.md` lists
-the package only once the proxy serves the tag and a consumer that ran
-`go get` from an empty module has passed.
+The owner decided on 11 November 2026 that the package follows the engine it
+drives, like the PHP package: its first version is 0.11.0, for `qrscan`
+0.11.x. A package version is cut from a mirror commit whose `SOURCE.json`
+names a merged commit of this repository, after that mirror commit's workflow
+is green. `distribution/README.md` lists the package only once the proxy
+serves the tag and a consumer that ran `go get` from an empty module has
+passed.
 
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
