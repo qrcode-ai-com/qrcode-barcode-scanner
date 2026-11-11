@@ -1,0 +1,54 @@
+{
+    "name": "qrcode-ai-com/qrcode-barcode-scanner",
+    "description": "Read QR codes and barcodes from images in PHP, through the installed qrscan command of the QR Code & Barcode Scanner engine.",
+    "type": "library",
+    "license": "AGPL-3.0-or-later",
+    "keywords": [
+        "qr code",
+        "barcode",
+        "scanner",
+        "qrcode",
+        "decode",
+        "code128",
+        "data matrix"
+    ],
+    "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/php",
+    "support": {
+        "issues": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues",
+        "source": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/bindings/php"
+    },
+    "require": {
+        "php": ">=8.2",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "11.5.57"
+    },
+    "autoload": {
+        "psr-4": {
+            "QrcodeAi\\BarcodeScanner\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "QrcodeAi\\BarcodeScanner\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        },
+        "sort-packages": true
+    },
+    "archive": {
+        "exclude": [
+            "/tests",
+            "/phpunit.xml.dist",
+            "/composer.lock",
+            "/.gitignore"
+        ]
+    }
+}

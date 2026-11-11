@@ -161,8 +161,9 @@ python3 /path/to/scripts/destination-acceptance.py removed \
   --receipt receipt.json
 ```
 
-The programs are in [`drivers/`](drivers/): `node-package.mjs` for the Node.js package and
-`python-package.py` for the Python package. Each one only scans and writes
+The programs are in [`drivers/`](drivers/): `node-package.mjs` for the Node.js package,
+`python-package.py` for the Python package and `php-package.php` for the PHP package, which
+drives an installed `qrscan`. Each one only scans and writes
 `fast.json`, `frame.json` and `full.json`; it judges nothing. A report read from a file has no
 exit code, so the receipt records `null` for it.
 
