@@ -6,14 +6,24 @@ command of the
 and returns its JSON report unchanged. It holds no decoder of its own, uses the standard library
 only and needs no cgo.
 
-> **Not published yet.** This package is checked in the engine repository against the released
-> `qrscan` 0.11.0. It has no tagged version: `go get` does not find it today.
-
 | | QR codes | Barcodes |
 | --- | --- | --- |
 | **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
 | **Go guide** | [QR code scanner for Go](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/go) | [Barcode scanner for Go](https://qrcode-ai.com/en-US/barcode-scanner/sdk/go) |
 | **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
+## Install
+
+```sh
+go get github.com/qrcode-ai-com/qrcode-barcode-scanner-go@v0.11.0
+```
+
+```go
+import qrscan "github.com/qrcode-ai-com/qrcode-barcode-scanner-go"
+```
+
+The package follows the engine it drives: version 0.11.x of the package works with `qrscan`
+0.11.x. The first version is 0.11.0.
 
 ## What you need
 
