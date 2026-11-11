@@ -481,6 +481,27 @@ must be a user's. 0.11.0 is the first version under every package's new
 name: [First publication of a new name](#first-publication-of-a-new-name),
 after the owner steps, says how those first versions go up.
 
+**Lanes that need a stored token do not live here.** The owner decided on
+11 November 2026 where they run. A destination that can only be updated with a
+long-lived token, such as an image mirror or a store with no OIDC path, gets
+its publishing job in the satellite repository
+`qrcode-ai-com/qrcode-barcode-scanner-distribution`, never in this one. That
+repository is created with its first lane. Each registry gets its own
+protected environment there, holding only that registry's token, and its
+deployment rule and tag rule are set before the token is added. A lane whose
+registry supports OIDC stays in this repository, under the rules above. The
+first version under a new name remains the owner's upload.
+
+**Packaging releases.** Extras that repack a published version without
+changing its source are attached to releases of their own:
+`linux-packages-vX.Y.Z` (Debian packages), `rpm-packages-vX.Y.Z` (Fedora
+RPMs) and `appimage-vX.Y.Z` (the AppImage). The `vX.Y.Z` release, its tag and
+its files stay as published. No workflow creates these releases: the owner
+creates each one, or gives an explicit go for it, from files a workflow built
+and judged, and it is never marked as the latest release. These tag patterns
+are not covered by a tag ruleset today, unlike `v*`, `oci-v*` and
+`agents-v*`.
+
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
 file: npm-package-arg looks for a hosted-git shorthand before a file. So the
