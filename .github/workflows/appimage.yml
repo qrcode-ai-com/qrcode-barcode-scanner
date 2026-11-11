@@ -104,6 +104,25 @@ jobs:
               apt-get install --yes --quiet --quiet --no-install-recommends appstream >/dev/null
               appstreamcli --version
               appstreamcli validate --no-net /recipe/qrcode-barcode-scanner.appdata.xml'
+      # The AppImage catalogue converts the description with its own, older tool. A description
+      # that this tool cannot read would fail the catalogue's test.
+      - name: Convert the AppStream description with the catalogue's own tool
+        if: matrix.architecture == 'x86_64'
+        env:
+          CATALOGUE_TOOL: https://github.com/AppImage/appimage.github.io/releases/download/deps/appstreamcli-x86_64.AppImage
+          CATALOGUE_TOOL_SHA256: 0b567ce75945bea2ba047533290ab85fb62749b025ef8bfbf8726e8b28c3e35f
+        run: |
+          set -euo pipefail
+          sudo apt-get install --yes --no-install-recommends libfuse2
+          tool="$RUNNER_TEMP/appstreamcli-x86_64.AppImage"
+          env -u GH_TOKEN -u GITHUB_TOKEN curl --fail --silent --show-error --location \
+            --retry 3 --max-time 300 --output "$tool" "$CATALOGUE_TOOL"
+          # A different file means the catalogue changed its tool: read it, then update this pin.
+          printf '%s  %s\n' "$CATALOGUE_TOOL_SHA256" "$tool" | sha256sum --strict --check
+          chmod +x "$tool"
+          "$tool" convert distribution/appimage/qrcode-barcode-scanner.appdata.xml "$RUNNER_TEMP/appdata.yaml"
+          test -s "$RUNNER_TEMP/appdata.yaml"
+          cat "$RUNNER_TEMP/appdata.yaml"
       - name: Inspect what the file holds
         run: |
           set -euo pipefail
