@@ -1,0 +1,38 @@
+# Spike for owner decision 4 (Go under wazero). Its own workspace: it has its own lock file and
+# is built only by the workflow `Go WASI spike`, for the target wasm32-wasip1.
+[workspace]
+
+[package]
+name = "qrcode-ai-scanner-wasi"
+description = "WASI exports of qrcode-barcode-scanner for hosts that load WebAssembly without JavaScript"
+publish = false
+version = "0.11.0"
+edition = "2024"
+rust-version = "1.88"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The same engines as the browser module, without rayon: WASI preview 1 has no threads.
+qrcode-barcode-scanner = { path = "../../../crates/qrcode-ai-scanner", default-features = false, features = [
+  "engine-rqrr",
+  "engine-rxing",
+  "serde",
+] }
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# The same arithmetic guard as the workspace keeps on this decoder.
+[profile.release.package.rxing]
+overflow-checks = true
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

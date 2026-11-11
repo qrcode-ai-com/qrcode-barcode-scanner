@@ -1,0 +1,109 @@
+name: Go WASI spike
+
+# Spike for the Go route (owner decision of 11 November 2026): the engine compiled to
+# wasm32-wasip1 behind plain exports and loaded by wazero from Go, with no cgo. It builds the
+# module, runs the Go tests in wazero's compiler and in its interpreter, compares every report
+# with the released native command and records the module's size and the scan times.
+# Nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/go-wasi-spike.yml
+      - bindings/go/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-wasi-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.99.1"
+  # The public release whose native command the reports are compared with.
+  RELEASE_REPOSITORY: qrcode-ai-com/qrcode-barcode-scanner
+  RELEASE_TAG: v0.11.0
+  RELEASE_VERSION: 0.11.0
+  SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+
+jobs:
+  module:
+    name: Build the WASI module
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-wasip1
+      - name: Build the engine for wasm32-wasip1
+        run: |
+          cargo build --manifest-path bindings/go/wasi/Cargo.toml --target wasm32-wasip1 --release --locked
+          mkdir module
+          cp bindings/go/wasi/target/wasm32-wasip1/release/qrcode_ai_scanner_wasi.wasm module/qrscan.wasm
+          (cd module && sha256sum qrscan.wasm | tee qrscan.wasm.sha256 && wc -c qrscan.wasm)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: go-wasi-module
+          path: module/
+          if-no-files-found: error
+          retention-days: 30
+
+  go:
+    name: Go tests · ${{ matrix.target }}
+    needs: module
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    env:
+      TARGET: ${{ matrix.target }}
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: go-wasi-module
+          path: module
+      - name: Download the public native CLI without a token and check it
+        run: |
+          python3 scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+          mkdir "$RUNNER_TEMP/install"
+          tar -xzf "$RUNNER_TEMP/download/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET.tar.gz" -C "$RUNNER_TEMP/install"
+          echo "QRSCAN_NATIVE=$RUNNER_TEMP/install/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET/qrscan" >> "$GITHUB_ENV"
+      # The Go of the hosted image fetches the toolchain go.mod names. No C compiler is used.
+      - name: Run the Go tests with wazero, compiler and interpreter
+        working-directory: bindings/go
+        env:
+          QRSCAN_WASM: ${{ github.workspace }}/module/qrscan.wasm
+          QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
+          QRSCAN_MEASURE_OUT: ${{ github.workspace }}/measurements/measurements-${{ matrix.target }}.json
+        run: |
+          mkdir "$GITHUB_WORKSPACE/measurements"
+          (cd "$GITHUB_WORKSPACE/module" && shasum -a 256 -c qrscan.wasm.sha256)
+          go version
+          go vet ./...
+          go test -count=1 -v ./...
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: go-wasi-measurements-${{ matrix.target }}
+          path: measurements/
+          if-no-files-found: error
+          retention-days: 90
