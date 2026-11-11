@@ -5,8 +5,9 @@ name: Destination acceptance
 # release anonymously, checks it against the release's checksum list, unpacks it and scans. Two
 # install the public npm and PyPI packages in a new project and scan through them. One pulls the
 # public container image by digest and scans inside it. One builds and installs the public AUR
-# recipe in a new Arch Linux container. Nothing is built from this repository's source and
-# nothing is published.
+# recipe in a new Arch Linux container. One starts the public MCP adapter the way a client does,
+# with npx and an exact version, and scans through the protocol. Nothing is built from this
+# repository's source and nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -181,6 +182,79 @@ jobs:
         if: always()
         with:
           name: destination-acceptance-npm-node${{ matrix.node }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  mcp-npx:
+    name: MCP adapter started with npx · Node.js ${{ matrix.node }} · ${{ matrix.runner }}
+    needs: self-test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            node: "22"
+          - runner: ubuntu-24.04
+            node: "24"
+          - runner: macos-15
+            node: "24"
+    env:
+      # The public adapter and the launch entry of bundles and install links: npx, an exact
+      # version, no install script.
+      ADAPTER: "@qrcode-ai-com/qrcode-barcode-scanner-mcp"
+      ADAPTER_VERSION: 0.2.1
+      NAME: mcp-npx-node${{ matrix.node }}-${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      # An empty home: npx finds no earlier copy and no configuration, as on a first start.
+      - name: Start the public adapter with npx and scan through the protocol
+        run: |
+          mkdir "$RUNNER_TEMP/home" "$RUNNER_TEMP/work" receipt
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          (cd "$RUNNER_TEMP/work" && HOME="$RUNNER_TEMP/home" \
+            node "$GITHUB_WORKSPACE/distribution/acceptance/drivers/mcp-server.mjs" "$image" "$RUNNER_TEMP/reports" \
+              -- npx --yes --ignore-scripts "$ADAPTER@$ADAPTER_VERSION")
+          cp "$RUNNER_TEMP/reports/server.json" "receipt/server-$NAME.json"
+          # The server that answered is the pinned adapter, and it ended when its input closed.
+          jq -e --arg version "$ADAPTER_VERSION" \
+            '.serverInfo.version == $version and (.tools | index("scan_image")) != null and .afterStdinClosed.code == 0' \
+            "receipt/server-$NAME.json"
+          python3 scripts/destination-acceptance.py reports --kind server \
+            --produced-by "node mcp-server.mjs -- npx --yes --ignore-scripts $ADAPTER@$ADAPTER_VERSION" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "npm · MCP adapter started with npx" \
+            --identifier "$ADAPTER@$ADAPTER_VERSION" \
+            --version "$RELEASE_VERSION" \
+            --url "https://www.npmjs.com/package/$ADAPTER/v/$ADAPTER_VERSION" \
+            --install "npx --yes --ignore-scripts $ADAPTER@$ADAPTER_VERSION" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-$NAME.json"
+      # npx keeps what it started under _npx in npm's cache. Without it, a start that may not
+      # install must fail. The command reads no input, so a server still there would end at once.
+      - name: Remove the copy npx kept and close the receipt
+        run: |
+          rm -r "$RUNNER_TEMP/home/.npm/_npx"
+          cd "$RUNNER_TEMP/work"
+          HOME="$RUNNER_TEMP/home" python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "sh -c 'npx --no $ADAPTER@$ADAPTER_VERSION < /dev/null'" \
+            --uninstall "rm -r ~/.npm/_npx" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-$NAME.json"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-$NAME.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-${{ env.NAME }}
           path: receipt/
           if-no-files-found: error
           retention-days: 90

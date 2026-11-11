@@ -70,6 +70,40 @@ configuration location and check that it discovers `scan_image`,
 also appears as `qrscan-mcp`; the explicit Node and script paths above make the
 selected runtime and installed copy unambiguous.
 
+### Start it with npx
+
+Bundles and install links start the adapter the same way in every client:
+`npx`, an exact version, no install script.
+
+```json
+{
+  "mcpServers": {
+    "qrscan": {
+      "command": "npx",
+      "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1"]
+    }
+  }
+}
+```
+
+- **An exact version, never a range or `latest`.** The client runs the version
+  that was qualified, and a newer one reaches it only when this entry changes.
+- The first start downloads the adapter and its dependencies from npm into
+  npm's cache, then runs it. Later starts reuse that copy. As with any npm
+  install without a lock file, what the adapter's three pinned dependencies
+  depend on is resolved when that copy is made.
+- `--ignore-scripts` keeps npm from running any install script on the way.
+- To run a reviewed copy that never contacts npm at start, use the installed
+  form above, with absolute paths.
+- To remove it, delete the entry from the client. The files npx kept are
+  under `_npx` in npm's cache (`npm config get cache`).
+
+The repository's `Destination acceptance` workflow starts the published 0.2.1
+with exactly this entry in an empty home, on Linux with Node.js 22 and 24 and
+on macOS with Node.js 24, then reads the QR code and the Code 128 through
+`scan_image` in the three profiles. Windows is not checked: a client there
+may need to start `npx` through `cmd`.
+
 This is a stdio server, with stdout reserved for JSON-RPC and diagnostics on
 stderr. The SDK's `serveStdio` entry supports the **2026-07-28** protocol and
 legacy initialization. No HTTP service or hosted MCP endpoint is included.
