@@ -17,7 +17,7 @@ only and needs no cgo.
 
 ## What you need
 
-- Go 1.25 or later. `CGO_ENABLED=0` works: there is no C code.
+- Go 1.24 or later. `CGO_ENABLED=0` works: there is no C code.
 - The `qrscan` command, version 0.11.x, installed separately. The
   [distribution guide](../../distribution/README.md) lists the routes: Homebrew, Scoop, the
   Debian and RPM packages, the AUR, `cargo install`, the release archives and the container
