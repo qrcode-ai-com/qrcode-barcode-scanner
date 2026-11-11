@@ -11,7 +11,8 @@ same local engine that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/
 
 To try the engine locally in a browser, use the [WASM image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
 
-[Runtime packages](#published-runtime-packages) · [CLI and containers](#cli-and-containers)
+[Runtime packages](#published-runtime-packages) · [Packages that drive the CLI](#packages-that-drive-the-installed-cli)
+· [CLI and containers](#cli-and-containers)
 · [Browser CDNs and indexes](#browser-cdns-and-package-indexes) · [Agent integrations](#published-agent-integrations)
 
 ## Published runtime packages
@@ -31,6 +32,27 @@ automatically from these six packages, all at **0.11.0**.
 - macOS · [`darwin-arm64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-arm64/v/0.11.0) · [`darwin-x64`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-darwin-x64/v/0.11.0)
 - Linux · [`linux-arm64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-arm64-gnu/v/0.11.0) · [`linux-x64-gnu`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-gnu/v/0.11.0) · [`linux-x64-musl`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-linux-x64-musl/v/0.11.0)
 - Windows · [`win32-x64-msvc`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-win32-x64-msvc/v/0.11.0)
+
+## Packages that drive the installed CLI
+
+These packages hold no decoder. Each one starts the `qrscan` command you installed
+([CLI and containers](#cli-and-containers)) and returns its JSON report unchanged. One scan is
+one process.
+
+| Language | Package | Version | Works with |
+| --- | --- | --- | --- |
+| Go | [`github.com/qrcode-ai-com/qrcode-barcode-scanner-go`](https://pkg.go.dev/github.com/qrcode-ai-com/qrcode-barcode-scanner-go@v0.11.0) | 0.11.0 | `qrscan` 0.11.x |
+
+```sh
+go get github.com/qrcode-ai-com/qrcode-barcode-scanner-go@v0.11.0
+```
+
+The Go package needs Go 1.24 or later, uses the standard library only and has no C code. Its
+guide is [`bindings/go`](../bindings/go/README.md). It is served from its own repository,
+[`qrcode-ai-com/qrcode-barcode-scanner-go`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-go),
+which is generated from this one and never edited by hand. Version 0.11.0 was installed through
+the public Go proxy in an empty module, on Linux, macOS and Windows, and read the mixed fixture
+in the three profiles.
 
 ## Browser CDNs and package indexes
 

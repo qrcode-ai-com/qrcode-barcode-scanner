@@ -1243,6 +1243,13 @@ is green. `distribution/README.md` lists the package only once the proxy
 serves the tag and a consumer that ran `go get` from an empty module has
 passed.
 
+Version 0.11.0 was tagged on 11 November 2026, on the mirror commit staged
+from `e0d5b12`. After each new tag, move three things in one pull request
+here: `MODULE_VERSION` of the `go-module` job of
+`.github/workflows/destination-acceptance.yml`, the install line of
+`bindings/go/README.md`, and the row of `distribution/README.md`. The job
+then proves the new version from the proxy on three systems.
+
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
 The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the
