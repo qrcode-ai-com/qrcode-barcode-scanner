@@ -1196,6 +1196,13 @@ of the package is a tag `vX.Y.Z` in the mirror. Only the owner creates it, and
 Packagist reads it through its hook. The first listing needs the owner's
 sign-in on packagist.org.
 
+The owner decided on 11 November 2026 that the package follows the engine it
+drives: its first version is 0.11.0, for `qrscan` 0.11.x, and its minimum PHP
+is 8.2. A package version is cut from a mirror commit whose `SOURCE.json`
+names a merged commit of this repository, after that mirror commit's workflow
+is green. `distribution/README.md` lists the package only once Packagist
+serves it and a consumer installed from Packagist has passed.
+
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
 The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the

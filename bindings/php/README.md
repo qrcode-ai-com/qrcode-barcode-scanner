@@ -5,15 +5,20 @@ Read QR codes and barcodes from an image file in PHP. This package drives the in
 [QR Code & Barcode Scanner engine](https://github.com/qrcode-ai-com/qrcode-barcode-scanner)
 and returns its JSON report unchanged. It holds no decoder of its own.
 
-> **Not published yet.** This is the first version of the PHP route, checked in the engine
-> repository against the released `qrscan` 0.11.0. It is not on Packagist: `composer require`
-> does not find it today.
-
 | | QR codes | Barcodes |
 | --- | --- | --- |
 | **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
 | **PHP guide** | [QR code scanner for PHP](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/php) | [Barcode scanner for PHP](https://qrcode-ai.com/en-US/barcode-scanner/sdk/php) |
 | **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
+## Install
+
+```sh
+composer require qrcode-ai-com/qrcode-barcode-scanner:^0.11
+```
+
+The package follows the engine it drives: version 0.11.x of the package works with `qrscan`
+0.11.x. The first version is 0.11.0.
 
 ## What you need
 
