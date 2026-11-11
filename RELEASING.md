@@ -986,6 +986,21 @@ and `server.json`. It uses the published scanner `0.11.0`; publishing an adapter
 version does not rebuild or republish the Rust, Node, Python or WASM engine.
 Published versions and tags are immutable.
 
+The adapter source on `main` may be ahead of the published version: the
+`scan_file` tool landed after 0.2.1 and ships with 0.3.0. A new adapter version
+is one commit that changes all of these together:
+
+- `version` in `integrations/mcp/package.json`, and the two root versions of
+  its `package-lock.json`;
+- `version` and `packages[0].version` in `integrations/mcp/server.json`;
+- `ADAPTER_VERSION` in `integrations/mcp/src/server.mjs`;
+- the two version checks of `integrations/mcp/test/protocol-consumer.mjs`;
+- the version table, the install line and the release paragraph of
+  `integrations/mcp/README.md`.
+
+`distribution/README.md` and the pins of `scripts/mcp-registry-publish.py`
+change after publication only, because they name what is public.
+
 `npm-mcp-publish.yml` runs on a pull request affecting its inputs, a manual
 dispatch, or an `agents-v*` tag. Pull requests and the default manual `inspect`
 mode pack and consume only: no environment, OIDC permission or upload. Rehearse

@@ -4,7 +4,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,7 +57,10 @@ await new Promise((accept, reject) => {
 assert.equal(oversizeStdout, "", "fatal framing diagnostics stay off protocol stdout");
 assert.match(oversizeStderr, /^qrscan-mcp: MCP transport error\n/);
 writeFileSync(join(evidence, "oversize-transport-receipt.json"), JSON.stringify({ verdict: "PASS", inputBytes: 12 * 1024 * 1024 + 1, peerKeptStdinOpen: true, serverExit: 1, stdoutBytes: 0, diagnostic: oversizeStderr, activeNativeWorkInterrupted: "NOT CLAIMED" }));
-for (const settings of [{ QRSCAN_MCP_MAX_INPUT_BYTES: "0" }, { QRSCAN_MCP_MAX_INPUT_BYTES: "8388609" }, { QRSCAN_MCP_MAX_PIXELS: "1.5" }, { QRSCAN_MCP_MAX_CONCURRENT: "3" }, { NAPI_RS_NATIVE_LIBRARY_PATH: "/private/unsupported.node" }]) {
+// An allowed-directory setting that is empty, relative, missing, a file, a filesystem root or too long stops the server.
+const directories = (value) => ({ QRSCAN_MCP_ALLOWED_DIRECTORIES: value });
+for (const settings of [{ QRSCAN_MCP_MAX_INPUT_BYTES: "0" }, { QRSCAN_MCP_MAX_INPUT_BYTES: "8388609" }, { QRSCAN_MCP_MAX_PIXELS: "1.5" }, { QRSCAN_MCP_MAX_CONCURRENT: "3" }, { NAPI_RS_NATIVE_LIBRARY_PATH: "/private/unsupported.node" },
+  directories(""), directories("relative/directory"), directories(join(consumer, "missing-directory")), directories(join(consumer, "package.json")), directories(parse(consumer).root), directories([consumer, ""].join(delimiter)), directories(Array(17).fill(consumer).join(delimiter))]) {
   const rejected = spawnSync(process.execPath, [join(installed, "src/cli.mjs")], { cwd: consumer, env: { PATH: process.env.PATH, ...settings }, input: "", encoding: "utf8", timeout: 10_000 });
   assert.equal(rejected.status, 1);
   assert.equal(rejected.stdout, "", "startup diagnostics cannot corrupt stdio");

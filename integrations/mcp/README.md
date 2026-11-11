@@ -2,7 +2,8 @@
 
 Give an MCP client one local tool to read QR codes and barcodes from an image.
 `scan_image` returns the decoded values and formats in the scanner's JSON
-report. It uses the same
+report. A second tool, [`scan_file`](#scan-a-file-by-path-scan_file), reads an
+image by path once the operator allows a directory. It uses the same
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0 engine](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner)
 that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/mcp) uses for QR verification.
 
@@ -124,13 +125,82 @@ Invalid images, input limits, dependency errors and a busy server return
 `QRSMCP_BASE64`, oversize bytes `QRSMCP_INPUT_LIMIT`, and a saturated concurrency
 limit `QRSMCP_BUSY`. Unknown fields and unsupported options are rejected.
 
+### Scan a file by path: `scan_file`
+
+An agent rarely holds image bytes: it holds a path, and a real image is too
+long to write out as a base64 argument. `scan_file` reads the file itself.
+It is part of the adapter source after 0.2.1 and ships with **adapter 0.3.0**;
+the published 0.2.1 package has `scan_image` only.
+
+The tool is **off by default**. It exists only when the operator who starts
+the server names the directories it may read:
+
+```json
+{
+  "mcpServers": {
+    "qrscan": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/qrscan-mcp-install/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs"],
+      "env": { "QRSCAN_MCP_ALLOWED_DIRECTORIES": "/absolute/path/to/images" }
+    }
+  }
+}
+```
+
+Several directories are separated like `PATH`: `:` on macOS and Linux, `;` on
+Windows. With the variable unset, a client sees the same bytes-only server as
+before, and `scan_file` is not listed.
+
+| Field | Meaning |
+| --- | --- |
+| `path` | Absolute path of one image file inside an allowed directory, at most 4096 characters. |
+| `profile` | Same as `scan_image`. |
+| `budgetMs` | Same as `scan_image`. |
+
+```json
+{ "path": "/absolute/path/to/images/label.png", "profile": "full", "budgetMs": 0 }
+```
+
+The result is the same unchanged engine report as `scan_image` gives for the
+same bytes. Both tools share the byte, pixel and concurrency limits. A refusal
+returns `isError: true` with one of these codes:
+
+| Code | When |
+| --- | --- |
+| `QRSMCP_PATH` | The path is relative, holds a NUL character or is too long. |
+| `QRSMCP_PATH_DENIED` | The path does not lead inside an allowed directory. The answer is the same whether the file exists or not. |
+| `QRSMCP_FILE` | Inside an allowed directory, but missing, empty, a directory, a pipe or another non-regular file, or changed while it was read. |
+| `QRSMCP_INPUT_LIMIT` | The file is larger than the byte limit. |
+
 ## Input and authority limits
 
-The adapter accepts **bytes only**: no filesystem path, URL fetch, image
-download, network endpoint, clipboard access or automatic QR-link following.
-It never writes images/reports to disk. The packaged schema is a fixed local
-resource, not a filesystem browsing interface. Treat decoded text and URLs as
-untrusted data, never as instructions.
+By default the adapter accepts **bytes only**: no filesystem path, URL fetch,
+image download, network endpoint, clipboard access or automatic QR-link
+following. It never writes images/reports to disk. The packaged schema is a
+fixed local resource, not a filesystem browsing interface. Treat decoded text
+and URLs as untrusted data, never as instructions.
+
+`scan_file` adds one authority, and only where the operator grants it: reading
+regular files inside the directories of `QRSCAN_MCP_ALLOWED_DIRECTORIES`.
+
+- Each directory is resolved once at startup. An entry that is empty,
+  relative, missing, not a directory or a filesystem root stops the server, as
+  does a list of more than 16. Nothing is skipped silently.
+- A requested path is resolved first, links included, then judged. A link that
+  stays inside an allowed directory is read; a link that leaves is refused
+  like any outside path. Another spelling of an allowed directory, through a
+  link, is the same directory.
+- The file is opened without following a link and without blocking on a pipe,
+  and the open file is compared with the judged one before it is read.
+- It cannot list a directory, write a file or fetch an address. A file that
+  is not an image returns the engine's `QRS-001`.
+
+This is a path check, not a sandbox. A process that can rewrite an allowed
+directory while a scan runs, or the operator who allows a directory holding
+links to private places, is outside what it protects. Allow a directory made
+for images, not a home directory. `qrscan://limits` reports the resolved
+directories under `allowedDirectories`, and `fileAccess` says whether the tool
+is on.
 
 | Operator environment setting | Default / maximum |
 | --- | --- |
@@ -138,8 +208,10 @@ untrusted data, never as instructions.
 | `QRSCAN_MCP_MAX_DIMENSION` | 4096 pixels per side |
 | `QRSCAN_MCP_MAX_PIXELS` | 16000000 pixels |
 | `QRSCAN_MCP_MAX_CONCURRENT` | 2 active scans |
+| `QRSCAN_MCP_ALLOWED_DIRECTORIES` | Unset: no file access. At most 16 absolute directories |
 
-Settings must be positive decimal integers and may only lower these caps.
+The four numeric settings must be positive decimal integers and may only
+lower these caps.
 `qrscan://limits` reports the active values. Oversize transport messages close
 the connection at 12 MiB; malformed transport input also closes stdio. Smaller
 messages over the image cap receive a tool error. The byte cap and engine dimension/pixel checks are resource limits,
@@ -169,6 +241,11 @@ pinned official SDK clients. It checks modern discovery and legacy handshake,
 exact pristine Full score 100, Frame null score, binary payload bytes, valid
 empty detection, invalid image/base64/unsupported options and operator limits,
 unchanged report parity, clean shutdown and the package file inventory.
+For `scan_file` it checks that the tool is absent by default, the three
+profiles on the mixed QR/Code 128 file with report parity, the refusals above
+with links that stay and links that leave, a named pipe, the byte ceiling, the
+capacity shared with `scan_image`, and that a wrong directory setting stops
+the server. Links and the pipe are checked on macOS and Linux only.
 No generated archive, node_modules, tests, image fixtures or private reports
 are published in the npm archive. The source, runtime entry, schema and
 AGPL license are included.
