@@ -1,0 +1,105 @@
+name: Tests
+
+# This repository is generated from the engine repository,
+# https://github.com/qrcode-ai-com/qrcode-barcode-scanner: SOURCE.json names the commit and the
+# sha256 of every file. Nothing here is edited by hand. The tests start the qrscan command of
+# the engine, downloaded from its public release and checked against the release's list.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  RELEASE_URL: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/v0.11.0
+  RELEASE_VERSION: 0.11.0
+  SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+
+jobs:
+  tests:
+    name: Tests · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The checksum list is pinned here by its own sha256; the archive is then checked against
+      # the list. The Windows archive is a zip and its command is qrscan.exe.
+      - name: Download the public qrscan without a token and check it
+        run: |
+          sum() { if command -v sha256sum > /dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+          asset="qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET"
+          list="qrcode-barcode-scanner-cli-$RELEASE_VERSION-SHA256SUMS"
+          mkdir "$RUNNER_TEMP/qrscan"
+          cd "$RUNNER_TEMP/qrscan"
+          if [ "$RUNNER_OS" = Windows ]; then archive="$asset.zip" command="qrscan.exe"; else archive="$asset.tar.gz" command="qrscan"; fi
+          curl -fsSLO "$RELEASE_URL/$list"
+          curl -fsSLO "$RELEASE_URL/$archive"
+          echo "$SUMS_SHA256  $list" | sum -c -
+          grep -F "  $archive" "$list" | sum -c -
+          if [ "$RUNNER_OS" = Windows ]; then
+            powershell -NoProfile -Command "Expand-Archive -Path '$archive' -DestinationPath ."
+          else
+            tar -xzf "$archive"
+          fi
+          test -f "$asset/$command"
+          echo "QRSCAN_BINARY=$RUNNER_TEMP/qrscan/$asset/$command" >> "$GITHUB_ENV"
+      # The Linux and Windows images carry Go. The macOS image does not put one on PATH.
+      - name: Install Go with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install go
+      # The package has no dependency and no C code: the tests run with cgo off.
+      - name: Run the tests against the released qrscan
+        env:
+          CGO_ENABLED: "0"
+          QRSCAN_FIXTURES: ${{ github.workspace }}/testdata/fixtures
+        run: |
+          go version
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test -count=1 ./...
+
+  provenance:
+    name: Every file comes from the engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The engine's own program stages the commit SOURCE.json names and compares it with this
+      # tree: same files, same bytes, nothing else.
+      - name: Stage the recorded engine commit again and compare
+        run: |
+          revision=$(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])")
+          git init --quiet "$RUNNER_TEMP/engine"
+          git -C "$RUNNER_TEMP/engine" remote add origin https://github.com/qrcode-ai-com/qrcode-barcode-scanner
+          git -C "$RUNNER_TEMP/engine" fetch --quiet --depth 1 origin "$revision"
+          git -C "$RUNNER_TEMP/engine" checkout --quiet FETCH_HEAD
+          python3 "$RUNNER_TEMP/engine/scripts/stage-go-package.py" verify "$GITHUB_WORKSPACE"

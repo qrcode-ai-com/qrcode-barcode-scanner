@@ -1,0 +1,190 @@
+name: Go adapter
+
+# The Go package under bindings/go starts the installed qrscan command. This workflow runs its
+# tests against the public CLI of a release, with cgo off: on Linux and Windows with the Go of
+# the hosted image and on macOS with Homebrew's. It then requires the package from an empty
+# module and judges three real scans with the destination acceptance driver. Nothing is built
+# from the engine's Rust source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/go-adapter.yml
+      - bindings/go/**
+      - scripts/stage-go-package.py
+      - distribution/acceptance/drivers/go-package.go
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - scripts/packed-cli-consumer.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - fixtures/clean/gen_v5_q.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The public release whose CLI the package drives, and the sha256 of its checksum list.
+  RELEASE_REPOSITORY: qrcode-ai-com/qrcode-barcode-scanner
+  RELEASE_TAG: v0.11.0
+  RELEASE_VERSION: 0.11.0
+  SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+
+jobs:
+  # The package's own repository is written from a commit of this one by a program. Its self-test
+  # stages this commit, checks it against itself and refuses five altered trees.
+  stage:
+    name: Stage for the package's own repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/stage-go-package.py --self-test
+      - name: Stage this commit and check what it holds
+        run: |
+          python3 scripts/stage-go-package.py stage --out "$RUNNER_TEMP/staged"
+          python3 scripts/stage-go-package.py verify "$RUNNER_TEMP/staged"
+          cd "$RUNNER_TEMP/staged"
+          test -f go.mod
+          test -f LICENSE
+          test -f .github/workflows/tests.yml
+          test -f testdata/fixtures/symbology/mixed-code128-qr.png
+          go vet ./...
+
+  tests:
+    name: Tests · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    env:
+      TARGET: ${{ matrix.target }}
+      # The package has no C code: every Go command here runs with cgo off.
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Download the public CLI without a token and check it
+        run: |
+          python scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+      # The Windows archive is a zip and its command is qrscan.exe.
+      - name: Unpack it outside the checkout
+        run: |
+          asset="qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET"
+          mkdir "$RUNNER_TEMP/install"
+          if [ "$RUNNER_OS" = Windows ]; then
+            python -m zipfile -e "$RUNNER_TEMP/download/$asset.zip" "$RUNNER_TEMP/install"
+            command="qrscan.exe"
+          else
+            tar -xzf "$RUNNER_TEMP/download/$asset.tar.gz" -C "$RUNNER_TEMP/install"
+            command="qrscan"
+          fi
+          test -f "$RUNNER_TEMP/install/$asset/$command"
+          echo "QRSCAN_BINARY=$RUNNER_TEMP/install/$asset/$command" >> "$GITHUB_ENV"
+      # The Linux and Windows images carry Go. The macOS image does not put one on PATH.
+      - name: Install Go with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install go
+      - name: Run the tests against the released qrscan
+        working-directory: bindings/go
+        env:
+          QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
+        run: |
+          go version
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test -count=1 ./...
+
+  consumer:
+    name: Go module consumer · Linux
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+      MODULE: github.com/qrcode-ai-com/qrcode-barcode-scanner-go
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the public CLI without a token and check it
+        run: |
+          python3 scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+          mkdir "$RUNNER_TEMP/install"
+          tar -xzf "$RUNNER_TEMP/download/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET.tar.gz" -C "$RUNNER_TEMP/install"
+          echo "QRSCAN=$RUNNER_TEMP/install/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET/qrscan" >> "$GITHUB_ENV"
+      # The module has no tagged version. The empty module requires it and points that
+      # requirement at this checkout: nothing comes from a proxy.
+      - name: Require the package from an empty module and build the acceptance program
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" receipt
+          cd "$RUNNER_TEMP/consumer"
+          go mod init acceptance/consumer
+          go mod edit -require "$MODULE@v0.0.0" -replace "$MODULE=$GITHUB_WORKSPACE/bindings/go"
+          cp "$GITHUB_WORKSPACE/distribution/acceptance/drivers/go-package.go" main.go
+          go build -o consumer .
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          "$RUNNER_TEMP/consumer/consumer" "$image" "$RUNNER_TEMP/reports" "$QRSCAN"
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "go run . (go-package.go)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Go package from this checkout (not published)" \
+            --identifier "$MODULE" \
+            --version "$RELEASE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/go" \
+            --install "go mod edit -require $MODULE@v0.0.0 -replace $MODULE=bindings/go" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-go-module.json
+      # Without the requirement, a program that imports the package no longer builds. The proxy
+      # is off for that check, so nothing can be fetched in its place.
+      - name: Drop the requirement and close the receipt
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          rm consumer
+          go mod edit -droprequire "$MODULE" -dropreplace "$MODULE"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "env GOFLAGS=-mod=readonly GOPROXY=off go build ./..." \
+            --uninstall "go mod edit -droprequire $MODULE -dropreplace $MODULE" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-go-module.json"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-go-module.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: go-adapter-acceptance
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
