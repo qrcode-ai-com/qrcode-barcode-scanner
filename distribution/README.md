@@ -109,6 +109,16 @@ Node.js 22.22.2, this install matched all five source files. Its helper used
 engine 0.11.0 and returned the QR payload and Code 128 `STOCK-4827` together
 in `fast`, `frame`, and `full`. This route installs directly from GitHub.
 
+To remove the skill from the project:
+
+```sh
+DISABLE_TELEMETRY=1 npx --yes skills@1.7.6 remove qrcode-barcode-scanner --agent codex --yes
+```
+
+On 11 November 2026 the same install put the five files in
+`.agents/skills/qrcode-barcode-scanner`, and this command deleted that folder.
+It leaves `skills-lock.json` in the project, with no skill listed.
+
 ### Install the portable skill in Hermes
 
 Hermes Agent installs the skill from its GitHub path. No account is needed:
@@ -168,7 +178,9 @@ mkdir -p skills/qrcode-barcode-scanner
 tar -xzf qrcode-barcode-scanner-skill-0.2.0.tar.gz -C skills/qrcode-barcode-scanner
 ```
 
-The skill does not install the engine: follow its `SKILL.md`.
+The skill does not install the engine: follow its `SKILL.md`. To remove
+either install, delete its folder: `./.qrscan-mcp` for the adapter,
+`skills/qrcode-barcode-scanner` for the skill.
 
 On macOS ARM64, the three files were fetched signed out and used as written
 here. The adapter installed from its file in empty projects with Node.js
