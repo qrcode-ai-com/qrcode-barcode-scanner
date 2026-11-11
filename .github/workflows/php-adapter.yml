@@ -1,0 +1,215 @@
+name: PHP adapter
+
+# The PHP package under bindings/php starts the installed qrscan command. This workflow runs its
+# tests against the public CLI of a release: on Linux, macOS and Windows with the PHP of each
+# hosted image, and on Linux with the oldest and the newest PHP line. It then installs the
+# package in an empty project through Composer and judges three real scans with the destination
+# acceptance driver. Nothing is built from the engine's Rust source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/php-adapter.yml
+      - bindings/php/**
+      - distribution/acceptance/drivers/php-package.php
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - scripts/packed-cli-consumer.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - fixtures/clean/gen_v5_q.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: php-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The public release whose CLI the package drives, and the sha256 of its checksum list.
+  RELEASE_REPOSITORY: qrcode-ai-com/qrcode-barcode-scanner
+  RELEASE_TAG: v0.11.0
+  RELEASE_VERSION: 0.11.0
+  SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+
+jobs:
+  tests:
+    name: Tests · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Download the public CLI without a token and check it
+        run: |
+          python scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+      # The Windows archive is a zip and its command is qrscan.exe.
+      - name: Unpack it outside the checkout
+        run: |
+          asset="qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET"
+          mkdir "$RUNNER_TEMP/install"
+          if [ "$RUNNER_OS" = Windows ]; then
+            python -m zipfile -e "$RUNNER_TEMP/download/$asset.zip" "$RUNNER_TEMP/install"
+            command="qrscan.exe"
+          else
+            tar -xzf "$RUNNER_TEMP/download/$asset.tar.gz" -C "$RUNNER_TEMP/install"
+            command="qrscan"
+          fi
+          test -f "$RUNNER_TEMP/install/$asset/$command"
+          echo "QRSCAN_BINARY=$RUNNER_TEMP/install/$asset/$command" >> "$GITHUB_ENV"
+      # The PHP and the Composer of the hosted image, as a developer on that system has them.
+      - name: Install the test dependencies from the lock file
+        working-directory: bindings/php
+        run: |
+          php --version
+          composer --version
+          composer validate --strict
+          composer install --no-interaction --no-progress
+      - name: Run the tests against the released qrscan
+        working-directory: bindings/php
+        env:
+          QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
+        run: php vendor/bin/phpunit
+
+  php-lines:
+    name: Tests · PHP ${{ matrix.php }} · Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest line the package accepts and the newest released one.
+          - php: "8.2"
+            image: php:8.2-cli@sha256:604de2f0cba9e9dde16cf717c2f03b0948c99949bdf7c11cdf76326e0da7d2ea
+          - php: "8.5"
+            image: php:8.5-cli@sha256:50956f094e90a716d43bea28087d447555ad80510e386ab8c9c10d8c70d781a9
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+      PHP_IMAGE: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the public CLI without a token and check it
+        run: |
+          python3 scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+          mkdir "$RUNNER_TEMP/install"
+          tar -xzf "$RUNNER_TEMP/download/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET.tar.gz" -C "$RUNNER_TEMP/install"
+      # The lock file is resolved for PHP 8.2, so the same packages install for every line.
+      - name: Install the test dependencies from the lock file
+        working-directory: bindings/php
+        run: composer install --no-interaction --no-progress
+      # The tests run inside the image of that PHP line, with no network.
+      - name: Run the tests in the PHP image
+        run: |
+          docker run --rm --network none \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/bindings/php,dst=/package" \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/fixtures,dst=/fixtures,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/install/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET,dst=/cli,readonly" \
+            --env QRSCAN_BINARY=/cli/qrscan --env QRSCAN_FIXTURES=/fixtures --workdir /package \
+            "$PHP_IMAGE" sh -c 'php --version && php vendor/bin/phpunit'
+
+  consumer:
+    name: Composer consumer · Linux
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TARGET: x86_64-unknown-linux-gnu
+      PACKAGE: qrcode-ai-com/qrcode-barcode-scanner
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the public CLI without a token and check it
+        run: |
+          python3 scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+          mkdir "$RUNNER_TEMP/install"
+          tar -xzf "$RUNNER_TEMP/download/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET.tar.gz" -C "$RUNNER_TEMP/install"
+          echo "QRSCAN=$RUNNER_TEMP/install/qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET/qrscan" >> "$GITHUB_ENV"
+      # The package is not on Packagist. Composer copies it from this checkout, and from nowhere
+      # else: the public registry is switched off for this project.
+      - name: Install the package in an empty project through Composer
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" receipt
+          cd "$RUNNER_TEMP/consumer"
+          cat > composer.json <<JSON
+          {
+            "name": "acceptance/php-consumer",
+            "description": "An empty project that installs the scanner package.",
+            "license": "MIT",
+            "repositories": [
+              { "type": "path", "url": "$GITHUB_WORKSPACE/bindings/php", "options": { "symlink": false } },
+              { "packagist.org": false }
+            ],
+            "require": { "$PACKAGE": "@dev" }
+          }
+          JSON
+          composer install --no-interaction --no-progress --no-dev
+          test -f "vendor/$PACKAGE/src/Scanner.php"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          (cd "$RUNNER_TEMP/consumer" &&
+            php "$GITHUB_WORKSPACE/distribution/acceptance/drivers/php-package.php" "$image" "$RUNNER_TEMP/reports" "$QRSCAN")
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "php php-package.php" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "PHP package from this checkout (not published)" \
+            --identifier "$PACKAGE" \
+            --version "$RELEASE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/php" \
+            --install "composer require $PACKAGE:@dev" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-php-composer.json
+      # The check that the package is gone loads the project's autoloader and looks for the class.
+      - name: Remove it and close the receipt
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          composer remove --no-interaction --no-progress "$PACKAGE"
+          cat > gone.php <<'PHP'
+          <?php
+          require 'vendor/autoload.php';
+          exit(class_exists('QrcodeAi\BarcodeScanner\Scanner') ? 0 : 1);
+          PHP
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "php gone.php" \
+            --uninstall "composer remove $PACKAGE" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-php-composer.json"
+          python3 "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-php-composer.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: php-adapter-acceptance
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90

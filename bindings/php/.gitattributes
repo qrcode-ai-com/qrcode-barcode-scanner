@@ -1,0 +1,6 @@
+# Left out of the archive Composer downloads.
+/tests export-ignore
+/phpunit.xml.dist export-ignore
+/composer.lock export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
