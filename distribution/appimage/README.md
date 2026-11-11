@@ -5,10 +5,10 @@ downloads, marks executable and runs as `qrscan`, with nothing to install. The e
 stays byte-identical to the published `qrscan` on x86_64 and aarch64. The file also carries the
 licences, the notices and the pointer to the corresponding source.
 
-**Not published yet.** The recipe is built and judged on every change by the
-[`AppImage` workflow](../../.github/workflows/appimage.yml), and the result is a workflow
-artifact. No release carries the file and no catalogue lists it. Until then, use the
-[CLI archives](../cli/README.md).
+**Published on GitHub.** The two files and their SHA-256 list are attached to the release
+[`appimage-v0.11.0`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/appimage-v0.11.0).
+The engine release `v0.11.0` and its files did not change. The
+[AppImage catalogue](https://appimage.github.io/) does not list the application yet.
 
 | | QR codes | Barcodes |
 | --- | --- | --- |
@@ -90,22 +90,43 @@ For x86_64 and aarch64, on Ubuntu 22.04 runners:
    Fedora.
 
 Each check writes a receipt. The receipts and the two files are kept as workflow artifacts for
-14 days.
+14 days. Steps 4 to 6 are one script, [`judge.sh`](judge.sh), which also runs on any machine with
+Python 3 and Docker.
+
+Started by hand with a release tag, a second job judges the files that release already
+carries: it downloads the file signed out, checks it against the release's SHA-256 list and runs
+`judge.sh` on it.
+
+```sh
+gh workflow run appimage.yml -f release_tag=appimage-v0.11.0
+```
 
 ## Limits and choices to review
 
 - Two architectures, x86_64 and aarch64, and the GNU C library 2.28 or later. No musl build.
 - The clean hosts are containers, which have no FUSE: the acceptance there uses the unpack route.
   The FUSE route is only tried on the runner.
-- The application name is `qrcode-barcode-scanner`, all lowercase, as a command-line tool. The
-  owner may choose `qrscan` instead: change `Name=` in the desktop entry.
+- The application name is `qrcode-barcode-scanner`, all lowercase, as a command-line tool.
 - The icon is a neutral drawing, not the QR Code AI logo. Replace
   `qrcode-barcode-scanner.png` to use another one.
 - The AppStream description is under CC0-1.0, the licence AppStream asks for metadata. The
   program stays under AGPL-3.0-or-later.
-- Where the file is released and the entry in the
-  [AppImage catalogue](https://appimage.github.io/) are the owner's steps. The catalogue takes
-  the file from the newest release of the repository.
+- The files are released under their own tag, `appimage-vX.Y.Z`, so that the engine release
+  stays as it was published.
+- The entry in the [AppImage catalogue](https://appimage.github.io/) is the owner's step: one
+  file under `data/` of its repository, holding this repository's address. The catalogue takes
+  the AppImage from the newest release of the repository, so a later release without an
+  AppImage may make its test fail.
+
+## Publish
+
+1. Start the workflow on `main` and wait for both architectures to pass.
+2. Download its two artifacts. Write the SHA-256 list of the two files as
+   `qrcode-barcode-scanner-appimage-X.Y.Z-SHA256SUMS`.
+3. Create the release `appimage-vX.Y.Z` on the commit that was built, with the three files, not
+   marked as the latest release.
+4. Start the workflow again with `release_tag=appimage-vX.Y.Z`: the second job judges the public
+   files.
 
 ## Update for a new version
 
