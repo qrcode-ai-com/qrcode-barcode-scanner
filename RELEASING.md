@@ -1203,6 +1203,46 @@ names a merged commit of this repository, after that mirror commit's workflow
 is green. `distribution/README.md` lists the package only once Packagist
 serves it and a consumer installed from Packagist has passed.
 
+## Go package — its own repository
+
+The Go package of `bindings/go` is not published yet. It starts the installed
+`qrscan` command and holds no decoder: the owner chose that route on
+11 November 2026, after a WebAssembly build of the engine run inside the Go
+process gave the same reports about twenty times slower. A Go module is
+fetched from the root of a repository at a tag, so the package is served from
+`qrcode-ai-com/qrcode-barcode-scanner-go`, and its module path is
+`github.com/qrcode-ai-com/qrcode-barcode-scanner-go`. That repository holds
+nothing written by hand:
+
+```bash
+python3 scripts/stage-go-package.py stage --revision <commit> --out <empty directory>
+python3 scripts/stage-go-package.py verify <directory>
+```
+
+`stage` reads the package from git at that commit, never from the working
+tree, and writes the whole tree: the package, the workflow of
+`bindings/go/mirror/`, the two images its tests scan under `testdata/`, a
+directory the Go tools skip, the licence, which pkg.go.dev reads at the root,
+and `SOURCE.json`, which names the commit and the sha256 of every file.
+`verify` stages the commit `SOURCE.json` names and compares: same files, same
+bytes, nothing else. The mirror runs it on every push.
+
+To change the package, change `bindings/go` here, merge, stage the merged
+commit and replace the mirror's tree with the result in one commit. A version
+of the package is a tag `vX.Y.Z` in the mirror, and only the owner creates
+it. No account and no upload exist for Go: the public module proxy fetches
+the tag the first time someone asks for it, and pkg.go.dev lists the package
+from the proxy. A version the proxy has served cannot be replaced, so a tag
+is never moved or reused.
+
+The number of the first version is the owner's decision and is not taken.
+The proposal is the rule of the PHP package: follow the engine the package
+drives, so that 0.11.z is for `qrscan` 0.11.x. A package version is cut from
+a mirror commit whose `SOURCE.json` names a merged commit of this repository,
+after that mirror commit's workflow is green. `distribution/README.md` lists
+the package only once the proxy serves the tag and a consumer that ran
+`go get` from an empty module has passed.
+
 ## OCI 0.11 preparation — unchanged public CLI inputs
 
 The separate [0.11 recipe](distribution/docker/v0.11/README.md) repackages the
