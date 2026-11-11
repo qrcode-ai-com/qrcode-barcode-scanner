@@ -176,7 +176,10 @@ runs the driver's self-test and real consumers of the public 0.11.0 artifacts:
 - the PyPI package, under Python 3.11 and 3.14, installed in a new environment;
 - the container image, pulled by digest without a credential, on Linux amd64 and arm64;
 - the MCP adapter, started with `npx` and an exact version in an empty home, under Node.js 22
-  and 24 on Linux and Node.js 24 on macOS.
+  and 24 on Linux and Node.js 24 on macOS;
+- the Go module, on Linux x64, macOS arm64 and Windows x64: an empty module runs `go get` of the
+  exact version through the public proxy, with the public CLI archive as the installed
+  `qrscan`.
 
 ## Run it for an MCP server
 

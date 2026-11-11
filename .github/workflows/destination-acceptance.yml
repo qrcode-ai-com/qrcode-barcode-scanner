@@ -6,8 +6,9 @@ name: Destination acceptance
 # install the public npm and PyPI packages in a new project and scan through them. One pulls the
 # public container image by digest and scans inside it. One builds and installs the public AUR
 # recipe in a new Arch Linux container. One starts the public MCP adapter the way a client does,
-# with npx and an exact version, and scans through the protocol. Nothing is built from this
-# repository's source and nothing is published.
+# with npx and an exact version, and scans through the protocol. One requires the public Go module
+# at an exact version through the public proxy, from an empty module, and scans through the
+# public CLI. Nothing is built from this repository's source and nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -311,6 +312,114 @@ jobs:
         if: always()
         with:
           name: destination-acceptance-pypi-python${{ matrix.python }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The Go package holds no decoder: it starts the installed qrscan. Its consumer therefore
+  # installs two public things, the CLI archive of the release and the module from the proxy.
+  go-module:
+    name: Go module · ${{ matrix.target }}
+    needs: self-test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      # The published module and the exact version a user gets.
+      MODULE: github.com/qrcode-ai-com/qrcode-barcode-scanner-go
+      MODULE_VERSION: v0.11.0
+      # Only through the public proxy, checked by the public checksum database, with the Go of
+      # the host and no C code.
+      GOPROXY: https://proxy.golang.org
+      GOTOOLCHAIN: local
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Download the public CLI without a token and check it
+        run: |
+          python scripts/packed-cli-consumer.py fetch --repository "$RELEASE_REPOSITORY" --tag "$RELEASE_TAG" \
+            --sums-sha256 "$SUMS_SHA256" --target "$TARGET" --out "$RUNNER_TEMP/download"
+      # The Windows archive is a zip and its command is qrscan.exe.
+      - name: Unpack it outside the checkout
+        run: |
+          asset="qrcode-barcode-scanner-cli-$RELEASE_VERSION-$TARGET"
+          mkdir "$RUNNER_TEMP/install" receipt
+          if [ "$RUNNER_OS" = Windows ]; then
+            python -m zipfile -e "$RUNNER_TEMP/download/$asset.zip" "$RUNNER_TEMP/install"
+            command="qrscan.exe"
+          else
+            tar -xzf "$RUNNER_TEMP/download/$asset.tar.gz" -C "$RUNNER_TEMP/install"
+            command="qrscan"
+          fi
+          test -f "$RUNNER_TEMP/install/$asset/$command"
+          echo "QRSCAN=$RUNNER_TEMP/install/$asset/$command" >> "$GITHUB_ENV"
+      # The Linux and Windows images carry Go. The macOS image does not put one on PATH.
+      - name: Install Go with Homebrew
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install go
+      # The build that must fail once the requirement is dropped passes here first: the removal
+      # step then proves a removal, not a command that was never there.
+      - name: Require the published version from an empty module
+        run: |
+          mkdir "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          go version
+          go mod init acceptance/consumer
+          go get "$MODULE@$MODULE_VERSION"
+          cp "$GITHUB_WORKSPACE/distribution/acceptance/drivers/go-package.go" main.go
+          go build -mod=readonly ./...
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          (cd "$RUNNER_TEMP/consumer" && go run . "$image" "$RUNNER_TEMP/reports" "$QRSCAN")
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "go run . (go-package.go)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "pkg.go.dev" \
+            --identifier "$MODULE" \
+            --version "${MODULE_VERSION#v}" \
+            --url "https://pkg.go.dev/$MODULE@$MODULE_VERSION" \
+            --install "go get $MODULE@$MODULE_VERSION" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-go-module-$TARGET.json"
+      - name: Drop the requirement and close the receipt
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          go mod edit -droprequire "$MODULE"
+          python "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "go build -mod=readonly ./..." \
+            --uninstall "go mod edit -droprequire $MODULE" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-go-module-$TARGET.json"
+          python "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-go-module-$TARGET.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: destination-acceptance-go-module-${{ matrix.target }}
           path: receipt/
           if-no-files-found: error
           retention-days: 90
