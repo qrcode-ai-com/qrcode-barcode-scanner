@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/php-adapter.yml
       - bindings/php/**
+      - scripts/stage-php-package.py
       - distribution/acceptance/drivers/php-package.php
       - scripts/destination-acceptance.py
       - scripts/consumer_truth.py
@@ -38,6 +39,27 @@ env:
   SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
 
 jobs:
+  # The package's own repository is written from a commit of this one by a program. Its self-test
+  # stages this commit, checks it against itself and refuses five altered trees.
+  stage:
+    name: Stage for the package's own repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/stage-php-package.py --self-test
+      # The staged tree must run its own tests' setup: a valid manifest and a workflow that parses.
+      - name: Stage this commit and read its manifest
+        run: |
+          python3 scripts/stage-php-package.py stage --out "$RUNNER_TEMP/staged"
+          python3 scripts/stage-php-package.py verify "$RUNNER_TEMP/staged"
+          cd "$RUNNER_TEMP/staged"
+          composer validate --strict
+          test -f .github/workflows/tests.yml
+          test -f tests/fixtures/symbology/mixed-code128-qr.png
+
   tests:
     name: Tests · ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
