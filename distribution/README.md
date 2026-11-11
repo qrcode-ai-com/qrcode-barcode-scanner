@@ -142,6 +142,7 @@ ClawHub listing of the same skill.
 | [GitHub Debian packages](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0) | 0.11.0-1 | Debian 12 and Ubuntu 24.04, amd64 and arm64 |
 | [AUR · qrcode-barcode-scanner-bin](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin) | 0.11.0-1 | Arch Linux x86_64 |
 | [GitHub Fedora RPMs](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/rpm-packages-v0.11.0) | 0.11.0-1.fc44 | Fedora 44, x86_64 and aarch64 |
+| [GitHub AppImage](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/appimage-v0.11.0) | 0.11.0 | GNU/Linux x86_64 and aarch64, C library 2.28 or later |
 | [GitHub Container Registry](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) | 0.11.0 | Linux AMD64 and ARM64 |
 
 Install `qrscan` through Homebrew.
@@ -183,6 +184,15 @@ verify its SHA-256, then run
 aarch64 file. The [Fedora recipe](rpm/README.md) documents how to rebuild it.
 Fresh Fedora 44 installs from the public downloads passed the mixed scan and
 removal on both architectures. COPR follows its own publication process.
+
+On any other GNU/Linux system, download the AppImage for your architecture from the
+[AppImage release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/appimage-v0.11.0):
+one file that runs `qrscan` with nothing to install. Check it against the accompanying SHA-256
+list, make it executable and run it. The [AppImage recipe](appimage/README.md) documents the
+build and the route for hosts without FUSE. The [public files](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42953422833),
+downloaded signed out, passed the mixed scan on an Ubuntu 22.04 runner and, with no network, on
+AlmaLinux 8, Ubuntu 22.04 and Fedora containers, for both architectures. The AppImage catalogue
+does not list it yet.
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)
