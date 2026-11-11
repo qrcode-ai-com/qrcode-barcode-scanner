@@ -1,0 +1,115 @@
+name: Ruby UniFFI spike
+
+# A spike, not a gem and not a release: do the Ruby bindings UniFFI generates load the engine's
+# UniFFI library and scan in process? On Linux, macOS and Windows this builds the library with
+# the locked UniFFI, generates the Ruby from that very file with the generator of the same crate,
+# runs a small program and judges its three scans with the destination acceptance driver.
+# Nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/ruby-uniffi-spike.yml
+      - bindings/ruby/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ruby-uniffi-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN).
+  RUST_TOOLCHAIN: "1.99.1"
+  UNIFFI_CRATE: crates/qrcode-ai-scanner-uniffi
+
+jobs:
+  spike:
+    name: Ruby through UniFFI · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            library: libqrcode_ai_scanner_uniffi.so
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            library: libqrcode_ai_scanner_uniffi.dylib
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            library: qrcode_ai_scanner_uniffi.dll
+    env:
+      TARGET: ${{ matrix.target }}
+      LIBRARY: ${{ matrix.library }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      # The crate is its own cargo root, with its own lock: UniFFI 0.31.2.
+      - name: Build the native library with the locked UniFFI
+        run: |
+          cargo build --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml"
+          ls -l "$UNIFFI_CRATE/target/release/$LIBRARY"
+          grep -A1 '^name = "uniffi"$' "$UNIFFI_CRATE/Cargo.lock"
+      # The generator is a binary of the same crate: it cannot differ from the library's UniFFI.
+      - name: Generate the Ruby from the built library
+        run: |
+          cargo run --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml" --bin uniffi-bindgen -- \
+            generate --library "$UNIFFI_CRATE/target/release/$LIBRARY" --language ruby \
+            --config bindings/ruby/spike/uniffi.toml --no-format --out-dir bindings/ruby/spike/generated
+          ls -l bindings/ruby/spike/generated
+          grep -n -E '^module |^  def self\.|ffi_lib' bindings/ruby/spike/generated/*.rb | cut -c1-220 || true
+      - name: Install the ffi gem for the Ruby of the host
+        run: |
+          ruby --version
+          gem install --user-install --no-document ffi
+      - name: Scan the mixed fixture with the three profiles, in process
+        run: |
+          mkdir receipt
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          library="$GITHUB_WORKSPACE/$UNIFFI_CRATE/target/release/$LIBRARY"
+          if [ "$RUNNER_OS" = Windows ]; then library=$(cygpath -m "$library"); fi
+          QRSCAN_UNIFFI_LIBRARY="$library" ruby bindings/ruby/spike/scan.rb \
+            bindings/ruby/spike/generated "$image" "$RUNNER_TEMP/reports"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "ruby scan.rb" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Ruby spike from this checkout (not a gem, not published)" \
+            --identifier "bindings/ruby/spike" \
+            --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/ruby/spike" \
+            --install "cargo build of the UniFFI crate, its uniffi-bindgen for Ruby, gem install ffi" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-ruby-uniffi-$TARGET.json"
+          python scripts/destination-acceptance.py removed --not-applicable \
+            --receipt "receipt/acceptance-ruby-uniffi-$TARGET.json"
+          python scripts/destination-acceptance.py check "receipt/acceptance-ruby-uniffi-$TARGET.json"
+          cp "$RUNNER_TEMP/reports/facts.json" "receipt/facts-$TARGET.json"
+          ls -l "$UNIFFI_CRATE/target/release/$LIBRARY" > "receipt/library-$TARGET.txt"
+          wc -l bindings/ruby/spike/generated/*.rb >> "receipt/library-$TARGET.txt"
+          cat "receipt/facts-$TARGET.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: ruby-uniffi-spike-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
