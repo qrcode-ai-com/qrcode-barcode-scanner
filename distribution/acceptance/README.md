@@ -167,13 +167,70 @@ The programs are in [`drivers/`](drivers/): `node-package.mjs` for the Node.js p
 exit code, so the receipt records `null` for it.
 
 The workflow [`destination-acceptance.yml`](../../.github/workflows/destination-acceptance.yml)
-runs the driver's self-test and three real consumers of the public 0.11.0 artifacts:
+runs the driver's self-test and real consumers of the public 0.11.0 artifacts:
 
 - the CLI archive, on Linux x64, Linux arm64, macOS arm64 and Windows x64: downloaded
   anonymously, checked against the release's checksum list, unpacked and judged;
 - the npm package, under Node.js 22 and 24, installed in a new project;
 - the PyPI package, under Python 3.11 and 3.14, installed in a new environment;
-- the container image, pulled by digest without a credential, on Linux amd64 and arm64.
+- the container image, pulled by digest without a credential, on Linux amd64 and arm64;
+- the MCP adapter, started with `npx` and an exact version in an empty home, under Node.js 22
+  and 24 on Linux and Node.js 24 on macOS.
+
+## Run it for an MCP server
+
+An MCP server is neither a command that prints a report nor a package to import: a client starts
+it and asks it through the protocol. The program
+[`drivers/mcp-server.mjs`](drivers/mcp-server.mjs) does what that client does. It starts the
+server with the command given after `--`, speaks the stdio transport itself with no package of
+its own, lists the tools, calls the scan tool with each profile and saves the three reports.
+The driver then judges them by the same rules.
+
+The launch entry of the adapter, for bundles and install links, is `npx` with an exact version
+and no install script. This checks that very entry, in a home with nothing in it:
+
+```sh
+# 1. Copy the checked fixture outside the checkout.
+image=$(python3 /path/to/scripts/destination-acceptance.py stage /tmp/acceptance-input)
+
+# 2. Start the server as a client would, in an empty home, and scan through the protocol.
+mkdir /tmp/acceptance-home /tmp/acceptance-work && cd /tmp/acceptance-work
+HOME=/tmp/acceptance-home node /path/to/distribution/acceptance/drivers/mcp-server.mjs \
+  "$image" /tmp/acceptance-reports \
+  -- npx --yes --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1
+
+# 3. Judge the three reports and write the receipt.
+python3 /path/to/scripts/destination-acceptance.py reports --kind server \
+  --produced-by "node mcp-server.mjs -- npx --yes --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1" \
+  --fast /tmp/acceptance-reports/fast.json \
+  --frame /tmp/acceptance-reports/frame.json \
+  --full /tmp/acceptance-reports/full.json \
+  --destination "npm · MCP adapter started with npx" \
+  --identifier @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1 --version 0.11.0 \
+  --url https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1 \
+  --install "npx --yes --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1" \
+  --receipt receipt.json
+
+# 4. Remove the copy npx kept, then close the receipt: a start that may not install must fail.
+rm -r /tmp/acceptance-home/.npm/_npx
+HOME=/tmp/acceptance-home python3 /path/to/scripts/destination-acceptance.py removed \
+  --gone "sh -c 'npx --no @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1 < /dev/null'" \
+  --uninstall "rm -r ~/.npm/_npx" --receipt receipt.json
+```
+
+`--version` is the engine version the reports must name, not the adapter's. Besides the three
+reports, the program writes `server.json`: the command, the protocol version, what the server
+says it is, the tools it lists and how it ended once its input closed. The program judges
+nothing; the workflow checks that file for the adapter version and a clean end.
+
+`--tool scan_file` sends the path of the image in place of its bytes, for a server whose
+operator allowed the directory of the staged fixture. `--wait` sets how long one answer may
+take, 300 seconds by default: the first start downloads the adapter. The removal check reads no
+input on purpose. A server that is still there ends at once and the check fails, where a server
+left waiting would only run into the time limit.
+
+The program starts the command as given, so on Windows it needs a real executable in place of
+the `npx` script. The workflow runs it on Linux and macOS.
 
 ## Run it for a web page
 

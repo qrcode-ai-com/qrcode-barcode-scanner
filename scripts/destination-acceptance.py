@@ -5,7 +5,7 @@
       [--kind cli|container] [--identifier ID] [--install "COMMAND LINE"] [--run-url URL]
       [--fixtures DIR] --receipt FILE
   destination-acceptance.py stage DIR [--fixtures DIR]
-  destination-acceptance.py reports --kind package|page --produced-by "COMMAND LINE" --fast FILE
+  destination-acceptance.py reports --kind package|page|server --produced-by "COMMAND LINE" --fast FILE
       --frame FILE --full FILE --destination NAME --version X.Y.Z --url URL
       [--identifier ID] [--install "COMMAND LINE"] [--run-url URL] [--fixtures DIR] --receipt FILE
   destination-acceptance.py removed (--qrscan COMMAND | --gone "COMMAND LINE") --receipt FILE
@@ -26,7 +26,9 @@ A surface that is not a command scans through a small program: `stage` copies th
 outside the checkout, that program writes one JSON report per profile, and `reports` judges the
 three files by the same rules and writes the same receipt. A language package has a program of its
 own language (--kind package). A web page that scans in the browser is driven through its own file
-input by distribution/acceptance/drivers/web-page.mjs (--kind page).
+input by distribution/acceptance/drivers/web-page.mjs (--kind page). A server that scans through a
+protocol is started with the command a client would run and asked through that protocol by
+distribution/acceptance/drivers/mcp-server.mjs (--kind server).
 
 `removed` is run after the route's own uninstall and closes the verdict: with --qrscan the command
 must no longer resolve, with --gone the given command line must fail (an import of the removed
@@ -56,7 +58,7 @@ SCHEMA = "qrscan-destination-acceptance/1"
 SCHEMA_FILE = ROOT / "distribution/acceptance/receipt.schema.json"
 CASE = "qr-and-code128"
 PROFILES = ("fast", "frame", "full")
-KINDS = ("cli", "package", "container", "page")
+KINDS = ("cli", "package", "container", "page", "server")
 REMOVAL = ("pending", "removed", "still_present", "not_applicable")
 TIMEOUT = 120
 
@@ -501,6 +503,11 @@ def self_test():
         close("package-still-there", package, False, 1, "FAIL", qrscan=None, gone=works)
         page = from_files("page", None, 0, "INCOMPLETE", '"kind": "page"', kind="page")
         close("page-nothing-installed", page, False, 0, "PASS", not_applicable=True)
+        # A server started by a command: the same three files, then a start that must fail.
+        server = from_files("server", None, 0, "INCOMPLETE", '"kind": "server"', kind="server")
+        close("server-gone", server, False, 0, "PASS", qrscan=None, gone=fails)
+        from_files("server-missing", "missing-barcode", 1, "FAIL", "fast: code128 'STOCK-4827' found 0 times",
+                   kind="server")
         staged_to = box / "staged"
         with open(os.devnull, "w") as quiet:
             stdout, stderr, sys.stdout, sys.stderr = sys.stdout, sys.stderr, quiet, quiet
@@ -548,7 +555,7 @@ def self_test():
         failures.append("receipt.schema.json and the validator disagree on route.kind")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'FAILED' if failures else 'ok'} (12 command scenarios, 4 report-file scenarios, 7 removal "
+    print(f"self-test: {'FAILED' if failures else 'ok'} (12 command scenarios, 6 report-file scenarios, 8 removal "
           "scenarios, the staging, 2 refused receipts, the schema file)")
     return 1 if failures else 0
 
@@ -575,7 +582,7 @@ def main(argv=None):
     staging.add_argument("directory")
     staging.add_argument("--fixtures", type=pathlib.Path, default=ROOT / "fixtures")
     files = commands.add_parser("reports", help="judge three report files and write the receipt")
-    files.add_argument("--kind", required=True, choices=["package", "page"])
+    files.add_argument("--kind", required=True, choices=["package", "page", "server"])
     files.add_argument("--produced-by", required=True, help="the command line that wrote the three reports")
     for profile in PROFILES:
         files.add_argument(f"--{profile}", required=True, help=f"the JSON report of the {profile} profile")

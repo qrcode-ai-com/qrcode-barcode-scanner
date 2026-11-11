@@ -999,7 +999,17 @@ is one commit that changes all of these together:
   `integrations/mcp/README.md`.
 
 `distribution/README.md` and the pins of `scripts/mcp-registry-publish.py`
-change after publication only, because they name what is public.
+change after publication only, because they name what is public. So do the
+launch entry and the job that proves it:
+
+- The launch entry of bundles and install links is `npx --yes
+  --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@<version>`, with
+  an exact version (owner decision of 11 November 2026). It is written in
+  `integrations/mcp/README.md`, section "Start it with npx".
+- The job `mcp-npx` of `destination-acceptance.yml` starts that entry in an
+  empty home and scans through the protocol. After a publication, move its
+  `ADAPTER_VERSION` and the version of the README entry together, and read the
+  job's receipts before any bundle or install link names the new version.
 
 `npm-mcp-publish.yml` runs on a pull request affecting its inputs, a manual
 dispatch, or an `agents-v*` tag. Pull requests and the default manual `inspect`
