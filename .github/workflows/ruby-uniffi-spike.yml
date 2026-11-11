@@ -61,51 +61,70 @@ jobs:
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      # The crate is its own cargo root, with its own lock: UniFFI 0.31.2.
-      - name: Build the native library with the locked UniFFI
-        run: |
-          cargo build --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml"
-          ls -l "$UNIFFI_CRATE/target/release/$LIBRARY"
-          grep -A1 '^name = "uniffi"$' "$UNIFFI_CRATE/Cargo.lock"
-      # The generator is a binary of the same crate: it cannot differ from the library's UniFFI.
-      - name: Generate the Ruby from the built library
-        run: |
-          cargo run --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml" --bin uniffi-bindgen -- \
-            generate --library "$UNIFFI_CRATE/target/release/$LIBRARY" --language ruby \
-            --config bindings/ruby/spike/uniffi.toml --no-format --out-dir bindings/ruby/spike/generated
-          ls -l bindings/ruby/spike/generated
-          grep -n -E '^module |^  def self\.|ffi_lib' bindings/ruby/spike/generated/*.rb | cut -c1-220 || true
       - name: Install the ffi gem for the Ruby of the host
         run: |
           ruby --version
           gem install --user-install --no-document ffi
-      - name: Scan the mixed fixture with the three profiles, in process
+      # The crate is its own cargo root, with its own lock: UniFFI 0.31.2. Its binding error has
+      # variants with one unnamed value. The spike tries that shape as it is, then two rewrites
+      # of it made in this checkout only: the error crossing as a message (flat), and each value
+      # given a name (named). For each shape it generates the Ruby with the generator of the same
+      # crate, asks Ruby whether the file is valid, and only then scans and judges. The outcome
+      # of a shape never fails the job: it is written in the summary.
+      - name: Try the binding error as it is, flat and with named values
         run: |
           mkdir receipt
           image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
           library="$GITHUB_WORKSPACE/$UNIFFI_CRATE/target/release/$LIBRARY"
           if [ "$RUNNER_OS" = Windows ]; then library=$(cygpath -m "$library"); fi
-          QRSCAN_UNIFFI_LIBRARY="$library" ruby bindings/ruby/spike/scan.rb \
-            bindings/ruby/spike/generated "$image" "$RUNNER_TEMP/reports"
-          python scripts/destination-acceptance.py reports --kind package \
-            --produced-by "ruby scan.rb" \
-            --fast "$RUNNER_TEMP/reports/fast.json" \
-            --frame "$RUNNER_TEMP/reports/frame.json" \
-            --full "$RUNNER_TEMP/reports/full.json" \
-            --destination "Ruby spike from this checkout (not a gem, not published)" \
-            --identifier "bindings/ruby/spike" \
-            --version 0.11.0 \
-            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/ruby/spike" \
-            --install "cargo build of the UniFFI crate, its uniffi-bindgen for Ruby, gem install ffi" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            --receipt "receipt/acceptance-ruby-uniffi-$TARGET.json"
-          python scripts/destination-acceptance.py removed --not-applicable \
-            --receipt "receipt/acceptance-ruby-uniffi-$TARGET.json"
-          python scripts/destination-acceptance.py check "receipt/acceptance-ruby-uniffi-$TARGET.json"
-          cp "$RUNNER_TEMP/reports/facts.json" "receipt/facts-$TARGET.json"
+          grep -A1 '^name = "uniffi"$' "$UNIFFI_CRATE/Cargo.lock"
+          for shape in as-is flat named; do
+            git checkout --quiet -- "$UNIFFI_CRATE/src/lib.rs"
+            if [ "$shape" != as-is ]; then
+              python bindings/ruby/spike/error_variants.py "$shape" "$UNIFFI_CRATE/src/lib.rs"
+            fi
+            cargo build --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml"
+            out="bindings/ruby/spike/generated/$shape"
+            cargo run --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml" --bin uniffi-bindgen -- \
+              generate --library "$UNIFFI_CRATE/target/release/$LIBRARY" --language ruby \
+              --config bindings/ruby/spike/uniffi.toml --no-format --out-dir "$out"
+            cp "$out/qrcode_ai_scanner_uniffi.rb" "receipt/generated-$shape.rb"
+            valid=false verdict=not_run
+            if ruby -c "$out/qrcode_ai_scanner_uniffi.rb" > "receipt/ruby-syntax-$shape-$TARGET.txt" 2>&1; then
+              valid=true verdict=scan_failed
+              if QRSCAN_UNIFFI_LIBRARY="$library" ruby bindings/ruby/spike/scan.rb "$out" "$image" \
+                  "$RUNNER_TEMP/reports-$shape" > "receipt/scan-$shape-$TARGET.txt" 2>&1; then
+                verdict=judged_fail
+                if python scripts/destination-acceptance.py reports --kind package \
+                    --produced-by "ruby scan.rb" \
+                    --fast "$RUNNER_TEMP/reports-$shape/fast.json" \
+                    --frame "$RUNNER_TEMP/reports-$shape/frame.json" \
+                    --full "$RUNNER_TEMP/reports-$shape/full.json" \
+                    --destination "Ruby spike from this checkout, error shape $shape (not a gem, not published)" \
+                    --identifier "bindings/ruby/spike" \
+                    --version 0.11.0 \
+                    --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/ruby/spike" \
+                    --install "cargo build of the UniFFI crate, its uniffi-bindgen for Ruby, gem install ffi" \
+                    --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+                    --receipt "receipt/acceptance-ruby-uniffi-$shape-$TARGET.json" \
+                  && python scripts/destination-acceptance.py removed --not-applicable \
+                    --receipt "receipt/acceptance-ruby-uniffi-$shape-$TARGET.json" \
+                  && python scripts/destination-acceptance.py check "receipt/acceptance-ruby-uniffi-$shape-$TARGET.json"; then
+                  verdict=PASS
+                fi
+                cp "$RUNNER_TEMP/reports-$shape/facts.json" "receipt/facts-$shape-$TARGET.json"
+              fi
+              cat "receipt/scan-$shape-$TARGET.txt"
+            else
+              head -5 "receipt/ruby-syntax-$shape-$TARGET.txt"
+            fi
+            echo "$shape valid_ruby=$valid verdict=$verdict" | tee -a "receipt/summary-$TARGET.txt"
+          done
+          git checkout --quiet -- "$UNIFFI_CRATE/src/lib.rs"
           ls -l "$UNIFFI_CRATE/target/release/$LIBRARY" > "receipt/library-$TARGET.txt"
-          wc -l bindings/ruby/spike/generated/*.rb >> "receipt/library-$TARGET.txt"
-          cat "receipt/facts-$TARGET.json"
+          wc -l receipt/generated-*.rb >> "receipt/library-$TARGET.txt"
+          echo "--- summary for $TARGET"
+          cat "receipt/summary-$TARGET.txt"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         if: always()
         with:

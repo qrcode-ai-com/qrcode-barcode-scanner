@@ -13,9 +13,25 @@ Linux x64, macOS arm64 and Windows x64, from one commit each time:
 1. it builds `crates/qrcode-ai-scanner-uniffi` with its locked UniFFI;
 2. it generates the Ruby from that very library, with the `uniffi-bindgen` binary of the same
    crate, so the generator and the library cannot differ;
-3. it runs [`scan.rb`](scan.rb), which scans the mixed fixture with the three profiles through
-   the `ffi` gem and writes each report unchanged;
-4. the destination acceptance driver judges the three reports.
+3. it asks Ruby whether the generated file is valid Ruby;
+4. only then it runs [`scan.rb`](scan.rb), which scans the mixed fixture with the three
+   profiles through the `ffi` gem and writes each report unchanged;
+5. the destination acceptance driver judges the three reports.
+
+The first run showed that step 3 fails: the crate's binding error has variants with one
+unnamed value, such as `ScanFailed(String)`, and UniFFI's Ruby backend writes invalid Ruby for
+that shape. So the workflow tries three shapes of that error, the last two rewritten in its own
+checkout by [`error_variants.py`](error_variants.py) and thrown away:
+
+| Shape | What it is |
+| --- | --- |
+| `as-is` | The crate as it is on `main` |
+| `flat` | The error crosses as its variant and its message (`#[uniffi(flat_error)]`) |
+| `named` | Each variant that holds one value names it `value` |
+
+Either rewrite would change what the Kotlin and Swift bindings see, so neither is proposed
+here: the spike only tells which shape the Ruby backend can express. The outcome of each shape
+is in the `summary-*.txt` file of the run's artifact.
 
 The generated Ruby and the native library are never checked in.
 
