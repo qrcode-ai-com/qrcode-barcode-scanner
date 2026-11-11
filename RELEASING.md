@@ -498,9 +498,10 @@ changing its source are attached to releases of their own:
 RPMs) and `appimage-vX.Y.Z` (the AppImage). The `vX.Y.Z` release, its tag and
 its files stay as published. No workflow creates these releases: the owner
 creates each one, or gives an explicit go for it, from files a workflow built
-and judged, and it is never marked as the latest release. These tag patterns
-are not covered by a tag ruleset today, unlike `v*`, `oci-v*` and
-`agents-v*`.
+and judged, and it is never marked as the latest release. Since 11 November
+2026 the tag ruleset of distribution tags covers these three patterns and
+`demos-v*`, the tags the hosted examples open, next to `oci-v*` and
+`agents-v*`: only the owner creates, moves or deletes such a tag.
 
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
