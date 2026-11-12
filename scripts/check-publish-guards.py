@@ -231,6 +231,13 @@ import tomllib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 ENVIRONMENTS = {"crates-io", "npm", "release", "pub"}
+DOTNET_JOB = ("dotnet.yml", "publish")
+DOTNET_CANDIDATE = 'python3 scripts/dotnet-release.py candidate --folder "$PWD/dotnet-package" --natives "$PWD/dotnet-natives" --receipt-sha256 "$RECEIPT_SHA256" --require-absent'
+DOTNET_PUSH = "\n".join((
+    DOTNET_CANDIDATE,
+    'version=$(python3 -c "import tomllib; print(tomllib.load(open(\'Cargo.toml\', \'rb\'))[\'workspace\'][\'package\'][\'version\'])")',
+    'dotnet nuget push "$PWD/dotnet-package/feed/QRCodeAI.QRCodeBarcodeScanner.$version.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --timeout 120',
+))
 MCP_JOB = ("npm-mcp-publish.yml", "publish")
 MCP_GUARD = "startsWith(github.ref, 'refs/tags/agents-v')"
 MCP_GATE_RUN = 'python3 scripts/mcp-release.py gate --ref "$GITHUB_REF" --environment npm-agents'
@@ -429,6 +436,7 @@ NOT_ON_TAG = {"!startsWith(github.ref, 'refs/tags/')", "!startsWith(github.ref, 
 # The job each publishing job must need: the one that inspects (for the iOS
 # zip, builds) what it uploads. A publishing job missing here fails.
 INSPECTION = {
+    DOTNET_JOB: "pack",
     MCP_JOB: "pack",
     MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
@@ -443,6 +451,7 @@ INSPECTION = {
 
 # Archive shape and installed runtime are separate release gates.
 CONSUMERS = {
+    DOTNET_JOB: {"preflight", "binding", "natives", "consumer"},
     MCP_JOB: {"preflight", "consume", "operand-proof"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
@@ -517,6 +526,7 @@ GH_API_BODY = re.compile(r"(?:^|\s)(?:-[fF]|--field|--raw-field|--input)(?=[=\s]
 HTTP_BODY = re.compile(r"(?:^|\s)(?:-[dF]|--data(?:-\w+)?|--json|--form(?:-string)?|--post-data|--post-file)"
                        r"(?=[=\s]|$)")
 PUBLISHING_RUN = (
+    (re.compile(r"\bdotnet\s+nuget\s+push\b"), "NuGet publish"),
     (re.compile(r"\bdocker\s+(push|manifest\s+push)\b"), "docker publish"),
     (re.compile(r"\bpython3\s+distribution/docker/publish\.py\s+publish\b"), "docker publish"),
     (re.compile(r"\bnapi\s+pre-?publish\b"), "napi pre-publish"),
@@ -525,7 +535,7 @@ PUBLISHING_RUN = (
     (GH_API_RELEASE, RELEASE),
     (re.compile(HTTP_CLIENT.pattern + r".*(?:" + GITHUB_API.pattern + r")", re.I), RELEASE),
 )
-PUBLISHING_ACTIONS = ("pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action") + RELEASE_ACTIONS
+PUBLISHING_ACTIONS = ("NuGet/login", "pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action") + RELEASE_ACTIONS
 NPM_FETCH = frozenset({"install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal",
                        "isntall", "add", "update", "up", "upgrade", "udpate", "exec", "x", "init", "create",
                        "innit", "install-test", "it"})
@@ -1538,6 +1548,63 @@ def _cli_problems(job_id: str, job: dict, wf: dict) -> list:
     return out
 
 
+def _dotnet_contract_problems(wf, publisher, first_publish):
+    """No broad NuGet exception: one reviewed OIDC action and one exact archive upload."""
+    out = []
+    def fail(message, index=-1):
+        out.append(("dotnet-contract", message, index))
+    for condition in ("github.event_name == 'push'",
+                      "github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'",
+                      "github.repository_id == '1126991539'",
+                      "needs.preflight.outputs.publish_allowed == 'true'"):
+        if _conjunct(publisher.get("if"), {condition}):
+            fail("publisher must bind tag-push, canonical identity and preflight approval readiness")
+    if publisher.get("env") != {"NUGET_USER": "${{ vars.NUGET_USER }}",
+                                 "RECEIPT_SHA256": "${{ needs.pack.outputs.receipt_sha256 }}"}:
+        fail("bind the real NuGet user and the producer receipt digest")
+    jobs, steps = wf["jobs"], _steps(publisher)
+    preflight = jobs.get("preflight", {})
+    if preflight.get("outputs") != {"publish_allowed": "${{ steps.preflight.outputs.publish_allowed }}"} or not any(
+            step.get("id") == "preflight" and step.get("run") == "python3 scripts/dotnet-release.py preflight" and
+            step.get("env") == {"NUGET_USER": "${{ vars.NUGET_USER }}"} for step in _steps(preflight)):
+        fail("prove the existing protected environment and account before scheduling publication")
+    for name in ("preflight", "binding", "natives", "pack", "consumer"):
+        job = jobs.get(name, {})
+        if "if" in job or "continue-on-error" in job:
+            fail(f"{name} may not skip or ignore its gate")
+        if any("continue-on-error" in step for step in _steps(job)):
+            fail(f"{name} may not ignore a failed step")
+    if jobs.get("pack", {}).get("outputs") != {"receipt_sha256": "${{ steps.receipt.outputs.sha256 }}"}:
+        fail("pack must export the digest of its archive inspection receipt")
+    if not any(_block(step.get("run")) == DOTNET_CANDIDATE and set(step) <= {"name", "run"}
+               for step in steps[:first_publish]):
+        fail("reinspect the receipt, native floors and archive, and refuse existing versions before OIDC")
+    logins = [step for step in steps if _uses(step)[0] == "NuGet/login"]
+    if len(logins) != 1 or logins[0] != {"uses": "NuGet/login@8d196754b4036150537f80ac539e15c2f1028841",
+                                       "id": "login", "with": {"user": "${{ vars.NUGET_USER }}"}}:
+        fail("use only the reviewed NuGet OIDC action and the individual username variable")
+    runs = [_block(step.get("run")) for step in steps if "run" in step]
+    if runs != [GATE_RUN, DOTNET_CANDIDATE, DOTNET_PUSH]:
+        fail("publisher may run only the version gate, candidate reinspection and exact immutable upload")
+    for i, step in enumerate(steps):
+        action = _uses(step)[0]
+        if action and action not in {"actions/checkout", "actions/setup-dotnet", "actions/download-artifact", "NuGet/login"}:
+            fail("an unreviewed action would see the publishing job", i)
+        if "if" in step or "continue-on-error" in step:
+            fail("publisher steps cannot skip or ignore checks", i)
+        if "run" in step and _block(step["run"]) == DOTNET_PUSH and step.get("env") != {
+                "NUGET_API_KEY": "${{ steps.login.outputs.NUGET_API_KEY }}"}:
+            fail("only the exact upload step receives the ephemeral NuGet key", i)
+    for name, job in jobs.items():
+        for step in _steps(job):
+            given = step.get("with", {})
+            if _uses(step)[0] == "actions/download-artifact" and given.get("digest-mismatch") != "error":
+                fail(f"{name} must refuse artifact digest mismatches")
+            if _uses(step)[0] == "actions/upload-artifact" and "overwrite" in given:
+                fail(f"{name} cannot overwrite a qualified artifact")
+    return out
+
+
 def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> list:
     """One independent adapter publisher; no other job gains its tag or environment."""
     out = []
@@ -1664,6 +1731,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
 
     oci = (workflow, job_id) == OCI_JOB
     mcp = (workflow, job_id) == MCP_JOB
+    dotnet = (workflow, job_id) == DOTNET_JOB
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     guard = MCP_REGISTRY_GUARD if mcp_registry else MCP_GUARD if mcp else OCI_GUARD if oci else GUARD
     condition_check = _conjunct(job.get("if"), {guard})
@@ -1682,7 +1750,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"npm-agents"} if mcp
-                            else {"container"} if oci else ENVIRONMENTS)
+                            else {"nuget"} if dotnet else {"container"} if oci else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1693,9 +1761,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif oci:
         if perms != {"contents": "read", "actions": "read", "packages": "write"}:
             flag("permissions", "OCI publisher needs exactly contents read, actions read and packages write; no id-token")
-    elif mcp_registry:
+    elif mcp_registry or dotnet:
         if perms != {"contents": "read", "id-token": "write"}:
-            flag("permissions", "Official MCP publisher needs exactly contents read and id-token write")
+            flag("permissions", "this publisher needs exactly contents read and id-token write")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -1785,6 +1853,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     first_publish = min((i for i, _ in publishing), default=len(steps))
     if oci:
         for code, message, index in _oci_contract_problems(wf, job, first_publish):
+            flag(code, message, index)
+    if dotnet:
+        for code, message, index in _dotnet_contract_problems(wf, job, first_publish):
             flag(code, message, index)
     if mcp:
         for code, message, index in _mcp_contract_problems(wf, job, first_publish):

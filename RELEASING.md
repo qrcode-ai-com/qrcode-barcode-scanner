@@ -1513,3 +1513,18 @@ pnpm/action-setup pinned by commit (v6.0.10); `@napi-rs/cli` 3.7.3
 action by commit (dtolnay/rust-toolchain, Swatinem/rust-cache,
 taiki-e/install-action, PyO3/maturin-action), with the release tag (for
 dtolnay/rust-toolchain, the branch and the date) in a comment.
+
+## .NET / NuGet
+
+The `QRCodeAI.QRCodeBarcodeScanner` package remains unpublished. Its archive pipeline and
+future engine-tag publisher live in `.github/workflows/dotnet.yml`. Branch and manual runs
+inspect only. Tags require the existing protected `nuget` environment, an actual individual
+`NUGET_USER`, five native floors, archive inspection and all five clean installed consumers.
+The owner approves the environment; `NuGet/login` then uses OIDC without a persistent API key.
+
+The job rechecks the archive against the producer receipt before authentication and immediately
+before the exact upload. Existing versions are refused. Public verification accounts for
+nuget.org's repository signature, validates it with `dotnet nuget verify --all`, compares all
+other members with the qualified archive, and installs/scans/removes from five fresh projects.
+See [account setup, tag approval and receipts](bindings/dotnet/PUBLISHING.md). No account setup,
+environment approval, tag or publication is performed by a branch rehearsal.

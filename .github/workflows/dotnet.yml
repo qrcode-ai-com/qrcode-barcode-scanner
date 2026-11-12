@@ -12,14 +12,20 @@ name: .NET binding
 #              file by file, then on the five systems a new project that installs it from a
 #              folder, scans and removes it.
 #
-# Nothing is published: no job holds a registry credential.
+# Branches inspect only. Engine tags may publish after all consumers and the owner's
+# protected nuget approval. No account or protected environment is created by this workflow.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
   pull_request:
     paths:
       - .github/workflows/dotnet.yml
       - bindings/dotnet/**
       - scripts/dotnet-package.py
+      - scripts/dotnet-release.py
+      - scripts/test-dotnet-release.py
+      - scripts/check-publish-guards.py
       - scripts/native-floor.py
       - crates/qrcode-ai-scanner-uniffi/**
       - scripts/destination-acceptance.py
@@ -35,7 +41,7 @@ permissions:
 
 concurrency:
   group: dotnet-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 defaults:
   run:
@@ -52,6 +58,21 @@ env:
   PROJECT: bindings/dotnet/src/QRCodeAI.QRCodeBarcodeScanner
 
 jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prove the owner and protected environment before scheduling publication
+        id: preflight
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: python3 scripts/dotnet-release.py preflight
+
   binding:
     name: .NET binding · ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
@@ -229,6 +250,8 @@ jobs:
 
   pack:
     name: Package archive
+    outputs:
+      receipt_sha256: ${{ steps.receipt.outputs.sha256 }}
     needs: [binding, natives]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -250,10 +273,12 @@ jobs:
           pattern: dotnet-native-*
           path: ${{ runner.temp }}/natives
           merge-multiple: true
+          digest-mismatch: error
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dotnet-binding-*
           path: ${{ runner.temp }}/bindings
+          digest-mismatch: error
       # The C# comes from the three `binding` jobs of this commit, which must have generated the
       # same file. The archive's own libraries cannot give it: built through cargo-zigbuild they
       # carry no symbol table, the only place the generator reads, and it then writes nothing
@@ -274,12 +299,21 @@ jobs:
             "$RUNNER_TEMP/feed/QRCodeAI.QRCodeBarcodeScanner.$ENGINE_VERSION.nupkg" \
             --natives "$RUNNER_TEMP/natives" --version "$ENGINE_VERSION" --commit "$GITHUB_SHA" \
             --out receipt/package.json
+      - name: Bind the producer receipt to the archive consumers judged
+        id: receipt
+        run: |
+          echo "sha256=$(sha256sum receipt/package.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/dotnet-package/feed"
+          cp "$RUNNER_TEMP/feed/QRCodeAI.QRCodeBarcodeScanner.$ENGINE_VERSION.nupkg" "$RUNNER_TEMP/dotnet-package/feed/"
+          cp receipt/package.json "$RUNNER_TEMP/dotnet-package/"
+      - name: Exercise the publisher's read-only inspection on the staged archive
+        env:
+          RECEIPT_SHA256: ${{ steps.receipt.outputs.sha256 }}
+        run: python3 scripts/dotnet-release.py candidate --folder "$RUNNER_TEMP/dotnet-package" --natives "$RUNNER_TEMP/natives" --receipt-sha256 "$RECEIPT_SHA256"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         with:
           name: dotnet-package
-          path: |
-            ${{ runner.temp }}/feed/*.nupkg
-            receipt/package.json
+          path: ${{ runner.temp }}/dotnet-package/
           if-no-files-found: error
           retention-days: 30
 
@@ -320,6 +354,7 @@ jobs:
         with:
           name: dotnet-package
           path: ${{ runner.temp }}/download
+          digest-mismatch: error
       - name: Install the archive in a new project
         run: |
           mkdir "$RUNNER_TEMP/consumer" "$RUNNER_TEMP/packages" receipt
@@ -390,3 +425,104 @@ jobs:
           path: receipt/
           if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: Publish the qualified NuGet archive
+    needs: [preflight, binding, natives, pack, consumer]
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner' && github.repository_id == '1126991539' && needs.preflight.outputs.publish_allowed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      NUGET_USER: ${{ vars.NUGET_USER }}
+      RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/package-inspect.py versions --tag "$GITHUB_REF" --strict --quiet
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: "10.0.404"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dotnet-package
+          path: dotnet-package
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dotnet-native-*
+          path: dotnet-natives
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Reinspect the archive and refuse an existing version before authentication
+        run: python3 scripts/dotnet-release.py candidate --folder "$PWD/dotnet-package" --natives "$PWD/dotnet-natives" --receipt-sha256 "$RECEIPT_SHA256" --require-absent
+      - uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Upload exactly the inspected archive, without replacement or skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          python3 scripts/dotnet-release.py candidate --folder "$PWD/dotnet-package" --natives "$PWD/dotnet-natives" --receipt-sha256 "$RECEIPT_SHA256" --require-absent
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version'])")
+          dotnet nuget push "$PWD/dotnet-package/feed/QRCodeAI.QRCodeBarcodeScanner.$version.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --timeout 120
+
+  public-consumer:
+    name: Public NuGet install · ${{ matrix.rid }}
+    needs: [pack, publish]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, runner: ubuntu-24.04 }
+          - { rid: linux-arm64, runner: ubuntu-24.04-arm }
+          - { rid: osx-x64, runner: macos-15-intel }
+          - { rid: osx-arm64, runner: macos-15 }
+          - { rid: win-x64, runner: windows-2025 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dotnet-package
+          path: dotnet-package
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dotnet-native-*
+          path: dotnet-natives
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Verify repository signature, compare content, install, scan and remove
+        env:
+          RID: ${{ matrix.rid }}
+          RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+        run: python scripts/dotnet-release.py consume-public --folder "$PWD/dotnet-package" --natives "$PWD/dotnet-natives" --receipt-sha256 "$RECEIPT_SHA256" --rid "$RID" --out "$RUNNER_TEMP/dotnet-public"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: dotnet-public-consumer-${{ matrix.rid }}
+          path: |
+            ${{ runner.temp }}/dotnet-public/publication.json
+            ${{ runner.temp }}/dotnet-public/acceptance.json
+          if-no-files-found: error
+          retention-days: 90
