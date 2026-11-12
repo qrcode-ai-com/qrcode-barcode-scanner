@@ -1,7 +1,8 @@
 # qr_barcode_scanner — Flutter / Dart
 
-QR decoding **+ scannability scoring** for artistic / AI-generated QR codes —
-the codes that break standard scanners. The native Rust core of
+Scan QR codes and barcodes locally from encoded images or RGBA camera frames.
+QR reports include scannability diagnostics when the selected profile measures
+them. The native Rust core of
 [`qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner)
 also decodes barcodes and connects to Flutter via
 [flutter_rust_bridge](https://pub.dev/packages/flutter_rust_bridge).
