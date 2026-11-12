@@ -1,16 +1,25 @@
 name: .NET binding
 
 # The .NET package under bindings/dotnet scans in process through the engine's UniFFI library,
-# the one the Kotlin and Swift bindings use. On Linux, macOS and Windows this workflow builds
-# that library with the locked UniFFI, generates the C# from that very file, builds the package
-# and runs its tests on .NET 8 and on .NET 10, then judges three real scans with the destination
-# acceptance driver. Nothing is packed and nothing is published.
+# the one the Kotlin and Swift bindings use. Three steps, from one commit:
+#
+#   binding    on Linux, macOS and Windows: the library of the host, the C# generated from that
+#              very file, the tests on .NET 8 and on .NET 10, three scans judged by the
+#              destination acceptance driver;
+#   natives    the library for the five systems of the package, at the floor of the prebuilt
+#              qrscan, each file read for what it needs from the system that loads it;
+#   pack       the archive, inspected file by file, then on the five systems a new project that
+#              installs it from a folder, scans and removes it.
+#
+# Nothing is published: no job holds a registry credential.
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - .github/workflows/dotnet.yml
       - bindings/dotnet/**
+      - scripts/dotnet-package.py
+      - scripts/native-floor.py
       - crates/qrcode-ai-scanner-uniffi/**
       - scripts/destination-acceptance.py
       - scripts/consumer_truth.py
@@ -139,6 +148,246 @@ jobs:
         if: always()
         with:
           name: dotnet-binding-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 30
+
+  # The floors are those of the prebuilt qrscan (scripts/cli-release.py TARGETS): the GNU rows
+  # link against glibc 2.28 through cargo-zigbuild, macOS x86_64 cross-builds on arm64 with its
+  # own deployment target, Windows links its C runtime statically.
+  natives:
+    name: Native library · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04, library: libqrcode_ai_scanner_uniffi.so }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04, library: libqrcode_ai_scanner_uniffi.so }
+          - { target: x86_64-apple-darwin, runner: macos-15, library: libqrcode_ai_scanner_uniffi.dylib, deployment: "10.15" }
+          - { target: aarch64-apple-darwin, runner: macos-15, library: libqrcode_ai_scanner_uniffi.dylib, deployment: "11.0" }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025, library: qrcode_ai_scanner_uniffi.dll }
+    env:
+      TARGET: ${{ matrix.target }}
+      LIBRARY: ${{ matrix.library }}
+      DEPLOYMENT: ${{ matrix.deployment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+      # Zig for the GNU rows, from ziglang.org and checked against the sha256 its download index
+      # publishes, as cli-archives.yml does.
+      - name: Zig 0.14.1, sha256-verified
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/zig-x86_64-linux-0.14.1.tar.xz"
+          curl -sSfL -o "$archive" https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz
+          echo "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  $archive" | sha256sum -c -
+          tar xJf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.14.1" >> "$GITHUB_PATH"
+          mkdir "$RUNNER_TEMP/zig-global-cache"
+          echo "ZIG_GLOBAL_CACHE_DIR=$RUNNER_TEMP/zig-global-cache" >> "$GITHUB_ENV"
+      - name: cargo-zigbuild 0.23.4
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-zigbuild@0.23.4
+      - name: Build the library at the floor of its target
+        run: |
+          manifest=crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          case "$TARGET" in
+            *-linux-gnu)
+              cargo zigbuild --release --locked --lib --manifest-path "$manifest" --target "$TARGET.2.28" ;;
+            *-apple-darwin)
+              MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT" \
+                cargo build --release --locked --lib --manifest-path "$manifest" --target "$TARGET" ;;
+            *-windows-msvc)
+              RUSTFLAGS="-Ctarget-feature=+crt-static" \
+                cargo build --release --locked --lib --manifest-path "$manifest" --target "$TARGET" ;;
+          esac
+      - name: Read what the file needs from the system that loads it
+        run: |
+          python scripts/dotnet-package.py native --target "$TARGET" \
+            --library "crates/qrcode-ai-scanner-uniffi/target/$TARGET/release/$LIBRARY" \
+            --out "$RUNNER_TEMP/native"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: dotnet-native-${{ matrix.target }}
+          path: ${{ runner.temp }}/native/
+          if-no-files-found: error
+          retention-days: 30
+
+  pack:
+    name: Package archive
+    needs: natives
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Read the engine version from the workspace
+        run: |
+          version=$(python3 -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\r?\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dotnet-native-*
+          path: ${{ runner.temp }}/natives
+          merge-multiple: true
+      - name: Install the C# generator at the tag of the same UniFFI line
+        run: |
+          cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs \
+            --tag "$BINDGEN_TAG" --locked --root "$RUNNER_TEMP/bindgen"
+      # The C# is generated from one of the five libraries of the archive: they were built from
+      # this commit, so their contract checksums are the ones the C# carries.
+      - name: Generate the C# and lay the five libraries out
+        run: |
+          "$RUNNER_TEMP/bindgen/bin/uniffi-bindgen-cs" --library --no-format \
+            --config bindings/dotnet/uniffi.toml --out-dir "$PROJECT/generated" \
+            "$RUNNER_TEMP/natives/linux-x64/libqrcode_ai_scanner_uniffi.so"
+          python3 scripts/dotnet-package.py layout --natives "$RUNNER_TEMP/natives" --project "$PROJECT"
+      - name: Pack, then inspect the archive file by file
+        run: |
+          mkdir receipt
+          dotnet pack "$PROJECT" --configuration Release -p:Version="$ENGINE_VERSION" \
+            -p:RepositoryCommit="$GITHUB_SHA" --output "$RUNNER_TEMP/feed"
+          ls -l "$RUNNER_TEMP/feed"
+          python3 scripts/dotnet-package.py inspect \
+            "$RUNNER_TEMP/feed/QRCodeAI.QRCodeBarcodeScanner.$ENGINE_VERSION.nupkg" \
+            --natives "$RUNNER_TEMP/natives" --version "$ENGINE_VERSION" --commit "$GITHUB_SHA" \
+            --out receipt/package.json
+          cp "$RUNNER_TEMP"/natives/*/native.json receipt/ 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: dotnet-package
+          path: |
+            ${{ runner.temp }}/feed/*.nupkg
+            receipt/package.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # A new project on each of the five systems. The package comes from the folder that holds the
+  # archive and from nowhere else; .NET's own packs may come from nuget.org.
+  consumer:
+    name: Archive in a new project · ${{ matrix.rid }}
+    needs: pack
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, runner: ubuntu-24.04 }
+          - { rid: linux-arm64, runner: ubuntu-24.04-arm }
+          - { rid: osx-x64, runner: macos-15-intel }
+          - { rid: osx-arm64, runner: macos-15 }
+          - { rid: win-x64, runner: windows-2025 }
+    env:
+      RID: ${{ matrix.rid }}
+      PACKAGE: QRCodeAI.QRCodeBarcodeScanner
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: "8.0.x"
+      - name: Read the engine version from the workspace
+        run: |
+          version=$(python -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\r?\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dotnet-package
+          path: ${{ runner.temp }}/download
+      - name: Install the archive in a new project
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" "$RUNNER_TEMP/packages" receipt
+          feed=$(python -c "import pathlib, sys; print(next(pathlib.Path(sys.argv[1]).rglob('*.nupkg')).parent.resolve())" "$RUNNER_TEMP/download")
+          cd "$RUNNER_TEMP/consumer"
+          cat > Consumer.csproj <<'XML'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net8.0</TargetFramework>
+              <Nullable>enable</Nullable>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <UseAppHost>false</UseAppHost>
+            </PropertyGroup>
+          </Project>
+          XML
+          # The package may come from the folder only. Anything else is .NET's own.
+          cat > nuget.config <<XML
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="archive" value="$feed" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="archive"><package pattern="QRCodeAI.*" /></packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          XML
+          cp "$GITHUB_WORKSPACE/bindings/dotnet/acceptance/Program.cs" Program.cs
+          export NUGET_PACKAGES="$RUNNER_TEMP/packages"
+          dotnet add package "$PACKAGE" --version "$ENGINE_VERSION"
+          dotnet build --configuration Release
+          # Where the build put the library of each system: the application loads its own.
+          python -c "import pathlib; print(*sorted(str(path) for path in pathlib.Path('bin/Release/net8.0').rglob('*qrcode_ai_scanner_uniffi*')), sep='\n')"
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          dotnet "$RUNNER_TEMP/consumer/bin/Release/net8.0/Consumer.dll" "$image" "$RUNNER_TEMP/reports"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "dotnet Consumer.dll (bindings/dotnet/acceptance/Program.cs)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination ".NET package archive of this commit, installed from a folder (not published)" \
+            --identifier "$PACKAGE" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/dotnet" \
+            --install "dotnet add package $PACKAGE --version $ENGINE_VERSION" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-dotnet-package-$RID.json"
+      - name: Remove the package and close the receipt
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          export NUGET_PACKAGES="$RUNNER_TEMP/packages"
+          dotnet remove package "$PACKAGE"
+          python "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" removed \
+            --gone "dotnet build --configuration Release" \
+            --uninstall "dotnet remove package $PACKAGE" \
+            --receipt "$GITHUB_WORKSPACE/receipt/acceptance-dotnet-package-$RID.json"
+          python "$GITHUB_WORKSPACE/scripts/destination-acceptance.py" check \
+            "$GITHUB_WORKSPACE/receipt/acceptance-dotnet-package-$RID.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: dotnet-package-consumer-${{ matrix.rid }}
           path: receipt/
           if-no-files-found: error
           retention-days: 30

@@ -2,5 +2,6 @@
 # generates and the native library it was generated from.
 /src/QRCodeAI.QRCodeBarcodeScanner/generated/
 /src/QRCodeAI.QRCodeBarcodeScanner/native/
+/src/QRCodeAI.QRCodeBarcodeScanner/runtimes/
 bin/
 obj/
