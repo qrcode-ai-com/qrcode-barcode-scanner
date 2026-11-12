@@ -61,5 +61,7 @@ available to the community **and** sustainable.
 
 ---
 
-© SuperNovae Studio. The dual-license model and the commercial license are administered by
-SuperNovae Studio. Already-published `0.x` releases remain available under the AGPL.
+Developed by **Thibaut Mélen** for **QR Code AI**, a product of **SuperNovae Studio**.
+SuperNovae Studio administers the dual-license model and handles commercial licensing.
+
+© SuperNovae Studio. Already-published `0.x` releases remain available under the AGPL.
