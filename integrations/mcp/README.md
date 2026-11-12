@@ -44,10 +44,10 @@ Install the exact adapter version from the public npm registry:
 npm install --prefix ./qrscan-mcp-install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1
 ```
 
-The published 0.2.1 package remains available. Version 0.3.1 adds the
+Version 0.3.1 is published on npm. It adds the
 [`scan_file`](#scan-a-file-by-path-scan_file) tool, which stays off unless the
 operator names the directories it may read. `scan_image`, the scanner 0.11.0
-and the report are unchanged. Repository source may precede a release: check the
+and the report are unchanged. For any later source version, check the
 [exact npm version](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.1)
 before using its installation command. A checked-in manifest, `server.json` or
 successful build does not establish that a version has been published.
@@ -82,8 +82,7 @@ selected runtime and installed copy unambiguous.
 
 ### Start it with npx
 
-Once this version is published, start it with `npx`, an exact version and no
-install script:
+Start the published adapter with `npx`, an exact version and no install script:
 
 ```json
 {
@@ -108,15 +107,16 @@ install script:
 - To remove it, delete the entry from the client. The files npx kept are
   under `_npx` in npm's cache (`npm config get cache`).
 
-The repository's `Destination acceptance` workflow has qualified the published
-0.2.1 through the same npx options in an empty home, on Linux with Node.js 22
-and 24 and on macOS with Node.js 24. It reads the QR code and the Code 128 through
+The repository's `Destination acceptance` workflow starts the published 0.3.1
+through these npx options in an empty home, on Linux with Node.js 22 and 24 and
+on macOS with Node.js 24. It reads the QR code and the Code 128 through
 `scan_image` in the three profiles. Windows is not checked: a client there may
 need to start `npx` through `cmd`.
 
-The 0.3.1 release workflow qualifies its packed archive before upload. A public
-npx check follows publication; bundles and install links keep the last proven
-public version until that check passes.
+The [0.3.1 release workflow](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43208185486)
+qualified its packed archive, published it through GitHub Trusted Publishing,
+then installed and tested the public npm version on Linux x64 with Node.js 22
+and 24. Bundles keep their own versions until their installed-client checks pass.
 
 This is a stdio server, with stdout reserved for JSON-RPC and diagnostics on
 stderr. The SDK's `serveStdio` entry supports the **2026-07-28** protocol and

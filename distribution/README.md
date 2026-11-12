@@ -1,7 +1,7 @@
 # Scanner downloads and package registries
 
-Choose an installation route for scanner engine 0.11.0. These packages run the
-same local engine that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) uses to verify QR designs.
+Choose an installation route for scanner engine 0.11.0. These packages scan QR
+codes and barcodes locally and return the engine's report.
 
 | | QR codes | Barcodes |
 | --- | --- | --- |
@@ -70,14 +70,16 @@ interface your application or agent already supports:
 
 | Integration | Public package | Install |
 | --- | --- | --- |
-| MCP stdio adapter | [`@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1) | `npm install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1` |
+| MCP stdio adapter | [`@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.1) | `npm install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1` |
 | Portable skill | [`qrcode-barcode-scanner@0.2.0`](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner) | `clawhub install qrcode-barcode-scanner --version 0.2.0` |
 | OpenClaw plugin bundle | [`@qrcode-ai-com/qrcode-barcode-scanner@0.2.0`](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner) | `openclaw plugins install clawhub:@qrcode-ai-com/qrcode-barcode-scanner@0.2.0` |
 
-The MCP adapter passed fresh registry installations on **Linux x64 and
-macOS ARM64 with Node.js 22 and 24**. Its
-[0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
-was published through GitHub Trusted Publishing with verified npm provenance.
+MCP adapter 0.3.1 passed fresh public npm installations on **Linux x64 with
+Node.js 22 and 24**. Its
+[release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.3.1)
+was published through GitHub Trusted Publishing; the public bytes match the
+qualified archive, and npm serves provenance metadata. The npx acceptance
+workflow also checks Linux and macOS from an empty home.
 The skill and bundle passed registry installation and real
 **OpenClaw 2026.11.1** runtime calls on macOS ARM64. Other clients and native
 engine targets need their own installed-consumer checks.
@@ -91,8 +93,8 @@ not change the other integration versions.
 
 The [Official MCP Registry lists adapter 0.2.1](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1)
 under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. Its entry points to the
-npm package above. Each additional client or catalogue has its own acceptance
-checks.
+npm package at that older version; updating the listing is a separate
+publication. Each additional client or catalogue has its own acceptance checks.
 
 ### Connect the published MCP adapter to OpenCode
 
@@ -102,13 +104,13 @@ the install directory in place because OpenCode stores its absolute path.
 
 ```sh
 npm install --prefix ./.qrscan-mcp --save-exact --ignore-scripts \
-  @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1
+  @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1
 opencode mcp add qrscan -- "$(command -v node)" \
   "$PWD/.qrscan-mcp/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs"
 opencode mcp list
 ```
 
-On OpenCode 1.18.15 with Node.js 22.22.2 on macOS ARM64, `qrscan` reported
+The earlier 0.2.1 adapter on OpenCode 1.18.15 with Node.js 22.22.2 on macOS ARM64 reported
 `connected` and the client discovered `scan_image`. A separate direct MCP
 call on the same adapter version returned the QR payload and Code 128
 `STOCK-4827` in `fast`, `frame`, and `full` with engine 0.11.0. To remove
@@ -166,30 +168,31 @@ ClawHub listing of the same skill.
 
 ### Install the adapter or the skill from the release files
 
-The [agents-v0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
-carries the adapter and the skill as files, for a project that installs from a
-release page instead of a registry. They are copies, not new versions:
+The [agents-v0.3.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.3.1)
+carries the current MCP adapter archive. The skill archives retain their own
+0.2.0 version on the [agents-v0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1).
+These files are copies for installation from a release page instead of a registry:
 
 | File | What it is | SHA-256 |
 | --- | --- | --- |
-| [`qrcode-barcode-scanner-mcp-0.2.1.tgz`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-mcp-0.2.1.tgz) | The npm archive of adapter 0.2.1, byte for byte | `e948ef8bac8fb8c197cd8cabb1a3df3d3d5db60e1b90d965125308186c8797e2` |
+| [`qrcode-ai-com-qrcode-barcode-scanner-mcp-0.3.1.tgz`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.3.1/qrcode-ai-com-qrcode-barcode-scanner-mcp-0.3.1.tgz) | The npm archive of adapter 0.3.1, byte for byte | `705b3223f6049024fd74ce2a41377b2586774304a9dab13b6619d19b1059308e` |
 | [`qrcode-barcode-scanner-skill-0.2.0.zip`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.zip) | The five files of the skill at `610879c`, the commit of the tag | `ef84d7a2e4d1c949371fc2d1aa242e101c0e79e85de88027f6a9f9656fe2884c` |
 | [`qrcode-barcode-scanner-skill-0.2.0.tar.gz`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.tar.gz) | The same five files | `e73e7b5fe8c6da40ce5c1971e35d1f27d923aa8bf574eeb5c70b55e7a18899a8` |
 
-The release also lists these values in two `SHA256SUMS` files. They are assets
-of the same release, so they detect a damaged download, not a substituted
-release. For the adapter, the npm provenance of 0.2.1 is the independent check.
+Each release lists its own checksums. They share that release's trust and detect
+damaged downloads; they do not independently authenticate a release. The 0.3.1
+release also carries its producer and npm publication receipts.
 
 Install the adapter from its file:
 
 ```sh
 npm install --prefix ./.qrscan-mcp --save-exact --ignore-scripts \
-  https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.2.1/qrcode-barcode-scanner-mcp-0.2.1.tgz
+  https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/download/agents-v0.3.1/qrcode-ai-com-qrcode-barcode-scanner-mcp-0.3.1.tgz
 ```
 
 The file holds the adapter only. npm still fetches its dependencies from the
 npm registry, among them engine 0.11.0. The integrity npm writes in your lock
-file is the one the registry publishes for 0.2.1.
+file is the one the registry publishes for 0.3.1.
 
 The skill archives have no top-level folder. Extract one into a folder named
 `qrcode-barcode-scanner` inside the skill directory of your host:
