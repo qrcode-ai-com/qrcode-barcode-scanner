@@ -73,7 +73,7 @@ toolchain pin, and no text member may name a build host. They need --commit ID
 DIR (a checkout holding that commit), whose git tree it must match file for
 file. --tag T, --sums-sha256 H (SHA256SUMS must hash to H) and --forbid S (a
 string no text member may hold, never echoed; repeatable) are optional.
---release-set: the five archives, the source archive and SHA256SUMS, from one
+--release-set: the seven archives, the source archive and SHA256SUMS, from one
 commit and toolchain, and nothing else.
 
 Verdicts: PASS · FAIL · UNAVAILABLE (a tool or input this host lacks, named,
@@ -2442,6 +2442,8 @@ CLI_TARGETS = {  # triple: archive extension
     "x86_64-apple-darwin": "tar.gz",
     "aarch64-apple-darwin": "tar.gz",
     "x86_64-pc-windows-msvc": "zip",
+    "x86_64-unknown-linux-musl": "tar.gz",
+    "aarch64-unknown-linux-musl": "tar.gz",
 }
 CLI_KINDS = frozenset({"cli", "cli-source", "cli-sums"})
 CLI_ARCHIVE = re.compile(r"qrcode-barcode-scanner-cli-(?P<version>[^-]+)-(?P<triple>.+?)\.(?P<ext>tar\.gz|zip)")
@@ -2481,7 +2483,9 @@ CLI_ANCHORS = ("clap", "image", "rqrr", "rxing", "serde_json")
 # the build host's path; the row flags follow.
 CLI_PLACEHOLDERS = ("<cargo-home>", "<checkout>", "<target-dir>")
 CLI_ROW_FLAGS = {"x86_64-unknown-linux-gnu": ["-Clinker-features=-lld"],
-                 "x86_64-pc-windows-msvc": ["-Ctarget-feature=+crt-static"]}
+                 "x86_64-pc-windows-msvc": ["-Ctarget-feature=+crt-static"],
+                 "x86_64-unknown-linux-musl": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"],
+                 "aarch64-unknown-linux-musl": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"]}
 CLI_DEPLOYMENT_TARGETS = {"x86_64-apple-darwin": "10.15", "aarch64-apple-darwin": "11.0"}
 CLI_UNWINDERS = ("zig-libunwind", "libgcc_s")
 THIRD_PARTY_FIELDS = (("license", r".+"), ("source", r"\S+"), ("checksum", r"[0-9a-f]{64}"),
@@ -3166,7 +3170,7 @@ def check_cli_sums(host: Host) -> None:
 
 
 def check_cli_release_set(host: Host) -> None:
-    """The release set is the five archives, the source archive and SHA256SUMS, once each, built from one
+    """The release set is the seven archives, the source archive and SHA256SUMS, once each, built from one
     commit, Cargo.lock, compiler and standard library notice, with nothing else beside them."""
     files = [a for a in host.artifacts if a.kind in CLI_KINDS]
     art = host.add(Artifact("CLI release set", "cli-set"))
@@ -5111,13 +5115,16 @@ def cli_self_test():
                       "cli-sums": ("sha256sum's text format", "one line per CLI archive", "--sums-sha256"),
                       "cli-set": ("archives, the source archive and SHA256SUMS once each",)}
             kinds = sorted(a.kind for a in host.artifacts)
-            if kinds != ["cli"] * 5 + ["cli-set", "cli-source", "cli-sums"]:
+            if kinds != ["cli"] * 7 + ["cli-set", "cli-source", "cli-sums"]:
                 failures.append(f"CLI clean release set: artifacts {kinds}")
             for art in host.artifacts:
                 names = " · ".join(c.name for c in art.checks)
                 absent = [needle for needle in wanted.get(art.kind, ()) if needle not in names]
                 if absent:
                     failures.append(f"CLI clean release set: {art.name} ran no check {absent}")
+            for musl in ("x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"):
+                judge(f"release set without {musl}", [path for path in full if path != archives[musl]],
+                      FAIL, f"no {musl} archive", options=("--release-set", *tree))
             gnu, win, mac = "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"
             judge("one archive and a SHA256SUMS listing it alone",
                   [archives[gnu], sums("partial", [archives[gnu]])], PASS)
@@ -5136,7 +5143,7 @@ def cli_self_test():
             clean_gnu = archives[gnu].read_bytes()
             for label, filename, needle in (
                     ("an archive named at another version", f"{CLI_PACKAGE}-0.10.0-{gnu}.tar.gz", "version 0.10.0"),
-                    ("an archive for a triple outside the five", f"{CLI_PACKAGE}-{version}-x86_64-unknown-linux-musl"
+                    ("an archive for a triple outside the seven", f"{CLI_PACKAGE}-{version}-riscv64gc-unknown-linux-musl"
                                                                  ".tar.gz", "target is one of"),
                     ("a Linux archive as .zip", f"{stem(gnu)}.zip", "zip for the Windows target"),
                     ("an archive name without a target", f"{CLI_PACKAGE}-{version}.tar.gz", "name is"),
@@ -5713,7 +5720,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="node · archive: the set about to publish, complete and nothing else — npm: the main "
                              "package pins every napi target at this version and every pin has its platform "
                              "package; Python: one wheel per row of python.yml's matrix and one sdist; CLI: the "
-                             "five archives, the source archive and SHA256SUMS. flutter: the "
+                             "seven archives, the source archive and SHA256SUMS. flutter: the "
                              "complete portable candidate and real pub validator (required in every Flutter inspection), "
                              f"and with --release-set the pubspec name {FLUTTER_NAME} and a README that states no "
                              "availability")
