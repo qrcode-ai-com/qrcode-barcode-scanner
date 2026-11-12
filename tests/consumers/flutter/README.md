@@ -9,7 +9,9 @@ Each job copies the published example outside the checkout, replaces its parent-
 with the exact pub.dev version, and resolves it in an empty pub cache. All 198 installed
 package files must match the reviewed public archive before the native build starts.
 
-Android 14 x86_64 and an available iPhone simulator run the real Rust bridge. Five native
+Android 14 x86_64 and an available iPhone simulator run the real Rust bridge with
+`CARGO_PROFILE_DEV_OPT_LEVEL=2`. Flutter remains in simulator-compatible debug mode;
+this explicitly optimizes the native Rust build without changing any package file. Five native
 cases execute: exact mixed QR/Code 128 contents in fast/frame/full, a blank frame and an invalid
 image. Full reports are collected in bounded chunks; missing or repeated chunks fail. The
 common destination acceptance driver judges the three reports. The dependency is then removed
@@ -27,3 +29,14 @@ python3 tests/consumers/flutter/consumer.py --self-test
 ```
 
 Native builds and simulator runs belong on hosted runners. Do not run them on the operator Mac.
+
+## Retained default-debug limitation
+
+The first Android run, [43274479127](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43274479127),
+resolved the public package correctly but failed `budgetExhausted == false` for all three
+mixed-scene profiles with Rust's default unoptimized development build. Blank-frame and
+invalid-image cases passed. The standalone Flutter crate does not inherit the core workspace's
+development optimization settings. This is a known limit of the published 0.11 package,
+not a passing default-debug result. The configured optimized consumer does not close that limit.
+Carry standalone development settings and a fresh default-debug check into the next engine
+release. Do not replace published 0.11.0 or infer release-device performance from simulators.
