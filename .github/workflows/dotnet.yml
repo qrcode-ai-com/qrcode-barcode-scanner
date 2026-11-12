@@ -274,7 +274,6 @@ jobs:
             "$RUNNER_TEMP/feed/QRCodeAI.QRCodeBarcodeScanner.$ENGINE_VERSION.nupkg" \
             --natives "$RUNNER_TEMP/natives" --version "$ENGINE_VERSION" --commit "$GITHUB_SHA" \
             --out receipt/package.json
-          cp "$RUNNER_TEMP"/natives/*/native.json receipt/ 2>/dev/null || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         with:
           name: dotnet-package

@@ -71,7 +71,8 @@ GLIBC_OWN = {"libc.so.6", "libm.so.6", "libpthread.so.0", "librt.so.1", "libdl.s
 C_RUNTIME = re.compile(r"^(vcruntime|msvcp|msvcr|concrt|vccorlib|ucrtbase|api-ms-win-crt-)", re.I)
 # The files of an archive that are its envelope, not its content.
 ENVELOPE = re.compile(r"\[Content_Types\]\.xml|_rels/\.rels|package/services/metadata/core-properties/[0-9a-f]+\.psmdcp")
-NUSPEC = "{http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd}"
+# NuGet writes the nuspec in the oldest of its schemas that holds what the package uses.
+NUSPEC = re.compile(r"\{http://schemas\.microsoft\.com/packaging/\d{4}/\d{2}/nuspec\.xsd\}")
 
 
 class Refused(Exception):
@@ -249,8 +250,11 @@ def inspect(archive, folder, version, commit):
     require(b"<!DOCTYPE" not in manifest and b"<!ENTITY" not in manifest,
             "the nuspec declares a document type or an entity")
     try:
-        metadata = ET.fromstring(manifest).find(f"{NUSPEC}metadata")
-        field = {child.tag.removeprefix(NUSPEC): child for child in metadata}
+        root = ET.fromstring(manifest)
+        schema = NUSPEC.match(root.tag)
+        require(schema and root.tag == schema[0] + "package", f"the nuspec is a {root.tag}, not a NuGet package")
+        metadata = root.find(schema[0] + "metadata")
+        field = {child.tag.removeprefix(schema[0]): child for child in metadata}
         told = {"id": field["id"].text, "version": field["version"].text,
                 "license": (field["license"].get("type"), field["license"].text),
                 "projectUrl": field["projectUrl"].text, "readme": field["readme"].text,
@@ -293,9 +297,10 @@ def canned(target):
 def nuspec(version="9.8.7", commit="c" * 40, **changes):
     fields = {"id": PACKAGE, "version": version, "license": LICENSE, "license_type": "expression",
               "projectUrl": PROJECT_URL, "readme": "README.md", "url": REPOSITORY, "commit": commit,
-              "dependencies": f'<group targetFramework="net8.0" />'}
+              "dependencies": '<group targetFramework="net8.0" />',
+              "schema": "http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd"}
     fields.update(changes)
-    return (f'<?xml version="1.0" encoding="utf-8"?><package xmlns="{NUSPEC[1:-1]}"><metadata>'
+    return (f'<?xml version="1.0" encoding="utf-8"?><package xmlns="{fields["schema"]}"><metadata>'
             f'<id>{fields["id"]}</id><version>{fields["version"]}</version><authors>QR Code AI</authors>'
             f'<license type="{fields["license_type"]}">{fields["license"]}</license>'
             f'<readme>{fields["readme"]}</readme><projectUrl>{fields["projectUrl"]}</projectUrl>'
@@ -413,6 +418,8 @@ def self_test():
         archive = packed(out)
         report = inspect(archive, out, "9.8.7", "c" * 40)
         check("accepts the archive of the package", report["version"] == "9.8.7" and len(report["natives"]) == 5)
+        older = packed(out, schema="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd")
+        check("accepts a nuspec in an older NuGet schema", refused(lambda: inspect(older, out, "9.8.7", "c" * 40)) is None)
         for label, words, broken in (
                 ("an archive with one library missing", "lacks", packed(out, drop=("runtimes/win-x64/native/" + TARGETS[windows]["file"],))),
                 ("an archive with a file too many", "beyond the package", packed(out, add={"tools/install.ps1": b"x"})),
@@ -430,6 +437,8 @@ def self_test():
                  packed(out, dependencies='<group targetFramework="net8.0"><dependency id="Newtonsoft.Json" version="13.0.3" /></group>')),
                 ("a README with a link beside it", "links to a file beside it",
                  packed(out, add={"README.md": b"[spec](../../spec/01-report.md)\n"})),
+                ("a nuspec of another kind of document", "not a NuGet package",
+                 packed(out, schema="http://example.org/another")),
                 ("a nuspec that declares an entity", "document type or an entity",
                  packed(out, add={f"{PACKAGE}.nuspec": b'<!DOCTYPE x [<!ENTITY a "b">]>' + nuspec()})),
                 ("an assembly that is not one", "not a .NET assembly", packed(out, add={f"lib/{FRAMEWORK}/{PACKAGE}.dll": b"text"}))):
