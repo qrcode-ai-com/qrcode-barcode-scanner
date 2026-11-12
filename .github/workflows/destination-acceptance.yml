@@ -206,7 +206,7 @@ jobs:
       # The public adapter and the launch entry of bundles and install links: npx, an exact
       # version, no install script.
       ADAPTER: "@qrcode-ai-com/qrcode-barcode-scanner-mcp"
-      ADAPTER_VERSION: 0.2.1
+      ADAPTER_VERSION: 0.3.1
       NAME: mcp-npx-node${{ matrix.node }}-${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
