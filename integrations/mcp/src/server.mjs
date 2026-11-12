@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 
 export const ENGINE_VERSION = "0.11.0";
-export const ADAPTER_VERSION = "0.3.0";
+export const ADAPTER_VERSION = "0.3.1";
 const HARD_LIMITS = Object.freeze({ inputBytes: 8 * 1024 * 1024, dimension: 4096, pixels: 16_000_000, concurrent: 2 });
 const ALLOWED_DIRECTORIES = "QRSCAN_MCP_ALLOWED_DIRECTORIES";
 const MAX_DIRECTORIES = 16;

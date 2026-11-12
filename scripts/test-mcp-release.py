@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import tarfile
 import tempfile
@@ -49,6 +50,25 @@ class ReleaseBoundaries(unittest.TestCase):
         self.assertEqual(value["package"], release.PACKAGE)
         self.assertEqual(value["engine"]["version"], "0.11.0")
         self.assertEqual(set(value["files"]), set(release.FILES))
+
+    def test_product_links_precede_installation(self):
+        readme = (release.ROOT / "integrations/mcp/README.md").read_text()
+        introduction = readme.split("\n## Install\n", 1)[0]
+        links = re.findall(r"\]\((https://qrcode-ai\.com/[^)]+)\)", introduction)
+        self.assertEqual(links, [
+            "https://qrcode-ai.com/en-US/qr-code-scanner",
+            "https://qrcode-ai.com/en-US/barcode-scanner",
+            "https://qrcode-ai.com/en-US/qr-code-scanner/mcp",
+            "https://qrcode-ai.com/en-US/barcode-scanner/mcp",
+            "https://qrcode-ai.com/en-US/qr-code-generator",
+            "https://qrcode-ai.com/en-US/barcode-generator",
+        ])
+
+    def test_install_examples_use_the_candidate_version(self):
+        readme = (release.ROOT / "integrations/mcp/README.md").read_text()
+        versions = re.findall(r"@qrcode-ai-com/qrcode-barcode-scanner-mcp@(\d+\.\d+\.\d+)", readme)
+        version = release.metadata()["version"]
+        self.assertEqual(versions, [version, version])
 
     def test_archive_source_substitution(self):
         self.make_archive(lambda name, member, data: data + b"modified" if name == "src/server.mjs" else data)
