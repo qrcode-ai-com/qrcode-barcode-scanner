@@ -1,0 +1,44 @@
+name: Release manifest
+
+# distribution/releases/ holds one manifest per public engine release: its tag, its commit and
+# the hash of every public file. This workflow runs the self-test of the program that writes
+# them, then reads each public release again, anonymously, and compares it with the committed
+# file: the tag, the GitHub release files, the two crates, the npm packages and the Python
+# files. Nothing is built from this repository's source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release-manifest.yml
+      - scripts/release-manifest.py
+      - distribution/releases/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-manifest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-test:
+    name: Program self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/release-manifest.py --self-test
+
+  public-release:
+    name: Public release against its manifest
+    needs: self-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read each public release again and compare it with its manifest
+        run: python3 scripts/release-manifest.py verify distribution/releases/v*.json
