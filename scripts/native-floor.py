@@ -336,8 +336,8 @@ CLI_FLOOR = {
     "x86_64-apple-darwin": {"format": "macho", "arch": "x86_64", "ext": "tar.gz", "minos": "10.15", "signed": False},
     "aarch64-apple-darwin": {"format": "macho", "arch": "arm64", "ext": "tar.gz", "minos": "11.0", "signed": True},
     "x86_64-pc-windows-msvc": {"format": "pe32+", "arch": "x86_64", "ext": "zip"},
-    "x86_64-unknown-linux-musl": {"format": "elf64", "arch": "x86_64", "ext": "tar.gz", "static": True},
-    "aarch64-unknown-linux-musl": {"format": "elf64", "arch": "aarch64", "ext": "tar.gz", "static": True},
+    "x86_64-unknown-linux-musl": {"format": "elf64", "arch": "x86_64", "ext": "tar.gz", "static": True, "elf_type": 3},
+    "aarch64-unknown-linux-musl": {"format": "elf64", "arch": "aarch64", "ext": "tar.gz", "static": True, "elf_type": 2},
 }
 UNWINDERS = ("zig-libunwind", "libgcc_s")
 ELF_GLIBC = ELF_SYSTEM - {"libc.so", "libc.musl-x86_64.so.1"}
@@ -442,12 +442,12 @@ def elf_cli_problems(label, floor, report, unwinder):
 
 
 def musl_cli_problems(label, floor, report):
-    """Static PIE only: no ELF interpreter, dynamic dependencies or symbol-version imports."""
+    """The target's static executable kind, without a dynamic runtime or version imports."""
     problems = []
     if report["arch"] != floor["arch"]:
         problems.append(f"{label}: {report['arch']}, not {floor['arch']}")
-    if report["elf_type"] != 3:
-        problems.append(f"{label}: not ET_DYN: not a position-independent executable")
+    if report["elf_type"] != floor["elf_type"]:
+        problems.append(f"{label}: ELF type {report['elf_type']}, expected {floor['elf_type']} for static musl")
     if report["interp"] is not None:
         problems.append(f"{label}: PT_INTERP {report['interp']} on a static musl executable")
     problems += [f"{label}: DT_NEEDED {name} on a static musl executable" for name in report["needed"]]
@@ -796,7 +796,7 @@ def cli_self_test():
     clean = {x64: gnu_elf(), arm: make_elf(**gnu_arm), intel: intel_macho(), mac: make_executable_macho(),
              win: console_pe(),
              "x86_64-unknown-linux-musl": make_elf(needed=(), versions=(), stack=6),
-             "aarch64-unknown-linux-musl": make_elf(machine=183, needed=(), versions=(), stack=6)}
+             "aarch64-unknown-linux-musl": make_elf(machine=183, e_type=2, needed=(), versions=(), stack=6)}
     # (case, target, bytes, unwinder, --forbid strings, refusal reasons after "qrscan: ")
     cases = [(f"clean {target}", target, data, zig if target in (x64, arm) else None, (), [])
              for target, data in clean.items()]

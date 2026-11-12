@@ -37,12 +37,22 @@ class MuslAdmission(unittest.TestCase):
                                   "platform": "linux/amd64" if arch == "x86_64" else "linux/arm64",
                                   "runner": runner}])
 
-    def test_static_position_independent_files_are_admitted(self):
+    def test_target_static_executable_kinds_are_admitted(self):
         for target, machine in (("x86_64-unknown-linux-musl", 62), ("aarch64-unknown-linux-musl", 183)):
             with self.subTest(target=target):
                 self.assertIn(target, floor.CLI_FLOOR)
-                data = floor.make_elf(machine=machine, needed=(), versions=(), stack=6)
+                data = floor.make_elf(machine=machine, e_type=3 if machine == 62 else 2, needed=(), versions=(), stack=6)
                 self.assertEqual(floor.cli_problems("qrscan", target, floor.elf(data), data, None, ()), [])
+
+    def test_static_files_refuse_the_wrong_executable_kind(self):
+        for target, machine, bad, expected in (
+            ("x86_64-unknown-linux-musl", 62, 2, 3),
+            ("aarch64-unknown-linux-musl", 183, 3, 2),
+        ):
+            with self.subTest(target=target):
+                data = floor.make_elf(machine=machine, e_type=bad, needed=(), versions=(), stack=6)
+                self.assertEqual(floor.cli_problems("qrscan", target, floor.elf(data), data, None, ()),
+                    [f"qrscan: ELF type {bad}, expected {expected} for static musl"])
 
     def test_static_files_refuse_dynamic_dependencies_and_loader(self):
         target = "x86_64-unknown-linux-musl"

@@ -885,7 +885,7 @@ assets, all named `qrcode-barcode-scanner-cli-X.Y.Z-…`:
 - one archive per target: `x86_64-unknown-linux-gnu` and
   `aarch64-unknown-linux-gnu` (glibc 2.28 or later), `x86_64-apple-darwin`
   (macOS 10.15 or later), `aarch64-apple-darwin` (11.0 or later),
-  `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` (static PIE) as
+  `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` (static; PIE on x86_64, ET_EXEC on arm64) as
   `.tar.gz`, and `x86_64-pc-windows-msvc` as `.zip`. Each holds one top
   directory named like the archive, with `qrscan` (`qrscan.exe`), its license
   material, `SOURCE.md` and `build-info.json`;

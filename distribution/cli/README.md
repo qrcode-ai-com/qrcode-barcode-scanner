@@ -32,7 +32,7 @@ For version `X.Y.Z`, nine assets of the release tagged `vX.Y.Z` belong to
   above, made of its SHA-256 in lowercase hexadecimal, two spaces and its name.
 
 The Windows program contains its C runtime, so it needs no Visual C++
-Redistributable. The musl programs are static position-independent executables:
+Redistributable. The musl programs are static executables (PIE on x86_64, ET_EXEC on arm64):
 no ELF interpreter or dynamic library is needed. They keep the engine's current
 allocator configuration. Windows on Arm and universal macOS archives are not provided.
 
