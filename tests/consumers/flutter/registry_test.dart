@@ -16,6 +16,16 @@ void main() {
       final bytes = (await rootBundle.load('assets/mixed.png')).buffer
           .asUint8List();
       final report = await QrcodeAiScanner.scan(bytes, profile: profile);
+      // Device logs may truncate a long line; the host requires every exact chunk.
+      final encoded = base64Encode(utf8.encode(jsonEncode(report.raw)));
+      final count = (encoded.length + 1199) ~/ 1200;
+      for (var index = 0; index < count; index++) {
+        final end = ((index + 1) * 1200).clamp(0, encoded.length);
+        // ignore: avoid_print
+        print(
+          'QRSCAN_REPORT:$profile:$index:$count:${encoded.substring(index * 1200, end)}',
+        );
+      }
       expect(report.versions.scanner, '0.11.0');
       expect(report.versions.pipeline, 5);
       expect(report.versions.scoreContract, 5);
@@ -31,16 +41,6 @@ void main() {
         expect(detection.content.raw, utf8.encode(detection.content.text));
       }
       if (profile == 'full') expect(report.score, isNotNull);
-      // Device logs may truncate a long line; the host requires every exact chunk.
-      final encoded = base64Encode(utf8.encode(jsonEncode(report.raw)));
-      final count = (encoded.length + 1199) ~/ 1200;
-      for (var index = 0; index < count; index++) {
-        final end = ((index + 1) * 1200).clamp(0, encoded.length);
-        // ignore: avoid_print
-        print(
-          'QRSCAN_REPORT:$profile:$index:$count:${encoded.substring(index * 1200, end)}',
-        );
-      }
     });
   }
 

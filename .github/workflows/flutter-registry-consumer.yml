@@ -14,6 +14,9 @@ permissions:
 env:
   RUST_TOOLCHAIN: "1.99.1"
   FLUTTER_VERSION: "3.47.9"
+  # Simulators require Flutter debug mode; the decoder needs optimized native code for its budgets.
+  # Default Rust opt-level 0 exceeded all three budgets in the retained first Android run.
+  CARGO_PROFILE_DEV_OPT_LEVEL: "2"
 
 jobs:
   native:
