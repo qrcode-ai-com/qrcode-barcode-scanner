@@ -2182,10 +2182,13 @@ pub(crate) mod tests {
         String::from_utf8_lossy(&out.stdout).trim().to_owned()
     }
 
-    /// Stopped (or running again) within 3 s.
+    /// Stopped (or running again) within 15 s. The state is read with one `ps` per look. On a
+    /// busy hosted macOS runner three seconds were not always enough to see a child that had been
+    /// stopped: the test failed that way twice in November 2026 and passed when run again. The
+    /// wait ends at the first look that agrees, so a healthy run is as fast as before.
     fn stopped_within(pid: u32, stopped: bool) -> bool {
         let started = Instant::now();
-        while started.elapsed() < Duration::from_secs(3) {
+        while started.elapsed() < Duration::from_secs(15) {
             if state(pid).starts_with('T') == stopped {
                 return true;
             }
