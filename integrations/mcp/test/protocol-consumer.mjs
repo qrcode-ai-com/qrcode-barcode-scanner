@@ -60,7 +60,7 @@ async function connect(era, settings = {}) {
   await client.connect(transport);
   const onmessage = transport.onmessage;
   transport.onmessage = (message, extra) => { wire.push({ direction: "received", message }); return onmessage(message, extra); };
-  assert.deepEqual(client.getServerVersion(), { name: "io.github.qrcode-ai-com/qrcode-barcode-scanner", version: "0.3.0", websiteUrl: "https://qrcode-ai.com/en-US/qr-code-scanner/mcp" });
+  assert.deepEqual(client.getServerVersion(), { name: "io.github.qrcode-ai-com/qrcode-barcode-scanner", version: "0.3.1", websiteUrl: "https://qrcode-ai.com/en-US/qr-code-scanner/mcp" });
   if (modern) assert.equal(client.getNegotiatedProtocolVersion(), "2026-07-28");
   else assert.equal(wire[0].message.method, "initialize");
   const pid = transport.pid;
@@ -268,6 +268,6 @@ try {
 const loaded = Object.keys(require.cache).filter((file) => file.endsWith(".node"));
 assert.equal(loaded.length, 1);
 assert.ok(!relative(root, loaded[0]).startsWith(".."));
-const receipt = { verdict: "PASS", adapter: "0.3.0", scanner: version(), node: process.version, os: process.platform, arch: process.arch, installedEntry: entry, fixtureSha256: sha256(fixture), loadedNative: { path: loaded[0], sha256: sha256(readFileSync(loaded[0])) }, sessions: receipts, scanFile: { eras: ["modern", "legacy"], mixedProfiles: ["fast", "frame", "full"], mixedExactPayloads: ["STOCK-4827", "https://qrc-ai.com/76xMa"], refusals, symbolicLinksAndPipeChecked: links }, inputByteCap: true, dimensionCap: true, pixelCap: true, concurrencyCap: true, concurrencyAcrossFactories: true, realProductClients: "NOT VERIFIED" };
+const receipt = { verdict: "PASS", adapter: "0.3.1", scanner: version(), node: process.version, os: process.platform, arch: process.arch, installedEntry: entry, fixtureSha256: sha256(fixture), loadedNative: { path: loaded[0], sha256: sha256(readFileSync(loaded[0])) }, sessions: receipts, scanFile: { eras: ["modern", "legacy"], mixedProfiles: ["fast", "frame", "full"], mixedExactPayloads: ["STOCK-4827", "https://qrc-ai.com/76xMa"], refusals, symbolicLinksAndPipeChecked: links }, inputByteCap: true, dimensionCap: true, pixelCap: true, concurrencyCap: true, concurrencyAcrossFactories: true, realProductClients: "NOT VERIFIED" };
 writeFileSync(join(root, "protocol-receipt.json"), JSON.stringify(receipt, null, 2));
 console.log(JSON.stringify(receipt));

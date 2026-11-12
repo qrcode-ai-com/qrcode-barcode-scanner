@@ -1,7 +1,7 @@
 {
   "name": "@qrcode-ai-com/qrcode-barcode-scanner-mcp",
-  "version": "0.3.0",
-  "description": "Local stdio MCP adapter for exact QR and barcode decoding and scannability reports",
+  "version": "0.3.1",
+  "description": "Local MCP server for QR code and barcode image scanning, preserved payload bytes and QR scannability reports",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "bin": {
@@ -29,8 +29,11 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
+    "qr-code",
     "qrcode",
     "barcode",
+    "barcode-scanner",
     "scanner",
     "local",
     "stdio",
