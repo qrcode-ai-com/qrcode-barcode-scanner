@@ -89,8 +89,9 @@ jobs:
           python3 scripts/destination-acceptance.py removed --not-applicable \
             --receipt "receipt/acceptance-host-$TARGET.json"
           python3 scripts/destination-acceptance.py check "receipt/acceptance-host-$TARGET.json"
-      # Alpine holds musl and nothing of glibc. Python is added for the driver only: qrscan
-      # itself must need nothing.
+      # Alpine holds musl and nothing of glibc. Python and git are added for the driver only,
+      # which records the commit it judged: qrscan itself must need nothing, and its version is
+      # asked before either is installed.
       - name: Judge three scans inside Alpine
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -100,7 +101,8 @@ jobs:
             -e TARGET -e ENGINE_VERSION -e RUN_URL -e TREE_URL "$ALPINE" sh -euc '
               cat /etc/alpine-release
               /src/out/qrscan-musl --version
-              apk add --no-cache python3 >/dev/null
+              apk add --no-cache python3 git >/dev/null
+              git config --global --add safe.directory /src
               python3 scripts/destination-acceptance.py cli \
                 --qrscan /src/out/qrscan-musl \
                 --destination "musl CLI spike inside Alpine (not a release)" \
