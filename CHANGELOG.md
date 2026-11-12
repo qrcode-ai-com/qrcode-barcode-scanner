@@ -47,6 +47,11 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   and as a minified one, with 4 KB and with 16 KB memory pages.
 - The Flutter publish job names its Flutter and Dart versions and installs
   from a tracked `pubspec.lock`.
+- `distribution/releases/` records each public release in one manifest: its
+  tag, its commit and the hash of every public file, read from the public
+  addresses. `scripts/release-fanout.py` keeps every mention of a release
+  version and every pinned hash of this repository equal to what it follows,
+  and ci fails on one that is not classified.
 
 ## 0.11.0 — 2026-10-31
 

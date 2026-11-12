@@ -76,7 +76,14 @@ Bump the workspace `Cargo.toml` version, then:
 cargo run -p xtask -- sync-version    # mirrors every publish surface + doc pins
 ```
 
-It rewrites the hand-spelled version surfaces (`bindings/flutter/rust/Cargo.toml`
+Then `python3 scripts/release-fanout.py render` moves what the source says of
+itself beyond those surfaces: the links of each package README to its own tag,
+the report example of the spec and one self-test value
+(`distribution/releases/pins.toml`, the mentions of kind `tree`).
+`scripts/prepare-release.py` runs both. `release-fanout.py check` runs in ci and
+fails while a mention differs from what it follows.
+
+`sync-version` rewrites the hand-spelled version surfaces (`bindings/flutter/rust/Cargo.toml`
 · py · uniffi · the cli core pin · `pubspec.yaml` · `build.gradle.kts` ·
 `package.json`), the Flutter example lockfile's entry for the plugin, **and**
 the version-pinned doc coordinate (the JitPack coordinate line in
@@ -1010,6 +1017,25 @@ changed: find out why before touching the file.
 
 The container image, the Linux packages, the AppImage and the hosted examples
 have their own tags and are not in this file.
+
+Once the manifest is merged, move what follows the public release, in a second
+pull request:
+
+```bash
+python3 scripts/release-fanout.py render --engine vX.Y.Z.json
+python3 scripts/release-fanout.py check --list lines
+```
+
+`render` makes that manifest the one `distribution/releases/pins.toml` names,
+then rewrites the install lines, the links to the release, the recipes with
+their hashes and the consumer checks of the release. It leaves what a
+destination holds until its own publication, and every statement of history.
+`--list lines` prints the lines no program can rewrite, such as the engine line
+the Go and PHP packages accept: read each one. Then read the diff. The
+workflows of the recipes and of the consumers run on that pull request against
+the public release, which qualifies each recipe before its own tag is cut
+([`distribution/releases/README.md`](distribution/releases/README.md) lists what
+stays by hand).
 
 ## Independent MCP npm releases
 

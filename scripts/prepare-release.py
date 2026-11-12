@@ -96,6 +96,8 @@ def main():
         raise SystemExit("workspace version source was not unique")
     manifest.write_text(text)
     run(str(xtask), "sync-version")
+    # What the source says of itself beyond those surfaces (distribution/releases/pins.toml).
+    run("python3", "scripts/release-fanout.py", "render")
     for folder in LOCK_ROOTS:
         run("cargo", "metadata", "--format-version", "1", "--manifest-path",
             str(ROOT / folder / "Cargo.toml"))
@@ -125,6 +127,7 @@ def main():
             raise SystemExit(f"CLI exit/report disagreement: {golden}")
         (ROOT / golden).write_text(result.stdout)
     run(str(xtask), "sync-version", "--check")
+    run("python3", "scripts/release-fanout.py", "check")
     run("python3", "scripts/package-inspect.py", "versions", "--tag", "refs/tags/v" + version,
         "--strict", "--quiet")
     run("cargo", "test", "--locked", "-p", "qrcode-barcode-scanner", "--test", "spec_golden")
