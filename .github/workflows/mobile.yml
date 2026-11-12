@@ -101,6 +101,16 @@ jobs:
             --language kotlin --out-dir /tmp/kotlin-smoke
           test -n "$(find /tmp/kotlin-smoke -name '*.kt' -print -quit)" \
             || { echo 'no .kt generated'; exit 1; }
+      # The binding error is flat so that every UniFFI backend can express it. The Ruby backend
+      # is the strict one: for a variant with an unnamed value it writes a file Ruby refuses.
+      # Generating it and asking Ruby keeps that shape from coming back unnoticed.
+      - name: smoke-generate Ruby bindings and check that Ruby accepts them
+        run: |
+          cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen -- \
+            generate --library crates/qrcode-ai-scanner-uniffi/target/release/libqrcode_ai_scanner_uniffi.so \
+            --language ruby --no-format --out-dir /tmp/ruby-smoke
+          ruby --version
+          ruby -c /tmp/ruby-smoke/qrcode_ai_scanner_uniffi.rb
 
   android:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'

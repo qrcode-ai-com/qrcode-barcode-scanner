@@ -70,3 +70,8 @@ A scan fault throws `ScanBindingException.ScanFailed` (Kotlin) or
 wire code ([catalog](/api/errors)). An unknown name or a palette above 32
 colors throws its own case (`UnknownProfile`, `PaletteTooLarge`, …) without
 a code. The report shape is the [one contract](/api/report).
+
+From the next engine version each case carries one message and nothing else:
+`scan failed: … [QRS-001]`, `unknown profile: turbo`. Up to 0.11.0 a case
+also held its value as a separate unnamed field (`v1` in Kotlin), and the
+message repeated that name. Read the message, and match the case.

@@ -16,7 +16,14 @@ uniffi::setup_scaffolding!();
 
 /// Errors crossing the FFI. UniFFI requires an enum that implements
 /// `std::error::Error`; the core's own QRS-XXX codes ride inside the message.
+///
+/// The error is flat: a binding receives the variant and its message, the text
+/// of `Display` below, and nothing else. The value a variant holds here stays
+/// on the Rust side. Two reasons (owner decision of 12 November 2026): UniFFI's
+/// Ruby backend writes invalid Ruby for a variant with an unnamed value, and
+/// the other generators named that value `v1` and showed it in the message.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
+#[uniffi(flat_error)]
 pub enum ScanBindingError {
     /// Unknown profile name (not "full" / "fast" / "frame").
     #[error("unknown profile: {0}")]
@@ -345,6 +352,8 @@ mod tests {
     #[test]
     fn unknown_profile_is_a_typed_error_not_a_scan() {
         let err = scan(clean_qr(), "turbo".into(), None, None, None, None, None, None, None, None).unwrap_err();
+        // The message a binding receives names the value: the error is flat.
+        assert_eq!(err.to_string(), "unknown profile: turbo");
         match err {
             ScanBindingError::UnknownProfile(name) => assert_eq!(name, "turbo"),
             other => panic!("expected UnknownProfile, got {other:?}"),
@@ -370,6 +379,12 @@ mod tests {
             None,
         )
         .unwrap_err();
+        // What a binding receives is the `Display` text: the error is flat.
+        let shown = err.to_string();
+        assert!(
+            shown.starts_with("scan failed: ") && shown.ends_with("[QRS-001]"),
+            "the message a binding sees must name the fault and end with the code: {shown}"
+        );
         let ScanBindingError::ScanFailed(msg) = err else {
             panic!("expected ScanFailed, got {err:?}");
         };
