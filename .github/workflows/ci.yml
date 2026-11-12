@@ -319,6 +319,7 @@ jobs:
       # set with a win32 addon importing the Visual C++ runtime, five of six,
       # a target twice, no addon at all).
       - run: python3 scripts/native-floor.py --self-test
+      - run: python3 scripts/test-cli-musl.py
       # The tooling cli-archives.yml runs: the release commands on stub tools,
       # clean and planted, with that workflow's matrices held to the release
       # targets; then the archive consumer and its anonymous fetch, on a

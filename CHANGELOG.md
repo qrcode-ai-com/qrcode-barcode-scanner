@@ -6,6 +6,13 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ## Unreleased
 
+### Added
+
+- Prebuilt CLI archives for `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`,
+  static position-independent executables checked natively and inside Alpine on both
+  architectures. The allocator configuration is unchanged; these targets do not add
+  platform support to the separate language packages.
+
 ### Changed
 
 - **Kotlin and Swift: an error case carries one message and nothing else.**

@@ -131,6 +131,7 @@ def elf(data):
                 stack = "".join(flag for bit, flag in ((4, "R"), (2, "W"), (1, "X")) if p_flags & bit)
     return {"format": "elf64", "arch": {62: "x86_64", 183: "aarch64"}.get(e_machine, f"e_machine {e_machine}"),
             "elf_type": e_type, "libc": libc, "needed": needed, "highest_versions": highest,
+            "version_needs": versions,
             "interp": interp, "gnu_stack": stack, "rpath": search[15], "runpath": search[29]}
 
 
@@ -335,6 +336,8 @@ CLI_FLOOR = {
     "x86_64-apple-darwin": {"format": "macho", "arch": "x86_64", "ext": "tar.gz", "minos": "10.15", "signed": False},
     "aarch64-apple-darwin": {"format": "macho", "arch": "arm64", "ext": "tar.gz", "minos": "11.0", "signed": True},
     "x86_64-pc-windows-msvc": {"format": "pe32+", "arch": "x86_64", "ext": "zip"},
+    "x86_64-unknown-linux-musl": {"format": "elf64", "arch": "x86_64", "ext": "tar.gz", "static": True},
+    "aarch64-unknown-linux-musl": {"format": "elf64", "arch": "aarch64", "ext": "tar.gz", "static": True},
 }
 UNWINDERS = ("zig-libunwind", "libgcc_s")
 ELF_GLIBC = ELF_SYSTEM - {"libc.so", "libc.musl-x86_64.so.1"}
@@ -438,6 +441,27 @@ def elf_cli_problems(label, floor, report, unwinder):
     return problems
 
 
+def musl_cli_problems(label, floor, report):
+    """Static PIE only: no ELF interpreter, dynamic dependencies or symbol-version imports."""
+    problems = []
+    if report["arch"] != floor["arch"]:
+        problems.append(f"{label}: {report['arch']}, not {floor['arch']}")
+    if report["elf_type"] != 3:
+        problems.append(f"{label}: not ET_DYN: not a position-independent executable")
+    if report["interp"] is not None:
+        problems.append(f"{label}: PT_INTERP {report['interp']} on a static musl executable")
+    problems += [f"{label}: DT_NEEDED {name} on a static musl executable" for name in report["needed"]]
+    problems += [f"{label}: symbol version {name} on a static musl executable"
+                 for name in report["version_needs"]]
+    if report["gnu_stack"] is None:
+        problems.append(f"{label}: no PT_GNU_STACK: the loader may map an executable stack")
+    elif "X" in report["gnu_stack"]:
+        problems.append(f"{label}: an executable stack (PT_GNU_STACK {report['gnu_stack']})")
+    problems += [f"{label}: DT_RPATH {path}: a library search path" for path in report["rpath"]]
+    problems += [f"{label}: DT_RUNPATH {path}: a library search path" for path in report["runpath"]]
+    return problems
+
+
 def macho_cli_problems(label, floor, report):
     if report["fat"]:
         arches = ", ".join(found["arch"] for found in report["slices"])
@@ -514,7 +538,8 @@ def cli_problems(label, target, report, data, unwinder, forbid):
     if report.get("format") != floor["format"]:
         problems = [f"{label}: {report.get('format')}, not {floor['format']}"]
     elif floor["format"] == "elf64":
-        problems = elf_cli_problems(label, floor, report, unwinder)
+        problems = (musl_cli_problems(label, floor, report) if floor.get("static")
+                    else elf_cli_problems(label, floor, report, unwinder))
     elif floor["format"] == "macho":
         problems = macho_cli_problems(label, floor, report)
     else:
@@ -557,14 +582,14 @@ def archive_unwinder(name, info, copies):
 def cli_entries(path, target, unwinder):
     """[(label, bytes, triple, unwinder, unwinder_from)] of one --policy cli input, and its refusals."""
     if cli_kind(path.name) == "raw":  # --target and --unwinder describe it
-        gnu = CLI_FLOOR[target]["format"] == "elf64"
+        gnu = target.endswith("-linux-gnu")
         return [(str(path), path.read_bytes(), target, unwinder if gnu else None, "--unwinder" if gnu else None)], []
     triple, ext, exe, info = cli_member(path.name)
     if triple not in CLI_FLOOR:
         return [], [f"{path.name}: {triple} is not a release target"]
     if ext != CLI_FLOOR[triple]["ext"]:
         return [], [f"{path.name}: a .{ext} archive, but {triple} ships as .{CLI_FLOOR[triple]['ext']}"]
-    gnu = CLI_FLOOR[triple]["format"] == "elf64"
+    gnu = triple.endswith("-linux-gnu")
     try:
         members = read_members(path, ext, {exe, info} if gnu else {exe})
     except (OSError, EOFError, RuntimeError, tarfile.TarError, zipfile.BadZipFile, zlib.error) as error:
@@ -616,7 +641,7 @@ def cli_usage(parser, args):
         parser.error(f"{raw[0]}: a raw binary needs --target")
     if args.target and len(raw) != 1:
         parser.error(f"--target describes one raw binary, and {len(raw)} were given")
-    gnu = bool(args.target) and CLI_FLOOR[args.target]["format"] == "elf64"
+    gnu = bool(args.target) and args.target.endswith("-linux-gnu")
     if gnu and not args.unwinder:
         parser.error(f"--target {args.target} needs --unwinder ({' or '.join(UNWINDERS)})")
     if args.unwinder and not gnu:
@@ -638,8 +663,8 @@ def make_elf(machine=62, needed=("libc.so.6", "libgcc_s.so.1"), versions=("GLIBC
     dynamic = b"".join(struct.pack("<qQ", tag, offsets[text])
                        for tag, texts in ((1, needed), (15, rpath), (29, runpath)) for text in texts)
     dynamic += struct.pack("<qQ", 0, 0)
-    library = next((n for n in needed if n.startswith("libc")), needed[0])
-    verneed = struct.pack("<HHIII", 1, len(versions), offsets[library], 16, 0)
+    library = next((n for n in needed if n.startswith("libc")), needed[0] if needed else "")
+    verneed = struct.pack("<HHIII", 1, len(versions), offsets.get(library, 0), 16, 0)
     for i, name in enumerate(versions):
         verneed += struct.pack("<IHHII", 0, 0, 2 + i, offsets[name], 16 if i < len(versions) - 1 else 0)
     segments = [(3, 4, interp.encode() + b"\0")] if interp is not None else []  # PT_INTERP, PF_R
@@ -769,7 +794,9 @@ def cli_self_test():
         return make_executable_macho(**{"cpu": 0x01000007, "minos": (10, 15), "signed": False, **changes})
 
     clean = {x64: gnu_elf(), arm: make_elf(**gnu_arm), intel: intel_macho(), mac: make_executable_macho(),
-             win: console_pe()}
+             win: console_pe(),
+             "x86_64-unknown-linux-musl": make_elf(needed=(), versions=(), stack=6),
+             "aarch64-unknown-linux-musl": make_elf(machine=183, needed=(), versions=(), stack=6)}
     # (case, target, bytes, unwinder, --forbid strings, refusal reasons after "qrscan: ")
     cases = [(f"clean {target}", target, data, zig if target in (x64, arm) else None, (), [])
              for target, data in clean.items()]
