@@ -11,7 +11,7 @@ that [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/mcp) uses for QR v
 
 | Component | Version | Purpose |
 | --- | --- | --- |
-| MCP adapter | 0.2.1 | Local stdio transport, tool validation and read-only resources |
+| MCP adapter | 0.3.0 | Local stdio transport, tool validation and read-only resources |
 | Scanner engine | 0.11.0 | Native QR, barcode and matrix-code decoding and QR diagnostics |
 | Report | Pipeline 5 · score contract 5 | The unchanged engine report and packaged JSON schema |
 
@@ -23,22 +23,24 @@ MSVC. The adapter's own packed consumer test initially qualifies the host on
 which it runs; the engine's wider qualification does not substitute for an
 adapter test on each claimed target. ARMv7 and musl ARM64 are unsupported.
 
-The published 0.2.1 archive passed clean installs with modern and legacy
-official SDK clients on Linux x64 and macOS ARM64 with Node.js 22 and 24.
-See the [0.2.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.2.1)
+The release workflow installs each version in a clean project, before and
+after its upload, and runs modern and legacy official SDK clients against it
+on Linux x64 with Node.js 22 and 24.
+See the [0.3.0 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.3.0)
 for provenance and verification. Product-client integrations have separate
 installed-consumer checks.
 
 Install the exact adapter version from the public npm registry:
 
 ```sh
-npm install --prefix ./qrscan-mcp-install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.2.1
+npm install --prefix ./qrscan-mcp-install --save-exact --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.0
 ```
 
-The published 0.2.0 package remains available. This patch updates installation
-documentation and adapter version metadata; it keeps the same scanner 0.11.0
-and scanning behavior. Repository source may precede a release: check the
-[exact npm version](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.2.1)
+The published 0.2.1 package remains available. Version 0.3.0 adds the
+[`scan_file`](#scan-a-file-by-path-scan_file) tool, which stays off unless the
+operator names the directories it may read. `scan_image`, the scanner 0.11.0
+and the report are unchanged. Repository source may precede a release: check the
+[exact npm version](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.0)
 before using its installation command. A checked-in manifest, `server.json` or
 successful build does not establish that a version has been published.
 
@@ -163,8 +165,7 @@ limit `QRSMCP_BUSY`. Unknown fields and unsupported options are rejected.
 
 An agent rarely holds image bytes: it holds a path, and a real image is too
 long to write out as a base64 argument. `scan_file` reads the file itself.
-It is part of the adapter source after 0.2.1 and ships with **adapter 0.3.0**;
-the published 0.2.1 package has `scan_image` only.
+It ships since **adapter 0.3.0**; the 0.2.1 package has `scan_image` only.
 
 The tool is **off by default**. It exists only when the operator who starts
 the server names the directories it may read:
