@@ -1,0 +1,333 @@
+# What each mention of a release version, and each pinned hash, follows in this repository.
+# Read by scripts/release-fanout.py; the kinds are explained in README.md of this folder.
+#
+#   train = "tree"     the workspace version of Cargo.toml: moved in the release commit
+#   train = "engine"   the public engine release named below: moved once it is public
+#   held = "<name>"    a destination with its own publication: moved when it is published again
+#   keep = "<why>"     a statement that never moves
+#   [[frozen]]         a whole file that is a dated record or is written by another tool
+#
+# A file that names a release version must be classified once; a frozen file is never read
+# further. A [[line]] rule decides for the lines its match finds, in every file or in the files
+# of its paths; where none matches, the file's own kind applies. Rules that disagree on one line
+# are an error, and so is a rule that no longer matches anything.
+schema = "qrscan-release-pins/1"
+
+# The public engine release that the engine mentions and the pinned values follow.
+[engine]
+manifest = "v0.11.0.json"
+
+# ------------------------------------------------------------------ whole files that never move
+
+[[frozen]]
+why = "A changelog is history."
+paths = ["CHANGELOG.md", "bindings/flutter/CHANGELOG.md"]
+
+[[frozen]]
+why = "The record of the 0.11 container image. release-0.11.0.json pins these files by hash."
+paths = ["distribution/docker/v0.11/**"]
+
+[[frozen]]
+why = "Written by its package manager. Regenerate it with that tool."
+paths = ["Cargo.lock", "**/Cargo.lock", "**/package-lock.json", "**/pubspec.lock"]
+
+[[frozen]]
+why = "Written from the built command by scripts/prepare-release.py."
+paths = ["spec/examples/*.json"]
+
+[[frozen]]
+why = "Written by scripts/readme-media.py, with the record of that run."
+paths = ["docs/assets/readme/scan-results.json", "docs/assets/readme/README.md"]
+
+[[frozen]]
+why = "Its self-test builds a sample release that it names 0.11.0, whatever this source's version."
+paths = ["scripts/cli-release.py"]
+
+[[frozen]]
+why = "The guide of the 0.11.0 rename, with the record of that publication."
+paths = ["docs/guides/migrate-to-qrcode-barcode-scanner.mdx"]
+
+# ------------------------------------------------------------------ what a file follows
+
+[[file]]
+train = "tree"
+paths = [
+  "Cargo.toml",
+  "crates/qrcode-ai-scanner-cli/Cargo.toml",
+  "crates/qrcode-ai-scanner-py/Cargo.toml",
+  "crates/qrcode-ai-scanner-py/pyproject.toml",
+  "crates/qrcode-ai-scanner-uniffi/Cargo.toml",
+  "crates/qrcode-ai-scanner-node/package.json",
+  "bindings/flutter/rust/Cargo.toml",
+  "bindings/flutter/pubspec.yaml",
+  "bindings/flutter/test/report_test.dart",
+  "bindings/kotlin/qrcodeaiscanner/build.gradle.kts",
+  "bindings/kotlin/README.md",
+  "crates/qrcode-ai-scanner/README.md",
+  "crates/qrcode-ai-scanner-cli/README.md",
+  "crates/qrcode-ai-scanner-node/README.md",
+  "crates/qrcode-ai-scanner-py/README.md",
+  "crates/qrcode-ai-scanner-wasm/README.md",
+  "crates/qrcode-ai-scanner-wasm/*.js",
+  "crates/qrcode-ai-scanner-wasm/*.d.ts",
+  "crates/qrcode-ai-scanner-wasm/*.mjs",
+  "crates/qrcode-ai-scanner-wasm/replay/generate.mjs",
+  "crates/qrcode-ai-scanner/src/**",
+  "spec/01-report.md",
+  "xtask/src/**",
+]
+
+[[file]]
+train = "engine"
+paths = [
+  "README.md",
+  "AGENTS.md",
+  "LICENSING.md",
+  "RELEASING.md",
+  "SOURCE-AND-EXTRACTION.md",
+  ".cursor/rules/scanner.mdc",
+  ".github/ISSUE_TEMPLATE/bug_report.md",
+  "docs/*.mdx",
+  "docs/api/*.mdx",
+  "docs/guides/agents.mdx",
+  "docs/guides/choosing-a-surface.mdx",
+  "docs/guides/nuxt-verify.mdx",
+  "distribution/README.md",
+  "distribution/releases/README.md",
+  "distribution/appimage/*",
+  "distribution/aur/*",
+  "distribution/chocolatey/*",
+  "distribution/debian/*",
+  "distribution/rpm/*",
+  ".github/workflows/appimage.yml",
+  ".github/workflows/destination-acceptance.yml",
+  ".github/workflows/go-adapter.yml",
+  ".github/workflows/php-adapter.yml",
+  ".github/workflows/oci-publish.yml",
+  "bindings/go/**",
+  "bindings/php/**",
+  "scripts/package-inspect.py",
+  "scripts/packed-node-consumer.mjs",
+]
+
+[[file]]
+held = "the agent integrations: they name the engine they were released on"
+paths = [
+  "integrations/**",
+  "skills/**",
+  "scripts/mcp-release.py",
+  "scripts/test-mcp-release.py",
+  ".github/workflows/ecosystem-checks.yml",
+]
+
+[[file]]
+held = "the hosted examples: examples/README.md says how to update them for a release"
+paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
+
+[[file]]
+held = "the JitPack build of a tag, judged by its consumer"
+paths = [".github/workflows/binding-consumers.yml", "tests/consumers/jitpack-android/**"]
+
+[[file]]
+held = "the AUR package, judged in an Arch Linux container"
+paths = ["distribution/acceptance/drivers/aur-on-arch.sh"]
+
+[[file]]
+held = "examples of judging a public destination, each at the version it was judged"
+paths = ["distribution/acceptance/README.md"]
+
+# ------------------------------------------------------------------ lines held by a destination
+
+[[line]]
+held = "the Debian packages, under their own tag"
+match = 'linux-packages-v|_(amd64|arm64)\.deb'
+
+[[line]]
+held = "the Fedora packages, under their own tag"
+match = 'rpm-packages-v|\.fc\d+'
+
+[[line]]
+held = "the AppImage files, under their own tag"
+match = 'appimage-v'
+
+[[line]]
+held = "the AppImage files, under their own tag"
+paths = ["distribution/appimage/README.md"]
+match = '^chmod \+x |\./qrcode-barcode-scanner-\S+\.AppImage'
+
+[[line]]
+held = "the AUR package"
+match = 'aur\.archlinux\.org'
+
+[[line]]
+held = "the Homebrew tap"
+match = '\[Homebrew tap\]|prebuilt `qrscan` \S+ binary on macOS'
+
+[[line]]
+held = "the Scoop bucket"
+match = '\[Scoop bucket\]|On Windows x64, install `qrscan`'
+
+[[line]]
+held = "the container image, under its own tag"
+match = 'public GHCR image|\[GitHub Container Registry\]'
+
+[[line]]
+held = "the hosted examples, under their own tag"
+match = 'demos-v|\[Vite example\]'
+
+[[line]]
+held = "the Go module, with its own versions"
+match = 'qrcode-barcode-scanner-go@v|MODULE_VERSION'
+
+[[line]]
+held = "the agent integrations: they name the engine they were released on"
+paths = ["README.md", "distribution/README.md", "SOURCE-AND-EXTRACTION.md", "docs/guides/agents.mdx"]
+match = 'agent integrations are published|native engine\. Choose|with engine \d|^engine \S+ and returned|into a project-local runtime|among them engine|a fresh engine|on engine \S+ The MCP adapter|^\S+ See the \[distribution guide\]|reuse the published scanner'
+
+# ------------------------------------------------------------------ lines that follow another source than their file
+
+[[line]]
+train = "tree"
+paths = ["scripts/package-inspect.py"]
+match = '"a second tag line"'
+
+# ------------------------------------------------------------------ statements that never move
+
+[[line]]
+keep = "What a version brought or ended."
+match = '[Ff]rom 0\.11\.0|0\.11\.0 onward|0\.11\.0 and later|retired at 0\.11\.0|left at 0\.11\.0|[Uu]p to 0\.11\.0'
+
+[[line]]
+keep = "The record of the 0.11 container image."
+match = 'release-0\.11\.0\.json|preserves the immutable v0\.11\.0'
+
+[[line]]
+keep = "The runbook names 0.11.0 where it records what was done for that release."
+paths = ["RELEASING.md"]
+match = '0\.11\.0|Engine source remains'
+
+[[line]]
+keep = "A package with its own versions: its first one, and an example of a value."
+paths = ["bindings/go/**", "bindings/php/**", "distribution/README.md"]
+match = 'The first version is 0\.11\.0|such as `?0\.11\.0|Version 0\.11\.0 was installed through'
+
+[[line]]
+keep = "What the published 0.11.0 artifact needs, and the JitPack build that was judged."
+paths = ["bindings/kotlin/README.md", "bindings/kotlin/qrcodeaiscanner/build.gradle.kts"]
+match = 'Version 0\.11\.0 was installed|[Ww]ith 0\.11\.0|For 0\.11\.0:|implementation\("com\.github|the 0\.11\.0 AAR'
+
+[[line]]
+keep = "The version of another product."
+paths = ["Cargo.toml", "crates/qrcode-ai-scanner/src/engine/rqrr_engine.rs"]
+match = '^rqrr = |verified on 0\.11\.0|0\.11\.0 still writes'
+
+[[line]]
+keep = "The version that added the entry."
+paths = ["crates/qrcode-ai-scanner-wasm/*.js", "crates/qrcode-ai-scanner-wasm/*.d.ts", "crates/qrcode-ai-scanner-wasm/README.md"]
+match = '^// \S+ · @qrcode-ai-com/|^## .*\(0\.11\.0'
+
+[[line]]
+keep = "Sample data of a test, whatever this source's version."
+paths = [
+  "crates/qrcode-ai-scanner-wasm/camera-overlay.test.mjs",
+  "crates/qrcode-ai-scanner-wasm/replay/generate.mjs",
+  "bindings/flutter/test/report_test.dart",
+  "xtask/src/bench/manifest.rs",
+  "xtask/src/sync_version.rs",
+  "scripts/package-inspect.py",
+]
+match = "scanner: '0\\.11\\.0'|\"scanner\":\"0\\.11\\.0\"|scanner@0\\.11\\.0\"\\)|String::from\\(\"0\\.11\\.0\"\\)|keeps `0\\.11\\.0`|qrscan-0\\.11\\.0"
+
+[[line]]
+keep = "An entry of the package changelog: a new version adds one above it."
+paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
+match = '^\* \w{3} \w{3} \d{2} \d{4} |^- Package the published'
+
+# ------------------------------------------------------------------ pinned values of the public release
+
+[[value]]
+fact = "release > checksums > sha256"
+paths = [
+  ".github/workflows/destination-acceptance.yml",
+  ".github/workflows/go-adapter.yml",
+  ".github/workflows/php-adapter.yml",
+  "bindings/go/mirror/tests.yml",
+  "bindings/php/mirror/tests.yml",
+]
+match = 'SUMS_SHA256: ([0-9a-f]{64})'
+
+[[value]]
+fact = "release > checksums > sha256"
+paths = ["distribution/appimage/build.sh", "distribution/debian/build.sh"]
+match = 'checksums_sha256=([0-9a-f]{64})'
+
+[[value]]
+facts = [
+  "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-unknown-linux-gnu.tar.gz > executable > sha256",
+  "release > assets > qrcode-barcode-scanner-cli-{version}-aarch64-unknown-linux-gnu.tar.gz > executable > sha256",
+]
+paths = ["distribution/appimage/build.sh", "distribution/debian/build.sh"]
+match = 'binary_sha256=([0-9a-f]{64})'
+
+[[value]]
+facts = [
+  "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-unknown-linux-gnu.tar.gz > executable > sha256",
+  "release > assets > qrcode-barcode-scanner-cli-{version}-aarch64-unknown-linux-gnu.tar.gz > executable > sha256",
+]
+paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
+match = '%global executable_sha256 ([0-9a-f]{64})'
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-unknown-linux-gnu.tar.gz > sha256"
+paths = ["distribution/aur/PKGBUILD", "distribution/aur/.SRCINFO"]
+match = "sha256sums ?= ?\\(?'?([0-9a-f]{64})"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-unknown-linux-gnu.tar.gz > sha256"
+paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
+match = "([0-9a-f]{64}) '%\\{SOURCE0\\}'"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-aarch64-unknown-linux-gnu.tar.gz > sha256"
+paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
+match = "([0-9a-f]{64}) '%\\{SOURCE1\\}'"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-source.tar.gz > sha256"
+paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
+match = "([0-9a-f]{64}) '%\\{SOURCE2\\}'"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-source.tar.gz > sha256"
+paths = ["distribution/chocolatey/build.ps1"]
+match = "\\$sourceSha = '([0-9a-f]{64})'"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-source.tar.gz > sha256"
+paths = ["distribution/debian/README.md"]
+match = '^`([0-9a-f]{64})`\.'
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-pc-windows-msvc.zip > sha256"
+paths = ["distribution/chocolatey/build.ps1"]
+match = "\\$zipSha = '([0-9a-f]{64})'"
+
+[[value]]
+fact = "release > assets > qrcode-barcode-scanner-cli-{version}-x86_64-pc-windows-msvc.zip > executable > sha256"
+paths = ["distribution/chocolatey/build.ps1", "distribution/chocolatey/test.ps1"]
+match = "\\$exeSha = '([0-9a-f]{64})'"
+
+[[value]]
+fact = "commit"
+paths = ["distribution/chocolatey/build.ps1"]
+match = 'Build commit: ([0-9a-f]{40})'
+
+[[value]]
+fact = "commit"
+paths = ["distribution/chocolatey/test.ps1", "distribution/debian/README.md"]
+match = 'qrcode-barcode-scanner/([0-9a-f]{40})/fixtures/'
+
+[[value]]
+fact = "source_date_epoch"
+paths = ["distribution/appimage/build.sh"]
+match = 'source_date_epoch=([0-9]+)'
