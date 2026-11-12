@@ -1,7 +1,7 @@
 name: qr_barcode_scanner
 description: >-
-  Decode QR codes and barcodes and score QR scannability with the native Rust
-  scanner engine via flutter_rust_bridge.
+  Scan QR codes and barcodes locally from images or camera frames, with
+  versioned reports and QR scannability diagnostics from the native Rust engine.
 version: 0.11.0
 repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner
 homepage: https://qrcode-ai.com/en-US/qr-code-scanner/sdk/flutter

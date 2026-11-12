@@ -780,14 +780,23 @@ performs them):
    One recorded exception, decided by the owner on 10 November 2026: the
    first upload of `qr_barcode_scanner` 0.11.0 may use the `flutter-stage`
    artifact of the `Flutter candidate qualification` workflow,
-   [run 42717410740](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42717410740),
-   on revision `1fa0813c1465f7b180ca883cb266bbc45e1fe1c6`. Its four jobs
+   [run 43268594217](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43268594217),
+   on revision `02ecb7bd0e893d3de3a41de58f6e09f6b32a30a4`. Its four jobs
    passed: stage, Dart host and pub.dev dry run, Android APK build, unsigned
    iOS build. The archive SHA-256 is
-   `0649680ff62cf27c1a072a61b11a8fcf726a6e097a15391e5ee8a70d82ab5eba`. Check
+   `84ffd8706647443a6c41bcb94cb86675f21490c4870b197734bededddcde9741`. Check
    that hash and re-inspect the extracted root as above before the upload.
    The exception covers that one archive. Every later version follows the
-   rule of this step.
+   rule of this step. The first upload still needs the owner's explicit
+   publication authorization and his personal pub.dev sign-in.
+
+   The 12 November metadata renewal supersedes the previously qualified
+   `1fa0813c1465f7b180ca883cb266bbc45e1fe1c6` archive (run 42717410740,
+   SHA-256 `0649680ff62cf27c1a072a61b11a8fcf726a6e097a15391e5ee8a70d82ab5eba`).
+   Only `bindings/flutter/README.md` and `bindings/flutter/pubspec.yaml`
+   changed: six destination links, the dedicated Flutter homepage, and
+   factual package copy. The core, bridge, dependencies and support floors
+   are unchanged. Do not upload the superseded metadata archive.
 
    This replaces the stage of revision `1695072` named here first. A device
    check of those sources
