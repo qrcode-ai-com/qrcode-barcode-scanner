@@ -69,8 +69,9 @@ TARGETS = {
 GLIBC_OWN = {"libc.so.6", "libm.so.6", "libpthread.so.0", "librt.so.1", "libdl.so.2",
              "ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1"}
 C_RUNTIME = re.compile(r"^(vcruntime|msvcp|msvcr|concrt|vccorlib|ucrtbase|api-ms-win-crt-)", re.I)
-# The files of an archive that are its envelope, not its content.
-ENVELOPE = re.compile(r"\[Content_Types\]\.xml|_rels/\.rels|package/services/metadata/core-properties/[0-9a-f]+\.psmdcp")
+# The files of an archive that are its envelope, not its content. NuGet names the properties
+# file after a random identifier or, in a build that can be repeated, a fixed word.
+ENVELOPE = re.compile(r"\[Content_Types\]\.xml|_rels/\.rels|package/services/metadata/core-properties/[0-9A-Za-z]+\.psmdcp")
 # NuGet writes the nuspec in the oldest of its schemas that holds what the package uses.
 NUSPEC = re.compile(r"\{http://schemas\.microsoft\.com/packaging/\d{4}/\d{2}/nuspec\.xsd\}")
 
@@ -420,9 +421,15 @@ def self_test():
         check("accepts the archive of the package", report["version"] == "9.8.7" and len(report["natives"]) == 5)
         older = packed(out, schema="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd")
         check("accepts a nuspec in an older NuGet schema", refused(lambda: inspect(older, out, "9.8.7", "c" * 40)) is None)
+        named = packed(out, drop=("package/services/metadata/core-properties/0123456789abcdef.psmdcp",),
+                       add={"package/services/metadata/core-properties/nuget.psmdcp": b"<coreProperties/>"})
+        check("accepts the properties file under the name a repeatable build gives it",
+              refused(lambda: inspect(named, out, "9.8.7", "c" * 40)) is None)
         for label, words, broken in (
                 ("an archive with one library missing", "lacks", packed(out, drop=("runtimes/win-x64/native/" + TARGETS[windows]["file"],))),
                 ("an archive with a file too many", "beyond the package", packed(out, add={"tools/install.ps1": b"x"})),
+                ("a file beside the properties file", "beyond the package",
+                 packed(out, add={"package/services/metadata/core-properties/run.ps1": b"x"})),
                 ("an archive with no README", "lacks", packed(out, drop=("README.md",))),
                 ("a library that is not the one judged", "not the one that was judged",
                  packed(out, add={"runtimes/linux-x64/native/" + TARGETS[linux]["file"]: b"another library"})),
