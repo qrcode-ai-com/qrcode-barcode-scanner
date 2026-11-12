@@ -338,6 +338,7 @@ jobs:
       # floor of each of the five targets on reports of clean and planted libraries, then
       # archives with one defect at a time.
       - run: python3 scripts/dotnet-package.py --self-test
+      - run: python3 scripts/test-dotnet-release.py
       - run: python3 scripts/release-fanout.py --self-test
       - run: python3 scripts/release-fanout.py check
       # The WASM build record build-wasm.sh writes and package-inspect checks

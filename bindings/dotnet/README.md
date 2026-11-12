@@ -7,7 +7,8 @@ install and no network call.
 
 > **Not published yet.** The package id is `QRCodeAI.QRCodeBarcodeScanner`. No version is on
 > nuget.org. The archive is built, inspected and installed by clean projects on each change;
-> its first publication comes with a later engine release.
+> its first publication comes with a later engine release. Maintainers: see the
+> [publication setup and release checks](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/dotnet/PUBLISHING.md).
 
 | | QR codes | Barcodes |
 | --- | --- | --- |
