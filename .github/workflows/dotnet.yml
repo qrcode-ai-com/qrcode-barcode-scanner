@@ -8,8 +8,9 @@ name: .NET binding
 #              destination acceptance driver;
 #   natives    the library for the five systems of the package, at the floor of the prebuilt
 #              qrscan, each file read for what it needs from the system that loads it;
-#   pack       the archive, inspected file by file, then on the five systems a new project that
-#              installs it from a folder, scans and removes it.
+#   pack       the archive, with the C# the three systems of `binding` generated alike, inspected
+#              file by file, then on the five systems a new project that installs it from a
+#              folder, scans and removes it.
 #
 # Nothing is published: no job holds a registry credential.
 on:
@@ -228,16 +229,13 @@ jobs:
 
   pack:
     name: Package archive
-    needs: natives
+    needs: [binding, natives]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
@@ -252,17 +250,19 @@ jobs:
           pattern: dotnet-native-*
           path: ${{ runner.temp }}/natives
           merge-multiple: true
-      - name: Install the C# generator at the tag of the same UniFFI line
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: dotnet-binding-*
+          path: ${{ runner.temp }}/bindings
+      # The C# comes from the three `binding` jobs of this commit, which must have generated the
+      # same file. The archive's own libraries cannot give it: built through cargo-zigbuild they
+      # carry no symbol table, the only place the generator reads, and it then writes nothing
+      # and reports no error. The C# checks its contract against the library it loads, at the
+      # first call: the five consumers below are that proof for the five libraries.
+      - name: Place the generated C# and lay the five libraries out
         run: |
-          cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs \
-            --tag "$BINDGEN_TAG" --locked --root "$RUNNER_TEMP/bindgen"
-      # The C# is generated from one of the five libraries of the archive: they were built from
-      # this commit, so their contract checksums are the ones the C# carries.
-      - name: Generate the C# and lay the five libraries out
-        run: |
-          "$RUNNER_TEMP/bindgen/bin/uniffi-bindgen-cs" --library --no-format \
-            --config bindings/dotnet/uniffi.toml --out-dir "$PROJECT/generated" \
-            "$RUNNER_TEMP/natives/linux-x64/libqrcode_ai_scanner_uniffi.so"
+          python3 scripts/dotnet-package.py generated "$RUNNER_TEMP"/bindings/*/qrcode_ai_scanner_uniffi.cs \
+            --project "$PROJECT"
           python3 scripts/dotnet-package.py layout --natives "$RUNNER_TEMP/natives" --project "$PROJECT"
       - name: Pack, then inspect the archive file by file
         run: |

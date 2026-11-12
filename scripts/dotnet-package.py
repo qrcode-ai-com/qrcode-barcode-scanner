@@ -2,6 +2,7 @@
 """The native libraries and the archive of the .NET package.
 
   dotnet-package.py native --target TRIPLE --library FILE --out DIR
+  dotnet-package.py generated FILE [FILE ...] --project DIR
   dotnet-package.py layout --natives DIR --project DIR
   dotnet-package.py inspect NUPKG --natives DIR --version X.Y.Z --commit SHA
   dotnet-package.py --self-test
@@ -14,6 +15,11 @@ qrscan (scripts/cli-release.py): glibc 2.28 with no library beyond glibc's own, 
 x86_64 and 11.0 on arm64 with system libraries only, and on Windows no Visual C++ or Universal
 C runtime library. It reads the file with scripts/native-floor.py, then writes it under
 DIR/<rid>/ beside `native.json`: its target, its hash, its size and what it needs.
+
+`generated` takes the C# that uniffi-bindgen-cs wrote on several systems from this commit,
+requires the same file from each, line ends aside, and places it in the project. The archive's
+own libraries cannot give it: built through cargo-zigbuild they carry no symbol table, the only
+place that generator reads, and it then writes nothing and reports no error.
 
 `layout` copies the five libraries into the project, where `dotnet pack` takes them. It refuses
 a missing or foreign target and a library that left its record.
@@ -45,6 +51,8 @@ REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
 PROJECT_URL = "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/dotnet"
 SCHEMA = "qrscan-dotnet-native/1"
 STEM = "qrcode_ai_scanner_uniffi"
+GENERATED = f"{STEM}.cs"
+NAMESPACE = f"namespace {PACKAGE}.Generated;"
 # Each target: the .NET runtime identifier, the file name and the floor of the prebuilt qrscan.
 TARGETS = {
     "x86_64-unknown-linux-gnu": {"rid": "linux-x64", "file": f"lib{STEM}.so",
@@ -181,6 +189,28 @@ def natives(folder):
                 f"{row['rid']} holds a file beyond its library and its record")
         found[row["rid"]] = (record, data)
     return found
+
+
+def generated(files, project):
+    """Place the one generated C# file in PROJECT: the same from every system, line ends aside."""
+    require(files, "no generated C# file was given")
+    texts = {}
+    for path in files:
+        require(path.name == GENERATED, f"the generated file is named {GENERATED}, not {path.name}")
+        try:
+            texts[str(path)] = path.read_bytes().replace(b"\r\n", b"\n")
+        except OSError as error:
+            raise Refused(f"{path} cannot be read: {error}") from error
+    digests = {name: sha256(text) for name, text in texts.items()}
+    require(len(set(digests.values())) == 1,
+            "the systems did not generate the same C#: " + ", ".join(f"{name} {digest[:16]}" for name, digest in digests.items()))
+    text = next(iter(texts.values()))
+    require(NAMESPACE.encode() in text, f"the generated C# does not declare {NAMESPACE}")
+    target = project / "generated"
+    require(not target.exists(), f"{target} exists: place the generated file in a clean checkout")
+    target.mkdir(parents=True)
+    (target / GENERATED).write_bytes(text)
+    return {"file": f"generated/{GENERATED}", "sha256": sha256(text), "lines": text.count(b"\n"), "systems": len(texts)}
 
 
 def layout(folder, project):
@@ -355,6 +385,24 @@ def self_test():
             linux, built / linux / TARGETS[linux]["file"], scratch / "y",
             read=lambda path: {**canned(linux), "highest_versions": {"GLIBC": "GLIBC_2.39"}}), "above GLIBC_2.28")
 
+        code = (NAMESPACE + "\ninternal static class NativeScanner {}\n").encode()
+        sources = []
+        for system, ends in (("linux", b"\n"), ("macos", b"\n"), ("windows", b"\r\n")):
+            (scratch / system).mkdir()
+            sources.append(scratch / system / GENERATED)
+            sources[-1].write_bytes(code.replace(b"\n", ends))
+        placed = generated(sources, scratch / "with-code")
+        check("places the C# that three systems generated alike, line ends aside",
+              placed["systems"] == 3 and (scratch / "with-code" / "generated" / GENERATED).read_bytes() == code, str(placed))
+        expect("a second generated file over the first", lambda: generated(sources, scratch / "with-code"), "exists")
+        sources[1].write_bytes(code + b"// one more line\n")
+        expect("systems that generated different C#", lambda: generated(sources, scratch / "differs"), "did not generate the same C#")
+        expect("no generated file at all", lambda: generated([], scratch / "none"), "no generated C# file")
+        sources[1].write_bytes(b"// a generator that wrote nothing useful\n")
+        expect("a generated file with another namespace", lambda: generated(sources[1:2], scratch / "foreign"), "does not declare")
+        (scratch / "linux" / "other.cs").write_bytes(code)
+        expect("a generated file under another name", lambda: generated([scratch / "linux" / "other.cs"], scratch / "named"), "is named")
+
         project = scratch / "project"
         project.mkdir()
         laid = layout(out, project)
@@ -408,6 +456,9 @@ def main(argv=None):
     one.add_argument("--target", required=True)
     one.add_argument("--library", required=True, type=pathlib.Path)
     one.add_argument("--out", required=True, type=pathlib.Path)
+    code = commands.add_parser("generated")
+    code.add_argument("files", nargs="+", type=pathlib.Path)
+    code.add_argument("--project", required=True, type=pathlib.Path)
     place = commands.add_parser("layout")
     place.add_argument("--natives", required=True, type=pathlib.Path)
     place.add_argument("--project", required=True, type=pathlib.Path)
@@ -424,6 +475,8 @@ def main(argv=None):
         if args.command == "native":
             record = native(args.target, args.library, args.out)
             print(json.dumps(record, indent=2, sort_keys=True))
+        elif args.command == "generated":
+            print(json.dumps(generated(args.files, args.project), indent=2, sort_keys=True))
         elif args.command == "layout":
             for path in layout(args.natives, args.project):
                 print(path)
