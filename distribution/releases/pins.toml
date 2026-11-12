@@ -130,6 +130,10 @@ held = "the JitPack build of a tag, judged by its consumer"
 paths = [".github/workflows/binding-consumers.yml", "tests/consumers/jitpack-android/**"]
 
 [[file]]
+held = "the exact public Flutter package, updated after its own publication and consumer review"
+paths = [".github/workflows/flutter-registry-consumer.yml", "tests/consumers/flutter/**"]
+
+[[file]]
 held = "the AUR package, judged in an Arch Linux container"
 paths = ["distribution/acceptance/drivers/aur-on-arch.sh"]
 
