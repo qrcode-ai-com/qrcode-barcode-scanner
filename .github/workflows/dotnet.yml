@@ -3,8 +3,8 @@ name: .NET binding
 # The .NET package under bindings/dotnet scans in process through the engine's UniFFI library,
 # the one the Kotlin and Swift bindings use. On Linux, macOS and Windows this workflow builds
 # that library with the locked UniFFI, generates the C# from that very file, builds the package
-# and runs its tests on .NET 8, then judges three real scans with the destination acceptance
-# driver. Nothing is packed and nothing is published.
+# and runs its tests on .NET 8 and on .NET 10, then judges three real scans with the destination
+# acceptance driver. Nothing is packed and nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -73,11 +73,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
-      # The package targets .NET 8. The hosted images carry a later runtime only, so the tests
-      # would otherwise run on that one.
+      # The package targets .NET 8, its floor, and the tests also run on .NET 10, the long-term
+      # release Microsoft supports. Both are named: the runtime of a hosted image is not a contract.
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Read the engine version from the workspace
         run: |
           version=$(python -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\r?\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
@@ -104,7 +106,7 @@ jobs:
           # Kept with the receipt, also when a later step fails: it is what the package was built on.
           mkdir receipt
           cp "$PROJECT"/generated/*.cs receipt/
-      - name: Build the package and run its tests on .NET 8
+      - name: Build the package and run its tests on .NET 8 and on .NET 10
         env:
           QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
           QRSCAN_ENGINE_VERSION: ${{ env.ENGINE_VERSION }}

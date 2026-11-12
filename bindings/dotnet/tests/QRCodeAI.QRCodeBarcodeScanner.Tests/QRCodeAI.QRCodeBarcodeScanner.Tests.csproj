@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- The package targets .NET 8. Its tests run on .NET 8, the floor, and on .NET 10, the
+       long-term release Microsoft supports. -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>

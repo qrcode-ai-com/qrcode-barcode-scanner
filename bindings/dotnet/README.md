@@ -17,7 +17,9 @@ install and no network call.
 
 ## What you need
 
-- .NET 8 or later.
+- .NET 8 or later. The package targets .NET 8, and its tests run on .NET 8 and on .NET 10.
+  Microsoft ended its support of .NET 8 on 10 November 2026: .NET 10 is the long-term release
+  it supports.
 - Linux, macOS or Windows. The checks of this folder run on Linux x64, macOS arm64 and
   Windows x64.
 
@@ -110,8 +112,8 @@ checked in:
 
 Generating both from one commit is what keeps their contract checksums equal. The workflow
 [`.NET binding`](../../.github/workflows/dotnet.yml) does it on three systems, runs the tests
-of [`tests/`](tests/) on .NET 8 and judges three real scans of the public API with the
-engine's [acceptance driver](../../distribution/acceptance/README.md).
+of [`tests/`](tests/) on .NET 8 and on .NET 10 and judges three real scans of the public API
+with the engine's [acceptance driver](../../distribution/acceptance/README.md).
 
 ## License
 
