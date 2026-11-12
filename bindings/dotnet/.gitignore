@@ -1,0 +1,6 @@
+# Written by the workflow from one commit, never checked in: the C# that uniffi-bindgen-cs
+# generates and the native library it was generated from.
+/src/QRCodeAI.QRCodeBarcodeScanner/generated/
+/src/QRCodeAI.QRCodeBarcodeScanner/native/
+bin/
+obj/

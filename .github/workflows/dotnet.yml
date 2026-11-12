@@ -1,0 +1,144 @@
+name: .NET binding
+
+# The .NET package under bindings/dotnet scans in process through the engine's UniFFI library,
+# the one the Kotlin and Swift bindings use. On Linux, macOS and Windows this workflow builds
+# that library with the locked UniFFI, generates the C# from that very file, builds the package
+# and runs its tests on .NET 8 and on .NET 10, then judges three real scans with the destination
+# acceptance driver. Nothing is packed and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/dotnet.yml
+      - bindings/dotnet/**
+      - crates/qrcode-ai-scanner-uniffi/**
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - fixtures/clean/gen_v5_q.png
+      - fixtures/eci/eci899-binary.png
+      - fixtures/degraded/FAIL_1491ms_0_584c998c.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dotnet-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN).
+  RUST_TOOLCHAIN: "1.99.1"
+  # The generator release that targets the UniFFI line of the crate (0.31).
+  BINDGEN_TAG: v0.11.1+v0.31.0
+  PROJECT: bindings/dotnet/src/QRCodeAI.QRCodeBarcodeScanner
+
+jobs:
+  binding:
+    name: .NET binding · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            library: libqrcode_ai_scanner_uniffi.so
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            library: libqrcode_ai_scanner_uniffi.dylib
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            library: qrcode_ai_scanner_uniffi.dll
+    env:
+      TARGET: ${{ matrix.target }}
+      LIBRARY: ${{ matrix.library }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      # The package targets .NET 8, its floor, and the tests also run on .NET 10, the long-term
+      # release Microsoft supports. Both are named: the runtime of a hosted image is not a contract.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Read the engine version from the workspace
+        run: |
+          version=$(python -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\r?\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "engine $version"
+      # The crate is its own cargo root, with its own lock: UniFFI 0.31.2.
+      - name: Build the native library with the locked UniFFI
+        run: |
+          cargo build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          ls -l "crates/qrcode-ai-scanner-uniffi/target/release/$LIBRARY"
+      - name: Install the C# generator at the tag of the same UniFFI line
+        run: |
+          cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs \
+            --tag "$BINDGEN_TAG" --locked --root "$RUNNER_TEMP/bindgen"
+      # Generated from the library that was just built, never from a checked-in file: the C# and
+      # the native code then carry the same contract checksums.
+      - name: Generate the C# from the built library
+        run: |
+          mkdir "$PROJECT/native"
+          cp "crates/qrcode-ai-scanner-uniffi/target/release/$LIBRARY" "$PROJECT/native/"
+          "$RUNNER_TEMP/bindgen/bin/uniffi-bindgen-cs" --library --no-format \
+            --config bindings/dotnet/uniffi.toml --out-dir "$PROJECT/generated" "$PROJECT/native/$LIBRARY"
+          wc -l "$PROJECT"/generated/*.cs
+          # Kept with the receipt, also when a later step fails: it is what the package was built on.
+          mkdir receipt
+          cp "$PROJECT"/generated/*.cs receipt/
+      - name: Build the package and run its tests on .NET 8 and on .NET 10
+        env:
+          QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
+          QRSCAN_ENGINE_VERSION: ${{ env.ENGINE_VERSION }}
+        run: |
+          dotnet --list-runtimes
+          dotnet test bindings/dotnet/tests/QRCodeAI.QRCodeBarcodeScanner.Tests \
+            --configuration Release -p:Version="$ENGINE_VERSION" --logger "console;verbosity=normal"
+      - name: Scan the mixed fixture with the three profiles through the public API
+        run: |
+          dotnet build bindings/dotnet/acceptance/Acceptance.csproj --configuration Release \
+            -p:Version="$ENGINE_VERSION" --output "$RUNNER_TEMP/acceptance"
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          dotnet "$RUNNER_TEMP/acceptance/QrscanAcceptance.dll" "$image" "$RUNNER_TEMP/reports"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "dotnet QrscanAcceptance.dll (bindings/dotnet/acceptance/Program.cs)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination ".NET package from this checkout (not packed, not published)" \
+            --identifier "QRCodeAI.QRCodeBarcodeScanner" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/dotnet" \
+            --install "cargo build of the UniFFI crate, uniffi-bindgen-cs $BINDGEN_TAG, dotnet build" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-dotnet-$TARGET.json"
+          python scripts/destination-acceptance.py removed --not-applicable \
+            --receipt "receipt/acceptance-dotnet-$TARGET.json"
+          python scripts/destination-acceptance.py check "receipt/acceptance-dotnet-$TARGET.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: dotnet-binding-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 30

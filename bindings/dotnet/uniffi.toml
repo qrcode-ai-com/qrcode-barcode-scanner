@@ -1,0 +1,5 @@
+# Names of the generated C#, fixed here so the package does not depend on the generator's
+# defaults. The generated code stays internal: the public API is the package's own.
+[bindings.csharp]
+namespace = "QRCodeAI.QRCodeBarcodeScanner.Generated"
+global_methods_class_name = "NativeScanner"

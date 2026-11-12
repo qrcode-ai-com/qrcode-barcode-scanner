@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The .NET package of the QR Code & Barcode Scanner engine. Two inputs are written by the
+       workflow from one commit and are never checked in: generated/, the C# that
+       uniffi-bindgen-cs writes from the engine's UniFFI library, and native/, that library for
+       the host. The version is the engine's: pass it with -p:Version. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The generated code reads and writes native memory. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>QRCodeAI.QRCodeBarcodeScanner</AssemblyName>
+    <RootNamespace>QRCodeAI.QRCodeBarcodeScanner</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+    <!-- Nothing packs this project yet: the package with its native libraries comes later. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- The native library sits beside the assembly: that is where .NET looks for it first. -->
+  <ItemGroup>
+    <None Include="native/*" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="QRCodeAI.QRCodeBarcodeScanner.Tests" />
+  </ItemGroup>
+
+</Project>
