@@ -91,10 +91,11 @@ its exact adapter dependency (MCP 0.2.0) through explicit setup. The adapter, sk
 bundle are versioned separately from the engine; adapter patch releases need
 not change the other integration versions.
 
-The [Official MCP Registry lists adapter 0.2.1](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.2.1)
+The [Official MCP Registry lists adapter 0.3.1](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.3.1)
 under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. Its entry points to the
-npm package at that older version; updating the listing is a separate
-publication. Each additional client or catalogue has its own acceptance checks.
+npm package at 0.3.1. Its separate publication completed in
+[run 43267825878](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43267825878).
+Each additional client or catalogue has its own acceptance checks.
 
 ### Connect the published MCP adapter to OpenCode
 
