@@ -16,24 +16,31 @@ Each archive includes the version of this guide from its source tag.
 | macOS 10.15 or later on Intel | `x86_64-apple-darwin` | `.tar.gz` |
 | macOS 11.0 or later on Apple silicon | `aarch64-apple-darwin` | `.tar.gz` |
 | Windows 10 or Windows Server 2016 or later, x86_64 | `x86_64-pc-windows-msvc` | `.zip` |
+| Linux x86_64 with static musl, including Alpine | `x86_64-unknown-linux-musl` | `.tar.gz` |
+| Linux arm64 with static musl, including Alpine | `aarch64-unknown-linux-musl` | `.tar.gz` |
 
-For version `X.Y.Z`, seven assets of the release tagged `vX.Y.Z` belong to
+The two musl targets start with engine 0.12. They are not assets of the published
+0.11 release. To check an older release, use the workflow and guide at its tag.
+
+For version `X.Y.Z`, nine assets of the release tagged `vX.Y.Z` belong to
 `qrscan`:
 
 - `qrcode-barcode-scanner-cli-X.Y.Z-<target>.tar.gz`, or `.zip` for Windows: the
   program with its license and build records, one archive per target;
 - `qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`: the corresponding source;
-- `qrcode-barcode-scanner-cli-X.Y.Z-SHA256SUMS`: one line for each of the six files
+- `qrcode-barcode-scanner-cli-X.Y.Z-SHA256SUMS`: one line for each of the eight files
   above, made of its SHA-256 in lowercase hexadecimal, two spaces and its name.
 
 The Windows program contains its C runtime, so it needs no Visual C++
-Redistributable. No archive is provided for musl-based Linux such as Alpine,
-for Windows on Arm or as a universal macOS binary.
+Redistributable. The musl programs are static executables (PIE on x86_64, ET_EXEC on arm64):
+no ELF interpreter or dynamic library is needed. They keep the engine's current
+allocator configuration. Windows on Arm and universal macOS archives are not provided.
 
 Before a release receives these archives, its workflow runs each one on its
-platform: the Linux archives on Ubuntu 24.04 and in AlmaLinux 8 and Debian 12
-containers, the macOS archives on macOS 15 and the Windows archive on Windows
-Server 2025. Older systems within the minimums above are judged from the
+platform: the Linux archives on Ubuntu 24.04, GNU builds in AlmaLinux 8 and Debian 12,
+and musl builds in Alpine 3.22 on x86_64 and arm64. The macOS archives run on macOS 15
+and the Windows archive on Windows Server 2025. Older systems within the minimums
+above are judged from the
 binaries themselves (glibc symbol versions, macOS deployment target, Windows
 imports), not run.
 

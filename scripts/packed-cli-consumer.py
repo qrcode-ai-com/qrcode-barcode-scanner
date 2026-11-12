@@ -2,7 +2,8 @@
 """Run qrscan from its release archive on a fresh host, the way a user would.
 
   packed-cli-consumer.py --release-dir DIR --target T [--sums-sha256 H] [--contract-root DIR] [--receipt F]
-      [--container IMAGE@sha256:H --platform linux/amd64|linux/arm64 --expect-glibc X.Y]
+      [--container IMAGE@sha256:H --platform linux/amd64|linux/arm64
+       (--expect-glibc X.Y | --expect-musl X.Y.Z)]
   packed-cli-consumer.py fetch --repository OWNER/REPO --tag vX.Y.Z --sums-sha256 H (--target T | --all)
       --out DIR [--receipt F]
   packed-cli-consumer.py fetch --rehearsal --repository OWNER/REPO --tag TAG --asset NAME --sha256 H
@@ -22,7 +23,7 @@ version, help, capabilities, usage and read errors, the JSON, frame, score-only 
 colour, paths, the PATH lookup, a panic that must unwind (exit 101, never an abort) and the truth
 set, where every report must carry trace.engine_panics 0. With --container the same cases run in
 that digest-pinned image (docker run --network none --read-only --cap-drop ALL ...) on the extracted
-tree mounted read-only, and the image's glibc must be --expect-glibc. Not executed: exit 3 (budget-
+tree mounted read-only, and the image's libc must match --expect-glibc or --expect-musl. Not executed: exit 3 (budget-
 and machine-dependent), a panic through engine frames (no deterministic fixture) and non-UTF-8 file
 names outside native Linux.
 
@@ -80,6 +81,8 @@ TARGETS = {
     "x86_64-apple-darwin": ("darwin", "x86_64", "tar.gz"),
     "aarch64-apple-darwin": ("darwin", "aarch64", "tar.gz"),
     "x86_64-pc-windows-msvc": ("win32", "x86_64", "zip"),
+    "x86_64-unknown-linux-musl": ("linux", "x86_64", "tar.gz"),
+    "aarch64-unknown-linux-musl": ("linux", "aarch64", "tar.gz"),
 }
 _VERSION = r"(?P<version>\d+\.\d+\.\d+)"
 ARCHIVE = re.compile("^" + re.escape(PREFIX) + _VERSION + "-(?P<target>" + "|".join(map(re.escape, TARGETS))
@@ -854,11 +857,16 @@ def container_box(args, docker, extracted, stage, stem):
     except Unavailable:
         raise Unavailable(f"{args.container} is not present; run docker pull --platform {args.platform} "
                           f"{args.container} first") from None
+    if found != args.platform:
+        raise Refused(f"{args.container}: image platform {found}, expected {args.platform}")
     box = {"docker": docker, "image": args.container, "platform": args.platform, "uid": os.getuid(),
            "gid": os.getgid(), "extracted": str(extracted), "stage": str(stage),
            "binary": f"/opt/qrscan/{stem}/qrscan"}
-    return box, {"image": args.container, "platform": args.platform, "image_platform": found, "docker": server,
-                 "expect_glibc": args.expect_glibc, "glibc": None, "glibc_probe": None}
+    record = {"image": args.container, "platform": args.platform, "image_platform": found, "docker": server,
+              "expect_glibc": args.expect_glibc or None, "glibc": None, "glibc_probe": None}
+    if args.expect_musl:
+        record.update(expect_musl=args.expect_musl, musl=None, musl_probe=None)
+    return box, record
 
 
 def container_glibc(box):
@@ -879,6 +887,21 @@ def container_glibc(box):
             return match[1], probe
         said.append(f"{probe}: exit {done.returncode}, {out[:120]!r}")
     raise Refused(f"{box['image']}: no glibc version ({'; '.join(said)})")
+
+
+def container_musl(box):
+    """Read musl's own loader banner; its no-program invocation normally exits 1."""
+    argv = ["-c", 'set -- /lib/ld-musl-*.so.1; [ "$#" -eq 1 ] && exec "$1"']
+    try:
+        done = subprocess.run(docker_command(box, argv, entrypoint="/bin/sh"), stdin=subprocess.DEVNULL,
+                              capture_output=True, timeout=TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise Unavailable(f"docker run musl loader: {error}") from None
+    text = (done.stdout + done.stderr).decode("utf-8", "replace")
+    match = re.search(r"(?m)^musl libc \([^)]+\)\nVersion (\d+\.\d+\.\d+)\n", text)
+    if done.returncode not in (0, 1) or not match:
+        raise Refused(f"{box['image']}: no musl loader version (exit {done.returncode}, {text[:120]!r})")
+    return match[1], "musl dynamic loader"
 
 
 def load_contract(contract, truth_lib):
@@ -954,10 +977,16 @@ def run_consumer(args, receipt):
            "long_path": long_path, "box": None, "env": scrubbed_env(scratch, system)}
     if args.container:
         ctx["box"], receipt["container"] = container_box(args, docker, extracted, stage, stem)
-        glibc, probe = container_glibc(ctx["box"])
-        receipt["container"].update(glibc=glibc, glibc_probe=probe)
-        if glibc != args.expect_glibc:
-            raise Refused(f"{args.container}: glibc {glibc}, expected {args.expect_glibc}")
+        if args.expect_musl:
+            musl, probe = container_musl(ctx["box"])
+            receipt["container"].update(musl=musl, musl_probe=probe)
+            if musl != args.expect_musl:
+                raise Refused(f"{args.container}: musl {musl}, expected {args.expect_musl}")
+        else:
+            glibc, probe = container_glibc(ctx["box"])
+            receipt["container"].update(glibc=glibc, glibc_probe=probe)
+            if glibc != args.expect_glibc:
+                raise Refused(f"{args.container}: glibc {glibc}, expected {args.expect_glibc}")
     # Step 5: every case.
     tally = {"identities": {}, "engine_panics": 0}
     versions = {"scanner": version, **consts}
@@ -1931,6 +1960,7 @@ def consumer_parser():
     parser.add_argument("--container", metavar="IMAGE@sha256:H", help="run every case in this pinned Linux image")
     parser.add_argument("--platform", choices=sorted(PLATFORMS))
     parser.add_argument("--expect-glibc", metavar="X.Y")
+    parser.add_argument("--expect-musl", metavar="X.Y.Z")
     parser.add_argument("--self-test", action="store_true")
     return parser
 
@@ -1944,6 +1974,8 @@ def consumer_usage(args):
         return "--sums-sha256 must be 64 lowercase hex digits"
     system, machine, _ = TARGETS[args.target]
     if args.container is None:
+        if args.expect_musl:
+            return "--expect-musl belongs to --container"
         if args.platform or args.expect_glibc:
             return "--platform and --expect-glibc belong to --container"
         if (system, machine) != (host_os(), host_machine()):
@@ -1951,7 +1983,12 @@ def consumer_usage(args):
         return None
     if not IMAGE.match(args.container):
         return f"--container {args.container!r} must be pinned as NAME@sha256:<64 hex>"
-    if not (args.platform and args.expect_glibc and re.fullmatch(r"\d+\.\d+", args.expect_glibc)):
+    if args.expect_glibc and args.expect_musl:
+        return "--container requires exactly one of --expect-glibc and --expect-musl"
+    if args.target.endswith("-linux-musl"):
+        if not (args.platform and args.expect_musl and re.fullmatch(r"\d+\.\d+\.\d+", args.expect_musl)):
+            return "--container needs --platform and --expect-musl X.Y.Z"
+    elif args.expect_musl or not (args.platform and args.expect_glibc and re.fullmatch(r"\d+\.\d+", args.expect_glibc)):
         return "--container needs --platform and --expect-glibc X.Y"
     if system != "linux" or PLATFORMS[args.platform] != machine:
         return f"{args.target} is not the {args.platform} target"

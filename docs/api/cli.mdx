@@ -12,6 +12,14 @@ CLI archives and `SHA256SUMS` are also available in the
 See the [migration guide](/guides/migrate-to-qrcode-barcode-scanner).
 </Note>
 
+<Note>
+Engine 0.12 adds static musl CLI archives for Linux x86_64 and arm64, including Alpine.
+They are not part of the published 0.11.0 release. See the
+[archive targets and verification guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/cli/README.md)
+for the exact target names and download checks. This adds command-line binaries;
+language bindings retain their own platform lists.
+</Note>
+
 ```bash
 cargo install qrcode-barcode-scanner-cli --version 0.11.0 --locked
 ```

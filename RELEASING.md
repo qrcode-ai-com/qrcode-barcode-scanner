@@ -256,11 +256,11 @@ tag it attaches only what a run of that tag built and qualified, and a tag
 never moves: a defect of the tagged commit that first shows on the tag keeps
 the CLI archives off this version (§ 6). So, for the CLI, the owner's step
 before the tag is two green runs on the exact commit to be tagged. Mode
-`build`, which a push to main also runs, is every job but attach: the five
-builds, the set assembled and inspected, run from its archives on the five
-native hosts and in the four glibc containers, then qualified. Mode
+`build`, which a push to main also runs, is every job but attach: the seven
+builds, the set assembled and inspected, run from its archives in seven native
+target rows, four glibc containers and two Alpine containers, then qualified. Mode
 `fetch-rehearsal`, a dispatch only, takes the anonymous download path of the
-public check (§ 7) on the five hosts, against an asset this repository
+public check (§ 7) on the seven target rows, against an asset this repository
 already publishes.
 
 ```bash
@@ -879,20 +879,27 @@ publisher's state.
 ## CLI archives — prebuilt qrscan in the owner's draft release
 
 `.github/workflows/cli-archives.yml` attaches prebuilt `qrscan` archives to
-the engine's `vX.Y.Z` GitHub release. For version X.Y.Z it makes seven
+the engine's `vX.Y.Z` GitHub release. For version X.Y.Z it makes nine
 assets, all named `qrcode-barcode-scanner-cli-X.Y.Z-…`:
 
 - one archive per target: `x86_64-unknown-linux-gnu` and
   `aarch64-unknown-linux-gnu` (glibc 2.28 or later), `x86_64-apple-darwin`
-  (macOS 10.15 or later) and `aarch64-apple-darwin` (11.0 or later) as
+  (macOS 10.15 or later), `aarch64-apple-darwin` (11.0 or later),
+  `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` (static; PIE on x86_64, ET_EXEC on arm64) as
   `.tar.gz`, and `x86_64-pc-windows-msvc` as `.zip`. Each holds one top
   directory named like the archive, with `qrscan` (`qrscan.exe`), its license
   material, `SOURCE.md` and `build-info.json`;
 - `…-source.tar.gz`, the corresponding source: a `git archive` of the tagged
   commit, which holds the workflow and the script that build the archives;
-- `…-SHA256SUMS`, one line for each of the six other assets.
+- `…-SHA256SUMS`, one line for each of the eight other assets.
 
-No musl, Windows arm64 or universal macOS archive is built.
+The musl archives first ship with engine 0.12. They keep the current allocator
+configuration, use Rust's self-contained musl libraries and a native C linker
+driver, and need no ELF interpreter, dynamic library or symbol-version import.
+The floor judge refuses any such dependency, an executable stack, wrong architecture,
+search path or build-host path. Windows arm64 and universal macOS archives are not built.
+For historical releases with five targets, dispatch the workflow at that release's
+immutable tag rather than the current main.
 `distribution/cli/README.md`, identical in every archive, is the user's page:
 download and verify, what the checksum proves, the unsigned binaries,
 extraction, exit codes, license and updates.
@@ -902,10 +909,11 @@ dispatches and the tag) judges the set from its bytes before any upload:
 
 - build, on each target's runner (`scripts/cli-release.py build`): the GNU
   rows through cargo-zigbuild against glibc 2.28, with Zig's libunwind, macOS
-  at its deployment target, the Windows C runtime linked statically. It
+  at its deployment target, the Windows C runtime linked statically, and the
+  musl rows natively on their Linux architecture with a static runtime. It
   refuses an inherited compiler setting or a Cargo config before cargo
   starts, and a binary holding a build-host path after;
-- assemble, on one host: the five builds must agree with each other and with
+- assemble, on one host: the seven builds must agree with each other and with
   the checkout; every linked crate's license text is collected (a license
   that `deny.toml` does not allow, or a crate without a text and without a
   reviewed override under `distribution/cli/license-texts/`, stops it); each
@@ -918,13 +926,14 @@ dispatches and the tag) judges the set from its bytes before any upload:
   (`package-inspect.py archive`, `cli-release.py licenses`), and each
   executable against its platform floor (`native-floor.py --policy cli`);
 - consume, from the archive as a user would (`scripts/packed-cli-consumer.py`):
-  on the five native hosts, and in AlmaLinux 8.10 (glibc 2.28) and Debian 12
-  containers pinned by digest on both Linux architectures, with no network, a
+  in seven native target rows, and in AlmaLinux 8.10 (glibc 2.28), Debian 12
+  and Alpine 3.22 (musl 1.2.5) containers pinned by digest on both Linux
+  architectures, with no network, a
   read-only root and every capability dropped. SHA256SUMS is checked by two
   hash implementations, the OS tool extracts, every case runs in a scrubbed
   environment, every report of the shared truth set must carry
   `trace.engine_panics` 0, and a panic must unwind (exit 101, never an abort);
-- qualified (`cli-release.py qualify`): the nine receipts agree on one set and
+- qualified (`cli-release.py qualify`): the thirteen receipts agree on one set and
   one identities digest, and the job exports the SHA256SUMS sha256 every
   consumer judged.
 
@@ -961,11 +970,11 @@ run's `cli-qualification` artifact by run id, and the run itself through
 recorded commit. Each target's archive and SHA256SUMS are then downloaded
 without a token, over HTTPS from github.com and a `*.githubusercontent.com`
 host (a draft answers 404, so a download also proves publication), checked
-against the anchor and run on the five hosts and in the four containers, the
+against the anchor and run in seven native rows and six containers, the
 consumer from the dispatch ref and its contract data from the anchor commit.
 public-verify downloads every CLI asset, the source archive included, and
 public-qualified requires every receipt to agree with the anchor. Before the
-tag, mode `fetch-rehearsal` (§ 4) runs that download path on the five hosts
+tag, mode `fetch-rehearsal` (§ 4) runs that download path on the seven target rows
 against an asset of the `agents-v0.1.0` release, which the repository
 already publishes.
 

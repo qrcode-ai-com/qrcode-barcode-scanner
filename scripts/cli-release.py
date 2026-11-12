@@ -58,8 +58,8 @@ that license material from the archives.
 qualify, attach-plan, readback and anchor read files only, and refuse to run
 while GH_TOKEN or GITHUB_TOKEN is set: the gh steps that wrote the files held
 the token. qualify reads every *.json below --receipts and knows each by its
-content: the qrscan-cli-consumer/1 receipts of the nine rows of TARGETS (each
-target natively, then each glibc container), the native-floor --policy cli
+content: the qrscan-cli-consumer/1 receipts of the thirteen rows of TARGETS (each
+target natively, then each libc container), the native-floor --policy cli
 report and, with --public, the qrscan-cli-fetch/1 receipts. It requires one
 passing receipt per row; the release directory's SHA256SUMS sha256 (with
 --public, the anchor's, which the fetched SHA256SUMS must match); each archive
@@ -181,6 +181,20 @@ TARGETS = {
         "linker": "msvc-link", "unwinder": None, "deployment_target": None,
         "adhoc_signature": False, "rustflags": ["-Ctarget-feature=+crt-static"],
         "consumer_runner": "windows-2025", "containers": []},
+    "x86_64-unknown-linux-musl": {
+        "ext": "tar.gz", "label": "Linux x86_64 (static musl, including Alpine)",
+        "build_runner": "ubuntu-24.04", "build_host": "x86_64-unknown-linux-gnu",
+        "linker": "musl-cc", "unwinder": None, "deployment_target": None,
+        "adhoc_signature": False, "rustflags": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"],
+        "consumer_runner": "ubuntu-24.04", "containers": [
+            {"image": "alpine:3.22", "musl": "1.2.5", "platform": "linux/amd64", "runner": "ubuntu-24.04"}]},
+    "aarch64-unknown-linux-musl": {
+        "ext": "tar.gz", "label": "Linux aarch64 (static musl, including Alpine)",
+        "build_runner": "ubuntu-24.04-arm", "build_host": "aarch64-unknown-linux-gnu",
+        "linker": "musl-cc", "unwinder": None, "deployment_target": None,
+        "adhoc_signature": False, "rustflags": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"],
+        "consumer_runner": "ubuntu-24.04-arm", "containers": [
+            {"image": "alpine:3.22", "musl": "1.2.5", "platform": "linux/arm64", "runner": "ubuntu-24.04-arm"}]},
 }
 
 # Archive members copied byte for byte from the checkout.
@@ -589,7 +603,13 @@ def msvc_facts(env, root):
     return {"visual_studio": version, "vc_tools": tools}
 
 
-LINKER_FACTS = {"cargo-zigbuild": zig_facts, "apple-ld": apple_facts, "msvc-link": msvc_facts}
+def musl_facts(env, root):
+    """The native C driver; Rust's target supplies the self-contained musl libraries."""
+    return {"cc": fact(env, ["cc", "--version"], root).strip().splitlines()}
+
+
+LINKER_FACTS = {"cargo-zigbuild": zig_facts, "apple-ld": apple_facts, "msvc-link": msvc_facts,
+                "musl-cc": musl_facts}
 
 
 def marks_of(pairs):
@@ -646,7 +666,8 @@ def after_cargo(env, root, target, host, version, binary, forbid, linker):
             if proc.returncode:
                 raise Stop(1, [f"codesign --verify --strict refused the binary: {tail(proc)}"])
             checks["signature"] = "codesign --verify --strict: valid"
-    if target != host:
+    native_musl = target.endswith("-linux-musl") and target.removesuffix("-musl") + "-gnu" == host
+    if target != host and not native_musl:
         checks["version"] = f"not run: {target} binaries do not run on the build host {host}"
         return checks
     want = f"{BINARY} {version}\n".encode()
@@ -1848,9 +1869,10 @@ def consumer_problems(label, receipt, target, box, want):
         if receipt.get(key) != commit:
             problems.append(f"{label}: {key} {receipt.get(key)}, expected {commit}")
     if box is not None:
-        found = (dig(receipt, "container", "glibc"), dig(receipt, "container", "platform"))
-        if found != (box["glibc"], box["platform"]):
-            problems.append(f"{label}: glibc {found[0]} on {found[1]}, expected {box['glibc']} on {box['platform']}")
+        libc = "musl" if "musl" in box else "glibc"
+        found = (dig(receipt, "container", libc), dig(receipt, "container", "platform"))
+        if found != (box[libc], box["platform"]):
+            problems.append(f"{label}: {libc} {found[0]} on {found[1]}, expected {box[libc]} on {box['platform']}")
     cases = [case for case in receipt.get("cases") or [] if isinstance(case, dict)]
     unwind = [case for case in cases if case.get("id") == "unwind"]
     if len(unwind) != 1:
@@ -1891,7 +1913,7 @@ def skipped_cases(judged):
 
 
 def qualify(args, env, root):
-    """The agreement of the nine consumer receipts (see the module doc); the qualification receipt."""
+    """The agreement of the thirteen consumer receipts (see the module doc); the qualification receipt."""
     folder = Path(args.receipts)
     if not folder.is_dir():
         raise Stop(2, [f"the receipts directory {folder} is not a directory"])
@@ -1936,8 +1958,11 @@ def qualify(args, env, root):
             host = {key: dig(receipt, "host", key) for key in ("os", "machine")}
             native.append({**entry, "host": host})
         else:
-            containers.append({**entry, "image": dig(receipt, "container", "image"), "platform": box["platform"],
-                               "glibc": dig(receipt, "container", "glibc")})
+            container = {**entry, "image": dig(receipt, "container", "image"), "platform": box["platform"],
+                         "glibc": dig(receipt, "container", "glibc")}
+            if "musl" in box:
+                container["musl"] = dig(receipt, "container", "musl")
+            containers.append(container)
     identities, more = identities_problems(judged, args.anchor_identities if args.public else None)
     problems = list(dict.fromkeys(problems + more))
     receipt = {"schema": QUALIFICATION_SCHEMA, "verdict": "FAIL" if problems else "PASS", "version": version,
@@ -2075,7 +2100,8 @@ def expected_matrices():
     def native(runner):
         return [{"target": target, "runner": row[runner]} for target, row in TARGETS.items()]
     boxes = [{"target": target, "runner": box["runner"], "image": box["image"], "platform": box["platform"],
-              "glibc": box["glibc"]} for target, row in TARGETS.items() for box in row["containers"]]
+              **{libc: box[libc] for libc in ("glibc", "musl") if libc in box}}
+             for target, row in TARGETS.items() for box in row["containers"]]
     return {"build": native("build_runner"), "consume": native("consumer_runner"), "consume-container": boxes,
             "public-download": native("consumer_runner"), "public-download-container": boxes,
             "fetch-rehearsal": native("consumer_runner")}
@@ -2209,6 +2235,7 @@ if tool == "codesign" and args[0] == "-dv":
 if tool == "ld" and args == ["-v"]:
     reply(err="@(#)PROGRAM:ld PROJECT:ld-1167.5\nBUILD 01:45:05 Apr 30 2025\n")
 answers = {
+    ("cc", "--version"): "cc (GCC) 13.3.0 (fixture)",
     ("rustc", "-vV"): "\n".join(state["rustc"]), ("rustc", "--print"): state["sysroot"],
     ("cargo", "-V"): state["cargo"], ("cargo", "metadata"): json.dumps(state["metadata"]),
     ("cargo-zigbuild", "--version"): state["zigbuild"], ("zig", "version"): state["zig"],
@@ -2247,7 +2274,7 @@ print(json.dumps({"verdict": "FAIL" if problems else "PASS", "policy": args.poli
 sys.exit(1 if problems else 0)
 '''
 
-STUB_TOOLS = ("git", "rustc", "cargo", "cargo-zigbuild", "zig", "xcrun", "xcode-select", "xcodebuild", "ld",
+STUB_TOOLS = ("git", "rustc", "cargo", "cargo-zigbuild", "zig", "cc", "xcrun", "xcode-select", "xcodebuild", "ld",
               "clang", "codesign")
 WATCH = ["CARGO_ENCODED_RUSTFLAGS", "CARGO_INCREMENTAL", "SOURCE_DATE_EPOCH", "MACOSX_DEPLOYMENT_TARGET",
          "RUSTUP_TOOLCHAIN", "RUST_TOOLCHAIN"]
@@ -2442,10 +2469,14 @@ class Fixture:
 
 
 TRIPLES = ("x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "aarch64-apple-darwin",
-           "x86_64-pc-windows-msvc")
-HOSTS = {"aarch64-unknown-linux-gnu": "x86_64-unknown-linux-gnu", "x86_64-apple-darwin": "aarch64-apple-darwin"}
+           "x86_64-pc-windows-msvc", "x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl")
+HOSTS = {"aarch64-unknown-linux-gnu": "x86_64-unknown-linux-gnu", "x86_64-apple-darwin": "aarch64-apple-darwin",
+         "x86_64-unknown-linux-musl": "x86_64-unknown-linux-gnu",
+         "aarch64-unknown-linux-musl": "aarch64-unknown-linux-gnu"}
 ROW_FLAGS = {"x86_64-unknown-linux-gnu": ["-Clinker-features=-lld"],
-             "x86_64-pc-windows-msvc": ["-Ctarget-feature=+crt-static"]}
+             "x86_64-pc-windows-msvc": ["-Ctarget-feature=+crt-static"],
+             "x86_64-unknown-linux-musl": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"],
+             "aarch64-unknown-linux-musl": ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"]}
 DEPLOYMENT = {"x86_64-apple-darwin": "10.15", "aarch64-apple-darwin": "11.0"}
 WANT_LINKERS = {
     "linux": {"kind": "cargo-zigbuild", "unwinder": "zig-libunwind", "zig": "0.14.1",
@@ -2458,11 +2489,13 @@ WANT_LINKERS = {
                "codesign": ["Executable=<out>/qrscan", "Identifier=qrscan", "Format=Mach-O thin (arm64)",
                             "Signature=adhoc"]},
     "windows": {"kind": "msvc-link", "unwinder": None, "visual_studio": "17.14.9", "vc_tools": "14.44.35207"},
+    "musl": {"kind": "musl-cc", "unwinder": None, "cc": ["cc (GCC) 13.3.0 (fixture)"]},
 }
 
 
 def family(target):
-    return "linux" if target.endswith("-linux-gnu") else "darwin" if target.endswith("-darwin") else "windows"
+    return ("musl" if target.endswith("-linux-musl") else "linux" if target.endswith("-linux-gnu")
+            else "darwin" if target.endswith("-darwin") else "windows")
 
 
 def stub_binary(target, plant="", smoke=SMOKE):
@@ -2499,7 +2532,7 @@ def want_facts(fx, target, binary, actions=False, dirty=False, linker=None):
                    "size": len(binary)},
         "checks": {"floor": {"policy": "cli", "verdict": "PASS", "unwinder": unwinder, "forbid": forbid},
                    "signature": "codesign --verify --strict: valid" if target == "aarch64-apple-darwin" else None,
-                   "version": "qrscan 0.11.0" if target == host else
+                   "version": "qrscan 0.11.0" if target == host or family(target) == "musl" else
                    f"not run: {target} binaries do not run on the build host {host}"},
     }
 
@@ -2857,7 +2890,7 @@ def _assemble_clean(t, fx):
         ["-C", str(fx.root), "-c", "core.autocrlf=false", "-c", "core.eol=lf", "-c", "tar.umask=0002", "archive",
          "--format=tar", "--prefix=qrcode-barcode-scanner-cli-0.11.0-source/", COMMIT]])
     cargo = [call["argv"] for call in calls if call["tool"] == "cargo"]
-    t.check("assemble: cargo calls", (len(cargo), cargo[:2]), (11, [
+    t.check("assemble: cargo calls", (len(cargo), cargo[:2]), (15, [
         ["metadata", "--format-version", "1", "--locked", "--offline"],
         ["tree", "-p", "qrcode-barcode-scanner-cli", "--target", "x86_64-unknown-linux-gnu", "-e",
          "normal,no-proc-macro", "--prefix", "none", "--format", "{p}", "--locked", "--offline"]]))
@@ -2876,7 +2909,7 @@ def _assemble_clean(t, fx):
     shutil.copytree(local, partial)
     shutil.rmtree(partial / "cli-build-x86_64-pc-windows-msvc")
     check_release_set(t, fx, "assemble --partial", assemble_case(fx, "partial", partial, partial=True), partial,
-                      targets=TRIPLES[:4])
+                      targets=tuple(target for target in TRIPLES if target != "x86_64-pc-windows-msvc"))
     for label in ("clean", "ci"):
         code, text, _calls = fx.invoke(["licenses", "--check-release", str(fx.base / "assembled" / label)])
         t.check(f"licenses --check-release {label}", (code, json.loads(text)), (0, {
@@ -3024,7 +3057,7 @@ def _writer_cases(t, fx):
     t.check("assemble: a varying gzip", stop_of(assemble, args, fx.env(), fx.root, compress=varying_gzip), (1, [
         "the archive writer is not deterministic: qrcode-barcode-scanner-cli-0.11.0-source.tar.gz differs between "
         "two writes"]))
-    t.check("assemble: nothing written by a varying writer", (out.exists(), len(writes), len(packs)), (False, 10, 2))
+    t.check("assemble: nothing written by a varying writer", (out.exists(), len(writes), len(packs)), (False, 14, 2))
 
 
 def _license_cases(t, fx, release):
@@ -3070,7 +3103,8 @@ WANT_NOTES = "\n".join([
     "### Prebuilt qrscan archives", "",
     "The `qrcode-barcode-scanner-cli-0.11.0-<target>` archives hold the qrscan command line for",
     "Linux x86_64 (glibc 2.28 or later), Linux aarch64 (glibc 2.28 or later), macOS x86_64 (10.15 or later), "
-    "macOS arm64 (11.0 or later) and Windows x86_64.",
+    "macOS arm64 (11.0 or later), Windows x86_64, Linux x86_64 (static musl, including Alpine) "
+    "and Linux aarch64 (static musl, including Alpine).",
     "`qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS` lists the sha256 of every other CLI asset. It is an asset of",
     "this same release, so it detects a damaged download, not a substituted release.",
     "`qrcode-barcode-scanner-cli-0.11.0-source.tar.gz` is the corresponding source, a git archive of the tagged "
@@ -3101,7 +3135,11 @@ def _command_cases(t, fx):
         ("aarch64-apple-darwin", "tar.gz", "macos-15", "aarch64-apple-darwin", "apple-ld", None, "11.0", [],
          "macos-15"),
         ("x86_64-pc-windows-msvc", "zip", "windows-2025", "x86_64-pc-windows-msvc", "msvc-link", None, None,
-         ["-Ctarget-feature=+crt-static"], "windows-2025")])
+         ["-Ctarget-feature=+crt-static"], "windows-2025"),
+        ("x86_64-unknown-linux-musl", "tar.gz", "ubuntu-24.04", "x86_64-unknown-linux-gnu", "musl-cc", None, None,
+         ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"], "ubuntu-24.04"),
+        ("aarch64-unknown-linux-musl", "tar.gz", "ubuntu-24.04-arm", "aarch64-unknown-linux-gnu", "musl-cc", None, None,
+         ["-Ctarget-feature=+crt-static", "-Clink-self-contained=yes"], "ubuntu-24.04-arm")])
     code, text, _calls = fx.invoke(["notes", "--version", "0.11.0"])
     t.check("notes 0.11.0", (code, text), (0, WANT_NOTES))
     undated = checkout_copy(fx, fx.base / "roots" / "undated", lambda root: put(
@@ -3129,7 +3167,7 @@ SOURCE_FILE = "qrcode-barcode-scanner-cli-0.11.0-source.tar.gz"
 SUMS_FILE = "qrcode-barcode-scanner-cli-0.11.0-SHA256SUMS"
 NAMES = [*map(archive_file, TRIPLES), SOURCE_FILE, SUMS_FILE]  # the upload order: archives, source, SHA256SUMS
 IOS = ["QRCodeScanner.xcframework.zip", "checksum.txt"]  # another lane's assets on the same draft
-MUSL = "qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-musl.tar.gz"
+FOREIGN = "qrcode-barcode-scanner-cli-0.11.0-riscv64gc-unknown-linux-musl.tar.gz"
 PUBLISHED_TEXT = "a published release is never completed in place; ship the next patch version (RELEASING §6)"
 DRAFT_TEXT = ("nothing was uploaded: the owner deletes the CLI assets from the draft, then dispatches mode build on "
               "the tag (RELEASING §6)")
@@ -3226,16 +3264,18 @@ def _plan_cases(t, fx, release):
     def lines(*indices):
         return "".join(f"{release / NAMES[index]}\n" for index in indices)
 
+    source, sums = len(TRIPLES), len(TRIPLES) + 1
+    binaries = range(len(TRIPLES))
     code, receipt, written, upload = plan_case(fx, "a draft without CLI assets", release, record, ios)
     want = {"schema": "qrscan-cli-attach-plan/1", "phase": "plan", "verdict": "PASS", "tag": "v0.11.0",
             "commit": COMMIT, "draft": True, "target": COMMIT, "present": {}, "identical": [],
             "upload": [str(release / name) for name in NAMES], "ignored": IOS, "next": None, "problems": []}
     t.check("attach-plan: a draft without CLI assets", (code, receipt, written, upload),
-            (0, want, want, lines(0, 1, 2, 3, 4, 5, 6)))
+            (0, want, want, lines(*range(len(NAMES)))))
     every = range(len(NAMES))
     cases = [  # (label, assets on the release, view keywords, exit, problems, upload list, identical, next)
-        ("a draft with two archives and the source", {**some(0, 1, 5), **ios}, {}, 0, [], lines(2, 3, 4, 6),
-         some(0, 1, 5), None),
+        ("a draft with two archives and the source", {**some(0, 1, source), **ios}, {}, 0, [],
+         lines(*range(2, len(TRIPLES)), sums), some(0, 1, source), None),
         ("a draft with the whole set", some(*every), {}, 0, [], "", files, None),
         ("a published release with the whole set", some(*every), {"draft": False}, 0, [], "", files, None),
         ("a foreign target", ios, {"target": "main"}, 1,
@@ -3244,27 +3284,27 @@ def _plan_cases(t, fx, release):
          [f"v0.11.0 targets {COMMIT[:12]}, not this run's commit {COMMIT}"], None, {}, None),
         ("another tag's view", {}, {"tag": "v0.10.0"}, 1, ["the release view is of v0.10.0, not v0.11.0"], None,
          {}, None),
-        ("SHA256SUMS before the other assets", some(0, 6), {}, 1,
-         [f"{SUMS_FILE} is on the draft while {', '.join(NAMES[1:6])} are missing: it goes last, after every "
-          "other asset"], None, some(0, 6), DRAFT_TEXT),
-        ("SHA256SUMS before the source", some(0, 1, 2, 3, 4, 6), {}, 1,
+        ("SHA256SUMS before the other assets", some(0, sums), {}, 1,
+         [f"{SUMS_FILE} is on the draft while {', '.join(NAMES[1:-1])} are missing: it goes last, after every "
+          "other asset"], None, some(0, sums), DRAFT_TEXT),
+        ("SHA256SUMS before the source", some(*binaries, sums), {}, 1,
          [f"{SUMS_FILE} is on the draft while {SOURCE_FILE} is missing: it goes last, after every other asset"],
-         None, some(0, 1, 2, 3, 4, 6), DRAFT_TEXT),
+         None, some(*binaries, sums), DRAFT_TEXT),
         ("a differing archive on the draft", some(3, base=altered), {}, 1,
          [f"{NAMES[3]} differs: the draft holds sha256 {sha256(altered[NAMES[3]])}, the inspected set "
           f"{sha256(files[NAMES[3]])}"], None, {}, DRAFT_TEXT),
-        ("an unexpected CLI asset", {MUSL: b"musl (fixture)"}, {}, 1,
-         [f"{MUSL} is on the draft but is not an asset of this set"], None, {}, DRAFT_TEXT),
+        ("an unexpected CLI asset", {FOREIGN: b"musl (fixture)"}, {}, 1,
+         [f"{FOREIGN} is on the draft but is not an asset of this set"], None, {}, DRAFT_TEXT),
         ("an interrupted upload", some(4), {"changes": {NAMES[4]: {"state": "open"}}}, 1,
          [f"{NAMES[4]} on the draft is in state open, not uploaded: an interrupted upload"], None, some(4),
          DRAFT_TEXT),
-        ("a published release without SHA256SUMS", some(0, 1, 2, 3, 4, 5), {"draft": False}, 1,
-         [PUBLISHED_TEXT, f"{SUMS_FILE} is missing from the published release"], None, some(0, 1, 2, 3, 4, 5), None),
-        ("a published release with another source", {**some(0, 1, 2, 3, 4, 6), **some(5, base=altered)},
+        ("a published release without SHA256SUMS", some(*binaries, source), {"draft": False}, 1,
+         [PUBLISHED_TEXT, f"{SUMS_FILE} is missing from the published release"], None, some(*binaries, source), None),
+        ("a published release with another source", {**some(*binaries, sums), **some(source, base=altered)},
          {"draft": False}, 1,
          [PUBLISHED_TEXT, f"{SOURCE_FILE} differs: the published release holds sha256 "
                           f"{sha256(altered[SOURCE_FILE])}, the inspected set {sha256(files[SOURCE_FILE])}"],
-         None, some(0, 1, 2, 3, 4, 6), None),
+         None, some(*binaries, sums), None),
     ]
     for label, on_release, view, code, problems, upload, identical, after in cases:
         got, receipt, written, uploaded = plan_case(fx, label, release, record, on_release, **view)
@@ -3287,7 +3327,7 @@ def _plan_refusals(t, fx, release, record, files):
     code, receipt, _written, upload = plan_case(fx, "another record", release, swapped_record, {})
     t.check("attach-plan: a record of another directory", (code, receipt["problems"], upload), (1, [
         f"{name}: '{sha256(files[name])}  {release / name}' is not in the inspected record" for name in NAMES], None))
-    code, receipt, _written, upload = plan_case(fx, "a stale upload list", release, record, {MUSL: b"musl"},
+    code, receipt, _written, upload = plan_case(fx, "a stale upload list", release, record, {FOREIGN: b"musl"},
                                                 prepare=lambda where, present: put(where / "upload.txt", "stale\n"))
     t.check("attach-plan: a refused plan removes a stale upload list", (code, receipt["verdict"], upload),
             (1, "FAIL", None))
@@ -3352,8 +3392,8 @@ def _readback_cases(t, fx, release):
         ("SHA256SUMS missing from the draft", without_sums, {}, [f"{SUMS_FILE} is missing from the draft"]),
         ("SHA256SUMS missing from the published release", without_sums, {"draft": False},
          [f"{SUMS_FILE} is missing from the published release"]),
-        ("an unexpected CLI asset", {**files, MUSL: b"musl"}, {},
-         [f"{MUSL} is on the draft but is not an asset of this set"]),
+        ("an unexpected CLI asset", {**files, FOREIGN: b"musl"}, {},
+         [f"{FOREIGN} is on the draft but is not an asset of this set"]),
         ("an asset that differs from the inspected set", {**files, NAMES[0]: altered}, {},
          [f"{NAMES[0]}: the draft serves sha256 {sha256(altered)}, the inspected set {sha256(files[NAMES[0]])}"]),
         ("a foreign target", files, {"target": "main"}, [f"v0.11.0 targets main, not this run's commit {COMMIT}"]),
@@ -3366,8 +3406,8 @@ def _readback_cases(t, fx, release):
         ("an asset not downloaded", files, {"prepare": lambda where, present: (present / NAMES[2]).unlink()},
          [f"{NAMES[2]} is on the draft but was not downloaded"]),
         ("a download the release does not list", files,
-         {"prepare": lambda where, present: put(present / MUSL, b"musl")},
-         [f"{MUSL} was downloaded, but the draft does not list it"]),
+         {"prepare": lambda where, present: put(present / FOREIGN, b"musl")},
+         [f"{FOREIGN} was downloaded, but the draft does not list it"]),
     ]
     for label, on_release, keywords, problems in cases:
         code, receipt, summary = readback_case(fx, f"readback {label}", record, on_release, **keywords)
@@ -3380,11 +3420,11 @@ def _readback_refusals(t, fx, release, files, record):
     """A record of another set refused; usage, malformed files and a token stopped with exit 2."""
     short = write_record(fx.base / "gh" / "readback-short.sha256", release, NAMES[:-1])
     longer = fx.base / "gh" / "readback-longer.sha256"
-    put(longer, record.read_text(encoding="utf-8") + f"{sha256(b'musl')}  {release / MUSL}\n")
+    put(longer, record.read_text(encoding="utf-8") + f"{sha256(b'musl')}  {release / FOREIGN}\n")
     for label, path, problems in (
             ("a record without SHA256SUMS", short, [f"{SUMS_FILE} has no line in the inspected record"]),
             ("a record naming another asset", longer,
-             [f"the inspected record names {MUSL}, not an asset of this set"])):
+             [f"the inspected record names {FOREIGN}, not an asset of this set"])):
         code, receipt, _summary = readback_case(fx, f"readback {label}", path, files)
         t.check(f"readback: {label}", (code, receipt["verdict"], receipt["problems"]), (1, "FAIL", problems))
     garbled = fx.base / "gh" / "readback-garbled.sha256"
@@ -3415,10 +3455,14 @@ BOXES = (  # the container rows of TARGETS, written out: (target, image, platfor
     ("x86_64-unknown-linux-gnu", "almalinux:8.10-minimal", "linux/amd64", "2.28"),
     ("x86_64-unknown-linux-gnu", "debian:bookworm-slim", "linux/amd64", "2.36"),
     ("aarch64-unknown-linux-gnu", "almalinux:8.10-minimal", "linux/arm64", "2.28"),
-    ("aarch64-unknown-linux-gnu", "debian:bookworm-slim", "linux/arm64", "2.36"))
+    ("aarch64-unknown-linux-gnu", "debian:bookworm-slim", "linux/arm64", "2.36"),
+    ("x86_64-unknown-linux-musl", "alpine:3.22", "linux/amd64", "1.2.5"),
+    ("aarch64-unknown-linux-musl", "alpine:3.22", "linux/arm64", "1.2.5"))
 NATIVE_HOSTS = {"x86_64-unknown-linux-gnu": ("linux", "x86_64"), "aarch64-unknown-linux-gnu": ("linux", "aarch64"),
                 "x86_64-apple-darwin": ("darwin", "x86_64"), "aarch64-apple-darwin": ("darwin", "aarch64"),
-                "x86_64-pc-windows-msvc": ("win32", "x86_64")}
+                "x86_64-pc-windows-msvc": ("win32", "x86_64"),
+                "x86_64-unknown-linux-musl": ("linux", "x86_64"),
+                "aarch64-unknown-linux-musl": ("linux", "aarch64")}
 # (label, target, (image, platform, glibc) or None, receipt path below the receipts directory)
 QUALIFY_ROWS = [(target, target, None, f"cli-receipt-{target}/cli-receipt.json") for target in TRIPLES] + [
     (f"{box[0]} in {box[1]}", box[0], box[1:], f"cli-receipt-container-{index}/cli-receipt.json")
@@ -3446,6 +3490,9 @@ def consumer_fixture(release, target, box, contract=COMMIT):
     container = None if box is None else {
         "image": image_ref(box[0]), "platform": box[1], "image_platform": box[1], "docker": "28.5.1",
         "expect_glibc": box[2], "glibc": box[2], "glibc_probe": "getconf GNU_LIBC_VERSION"}
+    if box and target.endswith("-linux-musl"):
+        container.update(expect_glibc=None, glibc=None, glibc_probe=None,
+                         expect_musl=box[2], musl=box[2], musl_probe="musl dynamic loader")
     return {"schema": "qrscan-cli-consumer/1", "verdict": "PASS", "exit": 0, "target": target, "version": "0.11.0",
             "archive": {"name": name, "sha256": sha256(data), "size": len(data)},
             "sums_sha256": sha256((release / SUMS_FILE).read_bytes()), "consumer_commit": COMMIT,
@@ -3486,7 +3533,7 @@ def fetch_fixture(release, names, **changes):
 
 def qualify_case(fx, label, release, edit=None, options=None, env=None, public=False, **changes):
     """(exit, printed receipt, --out file, summary, GitHub output) of one qualify over the receipts the
-    qualified job downloads: nine consumers and the floor report or, PUBLIC, nine consumers judged on
+    qualified job downloads: thirteen consumers and the floor report or, PUBLIC, thirteen consumers judged on
     the anchor commit's contract and the fetches (one per consumer, and public-verify's --all).
     EDIT(receipts by path) plants a defect; CHANGES go to the stub state."""
     receipts = {path: consumer_fixture(release, target, box, OTHER if public else COMMIT)
@@ -3522,7 +3569,9 @@ def want_qualification(release, **changes):
                "host": {"os": NATIVE_HOSTS[target][0], "machine": NATIVE_HOSTS[target][1]}}
               for _label, target, box, path in QUALIFY_ROWS if box is None]
     containers = [{"target": target, "receipt": path, "verdict": "PASS", "image": image_ref(box[0]),
-                   "platform": box[1], "glibc": box[2]} for _label, target, box, path in QUALIFY_ROWS if box]
+                   "platform": box[1], "glibc": None if target.endswith("-linux-musl") else box[2],
+                   **({"musl": box[2]} if target.endswith("-linux-musl") else {})}
+                  for _label, target, box, path in QUALIFY_ROWS if box]
     return {"schema": "qrscan-cli-qualification/1", "verdict": "PASS", "version": "0.11.0", "commit": COMMIT,
             "github_sha": COMMIT, "ref": "refs/tags/v0.11.0", "event": "push", "run_id": "123456", "run_attempt": "1",
             "sums_sha256": sha256((release / SUMS_FILE).read_bytes()),
@@ -3530,7 +3579,7 @@ def want_qualification(release, **changes):
             "native": native, "containers": containers,
             "unwinders": {"x86_64-unknown-linux-gnu": "zig-libunwind", "aarch64-unknown-linux-gnu": "zig-libunwind"},
             "identities_sha256": IDENTITIES,
-            "not_executed": [{**EXIT_3, "rows": LABELS}, {**NON_UTF8, "rows": LABELS[5:]}], "problems": [], **changes}
+            "not_executed": [{**EXIT_3, "rows": LABELS}, {**NON_UTF8, "rows": LABELS[len(TRIPLES):]}], "problems": [], **changes}
 
 
 def want_summary(receipt, what):
@@ -3545,7 +3594,7 @@ def want_summary(receipt, what):
 
 
 def _qualify_cases(t, fx, release):
-    """qualify over the nine consumer receipts and the floor report: the clean set passes, each
+    """qualify over the thirteen consumer receipts and the floor report: the clean set passes, each
     planted defect is refused by name. Returns the clean and a failed qualification."""
     sums, other = sha256((release / SUMS_FILE).read_bytes()), sha256(b"other (fixture)")
     want = want_qualification(release)
@@ -3553,7 +3602,9 @@ def _qualify_cases(t, fx, release):
     t.check("qualify: the clean receipts", (code, receipt, written, summary, output),
             (0, want, want, want_summary(want, "release set"), f"sums_sha256={sums}\ncommit={COMMIT}\n"))
     path = {label: where for label, _target, _box, where in QUALIFY_ROWS}
-    linux, darwin, windows, alma, deb = LABELS[0], LABELS[2], LABELS[4], LABELS[5], LABELS[8]
+    linux, darwin, windows = LABELS[0], LABELS[2], LABELS[4]
+    alma, deb = LABELS[len(TRIPLES)], LABELS[len(TRIPLES) + 3]
+    alpine = LABELS[len(TRIPLES) + 4]
     unwind_134 = {"id": "unwind", "exit": 134, "expected_exit": 101, "ok": False, "detail": ["exit 134, expected 101"]}
     member = f"{archive_file(darwin)}!qrcode-barcode-scanner-cli-0.11.0-{darwin}/qrscan"
 
@@ -3570,6 +3621,9 @@ def _qualify_cases(t, fx, release):
          [f"{LABELS[3]}: the consumer's verdict is FAIL (exit 1)"]),
         ("a missing target", lambda r: r.pop(path[windows]), [f"no consumer receipt for {windows}"]),
         ("a missing container row", lambda r: r.pop(path[deb]), [f"no consumer receipt for {deb}"]),
+        ("a missing Alpine row", lambda r: r.pop(path[alpine]), [f"no consumer receipt for {alpine}"]),
+        ("a wrong musl version", receipt_of(alpine, "container", "musl", value="1.2.4"),
+         [f"{alpine}: musl 1.2.4 on linux/amd64, expected 1.2.5 on linux/amd64"]),
         ("a differing sums_sha256", receipt_of(darwin, "sums_sha256", value=other),
          [f"{darwin}: judged a SHA256SUMS of sha256 {other}, expected {sums}"]),
         ("an archive digest that disagrees with its line", receipt_of(alma, "archive", "sha256", value=other),
@@ -3599,8 +3653,8 @@ def _qualify_cases(t, fx, release):
         ("a duplicate receipt", lambda r: r.update({"rerun/cli-receipt.json": r[path[darwin]]}),
          [f"2 consumer receipts for {darwin}: {path[darwin]}, rerun/cli-receipt.json"]),
         ("a receipt of a target this release lacks",
-         lambda r: r.update({"musl/cli-receipt.json": {**r[path[linux]], "target": "x86_64-unknown-linux-musl"}}),
-         ["musl/cli-receipt.json: a consumer receipt for x86_64-unknown-linux-musl, not a row of this release"]),
+         lambda r: r.update({"foreign/cli-receipt.json": {**r[path[linux]], "target": "riscv64gc-unknown-linux-musl"}}),
+         ["foreign/cli-receipt.json: a consumer receipt for riscv64gc-unknown-linux-musl, not a row of this release"]),
         ("a receipt of an image this release lacks", lambda r: r.update({"ubuntu/cli-receipt.json": {
             **r[path[alma]], "container": {**r[path[alma]]["container"], "image": image_ref("ubuntu:24.04")}}}),
          [f"ubuntu/cli-receipt.json: a consumer receipt for {linux} in ubuntu:24.04, not a row of this release"]),
@@ -3662,7 +3716,7 @@ def _qualify_more(t, fx, release, want):
 
 
 def _qualify_public(t, fx, release, want):
-    """qualify --public over the anonymous fetches and the nine consumers judged on the anchor's contract."""
+    """qualify --public over the anonymous fetches and the thirteen consumers judged on the anchor's contract."""
     sums, other = sha256((release / SUMS_FILE).read_bytes()), sha256(b"other (fixture)")
     env = fx.env(True, **{**QUALIFY_ENV, "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main",
                           "GITHUB_RUN_ID": "223344"})
@@ -3821,6 +3875,8 @@ CLI_RUNNERS = {  # (build runner, consumer runner) of each target, written out
     "x86_64-apple-darwin": ("macos-15", "macos-15-intel"),
     "aarch64-apple-darwin": ("macos-15", "macos-15"),
     "x86_64-pc-windows-msvc": ("windows-2025", "windows-2025"),
+    "x86_64-unknown-linux-musl": ("ubuntu-24.04", "ubuntu-24.04"),
+    "aarch64-unknown-linux-musl": ("ubuntu-24.04-arm", "ubuntu-24.04-arm"),
 }
 BOX_RUNNERS = {"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"}
 
@@ -3841,7 +3897,8 @@ def _matrix_cases(t, base):
     digests = {image: image_ref(image) for _target, image, _platform, _glibc in BOXES}
     native = {kind: [{"target": target, "runner": CLI_RUNNERS[target][index]} for target in TRIPLES]
               for index, kind in enumerate(("build", "consume"))}
-    boxes = [{"target": target, "runner": BOX_RUNNERS[platform], "image": image, "platform": platform, "glibc": glibc}
+    boxes = [{"target": target, "runner": BOX_RUNNERS[platform], "image": image, "platform": platform,
+              "musl" if target.endswith("-linux-musl") else "glibc": glibc}
              for target, image, platform, glibc in BOXES]
     t.check("matrices: TARGETS written out", expected_matrices(), {
         "build": native["build"], "consume": native["consume"], "consume-container": boxes,
@@ -3865,8 +3922,8 @@ def _matrix_cases(t, base):
 
     cases = [  # (label, edit, problems)
         ("a target missing from consume", lambda w: w["jobs"]["consume"]["strategy"]["matrix"]["include"].pop(),
-         [f"consume: no matrix row {text(runner='windows-2025', target=TRIPLES[4])}"]),
-        ("a musl row in build", lambda w: w["jobs"]["build"]["strategy"]["matrix"]["include"].append(
+         [f"consume: no matrix row {text(runner='ubuntu-24.04-arm', target=TRIPLES[-1])}"]),
+        ("a duplicate musl row in build", lambda w: w["jobs"]["build"]["strategy"]["matrix"]["include"].append(
             {"target": "x86_64-unknown-linux-musl", "runner": "ubuntu-24.04"}),
          ["build: a matrix row TARGETS does not hold: "
           + text(runner="ubuntu-24.04", target="x86_64-unknown-linux-musl")]),
