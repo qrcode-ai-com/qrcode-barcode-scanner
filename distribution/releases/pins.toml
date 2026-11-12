@@ -63,6 +63,7 @@ paths = [
   "bindings/flutter/test/report_test.dart",
   "bindings/kotlin/qrcodeaiscanner/build.gradle.kts",
   "bindings/kotlin/README.md",
+  "bindings/dotnet/README.md",
   "crates/qrcode-ai-scanner/README.md",
   "crates/qrcode-ai-scanner-cli/README.md",
   "crates/qrcode-ai-scanner-node/README.md",

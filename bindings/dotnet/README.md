@@ -6,8 +6,8 @@ itself, as a native library, and returns its JSON report unchanged. There is no 
 install and no network call.
 
 > **Not published yet.** The package id is `QRCodeAI.QRCodeBarcodeScanner`. No version is on
-> nuget.org: this folder is the source, built and tested on each change. The package with its
-> native libraries comes with a later engine release.
+> nuget.org. The archive is built, inspected and installed by clean projects on each change;
+> its first publication comes with a later engine release.
 
 | | QR codes | Barcodes |
 | --- | --- | --- |
@@ -20,8 +20,9 @@ install and no network call.
 - .NET 8 or later. The package targets .NET 8, and its tests run on .NET 8 and on .NET 10.
   Microsoft ended its support of .NET 8 on 10 November 2026: .NET 10 is the long-term release
   it supports.
-- Linux, macOS or Windows. The checks of this folder run on Linux x64, macOS arm64 and
-  Windows x64.
+- One of five systems, whose native library the package carries: Linux x64 or arm64 with
+  glibc 2.28 or later, macOS 10.15 or later on Intel and 11 or later on Apple silicon, or
+  Windows x64. Alpine and other musl systems are not covered.
 
 ## Scan an image
 
@@ -60,13 +61,13 @@ var report = Scanner.Scan(image, new ScanOptions { Profile = ScanProfile.Fast, B
 | `AlphaBackground`, `AlphaPalette` | What a transparent image is laid over, and the backgrounds a transparent code must scan over. |
 
 The values each option takes are those of the engine: see the
-[option domains](../../spec/02-profiles.md).
+[option domains](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/02-profiles.md).
 
 ## Read the report
 
 `report.Json` is the exact text the engine returned. Nothing is renamed, rounded or
 recalculated, so decode it yourself for the payload, the measured places and the trace. It
-follows the engine's [report contract](../../spec/01-report.md). The other members read the
+follows the engine's [report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md). The other members read the
 most used parts:
 
 | Member | Meaning |
@@ -97,7 +98,7 @@ Every refusal is one exception type, `ScanException`. Its message is the engine'
 | `UnknownAlphaBackground`, `UnknownPaletteColor`, `UnknownScorePreset`, `UnknownStressAxis`, `UnknownScoreCheck`, `PaletteTooLarge`, `ScorePresetConflict` | An option holds a value the engine does not know, or two options that cannot go together. | `null` |
 | `EngineFault` | A fault inside the engine itself, not a refusal of your input. | `null` |
 
-The codes are listed in the engine's [error catalog](../../docs/api/errors.mdx).
+The codes are listed in the engine's [error catalog](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/errors.mdx).
 
 ## How it is built
 
@@ -111,12 +112,17 @@ checked in:
   API is the six types of this folder.
 
 Generating both from one commit is what keeps their contract checksums equal. The workflow
-[`.NET binding`](../../.github/workflows/dotnet.yml) does it on three systems, runs the tests
-of [`tests/`](tests/) on .NET 8 and on .NET 10 and judges three real scans of the public API
-with the engine's [acceptance driver](../../distribution/acceptance/README.md).
+`.NET binding` of the engine repository (`.github/workflows/dotnet.yml`) does it on each change:
+
+- on three systems it runs the tests of this folder on .NET 8 and on .NET 10;
+- it builds the native library for the five systems at the floors above, and a program reads
+  each file to check what it needs from the system that loads it;
+- it packs the archive, inspects it file by file, then on the five systems a clean project
+  installs it from a folder, scans the engine's mixed fixture with the three profiles and
+  removes it. The engine's acceptance driver judges those scans.
 
 ## License
 
-AGPL-3.0-or-later, like the engine it contains: see [LICENSE](../../LICENSE) and the
-[licensing guide](../../LICENSING.md). A closed-source application needs the commercial
+AGPL-3.0-or-later, like the engine it contains: see [LICENSE](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSE) and the
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md). A closed-source application needs the commercial
 license described there.

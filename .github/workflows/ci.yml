@@ -334,6 +334,10 @@ jobs:
       # distribution/releases/pins.toml says it follows. The self-test first:
       # a small tree with one defect at a time, then a rehearsal of the next
       # release of this tree, in memory.
+      # The judge of the .NET package's native libraries and of its archive (dotnet.yml): the
+      # floor of each of the five targets on reports of clean and planted libraries, then
+      # archives with one defect at a time.
+      - run: python3 scripts/dotnet-package.py --self-test
       - run: python3 scripts/release-fanout.py --self-test
       - run: python3 scripts/release-fanout.py check
       # The WASM build record build-wasm.sh writes and package-inspect checks
