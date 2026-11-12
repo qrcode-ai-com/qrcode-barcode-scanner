@@ -420,6 +420,9 @@ nothing and names the state; the owner's step depends on it:
   version` from 0.11.0 on (`npm view @supernovae-st/qrcode-ai-scanner-wasm
   version` for 0.10.x; this is the builder's bump signal) + crates.io
   (`qrcode-barcode-scanner`) + PyPI (`qrcode-barcode-scanner`).
+- **Then write the release manifest, once** (§ Release manifest): the tag,
+  its commit and the hash of every public file, read from the public
+  addresses. It needs the published release and the three registries live.
 - Downstream: the landing/app pins a caret 0.x range — **the caret freezes
   the minor** (`^0.7.0` never takes 0.8.0); minor bumps need a manual edit
   in the consumer. A consumer of a former name never reaches 0.11.0 through
@@ -978,6 +981,35 @@ Server 2016 to 2022, and older Linux kernels (glibc 2.28 itself runs, in the
 AlmaLinux 8 containers). Every consumer receipt lists the cases it leaves
 out, among them exit 3, which depends on the budget and the machine, and a
 panic inside the engine, which no fixture triggers deterministically.
+
+## Release manifest — every public hash in one file
+
+`distribution/releases/vX.Y.Z.json` records a public engine release: the tag
+and its commit, the checksum list and each file of the GitHub release with the
+executable inside each prebuilt archive, the two crates, the Node package with
+its platform packages, the browser package with its WebAssembly module, and
+every file of the Python package. Recipes, demos, integrations and consumer
+checks take their pinned values from it
+([`distribution/releases/README.md`](distribution/releases/README.md)).
+
+Write it once, after the release is published (§ 7) and crates.io, npm and
+PyPI serve the version:
+
+```bash
+python3 scripts/release-manifest.py build --tag vX.Y.Z --out distribution/releases/vX.Y.Z.json
+```
+
+The program reads the public addresses anonymously, hashes the bytes itself and
+compares them with what each place declares. It refuses a yanked crate or
+file, an archive built from another commit and a tarball on a foreign address.
+The file has no date, so the same release gives the same bytes. Open a pull
+request with that one file: `release-manifest.yml` reads the public release
+again from a hosted runner and compares. Never edit a manifest by hand. When
+`verify` reports a difference later, a public file or a registry answer
+changed: find out why before touching the file.
+
+The container image, the Linux packages, the AppImage and the hosted examples
+have their own tags and are not in this file.
 
 ## Independent MCP npm releases
 

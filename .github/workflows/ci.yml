@@ -325,6 +325,11 @@ jobs:
       # stand-in qrscan.
       - run: python3 scripts/cli-release.py --self-test
       - run: python3 scripts/packed-cli-consumer.py --self-test
+      # The program that writes distribution/releases/vX.Y.Z.json
+      # (release-manifest.yml): a small public release held in memory, clean,
+      # then with one defect at a time, and the package names it reads, each
+      # spelled in its manifest of this tree.
+      - run: python3 scripts/release-manifest.py --self-test
       # The WASM build record build-wasm.sh writes and package-inspect checks
       # (scripts/wasm_provenance.py): its feature-envelope decoder on planted
       # modules (an immediate is not an opcode; unknown or truncated code is
