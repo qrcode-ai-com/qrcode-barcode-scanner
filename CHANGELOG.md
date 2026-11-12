@@ -4,6 +4,50 @@ All notable changes to this workspace. Every surface versions together — the R
 crate + CLI, the npm node + wasm packages, the Python wheel, and the
 Kotlin/Android · Swift/iOS · Flutter bindings.
 
+## Unreleased
+
+### Changed
+
+- **Kotlin and Swift: an error case carries one message and nothing else.**
+  This breaks code that read the value of a case. `ScanBindingError` now
+  crosses the binding as its case and its message, the text Rust prints:
+  `scan failed: … [QRS-001]`, `unknown profile: turbo`. Up to 0.11.0 a case
+  also held its value as a separate unnamed field (`v1` in Kotlin), and the
+  generated message repeated that name, as in `v1=unsupported or corrupt
+  image`. Read the message and match the case; the `[QRS-xxx]` code is in the
+  message, as before. The Rust enum is unchanged. UniFFI's Ruby generator
+  wrote an invalid file for the former shape, so the mobile workflow now
+  generates the Ruby file and has Ruby parse it.
+- The `homepage` field of each package manifest names that package's guide on
+  qrcode-ai.com instead of the site's home page: the two crates, the Node,
+  browser and Python packages and the Flutter package. A registry shows the
+  new address from this version on.
+- Flutter: the package is named `qr_barcode_scanner`, as its own changelog
+  records, and its README states NDK r28 as the floor. Built with NDK r27 the
+  Android libraries are aligned to 4 KB memory pages, not 16 KB.
+
+### Fixed
+
+- **Kotlin on Android: the one-line Gradle dependency works.** With 0.11.0 it
+  compiled, then the first scan failed with `UnsatisfiedLinkError`. The
+  published Gradle module metadata named JNA without its Android AAR, and
+  Gradle reads that file in preference to the POM. The module metadata is no
+  longer published, so a consumer reads the POM, which names the AAR. The
+  Kotlin README keeps the extra lines that 0.11.0 needs.
+- Kotlin on Android: a minified build no longer stops in R8 with
+  `Missing class java.awt.Component`. The rules shipped in the AAR carry
+  `-dontwarn java.awt.*`.
+- Kotlin on Android: JNA moves from 5.13.0 to 5.17.0, the first version whose
+  x86_64 library is aligned for 16 KB memory pages.
+
+### CI
+
+- `kotlin-publication.yml` publishes the AAR to a directory on the runner and
+  installs it with the one-line dependency on an emulator, as a debug build
+  and as a minified one, with 4 KB and with 16 KB memory pages.
+- The Flutter publish job names its Flutter and Dart versions and installs
+  from a tracked `pubspec.lock`.
+
 ## 0.11.0 — 2026-10-31
 
 ### Package names
