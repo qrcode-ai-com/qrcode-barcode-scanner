@@ -47,6 +47,10 @@ paths = ["scripts/cli-release.py"]
 why = "The guide of the 0.11.0 rename, with the record of that publication."
 paths = ["docs/guides/migrate-to-qrcode-barcode-scanner.mdx"]
 
+[[frozen]]
+why = "A dated source comparison: its release baseline and reviewed source hashes require a fresh factual review, not automatic version replacement."
+paths = ["docs/comparison.mdx"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]

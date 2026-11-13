@@ -42,7 +42,7 @@ To prepare a QR payload or a barcode label, use the [QR code generator](https://
 
 [![QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/hero.png?v=d6458e19d08a)](https://qrcode-ai.com/)
 
-[Get started](#get-started) · [Examples](#examples) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
+[Get started](#get-started) · [Examples](#examples) · [Compare scanners](docs/comparison.mdx) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
@@ -52,6 +52,20 @@ Scan QR codes and barcodes from images or camera frames, entirely on your device
 **0.11.0 is released** for Rust, CLI, Node.js, browser WASM and Python.
 [Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)
 · [Explore the examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md).
+
+## Compare scanner options
+
+Choose this scanner when you need a shared report across Rust, CLI, Node.js,
+Python and browser WASM, measured physical occurrences alongside decoded content,
+or QR design diagnostics with explicit budget and missing-score semantics. Review
+the [sourced scanner comparison](docs/comparison.mdx) for ZXing-C++, html5-qrcode,
+Nimiq qr-scanner, jsQR and quirc. It describes their documented formats, interfaces
+and licenses so you can choose around your application's needs.
+
+The comparison is dated and links to exact source revisions. It makes no
+unmeasured speed or accuracy ranking: runtime benchmarks and clean package/device
+qualification remain separate evidence. The engine's
+[licensing guide](LICENSING.md) explains its AGPL-3.0-or-later and commercial terms.
 
 ## Examples
 
