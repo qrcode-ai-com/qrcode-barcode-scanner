@@ -1549,8 +1549,8 @@ READMEs inherit the maintained distribution template.
 
 Each Ask AI badge opens a provider with a destination-specific question and public
 source links. Gemini uses Google AI Studio. Providers may require sign-in or a
-manual paste: every block includes the same copyable question. No message is sent
-by this repository, and an assistant's reply is not qualification evidence.
+manual paste: every block includes the same copyable question. The generator makes no provider request. Opening a link shares its public
+question with the chosen service; an assistant's reply is not qualification evidence.
 
 Only the root and MCP README expose editor add buttons. Their reviewed public
 launch configuration is held independently in `distribution/readme-actions.json`.

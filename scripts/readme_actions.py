@@ -81,9 +81,9 @@ def action_block(prompt, installers=()):
                         'Open your editor to review the pinned MCP configuration before adding it. '
                         'Node.js must already be installed; local file access remains disabled by default.')
     return (START + '\n\n### Ask AI\n\n' + badges(ai_links(prompt)) + '\n\n'
-            'Open an AI assistant with a question about this destination and its public sources. '
-            'Gemini opens Google AI Studio. Sign-in or pasting the question may be needed; '
-            'nothing is sent until you submit it. Check the answer against the documentation.\n\n'
+            'Choose an AI assistant to explain this destination using its public sources. '
+            'Gemini opens Google AI Studio. The link includes the public question; '
+            'sign-in or a manual paste may be required. Check the answer against the documentation.\n\n'
             '<details>\n<summary>Copy the question</summary>\n\n```text\n' + prompt + '\n```\n\n</details>'
             + installation + '\n\n' + END + '\n\n')
 
