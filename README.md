@@ -369,7 +369,7 @@ The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/
 
 ## QR Code AI
 
-Developed by **Thibaut Mélen** for [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk), a product of [SuperNovae Studio](https://github.com/supernovae-st).
+Developed by **Thibaut Mélen & Nicolas Cella** for [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk), a product of [SuperNovae Studio](https://github.com/supernovae-st).
 
 AGPL-3.0-or-later or a separate commercial license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 · [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/SECURITY.md)
