@@ -5,15 +5,19 @@ import json
 import re
 from urllib.parse import quote, urlencode, urlsplit
 
-START = '<!-- qrcode-ai-readme-actions:v1 -->'
-END = '<!-- /qrcode-ai-readme-actions:v1 -->'
+START = '<!-- qrcode-ai-readme-actions:v2 -->'
+END = '<!-- /qrcode-ai-readme-actions:v2 -->'
 ASSETS = 'https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/'
 PROVIDERS = (
     ('chatgpt', 'ChatGPT', 'https://chatgpt.com/', 'q'),
     ('claude', 'Claude', 'https://claude.ai/new', 'q'),
-    ('gemini', 'Gemini', 'https://aistudio.google.com/prompts/new_chat', 'prompt'),
+    ('gemini', 'Gemini', 'https://gemini.google.com/', None),
     ('grok', 'Grok', 'https://grok.com/', 'q'),
     ('perplexity', 'Perplexity', 'https://www.perplexity.ai/', 'q'),
+    ('copilot', 'Copilot', 'https://copilot.com/', None),
+    ('deepseek', 'DeepSeek', 'https://chat.deepseek.com/', None),
+    ('meta-ai', 'Meta AI', 'https://www.meta.ai/', None),
+    ('qwen', 'Qwen', 'https://qwen.ai/', None),
 )
 
 
@@ -44,7 +48,7 @@ def question(title, source_url, links=(), scope='scanner', status='Source docume
 
 
 def ai_links(prompt):
-    return [(key, label, base + '?' + urlencode({param: prompt}, quote_via=quote))
+    return [(key, label, base + ('?' + urlencode({param: prompt}, quote_via=quote) if param else ''))
             for key, label, base, param in PROVIDERS]
 
 
@@ -63,12 +67,17 @@ def mcp_links(config):
 
 
 def strip_actions(text):
-    if START not in text and END not in text:
+    tokens = re.findall(r'<!-- /?qrcode-ai-readme-actions:v\d+ -->', text)
+    if not tokens:
         return text
-    if text.count(START) != 1 or text.count(END) != 1:
+    if len(tokens) != 2:
         raise ValueError('Repeated or incomplete README action block')
-    before, rest = text.split(START)
-    block, after = rest.split(END)
+    version = next((v for v in (1, 2) if tokens == [f'<!-- qrcode-ai-readme-actions:v{v} -->',
+                                                   f'<!-- /qrcode-ai-readme-actions:v{v} -->']), None)
+    if version is None:
+        raise ValueError('Unknown or mismatched README action format')
+    before, rest = text.split(tokens[0])
+    block, after = rest.split(tokens[1])
     if not block.startswith('\n') or not after.startswith('\n\n'):
         raise ValueError('Malformed README action boundary')
     return before + after[2:]
@@ -83,9 +92,12 @@ def action_block(prompt, installers=()):
                         'Node.js must already be installed; local file access remains disabled by default.')
     return (START + '\n\n### Ask AI\n\n' + badges(ai_links(prompt)) + '\n\n'
             'Choose an AI assistant to explain this destination using its public sources. '
-            'Gemini opens Google AI Studio. The link includes the public question; '
-            'sign-in or a manual paste may be required. Check the answer against the documentation.\n\n'
-            '<details>\n<summary>Copy the question</summary>\n\n```text\n' + prompt + '\n```\n\n</details>'
+            'Gemini opens gemini.google.com. Gemini, Copilot, DeepSeek, Meta AI and Qwen require '
+            'pasting the prompt below; the other links include it in their URL. Sign-in or a manual '
+            'paste may still be required. Check the answer against the documentation.\n\n'
+            '<details>\n<summary>Copy the plain-text prompt</summary>\n\n'
+            'Use the code block\'s copy control, or select its complete text, then paste it into your assistant.\n\n'
+            '```text\n' + prompt + '\n```\n\n</details>'
             + installation + '\n\n' + END + '\n\n')
 
 

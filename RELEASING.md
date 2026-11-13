@@ -1547,10 +1547,15 @@ these blocks. The generator preserves the text outside its exact marked block;
 frozen evidence and vendored documentation are excluded. Native npm package
 READMEs inherit the maintained distribution template.
 
-Each Ask AI badge opens a provider with a destination-specific question and public
-source links. Gemini uses Google AI Studio. Providers may require sign-in or a
-manual paste: every block includes the same copyable question. The generator makes no provider request. Opening a link shares its public
-question with the chosen service; an assistant's reply is not qualification evidence.
+Each Ask AI block offers nine assistants and a destination-specific plain-text
+prompt with public source links. Gemini opens `https://gemini.google.com/`, not
+Google AI Studio. Gemini, Copilot, DeepSeek, Meta AI and Qwen have homepage links;
+copy the complete prompt from the code block and paste it there. The other links
+include the prompt in their URL, although sign-in or pasting may still be needed.
+The generator makes no provider request. Following a prompt-bearing link shares
+that public text; an assistant's reply is not qualification evidence. The v2
+generator safely replaces one previous v1 block without changing its README body.
+See [provider selection and link behavior](docs/ask-ai-providers.md).
 
 Only the root and MCP README expose editor add buttons. Their reviewed public
 launch configuration is held independently in `distribution/readme-actions.json`.
