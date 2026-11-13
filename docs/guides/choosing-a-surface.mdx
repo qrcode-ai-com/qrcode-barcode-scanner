@@ -14,15 +14,17 @@ your code runs:
 | Browser | [`…-wasm`](/api/wasm) | `npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0` |
 | Python | [`qrcode-barcode-scanner`](/api/python) | `python -m pip install qrcode-barcode-scanner==0.11.0` |
 | Native Android / iOS | [Kotlin / Swift](/api/mobile) | from source |
-| Cross-platform app | [Flutter](/api/flutter) | from source, not yet on pub.dev |
+| Cross-platform app | [Flutter](/api/flutter) | `flutter pub add qr_barcode_scanner:0.11.0`; Rust builds at app-build time |
 
 <Note>
 The five runtime packages are public in 0.11.0 under these names. Node selects
 one matching native platform dependency automatically; the browser package
 contains one portable WASM plus its included camera and overlay modules.
 The [migration guide](/guides/migrate-to-qrcode-barcode-scanner) keeps old
-packages separate. Flutter, Kotlin and Swift retain their source-build and
-qualification limits; a binding is not a mobile application.
+packages separate. Flutter is also public on pub.dev; its
+[dated native consumer evidence](/api/flutter#native-consumer-evidence) separates
+the passing optimized Android emulator from incomplete iOS qualification. Kotlin
+and Swift retain their source-build limits; a binding is not a mobile application.
 </Note>
 
 ## What each surface needs to *install*
@@ -37,8 +39,10 @@ qualification limits; a binding is not a mobile application.
   Building needs Rust and the Android NDK.
 - **Swift/iOS** — source build of the `.xcframework`; the package cannot be
   added by repository URL. Rust and the platform SDK are needed to build it.
-- **Flutter** — unpublished on pub.dev. Its source binding compiles Rust at
-  application build time through cargokit and needs the relevant platform toolchain.
+- **Flutter** — install `qr_barcode_scanner` from pub.dev. Its bundled core
+  compiles at application build time through cargokit: Rust 1.88 or newer and
+  the platform toolchain are required, including Android NDK r28 or newer.
+  The [Flutter guide](/api/flutter) records the public consumer limits.
 
 Container and agent adapters reuse these runtimes but keep separate publication
 and consumer evidence. The published MCP adapter, ClawHub skill and OpenClaw

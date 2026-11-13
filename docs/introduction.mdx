@@ -93,13 +93,16 @@ Plus **GS1 awareness** (element strings + Digital Link with a per-criterion
 | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | npm | browsers (one portable WASM, no SIMD) |
 | `qrcode-barcode-scanner` | PyPI | Python — abi3 wheels, declared CPython 3.8 → 3.14 compatibility |
 | Kotlin/Android · Swift/iOS | built from source | native mobile (UniFFI) |
-| Flutter package | pub.dev, not yet published | Flutter — typed `ScanReport` (flutter_rust_bridge) |
+| [`qr_barcode_scanner`](/api/flutter) | pub.dev, 0.11.0 public | Flutter — typed `ScanReport`, Rust compiled at app-build time |
 
 <Note>
 The Rust core, CLI, Node native, browser WASM and Python packages are public in
 **0.11.0**. The six native npm platform packages are automatic dependencies of
 the Node parent. Mobile bindings, JSR, agent adapters and container images have
-separate publication and qualification gates. Old package versions remain
+separate publication and qualification gates. Flutter is public under verified
+publisher `qrcode-ai.com`; its [native consumer evidence](/api/flutter#native-consumer-evidence)
+records a passing optimized Android emulator and incomplete iOS qualification.
+Old package versions remain
 available under their historical names; the
 [migration guide](/guides/migrate-to-qrcode-barcode-scanner) maps each name.
 </Note>

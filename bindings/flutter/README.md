@@ -46,8 +46,18 @@ Swift bindings (one serde wire contract).
 
 ## Install
 
-To build the binding from source, follow
-[Packaging from a candidate checkout](#packaging-from-a-candidate-checkout) below.
+Public Flutter package [`qr_barcode_scanner` 0.11.0](https://pub.dev/packages/qr_barcode_scanner/versions/0.11.0)
+is available under verified publisher `qrcode-ai.com`. In a Flutter project, pin
+the version explicitly:
+
+```bash
+flutter pub add qr_barcode_scanner:0.11.0
+```
+
+The package includes the Rust core sources; installation does not provide a
+prebuilt native library. To evaluate an upcoming version from this checkout,
+follow [Packaging from a candidate checkout](#packaging-from-a-candidate-checkout)
+below instead. Working source and the published archive are separate candidates.
 
 > **Toolchain prerequisite.** This package compiles the Rust core at *your* app's
 > build time (via cargokit) — the building machine needs the **Rust toolchain
@@ -58,6 +68,23 @@ To build the binding from source, follow
 > NDK r28 aligns the native library for Android devices with 16 KB memory
 > pages. A build with NDK r27 is aligned to 4 KB and does not meet that
 > requirement.
+
+## Public native consumer evidence
+
+The [public-package consumer run of 12 November 2026](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43278040726)
+installs the exact pub.dev archive in new applications with an empty package
+cache. Android 14 x86_64 passes the mixed QR/Code 128 scans in all three
+profiles, blank and invalid input checks, and uninstall. This run explicitly
+sets `CARGO_PROFILE_DEV_OPT_LEVEL=2` in Flutter debug mode; it does not qualify
+default unoptimized debug builds or physical devices. APK alignment passes for
+16 KB pages; the emulator itself uses 4 KB pages.
+
+On the iOS simulator, both payloads decode, but the fast profile reports
+`budgetExhausted == true` and fails the unchanged acceptance assertion. Common
+iOS acceptance and uninstall are consequently not complete. These are dated
+consumer observations, not a comparative benchmark or a claim that every
+Android or iOS device is supported. The [Flutter API guide](../../docs/api/flutter.mdx)
+keeps installation, build prerequisites and report-budget semantics together.
 
 ## Usage
 
