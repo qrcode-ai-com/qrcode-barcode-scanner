@@ -15,14 +15,18 @@ spec.loader.exec_module(builder)
 
 
 class ReadmeActions(unittest.TestCase):
-    def test_each_ai_receives_the_exact_unicode_question(self):
+    def test_prefill_routes_keep_exact_text_and_paste_routes_use_only_official_homepages(self):
         prompt = question('Flutter & café', 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/flutter/README.md')
         expected = [('chatgpt.com', '/', 'q'), ('claude.ai', '/new', 'q'),
-                    ('aistudio.google.com', '/prompts/new_chat', 'prompt'), ('grok.com', '/', 'q'), ('www.perplexity.ai', '/', 'q')]
+                    ('gemini.google.com', '/', None), ('grok.com', '/', 'q'), ('www.perplexity.ai', '/', 'q'),
+                    ('copilot.com', '/', None), ('chat.deepseek.com', '/', None),
+                    ('www.meta.ai', '/', None), ('qwen.ai', '/', None)]
+        self.assertEqual(len(ai_links(prompt)), 9)
         for (_, _, link), (host, path, param) in zip(ai_links(prompt), expected, strict=True):
             parsed = urlsplit(link)
             self.assertEqual((parsed.scheme, parsed.netloc, parsed.path), ('https', host, path))
-            self.assertEqual(parse_qs(parsed.query), {param: [prompt]})
+            self.assertEqual(parse_qs(parsed.query), {param: [prompt]} if param else {})
+            self.assertEqual(parsed.fragment, '')
         self.assertIn('if a page is unavailable', prompt)
         self.assertIn('Do not invent', prompt)
         contextual = question('MCP', 'https://qrcode-ai.com/', context='Local stdio adapter for the scanner.')
@@ -47,7 +51,21 @@ class ReadmeActions(unittest.TestCase):
         self.assertEqual(insert_actions(rendered, block), rendered)
         with self.assertRaises(ValueError):
             strip_actions(rendered + block)
-        self.assertIn('Copy the question', block)
+        self.assertIn('Copy the plain-text prompt', block)
+        self.assertIn('```text\nExplain this destination.\n```', block)
+        self.assertNotIn('Google AI Studio', block)
+        self.assertIn('](https://gemini.google.com/)', block)
+
+    def test_previous_action_blocks_upgrade_without_duplicating_or_rewriting_the_body(self):
+        body = '# Scanner\n\nA natural introduction.\n'
+        old = '# Scanner\n\n<!-- qrcode-ai-readme-actions:v1 -->\n\nOld controls.\n\n<!-- /qrcode-ai-readme-actions:v1 -->\n\nA natural introduction.\n'
+        self.assertEqual(strip_actions(old), body)
+        upgraded = insert_actions(old, action_block('Explain the scanner.'))
+        self.assertIn('qrcode-ai-readme-actions:v2', upgraded)
+        self.assertNotIn('qrcode-ai-readme-actions:v1', upgraded)
+        self.assertEqual(strip_actions(upgraded), body)
+        with self.assertRaises(ValueError):
+            strip_actions(old + action_block('Do not accept two formats.'))
 
     def test_frozen_and_vendored_readmes_are_not_targets(self):
         paths = builder.maintained_readmes()
