@@ -98,6 +98,7 @@ def main():
     run(str(xtask), "sync-version")
     # What the source says of itself beyond those surfaces (distribution/releases/pins.toml).
     run("python3", "scripts/release-fanout.py", "render")
+    run("python3", "scripts/build-readme-actions.py")
     for folder in LOCK_ROOTS:
         run("cargo", "metadata", "--format-version", "1", "--manifest-path",
             str(ROOT / folder / "Cargo.toml"))

@@ -137,6 +137,10 @@ paths = ["distribution/acceptance/drivers/aur-on-arch.sh"]
 held = "examples of judging a public destination, each at the version it was judged"
 paths = ["distribution/acceptance/README.md"]
 
+[[file]]
+held = "the reviewed public MCP configuration, updated only after its own publication"
+paths = ["distribution/readme-actions.json"]
+
 # ------------------------------------------------------------------ lines held by a destination
 
 [[line]]

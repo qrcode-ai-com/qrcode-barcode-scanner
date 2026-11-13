@@ -1,0 +1,13 @@
+{
+  "schema": "qrscan-readme-actions/1",
+  "mcpLaunch": {
+    "command": "npx",
+    "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+  },
+  "publication": "https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.1",
+  "reviewedOn": "2026-11-13",
+  "installDocumentation": [
+    "https://prod.cursor.com/docs/mcp/install-links",
+    "https://code.visualstudio.com/api/extension-guides/ai/mcp"
+  ]
+}
