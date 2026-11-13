@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import unittest
 from urllib.parse import parse_qs, urlsplit, unquote
+from readme_prose import canonical_links, prose_links
 from readme_actions import action_block, ai_links, insert_actions, mcp_links, question, strip_actions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +79,20 @@ class ReadmeActions(unittest.TestCase):
             self.assertEqual(outputs[path].count('### Ask AI'), 1)
             self.assertEqual(outputs[path].count('[![ChatGPT]'), 1)
             self.assertEqual('Add to Cursor' in outputs[path], path in ('README.md', 'integrations/mcp/README.md'))
+
+    def test_six_links_must_be_in_sentences_not_just_a_table_or_prompt(self):
+        link = '[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)'
+        self.assertEqual(prose_links('A sentence before the table.\n| Try it | ' + link + ' |'), set())
+        self.assertEqual(prose_links('```text\nTry the scanner with this prompt: ' + link + '\n```'), set())
+        self.assertEqual(prose_links(link + ' · [Other](https://example.com/)'), set())
+        self.assertEqual(prose_links('To check an image before integrating the package, use the ' + link + '.'),
+                         {'https://qrcode-ai.com/en-US/qr-code-scanner'})
+
+    def test_every_maintained_readme_has_its_six_canonical_links_in_prose(self):
+        for path in builder.maintained_readmes():
+            with self.subTest(path=path):
+                body = (ROOT / path).read_text()
+                self.assertEqual(set(canonical_links(path)) - prose_links(body), set())
 
     def test_scope_and_context_cannot_be_ambiguous(self):
         self.assertIn('connected product', question('iOS app', 'https://qrcode-ai.com/', scope='qrcodeai'))
