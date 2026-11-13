@@ -268,6 +268,10 @@ def consume(archive: Path, receipt: Path, expected: str, out: Path, registry: bo
     white = re.search(r'const white = Buffer.from\("([A-Za-z0-9+/=]+)"', (ROOT / "scripts/packed-node-consumer.mjs").read_text())
     require(white is not None, "public negative fixture is missing")
     (consumer / "white.png").write_bytes(base64.b64decode(white[1], validate=True))
+    shutil.copyfile(ROOT / "integrations/mcp/test/readme-consumer.mjs", consumer / "readme-probe.mjs")
+    example = subprocess.run(["node", "readme-probe.mjs"], cwd=consumer, env=environment, text=True, capture_output=True, timeout=120, check=True)
+    (out / "readme-example-output.json").write_text(example.stdout)
+    shutil.copyfile(consumer / "readme-example-receipt.json", out / "readme-example-receipt.json")
     result = subprocess.run(["node", "probe.mjs"], cwd=consumer, env=environment, text=True, capture_output=True, timeout=180, check=True)
     (out / "protocol-output.json").write_text(result.stdout)
     for name in ("protocol-receipt.json", "modern-wire.json", "legacy-wire.json", "package-lock.json"):

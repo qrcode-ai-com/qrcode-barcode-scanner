@@ -32,7 +32,10 @@ const white = readFileSync(join(source, "scripts/packed-node-consumer.mjs"), "ut
 assert.ok(white, "reuse the established public negative PNG fixture");
 writeFileSync(join(consumer, "white.png"), Buffer.from(white[1], "base64"));
 const installed = join(consumer, "node_modules/@qrcode-ai-com/qrcode-barcode-scanner-mcp");
-for (const file of ["LICENSE", "scan-report.schema.json", "src/cli.mjs", "src/server.mjs"]) assert.deepEqual(readFileSync(join(installed, file)), readFileSync(join(pkg, file)), `installed ${file} matches packed source bytes`);
+for (const file of ["README.md", "LICENSE", "scan-report.schema.json", "src/cli.mjs", "src/server.mjs"]) assert.deepEqual(readFileSync(join(installed, file)), readFileSync(join(pkg, file)), `installed ${file} matches packed source bytes`);
+copyFileSync(join(here, "readme-consumer.mjs"), join(consumer, "readme-probe.mjs"));
+execFileSync(process.execPath, ["readme-probe.mjs"], { cwd: consumer, encoding: "utf8", timeout: 120_000 });
+copyFileSync(join(consumer, "readme-example-receipt.json"), join(evidence, "readme-example-receipt.json"));
 // Frozen v0.11.0 (176ac96) schema, byte-for-byte; update with the engine pin.
 const pinnedEngineSchemaSha256 = "101f84b2888bea2ba617dd4a1d97593bd1a7c7e37e4bd57da6767e944e21fcad";
 assert.equal(createHash("sha256").update(readFileSync(join(installed, "scan-report.schema.json"))).digest("hex"), pinnedEngineSchemaSha256, "the packaged schema is the pinned engine release's schema");

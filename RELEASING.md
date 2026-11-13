@@ -1079,6 +1079,21 @@ candidate before packing, with an explicit availability check for readers of
 unpublished source. Keep dated qualification statements at the version actually
 tested; changing an example does not prove a public npx installation.
 
+Before freezing the README, read its introduction as natural English prose
+with the six destination-specific product links in meaningful sentences.
+Keep the license attribution to Thibaut Mélen & Nicolas Cella, QR Code AI and
+SuperNovae Studio. Check linked pages separately from link placement and retain
+an explicit unavailable-page qualification where needed. Do not add accuracy,
+speed or competitor claims without measurements or primary sources.
+
+The packed consumer extracts `scan.mjs` from the installed README's
+`executable-example:scan.mjs` block and executes that exact code outside the
+checkout. Its `readme-example-receipt.json` records the example hash, Node
+runtime and host, both mixed QR/Code 128 payloads, valid empty results and the
+invalid-image error. Retain it with the packed artifact's evidence before
+publication. This establishes the tested package and host, not every product
+client or an unpublished engine upgrade.
+
 `distribution/README.md` and the pins of `scripts/mcp-registry-publish.py`
 change after publication only, because they name what is public. So do the
 launch entries of bundles and install links, and the job that proves them:
