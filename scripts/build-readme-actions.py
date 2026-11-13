@@ -28,7 +28,11 @@ def outputs():
         clean = strip_actions(text)
         title = re.search(r'^# (.+)$', clean, re.M)[1]
         urls = list(dict.fromkeys(re.findall(r'https://qrcode-ai\.com/en-US/[a-zA-Z0-9/_-]+', clean)))[:6]
-        prompt = question(f'{title} ({path})', REPOSITORY + path, urls)
+        paragraphs = [part.replace('\n', ' ').strip() for part in clean.split('\n\n')]
+        context = next((part for part in paragraphs if len(part) > 60 and not part.startswith(('#', '[', '|', '<', '!', '```', '>'))), '')
+        context = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', context)
+        context = re.sub(r'[`<>*]', '', context)[:500]
+        prompt = question(f'{title} ({path})', REPOSITORY + path, urls, context=context)
         installers = mcp_links(config) if path in ('README.md', 'integrations/mcp/README.md') else ()
         result[path] = insert_actions(text, action_block(prompt, installers))
     for key, label, *_ in PROVIDERS:

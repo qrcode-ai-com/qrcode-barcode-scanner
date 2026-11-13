@@ -25,6 +25,8 @@ class ReadmeActions(unittest.TestCase):
             self.assertEqual(parse_qs(parsed.query), {param: [prompt]})
         self.assertIn('if a page is unavailable', prompt)
         self.assertIn('Do not invent', prompt)
+        contextual = question('MCP', 'https://qrcode-ai.com/', context='Local stdio adapter for the scanner.')
+        self.assertIn('Provided README context (verify against the sources): Local stdio adapter for the scanner.', contextual)
 
     def test_editor_configuration_is_exact_pinned_and_has_no_grants(self):
         config = json.loads((ROOT / 'distribution/readme-actions.json').read_text())['mcpLaunch']

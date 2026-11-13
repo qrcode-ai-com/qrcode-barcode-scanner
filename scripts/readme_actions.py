@@ -25,8 +25,8 @@ def public_url(value):
     return value
 
 
-def question(title, source_url, links=(), scope='scanner', status='Source documentation; publication is not implied.'):
-    if any(c in title + status for c in '\r\n`<>'):
+def question(title, source_url, links=(), scope='scanner', status='Source documentation; publication is not implied.', context=''):
+    if len(context) > 800 or any(c in title + status + context for c in '\r\n`<>'):
         raise ValueError('README title and status must be plain single-line text')
     product = 'QR Code & Barcode Scanner, the open-source scanner' if scope == 'scanner' else 'QR Code AI, the connected product'
     if scope not in ('scanner', 'qrcodeai'):
@@ -35,6 +35,7 @@ def question(title, source_url, links=(), scope='scanner', status='Source docume
     if len(sources) > 8:
         raise ValueError('Too many public context links')
     return (f'Help me understand {title} for {product}. {status} '
+            + (f'Provided README context (verify against the sources): {context} ' if context else '') +
             'Read the public documentation below. Explain what this destination does, its documented '
             'installation or access steps, a minimal example if supported, prerequisites, limitations and license. '
             'Distinguish published packages from working source and preparation. Cite your sources; if a page '
