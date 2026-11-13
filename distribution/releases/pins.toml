@@ -68,6 +68,7 @@ paths = [
   "bindings/kotlin/qrcodeaiscanner/build.gradle.kts",
   "bindings/kotlin/README.md",
   "bindings/dotnet/README.md",
+  "bindings/flutter/README.md",
   "crates/qrcode-ai-scanner/README.md",
   "crates/qrcode-ai-scanner-cli/README.md",
   "crates/qrcode-ai-scanner-node/README.md",
@@ -192,6 +193,11 @@ match = 'qrcode-barcode-scanner-go@v|MODULE_VERSION'
 held = "the agent integrations: they name the engine they were released on"
 paths = ["README.md", "distribution/README.md", "SOURCE-AND-EXTRACTION.md", "docs/guides/agents.mdx"]
 match = 'agent integrations are published|native engine\. Choose|with engine \d|^engine \S+ and returned|into a project-local runtime|among them engine|a fresh engine|on engine \S+ The MCP adapter|^\S+ See the \[distribution guide\]|reuse the published scanner'
+
+[[line]]
+held = "The public Flutter archive and its dated consumer proof; refresh only after a separate publication."
+paths = ["README.md", "AGENTS.md", "SOURCE-AND-EXTRACTION.md", "bindings/flutter/README.md", "docs/api/flutter.mdx", "docs/introduction.mdx", "docs/guides/choosing-a-surface.mdx"]
+match = 'qr_barcode_scanner.*0\.11\.0|^`460e3a09878f1148554732212f31e5ec604fd820583a78554292cf8689ff862e`'
 
 # ------------------------------------------------------------------ lines that follow another source than their file
 

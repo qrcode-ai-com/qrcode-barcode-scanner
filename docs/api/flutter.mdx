@@ -1,19 +1,67 @@
 ---
 title: "Flutter"
-description: "flutter_rust_bridge binding — a fully typed ScanReport, scans on the Rust worker pool."
+description: "Install qr_barcode_scanner from pub.dev, build its native Rust core, and read typed QR and barcode reports with documented platform limits."
 ---
 
-<Note>
-The Flutter package is not yet published on pub.dev. Build it from source: the
-[Flutter binding's README](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/flutter/README.md#packaging-from-a-candidate-checkout)
-shows how to stage the package and its bundled Rust core from a repository checkout.
-</Note>
+Use `qr_barcode_scanner` to scan encoded images or application-supplied RGBA
+camera frames in a Flutter app. The package returns a typed `ScanReport` from
+the shared native Rust engine. Your app supplies camera access, permissions,
+preview and the action taken after decoding; this package is a scanner binding.
+
+You can try the [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
+and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) in a browser
+before adding native scanning to an app. The [QR code scanner Flutter guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/flutter)
+and [barcode scanner Flutter guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/flutter)
+connect the two development journeys. Prepare test images with the
+[QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or
+[barcode generator](https://qrcode-ai.com/en-US/barcode-generator), keep the
+original payload, and compare that exact value with each decoded result.
+If a product guide is unavailable, use the API and build instructions here.
+
+## Install the published package
+
+Public Flutter package [`qr_barcode_scanner` 0.11.0](https://pub.dev/packages/qr_barcode_scanner/versions/0.11.0)
+is published under verified publisher [`qrcode-ai.com`](https://pub.dev/publishers/qrcode-ai.com/packages).
+In an existing Flutter project:
+
+```bash
+flutter pub add qr_barcode_scanner:0.11.0
+```
+
+The public archive declares Dart `>=3.3.0 <4.0.0`, Flutter `>=3.19.0` and
+`flutter_rust_bridge` exactly `2.12.0`. These declarations are not evidence of
+installation on every SDK version. Android and iOS are the plugin's declared
+platforms. For an upcoming source candidate, follow the
+[separate packaging instructions](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/flutter/README.md#packaging-from-a-candidate-checkout);
+they do not replace or republish the archive on pub.dev.
 
 <Warning>
 This package compiles the Rust core at **your app's build time** (via cargokit) —
-the building machine needs the **Rust toolchain (≥1.87)** and, for Android, the
+the building machine needs the **Rust toolchain (≥1.88)** and, for Android, the
 **NDK (r28+)**, which aligns the native library for 16 KB memory pages. A one-time `rustup` install; no Rust knowledge required.
 </Warning>
+
+## Native consumer evidence
+
+The [12 November 2026 public-package run](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43278040726)
+installs the exact pub.dev archive in fresh Flutter apps with an empty package
+cache and checks the installed files. Both native jobs use Flutter debug mode
+with explicit `CARGO_PROFILE_DEV_OPT_LEVEL=2`.
+
+Android 14 x86_64 passes mixed QR/Code 128 scans in `fast`, `frame` and `full`,
+blank-frame and invalid-image cases, and uninstall. The APK passes the 16 KB
+alignment check; the emulator runs with 4 KB pages. This is evidence for that
+optimized emulator configuration, not default unoptimized debug or physical devices.
+
+The iOS simulator decodes both exact payloads in all three profiles, but the
+fast report has `budgetExhausted == true`; its unchanged assertion fails.
+Common iOS acceptance and uninstall are skipped after that failure. Publication
+is complete; iOS consumer qualification is incomplete. No physical-device or
+cross-platform performance comparison is claimed by this run.
+
+The public archive SHA-256 is
+`460e3a09878f1148554732212f31e5ec604fd820583a78554292cf8689ff862e`.
+These observations describe the published archive, not a future source candidate.
 
 ## API
 

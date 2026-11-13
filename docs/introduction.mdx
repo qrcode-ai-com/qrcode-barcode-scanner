@@ -1,22 +1,22 @@
 ---
 title: "Introduction"
-description: "Decode the undecodable — and know your margin."
+description: "Local QR and barcode decoding, versioned reports and QR scannability diagnostics from one Rust core."
 ---
 
-**QR Code & Barcode Scanner** (`qrcode-barcode-scanner`) decodes and
-*grades* QR codes that break standard scanners: artistic and AI-generated
-symbols with damaged finders, low module contrast, art texture over data,
-logos over the center. It powers the [qrcode-ai.com](https://qrcode-ai.com)
-verify flow. Five runtime entry points are published from one Rust core:
-Rust, CLI, Node native, browser WASM and Python.
+**QR Code & Barcode Scanner** (`qrcode-barcode-scanner`) reads supported QR
+codes and barcodes locally and provides QR scannability diagnostics when the
+selected profile completes those measurements. Its recovery ladder includes
+preprocessing and erasure recovery for suitable damaged or artistic QR images;
+results depend on the input and profile. Five runtime entry points are published
+from one Rust core: Rust, CLI, Node native, browser WASM and Python.
 
-<Frame caption="An AI-art QR, decoded and scored 70/100 — see clean, artistic, occluded and retail codes scored end-to-end in the gallery.">
+<Frame caption="A retained artistic QR example; the gallery explains the sample images and their recorded reports.">
   <img src="/images/gallery-artistic.png" alt="AI-generated artistic QR code, decoded and scored by the scanner" width="220" />
 </Frame>
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Decode your first image on every surface in 5 minutes
+    Install a runtime and scan your first image
   </Card>
   <Card title="See it in action" icon="images" href="/concepts/gallery">
     Real QR images scored — clean, artistic, occluded, retail
@@ -93,13 +93,16 @@ Plus **GS1 awareness** (element strings + Digital Link with a per-criterion
 | `@qrcode-ai-com/qrcode-barcode-scanner-wasm` | npm | browsers (one portable WASM, no SIMD) |
 | `qrcode-barcode-scanner` | PyPI | Python — abi3 wheels, declared CPython 3.8 → 3.14 compatibility |
 | Kotlin/Android · Swift/iOS | built from source | native mobile (UniFFI) |
-| Flutter package | pub.dev, not yet published | Flutter — typed `ScanReport` (flutter_rust_bridge) |
+| [`qr_barcode_scanner`](/api/flutter) | pub.dev, 0.11.0 public | Flutter — typed `ScanReport`, Rust compiled at app-build time |
 
 <Note>
 The Rust core, CLI, Node native, browser WASM and Python packages are public in
 **0.11.0**. The six native npm platform packages are automatic dependencies of
 the Node parent. Mobile bindings, JSR, agent adapters and container images have
-separate publication and qualification gates. Old package versions remain
+separate publication and qualification gates. Flutter is public under verified
+publisher `qrcode-ai.com`; its [native consumer evidence](/api/flutter#native-consumer-evidence)
+records a passing optimized Android emulator and incomplete iOS qualification.
+Old package versions remain
 available under their historical names; the
 [migration guide](/guides/migrate-to-qrcode-barcode-scanner) maps each name.
 </Note>
@@ -108,13 +111,19 @@ Every surface speaks the **same JSON report** — one contract, machine-validate
 against the [normative spec](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec)
 in CI.
 
-## Measured accuracy
+## Dated corpus observations
 
-| Corpus | Result |
-|---|---|
-| zxing blackbox (179 images, ground truth) | **169/179** exact-text @ 0° — at or above ZXing's own 0° pass thresholds on every suite: above on four, equal on the two whose thresholds are every image |
-| qrcode-ai.com production templates | **15/15** decoded (incl. the blob-pixel class) |
-| Center-logo occlusion (v5-H) | engines die >20% radius · **rescue decodes through 30%** |
+The [13 October 2026 observations and their limits](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/612ede0d489812b0211b81e99ad2b6d8b61a2c3a/README.md#external-corpus-observations)
+retain 169/179 strict exact results on the labelled ZXing blackbox inputs.
+The 15 production-template decodes are observations without qualified content
+truth; they are not 15 exact-content successes. Earlier centre-logo experiments
+through 30% radius concern a synthetic v5-H scene, not general recovery accuracy.
+
+These dated diagnostics do not qualify a shipped package's performance or rank
+other scanners. No common-corpus speed or accuracy comparison was run for this
+guide. Use the [sourced scanner comparison](/comparison) to compare documented
+interfaces, formats and license terms, and retain the original image, expected
+payload and complete report when evaluating your own application.
 
 <Note>
 License: **AGPL-3.0-or-later** © SuperNovae Studio. The qrcode-ai.com

@@ -134,9 +134,12 @@ browser package uses one portable WASM. See the
   </Tab>
 </Tabs>
 
-Mobile bindings use the same report contract, but Flutter is not published,
-Kotlin/JitPack is not qualified and Swift requires a local build. See their
-[API pages](/api/mobile) for source-build instructions.
+Mobile bindings use the same report contract. The public
+[Flutter package](/api/flutter) installs from pub.dev and compiles its bundled
+Rust core at app-build time. Its optimized Android emulator consumer passes;
+iOS simulator qualification remains incomplete because of the fast-profile
+budget check. Kotlin/JitPack is not qualified and Swift requires a local
+build; see the [native mobile API page](/api/mobile).
 
 ## Choosing a profile
 
@@ -146,10 +149,11 @@ Kotlin/JitPack is not qualified and Swift requires a local build. See their
 | `fast` | 800 ms | upload tools where latency beats recall |
 | `frame` | 80 ms | per-frame camera loops (no scoring) |
 
-Every budget is a default you can override (`budget_ms` / `budgetMs` /
-`--budget-ms`); `0` is unbounded and the only strictly reproducible mode.
+For APIs that expose a budget override (`budget_ms` / `budgetMs` /
+`--budget-ms`), `0` is unbounded and the only strictly reproducible mode.
 `trace.budget_exhausted` tells a final report (`false`) from one the budget
-cut (`true`).
+cut (`true`). The published Flutter facade exposes the three profiles but no
+budget override; its [API guide](/api/flutter) documents that restriction.
 
 <Tip>
 The report's `trace.stages` tells you exactly which stage decoded (or how
