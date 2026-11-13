@@ -1,84 +1,139 @@
 ---
-title: "Why this scanner"
-description: "Before vs after — and why local, instant, and categorized matters."
+title: "Compare scanner options"
+description: "Choose a QR and barcode scanner by its documented formats, interface, diagnostics and license, with dated primary sources."
 ---
 
-## The three properties that matter
+Choose a scanner around the work your application needs to do: decode a QR image,
+run a camera interface, read several barcode formats or inspect a QR design's
+scanning margin. QR Code & Barcode Scanner combines local decoding with a
+structured report and QR-specific diagnostics. Those are useful integration
+features; they do not establish a higher detection rate or lower latency than
+another library.
 
-<CardGroup cols={3}>
-  <Card title="100% local" icon="shield-check">
-    The scan runs **in the user's browser** (wasm) or on **your server**
-    (native) — the image never leaves the device. No third-party decode
-    API, no upload, nothing to leak, GDPR-trivial.
-  </Card>
-  <Card title="Instant" icon="bolt">
-    Clean codes decode in **3-10 ms**; production templates average
-    **~45 ms**; the deep artistic ladder is budget-bounded (you choose the
-    worst case). No network round-trip — the latency floor of any cloud
-    decode API is already 10× our typical full scan.
-  </Card>
-  <Card title="Categorized" icon="tags">
-    Every detection tells you WHAT it is — `symbology` (QR · EAN-13 ·
-    Data Matrix · 19 kinds) and `payload.kind` (url · wifi · gs1 ·
-    me_card · 13 kinds) — so UIs route instead of regex-guessing.
-  </Card>
-</CardGroup>
+**Reviewed on 13 November 2026.** Our row describes the published **0.11.0**
+contract. The alternatives are pinned source snapshots, linked below; their
+branches can differ from registry releases. This is a documentation comparison.
+No common-corpus performance comparison was run for this page, and none of the
+alternatives was installed or device-qualified by this review. Engine **0.12
+remains unreleased**.
 
-## Before → after on qrcode-ai.com
+## Match the interface to the job
 
-The landing's verify flow ran `qr-scanner-wechat@0.1.3` (a CNN-based
-wasm decoder) inside a hand-tuned retry loop. Field by field:
+These projects cover different layers. A camera integration and a decoder library
+can be alternatives for an application without exposing the same API. Documented
+formats below are examples rather than a count-based ranking.
 
-| | Before (qr-scanner-wechat) | After (this scanner) |
-|---|---|---|
-| Verify calls per generation | up to **3** (HIGH/MEDIUM/LOW canvas filter loop) | **1** |
-| Preprocessing | manual: per-type contrast/brightness/blur presets in app code | internal: a deterministic 5-stage ladder (binarization · channels · contrast boosts · morphological closes · erasure rescue) |
-| "Quality" meaning | *which filter level happened to work* | a real **0-100 margin score**: 6 stress axes + structural checks + Reed-Solomon unused-error-correction |
-| Output | `result.text` — one string | typed `ScanReport`: symbology, payload classification, geometry, score, ISO grade card, hints, trace |
-| Blob/dot template styles (a generator OUTPUT class) | **0/3 filter levels decoded** | decoded (morphological close rungs — probe-calibrated on the template corpus) |
-| Logo-occluded codes | fails past the RS error wall | erasure rescue decodes through **30% center occlusion** (vs 20%) |
-| Correction-margin feedback | decoded text alone | `low_correction_margin` distrust signal; it does not prove a decode wrong or guarantee that every wrong decode is flagged |
-| Barcodes / other symbologies | QR only | **19 symbologies**, labeled |
-| Determinism | not guaranteed (CNN) | bit-for-bit reproducible on a given platform when the scan is unbounded or uncut (no RNG; PDF417 tie order excepted) |
-| Feedback to the generator | none | machine-actionable hints (`fix_finder_pattern`, `raise_error_correction`, …) |
-| Import an existing code | impossible | drop / browse / **paste** → decode locally → editor prefilled with the detected type |
-| Verifiable claims | — | measured: zxing ground-truth **169/179** (at or above ZXing's own pass thresholds on all 6 suites, above on 4) · production templates **15/15** |
+| Project | Documented format scope | Interface described by its source | Project license |
+| --- | --- | --- | --- |
+| **QR Code & Barcode Scanner 0.11.0** | QR family, linear barcodes and other 2D formats, including Code 128 and Data Matrix | Rust core, `qrscan` CLI, native Node/Python and browser WASM; shared scan-report contract with content, measured occurrences and QR diagnostics. [Report][our-report] · [published artifacts][our-surfaces] | [AGPL-3.0-or-later or commercial terms][our-license] |
+| **ZXing-C++** | Linear and matrix formats, including EAN/UPC, Code 128, Data Matrix and the QR family | C++ library with `ReadBarcodes`, format selection, language wrappers and WebAssembly. Its README also documents barcode writing. [Source][zxing] | [Apache-2.0][zxing-license] |
+| **html5-qrcode** | QR and multiple barcode formats, including Code 128, EAN-13 and Data Matrix | Browser camera/file scanning, a ready-made `Html5QrcodeScanner` UI and a lower-level `Html5Qrcode` API. [Source][html5] | [Apache-2.0][html5-license] |
+| **Nimiq qr-scanner** | QR codes | Browser camera and single-image API; native `BarcodeDetector` when available, with a worker-based fallback. [Source][nimiq] | [MIT][nimiq-license] |
+| **jsQR** | QR codes | JavaScript/TypeScript function over RGBA pixels; decoded bytes/text and location information. The application supplies camera capture and frame extraction. [Source][jsqr] | [Apache-2.0][jsqr-license] |
+| **quirc** | QR codes, including multiple codes in an image | C library over grayscale pixels, with separate identification and decode steps; camera and inspection programs supplied as examples. [Source][quirc] | [ISC][quirc-license] |
 
-Bundle honesty: ~778 KB gz all-symbologies (the incumbent was ~1 MB;
-a QR-only build drops ~180 KB — documented escape hatch).
+The license links identify each project's text at the reviewed revision, rather
+than summarizing every dependency's terms. Our portable skill is licensed
+separately from the decoding engine; see the [licensing guide][our-license].
 
-The two classes the incumbent loop could not handle — both decode here:
+## When our scanner fits
 
-<Frame caption="Artistic template (blob/dot class): 0/3 filter levels in the old loop — decoded here at score 70 via the deep ladder.">
-  <img src="/images/gallery-artistic.png" alt="Artistic QR the old decoder failed on" width="200" />
-</Frame>
+**You need decoded content and physical occurrences in one report.** The
+[report contract][our-report] groups detections by content identity and retains
+measured physical occurrences separately. An application can show two copies of
+the same QR payload without inventing two decoded values. Geometry is evidence
+from the scan; not every detection has a measured quadrilateral.
 
-<Frame caption="Logo over the center: past the old decoder's Reed-Solomon error wall — the erasure rescue recovers the exact URL and flags the thin margin.">
-  <img src="/images/gallery-rescue.png" alt="Logo-occluded QR recovered by the rescue stage" width="200" />
-</Frame>
+**You inspect QR designs as well as reading their values.** The
+[score contract][our-score] defines stress axes, correction-margin diagnostics
+and hints for generator or template feedback. Scoring is QR-specific: it is not
+a barcode-wide quality grade, an ISO-certified verifier measurement or a
+guarantee of readability on every camera. Images and capture conditions affect
+the result.
 
-See both scored, with their full reports, in [the gallery](/concepts/gallery).
+**You distinguish an empty result from unfinished work.** The
+[profile and budget contract][our-profiles] exposes `trace.budget_exhausted`.
+An interrupted judgment has `score: null`; the `frame` profile also omits scoring
+by design. A configured budget is checked at work boundaries, so it is not a
+hard real-time upper bound on call duration.
 
-## Versus cloud decode APIs
+**You share decoding behavior across a browser and a backend.** The
+[artifact manifest][our-surfaces] records the Rust/CLI, Node, WASM and Python
+release files. The browser package's [camera documentation][our-camera] is
+separate from those native interfaces. The browser camera UI does not
+become a native mobile UI by installing a binding. Core decoding runs locally;
+application uploads, downloaded input and optional caller-supplied destination
+transport have their own network behavior.
 
-| | Cloud decode API | This scanner |
-|---|---|---|
-| Privacy | image uploaded to a third party | never leaves the device |
-| Latency | network RTT + queue (100-1000 ms) | 3-50 ms typical, budget-bounded worst case |
-| Cost | per-call forever | zero marginal cost |
-| Offline / flaky network | dead | works |
-| Rate limits | yes | no |
-| Sovereignty | vendor ToS can change | AGPL code you can read, pin and fork |
+## When another interface may fit
 
-## What the categorization unlocks
+For a C++ application, ZXing-C++ supplies a native multiformat API and documents
+both reading and writing. For a browser page needing ready-made camera/file
+controls, html5-qrcode documents that UI directly; its reviewed README also
+announces maintenance mode. That dated notice helps maintenance planning; it
+is not a finding about scanning accuracy. [ZXing-C++][zxing] ·
+[html5-qrcode][html5]
 
-```json
-{ "symbology": "ean13",
-  "payload": { "kind": "gs1", "gtin": "09506000134352", "conformant": true } }
-```
+For QR-focused browser interactions, Nimiq qr-scanner documents camera handling
+and a native-detector/worker path. If your application already owns RGBA frames,
+jsQR exposes a direct JavaScript function. For C integrations owning grayscale
+frames, quirc documents a decoder API and multiple-code iteration. These are
+interface choices, not measured speed recommendations.
+[Nimiq qr-scanner][nimiq] · [jsQR][jsqr] · [quirc][quirc]
 
-One field tells the UI it's a retail barcode; the second hands it a
-validated GTIN. The same shape routes wifi joins, vCards, GS1 Digital
-Links (retail-ready badge), crypto URIs — without a single regex in app
-code. The full taxonomy: [payloads](/api/report) ·
-[symbologies](/api/report#detection).
+Our pipeline also uses existing decoder work: the
+[0.11.0 architecture][our-architecture] identifies `rxing` from the ZXing lineage
+and `rqrr` from the quirc lineage. The surrounding report, recovery and scoring
+layers do not make those components independent new decoders. There is no claim
+here that these diagnostics are exclusive to this project or absent from every
+alternative.
+
+## What a performance comparison still needs
+
+Detection rate, wrong reads, latency, memory and download size are **not measured
+across these projects here**. A project's own benchmark, a synthetic fixture or
+results from another machine cannot establish a relative winner.
+
+A repeatable comparison must retain exact release/artifact hashes and build
+options; the same labeled corpus and truth provenance; hardware, OS and runtime;
+preprocessing and image-loading boundaries; warmup and cold-start policy; profile,
+timeout and concurrency; and raw per-image results. Report correct content,
+wrong content and missed content separately. Measure physical-occurrence recall
+separately from content recall. Publish timing distributions and input limits
+rather than an unqualified average.
+
+Our [benchmark harness](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/bench/README.md)
+documents runtime and corpus methodology. It is not a completed head-to-head
+study of these projects. Measured results can be added once the candidates,
+adapters, corpus and retained receipts meet the same protocol.
+
+## Source snapshots
+
+Reviewed on 13 November 2026. A pinned source describes that revision; it does
+not prove a registry publication, successful installation or supported device.
+Recheck changed claims before using this comparison for a future release.
+
+- Our contract: [published v0.11.0 source][our-report], commit `176ac96ef16ee330dbfc6ada10327d0b4e23a8b2`.
+- ZXing-C++: [README][zxing] and [license][zxing-license], commit `e17ae29906c9868fe8400b50b847cb7f01ebff3a`.
+- html5-qrcode: [README][html5] and [license][html5-license], commit `d505e505022cbb6680e6c8babd964e3be9a2d586`.
+- Nimiq qr-scanner: [README][nimiq] and [license][nimiq-license], commit `abcfe1bce2703721408d8ce7ebde94a359998506`.
+- jsQR: [README][jsqr] and [license][jsqr-license], commit `8e6a036beafa7053dd44b1b76ac578d22b1b3311`.
+- quirc: [README][quirc] and [license][quirc-license], commit `f2e4271ae43a15d9263704e07bc86cba5697d74d`.
+
+[our-report]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/spec/01-report.md
+[our-surfaces]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/dd3668be356bd7579761da84286051ebea33e812/distribution/releases/v0.11.0.json
+[our-camera]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/crates/qrcode-ai-scanner-wasm/README.md
+[our-license]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/LICENSING.md
+[our-score]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/spec/04-score.md
+[our-profiles]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/spec/02-profiles.md
+[our-architecture]: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/176ac96ef16ee330dbfc6ada10327d0b4e23a8b2/docs/ARCHITECTURE.md
+[zxing]: https://github.com/zxing-cpp/zxing-cpp/blob/e17ae29906c9868fe8400b50b847cb7f01ebff3a/README.md
+[zxing-license]: https://github.com/zxing-cpp/zxing-cpp/blob/e17ae29906c9868fe8400b50b847cb7f01ebff3a/LICENSE
+[html5]: https://github.com/mebjas/html5-qrcode/blob/d505e505022cbb6680e6c8babd964e3be9a2d586/README.md
+[html5-license]: https://github.com/mebjas/html5-qrcode/blob/d505e505022cbb6680e6c8babd964e3be9a2d586/LICENSE
+[nimiq]: https://github.com/nimiq/qr-scanner/blob/abcfe1bce2703721408d8ce7ebde94a359998506/README.md
+[nimiq-license]: https://github.com/nimiq/qr-scanner/blob/abcfe1bce2703721408d8ce7ebde94a359998506/LICENSE
+[jsqr]: https://github.com/cozmo/jsQR/blob/8e6a036beafa7053dd44b1b76ac578d22b1b3311/README.md
+[jsqr-license]: https://github.com/cozmo/jsQR/blob/8e6a036beafa7053dd44b1b76ac578d22b1b3311/LICENSE
+[quirc]: https://github.com/dlbeer/quirc/blob/f2e4271ae43a15d9263704e07bc86cba5697d74d/README.md
+[quirc-license]: https://github.com/dlbeer/quirc/blob/f2e4271ae43a15d9263704e07bc86cba5697d74d/LICENSE
