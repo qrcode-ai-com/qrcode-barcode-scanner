@@ -1537,3 +1537,26 @@ nuget.org's repository signature, validates it with `dotnet nuget verify --all`,
 other members with the qualified archive, and installs/scans/removes from five fresh projects.
 See [account setup, tag approval and receipts](bindings/dotnet/PUBLISHING.md). No account setup,
 environment approval, tag or publication is performed by a branch rehearsal.
+
+## README actions
+
+Run `python3 scripts/build-readme-actions.py` after changing a maintained README,
+then `python3 scripts/test-readme-actions.py` and
+`python3 scripts/build-readme-actions.py --check`. Release preparation also renders
+these blocks. The generator preserves the text outside its exact marked block;
+frozen evidence and vendored documentation are excluded. Native npm package
+READMEs inherit the maintained distribution template.
+
+Each Ask AI badge opens a provider with a destination-specific question and public
+source links. Gemini uses Google AI Studio. Providers may require sign-in or a
+manual paste: every block includes the same copyable question. The generator makes no provider request. Opening a link shares its public
+question with the chosen service; an assistant's reply is not qualification evidence.
+
+Only the root and MCP README expose editor add buttons. Their reviewed public
+launch configuration is held independently in `distribution/readme-actions.json`.
+Update that pin only after the corresponding npm publication is verified; never
+substitute the engine version or `latest`. Cursor and VS Code open an installation
+review. The configuration retains `--ignore-scripts` and grants no file access.
+The HTTPS bridges follow [Cursor's install-link documentation](https://prod.cursor.com/docs/mcp/install-links)
+and [VS Code's MCP integration documentation](https://code.visualstudio.com/api/extension-guides/ai/mcp).
+The original text-only SVG badges contain no third-party logo geometry.
