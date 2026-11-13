@@ -4,11 +4,11 @@
 
 ### Ask AI
 
-[![ChatGPT](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/chatgpt-v1.svg)](https://chatgpt.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20Scan%20QR%20codes%20and%20barcodes%20from%20images%20in%20your%20MCP%20client.%20This%20local%20stdio%20server%20preserves%20decoded%20payload%20bytes%20and%20returns%20formats%20and%20the%20scanner%27s%20JSON%20report%2C%20with%20QR%20scannability%20diagnostics%20when%20requested.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
-[![Claude](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/claude-v1.svg)](https://claude.ai/new?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20Scan%20QR%20codes%20and%20barcodes%20from%20images%20in%20your%20MCP%20client.%20This%20local%20stdio%20server%20preserves%20decoded%20payload%20bytes%20and%20returns%20formats%20and%20the%20scanner%27s%20JSON%20report%2C%20with%20QR%20scannability%20diagnostics%20when%20requested.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![ChatGPT](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/chatgpt-v1.svg)](https://chatgpt.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20gives%20MCP%20clients%20a%20local%20tool%20for%20reading%20QR%20codes%2C%20product%20barcodes%20and%20supported%20matrix%20codes%20from%20images.%20It%20connects%20inventory%20workflows%2C%20label%20checks%20and%20QR%20design%20reviews%20to%20the%20same%20open-source%20scanner%20engine%20used%20by%20the%20project%27s%20native%20packages.%20The%20adapter%20returns%20the%20engine%27s%20structured%20JSON%20report%2C%20including%20exact%20encoded%20payload%20bytes%2C%20detected%20formats%20and%20QR%20scannability%20diagnostics%20when%20requested.%20No%20model%20API%20key%20or%20hosted%20scanner%20service%20is%20require%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Claude](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/claude-v1.svg)](https://claude.ai/new?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20gives%20MCP%20clients%20a%20local%20tool%20for%20reading%20QR%20codes%2C%20product%20barcodes%20and%20supported%20matrix%20codes%20from%20images.%20It%20connects%20inventory%20workflows%2C%20label%20checks%20and%20QR%20design%20reviews%20to%20the%20same%20open-source%20scanner%20engine%20used%20by%20the%20project%27s%20native%20packages.%20The%20adapter%20returns%20the%20engine%27s%20structured%20JSON%20report%2C%20including%20exact%20encoded%20payload%20bytes%2C%20detected%20formats%20and%20QR%20scannability%20diagnostics%20when%20requested.%20No%20model%20API%20key%20or%20hosted%20scanner%20service%20is%20require%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
 [![Gemini](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/gemini-v1.svg)](https://gemini.google.com/)
-[![Grok](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/grok-v1.svg)](https://grok.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20Scan%20QR%20codes%20and%20barcodes%20from%20images%20in%20your%20MCP%20client.%20This%20local%20stdio%20server%20preserves%20decoded%20payload%20bytes%20and%20returns%20formats%20and%20the%20scanner%27s%20JSON%20report%2C%20with%20QR%20scannability%20diagnostics%20when%20requested.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
-[![Perplexity](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/perplexity-v1.svg)](https://www.perplexity.ai/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20Scan%20QR%20codes%20and%20barcodes%20from%20images%20in%20your%20MCP%20client.%20This%20local%20stdio%20server%20preserves%20decoded%20payload%20bytes%20and%20returns%20formats%20and%20the%20scanner%27s%20JSON%20report%2C%20with%20QR%20scannability%20diagnostics%20when%20requested.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Grok](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/grok-v1.svg)](https://grok.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20gives%20MCP%20clients%20a%20local%20tool%20for%20reading%20QR%20codes%2C%20product%20barcodes%20and%20supported%20matrix%20codes%20from%20images.%20It%20connects%20inventory%20workflows%2C%20label%20checks%20and%20QR%20design%20reviews%20to%20the%20same%20open-source%20scanner%20engine%20used%20by%20the%20project%27s%20native%20packages.%20The%20adapter%20returns%20the%20engine%27s%20structured%20JSON%20report%2C%20including%20exact%20encoded%20payload%20bytes%2C%20detected%20formats%20and%20QR%20scannability%20diagnostics%20when%20requested.%20No%20model%20API%20key%20or%20hosted%20scanner%20service%20is%20require%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Perplexity](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/perplexity-v1.svg)](https://www.perplexity.ai/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20%28integrations%2Fmcp%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20QR%20Code%20%26%20Barcode%20Scanner%20MCP%20gives%20MCP%20clients%20a%20local%20tool%20for%20reading%20QR%20codes%2C%20product%20barcodes%20and%20supported%20matrix%20codes%20from%20images.%20It%20connects%20inventory%20workflows%2C%20label%20checks%20and%20QR%20design%20reviews%20to%20the%20same%20open-source%20scanner%20engine%20used%20by%20the%20project%27s%20native%20packages.%20The%20adapter%20returns%20the%20engine%27s%20structured%20JSON%20report%2C%20including%20exact%20encoded%20payload%20bytes%2C%20detected%20formats%20and%20QR%20scannability%20diagnostics%20when%20requested.%20No%20model%20API%20key%20or%20hosted%20scanner%20service%20is%20require%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner%2Fblob%2Fmain%2Fintegrations%2Fmcp%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fmcp%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
 [![Copilot](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/copilot-v1.svg)](https://copilot.com/)
 [![DeepSeek](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/deepseek-v1.svg)](https://chat.deepseek.com/)
 [![Meta AI](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/meta-ai-v1.svg)](https://www.meta.ai/)
@@ -22,7 +22,7 @@ Choose an AI assistant to explain this destination using its public sources. Gem
 Use the code block's copy control, or select its complete text, then paste it into your assistant.
 
 ```text
-Help me understand QR Code & Barcode Scanner MCP (integrations/mcp/README.md) for QR Code & Barcode Scanner, the open-source scanner. Source documentation; publication is not implied. Provided README context (verify against the sources): Scan QR codes and barcodes from images in your MCP client. This local stdio server preserves decoded payload bytes and returns formats and the scanner's JSON report, with QR scannability diagnostics when requested. Read the public documentation below. Explain what this destination does, its documented installation or access steps, a minimal example if supported, prerequisites, limitations and license. Distinguish published packages from working source and preparation. Cite your sources; if a page is unavailable or a fact cannot be checked, say so. Do not invent installation commands, benchmark results or comparisons. Answer in my language. Public sources: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/integrations/mcp/README.md https://qrcode-ai.com/en-US/qr-code-scanner https://qrcode-ai.com/en-US/barcode-scanner https://qrcode-ai.com/en-US/qr-code-scanner/mcp https://qrcode-ai.com/en-US/barcode-scanner/mcp https://qrcode-ai.com/en-US/qr-code-generator https://qrcode-ai.com/en-US/barcode-generator
+Help me understand QR Code & Barcode Scanner MCP (integrations/mcp/README.md) for QR Code & Barcode Scanner, the open-source scanner. Source documentation; publication is not implied. Provided README context (verify against the sources): QR Code & Barcode Scanner MCP gives MCP clients a local tool for reading QR codes, product barcodes and supported matrix codes from images. It connects inventory workflows, label checks and QR design reviews to the same open-source scanner engine used by the project's native packages. The adapter returns the engine's structured JSON report, including exact encoded payload bytes, detected formats and QR scannability diagnostics when requested. No model API key or hosted scanner service is require Read the public documentation below. Explain what this destination does, its documented installation or access steps, a minimal example if supported, prerequisites, limitations and license. Distinguish published packages from working source and preparation. Cite your sources; if a page is unavailable or a fact cannot be checked, say so. Do not invent installation commands, benchmark results or comparisons. Answer in my language. Public sources: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/integrations/mcp/README.md https://qrcode-ai.com/en-US/qr-code-scanner https://qrcode-ai.com/en-US/barcode-scanner https://qrcode-ai.com/en-US/qr-code-scanner/mcp https://qrcode-ai.com/en-US/barcode-scanner/mcp https://qrcode-ai.com/en-US/qr-code-generator https://qrcode-ai.com/en-US/barcode-generator
 ```
 
 </details>
@@ -34,22 +34,35 @@ Open your editor to review the pinned MCP configuration before adding it. Node.j
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
-Scan QR codes and barcodes from images in your MCP client. This local stdio
-server preserves decoded payload bytes and returns formats and the scanner's
-JSON report, with QR scannability diagnostics when requested.
+QR Code & Barcode Scanner MCP gives MCP clients a local tool for reading QR
+codes, product barcodes and supported matrix codes from images. It connects
+inventory workflows, label checks and QR design reviews to the same open-source
+scanner engine used by the project's native packages. The adapter returns the
+engine's structured JSON report, including exact encoded payload bytes, detected
+formats and QR scannability diagnostics when requested. No model API key or
+hosted scanner service is required to run the adapter; your MCP host supplies
+its own assistant and user interface.
 
-Use `scan_image` for image bytes. Adapter 0.3.1 also provides
-[`scan_file`](#scan-a-file-by-path-scan_file) for images inside directories
-explicitly allowed by the operator. Both use the published
+The project's browser entry points are the [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner)
+and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner). For this
+integration, the product documentation routes are the
+[QR code scanner MCP guide](https://qrcode-ai.com/en-US/qr-code-scanner/mcp)
+and [barcode scanner MCP guide](https://qrcode-ai.com/en-US/barcode-scanner/mcp).
+Related creation entry points are the
+[QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) and
+[barcode generator](https://qrcode-ai.com/en-US/barcode-generator). If a product
+or guide page is unavailable, the installation, runnable example and tool
+reference below remain self-contained.
+
+Use `scan_image` when your client already holds image bytes. Adapter 0.3.1 also
+provides [`scan_file`](#scan-a-file-by-path-scan_file) for regular image files
+inside directories explicitly allowed by the operator. File access is off by
+default. Both tools use the published
 [`@qrcode-ai-com/qrcode-barcode-scanner` 0.11.0 engine](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner).
+The adapter, engine and client bundles have independent versions; a change to
+this README does not publish a new package.
 
-| | QR codes | Barcodes |
-| --- | --- | --- |
-| **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
-| **MCP server guide** | [QR code scanner MCP server](https://qrcode-ai.com/en-US/qr-code-scanner/mcp) | [Barcode scanner MCP server](https://qrcode-ai.com/en-US/barcode-scanner/mcp) |
-| **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
-
-[Install](#install) · [Connect a client](#connect-a-client) · [Tool contract](#tool-contract) · [Limits](#input-and-authority-limits) · [Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp)
+[Install](#install) · [Connect a client](#connect-a-client) · [First scan](#first-scan-from-nodejs) · [Tools and reports](#tool-contract) · [Profiles](#choose-a-profile) · [Resources](#read-the-schema-and-limits) · [Limits](#input-and-authority-limits) · [Troubleshooting](#troubleshooting) · [Migration](#upgrading-from-021) · [License](#license-and-maintainers)
 
 | Component | Version | Purpose |
 | --- | --- | --- |
@@ -161,6 +174,105 @@ under `io.github.qrcode-ai-com/qrcode-barcode-scanner`. The entry points to the
 same npm package and stdio transport described here. For a specific product
 client, verify tool discovery and a fixture call after installation.
 
+## First scan from Node.js
+
+An MCP host can call the tools directly; you do not need an LLM to test the
+adapter. This example uses the pinned official TypeScript SDK from JavaScript
+and the exact package installed above. From the directory in which you ran the
+installation command, enter the new consumer project and add the client:
+
+```sh
+cd qrscan-mcp-install
+npm install --save-exact --ignore-scripts @modelcontextprotocol/client@2.3.1
+```
+
+Download the versioned mixed QR/Code 128 test image, or use an image of your
+own. This command is for a POSIX shell; in PowerShell, use `curl.exe` in place
+of `curl`:
+
+```sh
+curl --fail --location --output mixed-code128-qr.png https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/agents-v0.3.1/fixtures/symbology/mixed-code128-qr.png
+```
+
+Save the following as `scan.mjs` in `qrscan-mcp-install`. It reads one image in
+the client process, sends its bytes to `scan_image`, prints the full report,
+reports tool errors and closes the child server. It grants the server no
+additional image directories.
+
+<!-- executable-example:scan.mjs -->
+```js
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+
+const imagePath = process.argv[2];
+if (!imagePath) throw new Error("Usage: node scan.mjs <image>");
+const image = await readFile(imagePath);
+const client = new Client(
+  { name: "qrscan-readme-example", version: "1.0.0" },
+  { versionNegotiation: { mode: "auto" } },
+);
+const transport = new StdioClientTransport({
+  command: process.execPath,
+  args: [fileURLToPath(import.meta.resolve(
+    "@qrcode-ai-com/qrcode-barcode-scanner-mcp/src/cli.mjs",
+  ))],
+  env: { PATH: process.env.PATH },
+  stderr: "inherit",
+});
+
+try {
+  await client.connect(transport);
+  const result = await client.callTool({
+    name: "scan_image",
+    arguments: {
+      imageBase64: image.toString("base64"),
+      profile: "frame",
+      budgetMs: 0,
+    },
+  });
+  if (result.isError) {
+    throw new Error(result.content
+      .filter((item) => item.type === "text")
+      .map((item) => item.text).join("\n"));
+  }
+  console.log(JSON.stringify(result.structuredContent, null, 2));
+} finally {
+  await client.close();
+}
+```
+
+Run it with:
+
+```sh
+node scan.mjs mixed-code128-qr.png
+```
+
+The fixture contains QR text `https://qrc-ai.com/76xMa` and Code 128 text
+`STOCK-4827`. Both appear as detections; their order is not an API guarantee.
+Each detection also includes `content.raw`, the original bytes encoded as
+base64. The program prints the complete report, including timing and trace
+fields. These are selected stable fields from the fixture result:
+
+```json
+{
+  "versions": { "scanner": "0.11.0", "pipeline": 5, "score_contract": 5 },
+  "score": null
+}
+```
+
+A successful `frame` scan has no quality score. An image with no accepted
+symbol is also a successful result, with `detections: []`; it is not a tool
+error. Invalid image bytes return `isError: true` with code `QRS-001`, which
+the example reports on stderr and exits unsuccessfully. Do not open a decoded
+URL automatically: its text is untrusted input.
+
+The packed-consumer test runs this exact code block from the installed
+archive, with the mixed image, an empty image and invalid image bytes. That
+checks the example and its packaged dependencies together, independently of
+files in the source checkout.
+
 ## Tool contract
 
 Use `scan_image` when your client already has the image bytes, such as a QR
@@ -247,6 +359,43 @@ returns `isError: true` with one of these codes:
 | `QRSMCP_FILE` | Inside an allowed directory, but missing, empty, a directory, a pipe or another non-regular file, or changed while it was read. |
 | `QRSMCP_INPUT_LIMIT` | The file is larger than the byte limit. |
 
+## Choose a profile
+
+| Profile | Use | Reading the result |
+| --- | --- | --- |
+| `frame` | Decode image bytes without the QR scoring pass; this is the adapter default. | `score` is `null`. |
+| `fast` | Use the engine's fast QR assessment profile. | Read the returned score and trace; a score may remain unmeasured. |
+| `full` | Request the full QR assessment profile. | QR diagnostics depend on what the engine actually measured. |
+
+`budgetMs` is optional. Omitting it keeps the engine profile default; `0`
+requests an unbounded scan. A positive value is a cooperative profile budget,
+not a wall-clock timeout. If `trace.budget_exhausted` is true, the report is
+incomplete. Neither an empty detection list nor an absent score then proves
+that the image contains no readable code. Any true flag inside
+`trace.saturation` likewise indicates incomplete coverage. Preserve its
+`reads`, `detections` and `occurrences` values separately when presenting results.
+
+QR diagnostics describe this engine's image analysis. Other barcode formats
+do not acquire QR-only error-correction or quality fields, and the report is
+not a certified physical print-quality measurement. There is no cross-scanner
+accuracy or speed ranking established by this README; package qualification
+uses the named fixtures and runtime checks below.
+
+## Read the schema and limits
+
+The server exposes two read-only MCP resources. Use `listResources()` to
+discover them and `readResource({ uri })` in the official JavaScript client:
+
+| URI | Content |
+| --- | --- |
+| `qrscan://scan-report-schema` | The JSON Schema bundled with the pinned engine report. |
+| `qrscan://limits` | Active byte/pixel/concurrency limits and the operator's allowed directories, if any. |
+
+Read the limits before forwarding large images. Resource availability is not
+a grant to browse the filesystem; `scan_file` still has to be explicitly
+enabled. A resource read is separate from a scan and does not establish that
+an image was accepted.
+
 ## Input and authority limits
 
 By default the adapter accepts **bytes only**: no filesystem path, URL fetch,
@@ -301,6 +450,36 @@ Runtime scanning makes no network calls. Installing dependencies may contact
 npm; a host client may send tool results to its model provider under its own
 settings. This package does not control that host behavior.
 
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| The client does not discover `scan_file`. | It is absent by default. Set `QRSCAN_MCP_ALLOWED_DIRECTORIES` in the server process configuration, then restart that process. |
+| `QRSMCP_PATH_DENIED` | The resolved image path must be inside an explicitly allowed directory. The refusal does not reveal whether an outside file exists. |
+| `QRSMCP_BASE64` | Send canonical base64 bytes only, without whitespace or a `data:` prefix. Prefer `scan_file` when the operator has enabled it. |
+| `QRS-001` | The supplied bytes are not an image the pinned engine can read. Check the file before encoding it. |
+| `QRSMCP_INPUT_LIMIT` or an MCP transport closure | Check `qrscan://limits`. Base64 expands the input and the framing ceiling is independent of the decoded-image ceiling. |
+| `QRSMCP_BUSY` | Wait for the active scan and retry; `scan_image` and `scan_file` share the same concurrency limit. |
+| Native dependency cannot load | Check the selected Node runtime, operating system, CPU and libc against the engine targets above. Preserve npm's optional native dependencies. Do not override the native-library path. |
+| The host times out | A host timeout does not interrupt an already-running native scan. Choose a smaller input or a measured profile/budget appropriate to that host. |
+
+A protocol connection, a listed tool and a successful scan are three different
+checks. After changing a client configuration, list the tools and run a known
+image; do not infer a working scanner from the configuration screen alone.
+
+## Upgrading from 0.2.1
+
+Adapter 0.3.1 keeps the byte-based `scan_image` entry, engine 0.11.0 and report
+contract. To use the new `scan_file` entry, update the pinned adapter version
+and explicitly allow the intended image directories. With that setting
+absent, file access remains disabled. Client bundles and the Official MCP
+Registry keep their own publication and installed-consumer checks.
+
+The next engine release is prepared separately. Do not substitute an
+unpublished engine or adapter version into these installation examples merely
+because repository source has changed. Check the exact registry version and
+its release evidence before updating a host configuration.
+
 ## Development and qualification
 
 From this directory:
@@ -330,9 +509,16 @@ Source engine: [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner
 The adapter is versioned separately from the engine. A local packed-consumer
 pass qualifies the tested archive and host; public registry installation and
 additional platforms retain separate checks.
-License: **AGPL-3.0-or-later**, including the adapter; see [LICENSE](LICENSE).
 
 SDK API sources:
 [official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk),
 [stdio server guidance](https://modelcontextprotocol.io/docs/develop/build-server),
 [server metadata specification](https://github.com/modelcontextprotocol/registry/blob/main/docs/reference/server-json/generic-server-json.md).
+
+## License and maintainers
+
+Created and maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**,
+a product of **SuperNovae Studio**. The adapter is distributed under
+**AGPL-3.0-or-later**; see the packaged [LICENSE](LICENSE). The scanner engine
+and other components retain their own license notices. Review those materials
+for your intended distribution and deployment.
