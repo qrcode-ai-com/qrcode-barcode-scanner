@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import tomllib
+from readme_prose import canonical_links
 from readme_actions import PROVIDERS, action_block, badge_svg, insert_actions, mcp_links, question, strip_actions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +28,7 @@ def outputs():
         text = (ROOT / path).read_text()
         clean = strip_actions(text)
         title = re.search(r'^# (.+)$', clean, re.M)[1]
-        urls = list(dict.fromkeys(re.findall(r'https://qrcode-ai\.com/en-US/[a-zA-Z0-9/_-]+', clean)))[:6]
+        urls = canonical_links(path)
         paragraphs = [part.replace('\n', ' ').strip() for part in clean.split('\n\n')]
         context = next((part for part in paragraphs if len(part) > 60 and not part.startswith(('#', '[', '|', '<', '!', '```', '>'))), '')
         context = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', context)

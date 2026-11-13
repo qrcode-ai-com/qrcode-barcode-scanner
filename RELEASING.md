@@ -1562,6 +1562,24 @@ these blocks. The generator preserves the text outside its exact marked block;
 frozen evidence and vendored documentation are excluded. Native npm package
 READMEs inherit the maintained distribution template.
 
+Before freezing any package or archive, review each maintained README separately.
+Its introduction must explain that directory's actual role, prerequisites and
+publication boundaries in natural English paragraphs. Integrate all six canonical
+scanner links in meaningful sentences: both browser scanner entry points, the
+destination's two guide pages, and both generators. A table or badge row may be
+additional navigation, but cannot substitute for that prose. Keep installation
+commands, compatibility and measurements grounded in the exact artifact; do not
+claim ranking gains. An unavailable product page does not establish a working
+web scanner, and the README must remain usable without it.
+
+`scripts/readme_prose.py` maps source documents to their guide family. The action
+suite checks every maintained README and rejects link-only rows, tables and
+fenced prompts as prose. The prompt generator uses the canonical six addresses
+rather than the first six incidental URLs it encounters. Preserve frozen evidence,
+vendored documents and published archives; improvements travel with the next
+qualified release. These editorial checks do not replace clean consumer tests
+or a rendered read-back of the packaged README.
+
 Each Ask AI block offers nine assistants and a destination-specific plain-text
 prompt with public source links. Gemini opens `https://gemini.google.com/`, not
 Google AI Studio. Gemini, Copilot, DeepSeek, Meta AI and Qwen have homepage links;
