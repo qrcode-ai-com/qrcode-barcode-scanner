@@ -371,8 +371,9 @@ returns `isError: true` with one of these codes:
 requests an unbounded scan. A positive value is a cooperative profile budget,
 not a wall-clock timeout. If `trace.budget_exhausted` is true, the report is
 incomplete. Neither an empty detection list nor an absent score then proves
-that the image contains no readable code. `trace.saturation` likewise signals
-that a bounded capacity was reached. Keep these flags when presenting results.
+that the image contains no readable code. Any true flag inside
+`trace.saturation` likewise indicates incomplete coverage. Preserve its
+`reads`, `detections` and `occurrences` values separately when presenting results.
 
 QR diagnostics describe this engine's image analysis. Other barcode formats
 do not acquire QR-only error-correction or quality fields, and the report is
