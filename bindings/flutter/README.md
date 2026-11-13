@@ -125,7 +125,7 @@ Dual-licensed **AGPL-3.0-or-later OR commercial** — see the repo-root
 A closed-source app on the App Store / Play Store links the AGPL Rust core and
 therefore needs the **commercial** license: `studio.supernovae@gmail.com`.
 
-Developed by **Thibaut Mélen** for **QR Code AI**, a product of **SuperNovae Studio**.
+Developed by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**.
 SuperNovae Studio administers the dual-license model and handles commercial licensing.
 
 © SuperNovae Studio.
