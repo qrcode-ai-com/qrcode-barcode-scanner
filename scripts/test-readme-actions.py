@@ -88,6 +88,24 @@ class ReadmeActions(unittest.TestCase):
         self.assertEqual(prose_links('To check an image before integrating the package, use the ' + link + '.'),
                          {'https://qrcode-ai.com/en-US/qr-code-scanner'})
 
+    def test_fence_like_lines_cannot_turn_code_links_into_prose(self):
+        url = 'https://qrcode-ai.com/en-US/qr-code-scanner'
+        sentence = 'To check an image before integrating the package, use the [QR code scanner](' + url + ').'
+        for newline in ('\n', '\r\n'):
+            for marker in ('`', '~'):
+                for false_close in (marker * 3 + 'not-a-close', marker * 5 + ' trailing',
+                                    marker * 3 + ' ' + marker, marker * 2, '    ' + marker * 4):
+                    with self.subTest(newline=newline, marker=marker, false_close=false_close):
+                        code = newline.join((marker * 4 + 'md', false_close, sentence))
+                        self.assertEqual(prose_links(code), set())
+                        self.assertEqual(prose_links(code + newline + marker * 5 + ' \t'), set())
+                        # Only a real closer allows a subsequent prose paragraph to qualify.
+                        self.assertEqual(prose_links(code + newline + marker * 5 + ' \t' + newline * 2 + sentence), {url})
+        self.assertEqual(prose_links('```invalid`info\n\n' + sentence), {url})
+        for indent in ('    ', '\t'):
+            self.assertEqual(prose_links(indent + sentence), set())
+            self.assertEqual(prose_links(indent + '```md\n' + indent + sentence + '\n' + indent + '```'), set())
+
     def test_every_maintained_readme_has_its_six_canonical_links_in_prose(self):
         for path in builder.maintained_readmes():
             with self.subTest(path=path):

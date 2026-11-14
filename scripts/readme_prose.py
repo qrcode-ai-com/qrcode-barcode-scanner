@@ -49,14 +49,17 @@ def prose_links(text):
     text = strip_actions(text)
     lines, fence = [], None
     for line in text.splitlines():
-        marker = re.match(r'^\s*(`{3,}|~{3,})', line)
-        if marker:
-            if fence is None:
-                fence = marker[1][0]
-            elif marker[1][0] == fence:
+        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if fence is not None:
+            # CommonMark closers have no info string and cannot be shorter than the opener.
+            if (marker and marker[1][0] == fence[0] and len(marker[1]) >= fence[1]
+                    and re.fullmatch(r'[ \t]*', marker[2])):
                 fence = None
             lines.append('')
-        elif fence or re.match(r'^\s*(?:[#|<!>]|[-+*]\s|\d+[.)]\s|\[[^]]+\]:)', line):
+        elif marker and not (marker[1][0] == '`' and '`' in marker[2]):
+            fence = (marker[1][0], len(marker[1]))
+            lines.append('')
+        elif line.startswith(('    ', '\t')) or re.match(r'^\s*(?:[#|<!>]|[-+*]\s|\d+[.)]\s|\[[^]]+\]:)', line):
             lines.append('')
         else:
             lines.append(line)
