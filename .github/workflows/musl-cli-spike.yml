@@ -1,0 +1,138 @@
+name: musl CLI spike
+
+# A spike, not a release: does qrscan build for musl from this source, run on Alpine with
+# nothing else installed and return the engine's reports, and how fast is it next to the glibc
+# build of the same commit? On x86_64 and on arm64 this builds both, judges three scans with the
+# destination acceptance driver on the host and inside an Alpine container, and times both
+# builds on the same host. Nothing is packed and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/musl-cli-spike.yml
+      - distribution/cli/musl-spike/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musl-cli-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN).
+  RUST_TOOLCHAIN: "1.99.1"
+  # Alpine 3.22, by the digest of its multi-platform index.
+  ALPINE: alpine@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
+
+jobs:
+  spike:
+    name: musl CLI · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            gnu: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            gnu: aarch64-unknown-linux-gnu
+    env:
+      TARGET: ${{ matrix.target }}
+      GNU: ${{ matrix.gnu }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+      - name: Read the engine version from the workspace
+        run: |
+          version=$(python3 -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Build qrscan for musl and for glibc from this commit
+        run: |
+          cargo build --release --locked -p qrcode-barcode-scanner-cli --bin qrscan --target "$TARGET"
+          cargo build --release --locked -p qrcode-barcode-scanner-cli --bin qrscan --target "$GNU"
+          mkdir out receipt
+          cp "target/$TARGET/release/qrscan" out/qrscan-musl
+          cp "target/$GNU/release/qrscan" out/qrscan-gnu
+          {
+            file out/qrscan-musl out/qrscan-gnu
+            ls -l out
+            echo "ldd out/qrscan-musl:"
+            ldd out/qrscan-musl 2>&1 || true
+            echo "dynamic section of out/qrscan-musl:"
+            readelf -d out/qrscan-musl 2>&1 | head -20
+          } | tee "receipt/files-$TARGET.txt"
+      - name: Judge three scans on the build host
+        run: |
+          python3 scripts/destination-acceptance.py cli \
+            --qrscan "$PWD/out/qrscan-musl" \
+            --destination "musl CLI spike on the build host (not a release)" \
+            --identifier "qrscan $TARGET" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/distribution/cli/musl-spike" \
+            --install "cargo build --release --locked -p qrcode-barcode-scanner-cli --bin qrscan --target $TARGET" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-host-$TARGET.json"
+          python3 scripts/destination-acceptance.py removed --not-applicable \
+            --receipt "receipt/acceptance-host-$TARGET.json"
+          python3 scripts/destination-acceptance.py check "receipt/acceptance-host-$TARGET.json"
+      # Alpine holds musl and nothing of glibc. Python and git are added for the driver only,
+      # which records the commit it judged: qrscan itself must need nothing, and its version is
+      # asked before either is installed.
+      - name: Judge three scans inside Alpine
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TREE_URL: ${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}/distribution/cli/musl-spike
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            -e TARGET -e ENGINE_VERSION -e RUN_URL -e TREE_URL "$ALPINE" sh -euc '
+              cat /etc/alpine-release
+              /src/out/qrscan-musl --version
+              apk add --no-cache python3 git >/dev/null
+              git config --global --add safe.directory /src
+              python3 scripts/destination-acceptance.py cli \
+                --qrscan /src/out/qrscan-musl \
+                --destination "musl CLI spike inside Alpine (not a release)" \
+                --identifier "qrscan $TARGET" \
+                --version "$ENGINE_VERSION" \
+                --url "$TREE_URL" \
+                --install "copy of the built file into an Alpine container" \
+                --run-url "$RUN_URL" \
+                --receipt "receipt/acceptance-alpine-$TARGET.json"
+              python3 scripts/destination-acceptance.py removed --not-applicable \
+                --receipt "receipt/acceptance-alpine-$TARGET.json"
+              python3 scripts/destination-acceptance.py check "receipt/acceptance-alpine-$TARGET.json"
+            '
+      - name: Check that the glibc build does not start on Alpine
+        run: |
+          if docker run --rm -v "$PWD:/src:ro" "$ALPINE" /src/out/qrscan-gnu --version > "receipt/gnu-on-alpine-$TARGET.txt" 2>&1; then
+            echo "the glibc build started on Alpine: this spike would have nothing to show"
+            cat "receipt/gnu-on-alpine-$TARGET.txt"
+            exit 1
+          fi
+          echo "the glibc build does not start on Alpine:"
+          cat "receipt/gnu-on-alpine-$TARGET.txt"
+      - name: Time both builds on the same host
+        run: |
+          python3 distribution/cli/musl-spike/measure.py --musl "$PWD/out/qrscan-musl" --gnu "$PWD/out/qrscan-gnu" \
+            --fixtures fixtures --out "receipt/timing-$TARGET.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: musl-cli-spike-${{ matrix.target }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
