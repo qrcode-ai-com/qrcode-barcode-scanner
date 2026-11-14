@@ -8,7 +8,7 @@
   },
   "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/openclaw",
   "repository": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
-  "license": "MIT-0",
+  "license": "MIT",
   "keywords": [
     "qr",
     "barcode",

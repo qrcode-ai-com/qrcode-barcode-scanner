@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 // Package qrscan reads QR codes and barcodes from an image file through the installed qrscan
 // command of the QR Code & Barcode Scanner engine.

@@ -6,7 +6,7 @@
 // Build: `./gradlew :qrcodeaiscanner:assembleRelease`
 //   → qrcodeaiscanner/build/outputs/aar/qrcodeaiscanner-release.aar
 //
-// SPDX-License-Identifier: AGPL-3.0-or-later  (dual-licensed — see LICENSING.md)
+// SPDX-License-Identifier: MIT
 
 plugins {
     id("com.android.library")
@@ -91,11 +91,10 @@ publishing {
                 description.set("Kotlin/Android bindings for qrcode-barcode-scanner via UniFFI.")
                 url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
                 licenses {
-                    // Dual-licensed: AGPL-3.0-or-later OR commercial (LICENSING.md).
-                    // The manifest SPDX stays AGPL-3.0-or-later per operator decision.
+                    // Project-authored source is MIT; dependencies retain their own notices.
                     license {
-                        name.set("AGPL-3.0-or-later")
-                        url.set("https://www.gnu.org/licenses/agpl-3.0.txt")
+                        name.set("MIT")
+                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE")
                     }
                 }
             }

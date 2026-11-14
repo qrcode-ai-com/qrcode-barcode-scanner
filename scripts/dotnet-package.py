@@ -46,7 +46,7 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PACKAGE = "QRCodeAI.QRCodeBarcodeScanner"
 FRAMEWORK = "net8.0"
-LICENSE = "AGPL-3.0-or-later"
+LICENSE = "MIT"
 REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
 PROJECT_URL = "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/dotnet"
 SCHEMA = "qrscan-dotnet-native/1"
@@ -435,7 +435,7 @@ def self_test():
                  packed(out, add={"runtimes/linux-x64/native/" + TARGETS[linux]["file"]: b"another library"})),
                 ("another package id", "says id", packed(out, id="Another.Package")),
                 ("another version", "says version", packed(out, version="9.8.6")),
-                ("another license", "says license", packed(out, license="MIT")),
+                ("another license", "says license", packed(out, license="AGPL-3.0-or-later")),
                 ("a license file in place of an expression", "says license", packed(out, license_type="file")),
                 ("another project address", "says projectUrl", packed(out, projectUrl="https://example.org/")),
                 ("another repository", "says repository", packed(out, url="https://github.com/elsewhere/fork")),

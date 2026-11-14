@@ -19,7 +19,7 @@ const EXAMPLE_FILES = ["headless.html", "headless.js", "camera.html", "camera.js
 pkg.name = "@qrcode-ai-com/qrcode-barcode-scanner-wasm";
 pkg.description =
   "QR and barcode decoding + scannability scoring — one portable browser WASM with camera, tracking and overlay modules, plus optional URL destination checks";
-pkg.license = "AGPL-3.0-or-later";
+pkg.license = "MIT";
 pkg.homepage = "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript";
 pkg.repository = {
   type: "git",
@@ -56,7 +56,7 @@ pkg.exports = {
 for (const file of COPIED_FILES) copyFileSync(file, join("pkg", file));
 mkdirSync(join("pkg", "examples"), { recursive: true });
 for (const file of EXAMPLE_FILES) copyFileSync(join(...file.split("/")), join("pkg", ...file.split("/")));
-// The AGPL text ships in the tarball (0.9.0 shipped none). wasm-pack copies
+// The MIT text ships in the tarball (0.9.0 shipped none). wasm-pack copies
 // LICENSE* from the crate dir when Cargo.toml sets `license`, but it rebuilds
 // pkg/ from scratch every time, so the crate's copy is pinned in here.
 copyFileSync("LICENSE", join("pkg", "LICENSE"));

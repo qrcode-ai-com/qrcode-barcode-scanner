@@ -1,78 +1,57 @@
 # Licensing
 
-The QR Code & Barcode Scanner engine (`qrcode-barcode-scanner` packages from 0.11.0,
-`qrcode-ai-scanner` packages through 0.10.x) is **dual-licensed**. You may use it under
-**either** license below.
+Project-authored QR Code & Barcode Scanner source and documentation in this checkout use the
+**[MIT License](LICENSE)**. This covers our engine, runtime bindings, command adapters, MCP
+adapter, portable skill and bundle helpers. Thibaut Mélen & Nicolas Cella develop the scanner
+for **QR Code AI**, a product of **SuperNovae Studio**.
 
-## ① AGPL-3.0-or-later — free & open source (the default)
+## Using the MIT source
 
-Free for open-source projects, research, and personal use — for anyone willing to comply
-with the [AGPL-3.0-or-later](LICENSE). The AGPL is strong copyleft: if you **distribute** a
-work that includes this library, or run a modified version that users interact with **over a
-network**, you must make your **complete corresponding source** available under the AGPL.
+MIT permits use, modification, redistribution, sublicensing and sale of this source, including
+use in proprietary applications. Keep the copyright and permission notice in copies or
+substantial portions. The license contains its warranty and liability terms. A separate
+commercial license is not required for project-authored MIT source.
 
-## ② Commercial license — for proprietary / closed-source use
+## Published versions and pinned dependencies
 
-To embed the QR Code & Barcode Scanner engine in a **closed-source or proprietary**
-product — a native mobile app (iOS / Android), a SaaS you won't open-source, or any
-commercial software — **without** the AGPL's source-disclosure obligations, a commercial
-license is available.
+The source change does not replace or relabel a published archive. Each archive retains its
+packaged license. The [dated license history](docs/guides/license-history.mdx) records earlier
+engine, adapter and portable-helper grants. Source, an installed package and a hosted listing
+can show different licenses until a new qualified version is published. Identify an unreleased
+source build by its exact commit and archive hash, not just its version.
 
-**→ For commercial licensing, contact `studio.supernovae@gmail.com`.**
+Some examples and helpers install an earlier published engine. Their MIT-authored wrapper
+does not change that runtime's license. Inspect the complete dependency set before treating an
+installation as an MIT engine distribution. New tags and registry uploads need their normal
+qualification and owner approval.
 
-## Which license do I need?
+## Third-party components and data
 
-| Your use | License |
-|---|---|
-| Open-source project (AGPL-compatible), research, personal | **AGPL** — free ✅ |
-| Internal tool you don't distribute or expose over a network | **AGPL** — free ✅ |
-| Closed-source app / proprietary product / SaaS (no source disclosure) | **Commercial** |
-| Native mobile app shipped on the App Store / Play Store | **Commercial** (these are almost always closed-source) |
+Retain upstream licenses and notices. The copied rxing/ZXing reader source keeps its Apache-2.0
+notices and [license text](crates/qrcode-ai-scanner/LICENSE-APACHE-2.0), as described in
+[THIRD-PARTY.md](crates/qrcode-ai-scanner/THIRD-PARTY.md). UniFFI dependencies include MPL-2.0
+components; other dependencies retain their declared licenses. Our MIT grant does not relicense
+those dependencies, third-party fixtures, datasets or the separate QR Code AI service.
 
-Unsure? The AGPL is always the safe free option — reach out if you need the commercial terms.
+CLI archives carry LICENSE, this guide, source references and third-party license material.
+Their build-info.json records dependencies and checksums; SOURCE.md identifies the corresponding
+source and registry crates. Keep this material with redistributed archives. AUR, AppImage and
+container recipes pinned to older public CLI bytes retain that CLI's actual license until a
+new qualified artifact replaces the pin.
 
-## Portable consumer skill
+## Ask AI artwork
 
-The original instructions and helpers under [`skills/qrcode-barcode-scanner/`](skills/qrcode-barcode-scanner/)
-are separately licensed **MIT-0**, as declared in that directory's LICENSE.
-They do not bundle or relicense the engine. Installing the scanner as a separate
-dependency retains its AGPL-3.0-or-later or agreed commercial terms. The MCP
-adapter and CLI container retain the engine's AGPL source/license materials.
-The portable bundle metadata and setup helpers under `integrations/openclaw/`
-are also MIT-0. Their separately installed MCP adapter and engine retain AGPL.
-
-## Prebuilt `qrscan` archives
-
-The `qrcode-barcode-scanner-cli-X.Y.Z-<target>` archives attached to a release hold `LICENSE`,
-`LICENSING.md` and the third-party notices and license texts beside the program. Their
-corresponding source is the same release's `qrcode-barcode-scanner-cli-X.Y.Z-source.tar.gz`, a
-`git archive` of the commit they were built from, whose SHA-256 is a line of
-`qrcode-barcode-scanner-cli-X.Y.Z-SHA256SUMS`. The third-party Rust crates linked into `qrscan`
-are not bundled: each archive's `build-info.json` lists them with their `Cargo.lock`
-checksums, and its `SOURCE.md` gives their crates.io download address.
-
-## Ask AI brand artwork
-
-The retained assistant marks and their derived README badges use
-[Lobe Icons](https://github.com/lobehub/lobe-icons), under its retained
-[MIT license](docs/assets/actions/brands/LICENSE-Lobe-Icons.txt). Their pinned source
-revision and file hashes are in [the asset provenance](docs/assets/actions/brands/provenance.json).
-Each colored image embeds the license notice so a standalone badge retains its attribution.
-These marks identify the linked assistants; their trademarks remain with their owners and
-do not imply endorsement. The OpenAI knot uses a green display tint; Grok keeps its black mark.
-This artwork does not change the engine's dual-license terms.
+The retained marks and badges use [Lobe Icons](https://github.com/lobehub/lobe-icons) under its
+[MIT license](docs/assets/actions/brands/LICENSE-Lobe-Icons.txt). Source revision and hashes are
+in [the provenance](docs/assets/actions/brands/provenance.json); each colored image embeds the
+notice. Trademarks remain with their owners and imply no endorsement. OpenAI uses a green
+display tint; Grok retains black. Vendored Cargokit keeps its upstream MIT notice.
 
 ## Contributions
 
-By submitting a contribution (e.g. a pull request) you agree that it is licensed under
-**both** the AGPL-3.0-or-later **and** SuperNovae Studio's commercial license — i.e. you
-grant SuperNovae Studio the right to distribute your contribution under both, so the
-dual-license model stays intact (inbound = outbound, dual). This keeps the project freely
-available to the community **and** sustainable.
+New project-authored contributions are accepted under MIT, matching this source. Retain
+third-party notices and identify imports and their license. Earlier contributions and releases
+retain their existing grants; this document claims no retroactive change to packaged metadata.
 
----
-
-Developed by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**.
-SuperNovae Studio administers the dual-license model and handles commercial licensing.
-
-© SuperNovae Studio. Already-published `0.x` releases remain available under the AGPL.
+Developed by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of
+**SuperNovae Studio**. © SuperNovae Studio.

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT-0
+// SPDX-License-Identifier: MIT
 import { closeSync, constants, fstatSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { isAbsolute, join, relative, resolve } from "node:path";

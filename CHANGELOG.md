@@ -15,6 +15,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 
 ### Changed
 
+- Project-authored scanner source, SDKs, adapters and maintained documentation
+  now use the MIT License, with attribution to Thibaut Mélen & Nicolas Cella,
+  QR Code AI and SuperNovae Studio. Third-party licenses and notices are
+  retained. Published archives keep their version-specific license; this
+  source change does not republish 0.11.0, MCP 0.3.1 or skill/bundle 0.2.0.
+
 - **Kotlin and Swift: an error case carries one message and nothing else.**
   This breaks code that read the value of a case. `ScanBindingError` now
   crosses the binding as its case and its message, the text Rust prints:

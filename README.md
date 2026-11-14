@@ -45,7 +45,7 @@ To prepare a QR payload or a barcode label, use the [QR code generator](https://
 [Get started](#get-started) · [Examples](#examples) · [Compare scanners](docs/comparison.mdx) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/AGPL--3.0%20or%20commercial-6366f1?style=flat-square&label=license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[![License](https://img.shields.io/badge/MIT-6366f1?style=flat-square&label=source%20license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 
 Scan QR codes and barcodes from images or camera frames, entirely on your device. One Rust engine reads mixed formats in the same image and reports each code's value and format, plus its position when available. It also scores how reliably a QR design can be read, a check [QR Code AI](https://qrcode-ai.com/) uses before export.
 
@@ -65,7 +65,7 @@ and licenses so you can choose around your application's needs.
 The comparison is dated and links to exact source revisions. It makes no
 unmeasured speed or accuracy ranking: runtime benchmarks and clean package/device
 qualification remain separate evidence. The engine's
-[licensing guide](LICENSING.md) explains its AGPL-3.0-or-later and commercial terms.
+[licensing guide](LICENSING.md) explains the MIT source grant and the original terms retained by published archives.
 
 ## Examples
 
@@ -420,7 +420,7 @@ The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/
 
 Developed by **Thibaut Mélen & Nicolas Cella** for [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk), a product of [SuperNovae Studio](https://github.com/supernovae-st).
 
-AGPL-3.0-or-later or a separate commercial license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+MIT for project-authored source; published archives retain their packaged license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
 · [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/SECURITY.md)
 · Commercial enquiries: `studio.supernovae@gmail.com`.
 
@@ -532,3 +532,15 @@ unverified. `scripts/batch-scan.py` and `scripts/zxing-blackbox.py` stay
 as exploratory reporters.
 
 </details>
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->

@@ -563,11 +563,10 @@ The endpoint lets callers make your server send requests, even with that
 policy. Authenticate callers, limit their rate, keep URLs out of logs, and add
 your network's NAT64 prefix and denied ranges; the
 [security guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/concepts/security.mdx)
-lists the policy and the operator's duties. The package is AGPL-3.0-or-later:
-running a modified version of it, this resolver included, as a service that
-users reach over a network brings the AGPL's source obligations (section 13).
-[LICENSING.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md)
-describes the licensing options. This is a licensing note, not legal advice.
+lists the policy and the operator's duties. Project-authored source in this checkout is MIT;
+the pinned published package retains its own license. The current [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains
+source, package and third-party terms.
+
 
 ## Examples
 
@@ -667,6 +666,18 @@ Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner-wasm`.
 
 
 
-License: AGPL-3.0-or-later · © SuperNovae Studio.
+Source license: MIT · © SuperNovae Studio. Published archives retain their own license.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->

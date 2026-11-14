@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 using System.Text.RegularExpressions;
 
 namespace QRCodeAI.QRCodeBarcodeScanner;

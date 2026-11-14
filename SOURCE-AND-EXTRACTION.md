@@ -85,3 +85,11 @@ its distributable archives.
 | **Try the scanner live** | [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) | [Barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) |
 | **SDK guides** | [QR code scanner SDKs](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) | [Barcode scanner SDKs](https://qrcode-ai.com/en-US/barcode-scanner/sdk) |
 | **Create a code** | [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) | [Barcode generator](https://qrcode-ai.com/en-US/barcode-generator) |
+
+## Source license amendment · 14 November 2026
+
+The owner explicitly chose MIT for current project-authored scanner source and
+future qualified releases. [LICENSING.md](LICENSING.md) defines the scope and
+third-party boundaries. Existing published archives, their license metadata and
+frozen release evidence remain version-specific. No tag, publication or service
+license is changed by this source decision.

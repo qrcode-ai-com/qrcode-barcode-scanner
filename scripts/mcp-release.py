@@ -60,7 +60,7 @@ def metadata(root: Path = ROOT) -> dict:
     require(re.fullmatch(SEMVER, version) is not None, "adapter version must be a release SemVer")
     require(package.get("name") == PACKAGE and package.get("mcpName") == MCP_NAME, "wrong adapter identity")
     require(package.get("bin") == {"qrscan-mcp": "src/cli.mjs"} and package.get("type") == "module", "wrong adapter executable")
-    require(package.get("license") == "AGPL-3.0-or-later", "wrong adapter license")
+    require(package.get("license") == "MIT", "wrong adapter license")
     require(package.get("engines") == {"node": "^22.19.0 || >=24.0.0"}, "adapter runtime floor differs from the consumer matrix")
     require(package.get("repository") == {"type": "git", "url": f"https://github.com/{REPOSITORY}.git", "directory": "integrations/mcp"}, "wrong source repository")
     require(package.get("homepage") == "https://qrcode-ai.com/en-US/qr-code-scanner/mcp", "wrong homepage")

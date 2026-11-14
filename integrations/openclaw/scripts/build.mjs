@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT-0
+// SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync } from "node:fs";
@@ -16,7 +16,8 @@ mkdirSync(join(stage, ".codex-plugin"));
 for (const file of [".codex-plugin/plugin.json", ".mcp.json", "package.json", "README.md", "LICENSE"]) copyFileSync(join(here, file), join(stage, file));
 mkdirSync(join(stage, "scripts"));
 copyFileSync(join(here, "scripts/setup.mjs"), join(stage, "scripts/setup.mjs"));
-copyFileSync(join(source, "LICENSE"), join(stage, "ENGINE-LICENSE"));
+// The bundle still pins the published AGPL engine; its authored source is MIT.
+copyFileSync(join(source, "distribution/releases/historical-agpl-3.0.txt"), join(stage, "ENGINE-LICENSE"));
 cpSync(join(source, "skills/qrcode-barcode-scanner"), join(stage, "skills/qrcode-barcode-scanner"), { recursive: true });
 assert.ok(!existsSync(join(stage, "openclaw.plugin.json")), "Keep the portable bundle family");
 const manifest = JSON.parse(readFileSync(join(stage, ".codex-plugin/plugin.json")));

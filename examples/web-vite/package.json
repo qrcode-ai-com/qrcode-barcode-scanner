@@ -10,7 +10,7 @@
     "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git",
     "directory": "examples/web-vite"
   },
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

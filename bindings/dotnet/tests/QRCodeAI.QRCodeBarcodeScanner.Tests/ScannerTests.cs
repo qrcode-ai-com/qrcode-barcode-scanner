@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 //
 // The tests scan real fixtures of the engine through the public API. QRSCAN_FIXTURES names the
 // engine's `fixtures` directory and QRSCAN_ENGINE_VERSION the version the native library was

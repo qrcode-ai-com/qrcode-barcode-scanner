@@ -1165,7 +1165,7 @@ def source_md(info):
         "whose sha256 equals that checksum. build-info.json also lists the crates used only to",
         "build qrscan (`build_dependencies`).", "",
         "## License and notice files", "",
-        "- LICENSE: the AGPL-3.0-or-later text that covers qrscan and its engine.",
+        "- LICENSE: the MIT text that covers qrscan and its engine.",
         "- LICENSING.md: how the engine is licensed.",
         "- LICENSE-APACHE-2.0 and THIRD-PARTY.md: the notices of the engine's parts derived from rxing.",
         "- THIRD-PARTY-LICENSES.txt: the license and notice texts of the linked crates.",
@@ -2316,7 +2316,7 @@ resolver = "3"
 
 [workspace.package]
 version = "0.11.0"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 repository = "{FIXTURE_REPO}"
 
 [profile.release]
@@ -2405,7 +2405,7 @@ class Fixture:
                 put(folder / relative, data)
             packages.append({"name": name, "version": version, "license": license, "license_file": license_file,
                              "manifest_path": str(folder / "Cargo.toml")})
-        packages += [{"name": name, "version": "0.11.0", "license": "AGPL-3.0-or-later", "license_file": None,
+        packages += [{"name": name, "version": "0.11.0", "license": "MIT", "license_file": None,
                       "manifest_path": str(self.root / folder / "Cargo.toml")} for name, folder in FIXTURE_WORKSPACE]
         self.state = {
             "log": str(self.log), "watch": WATCH, "python": sys.executable, "bin": str(self.bin), "commit": COMMIT,
@@ -2752,7 +2752,7 @@ def want_dependencies(target):
     rows = [{"name": name, "version": version, "source": CRATES_IO, "checksum": checksum(name, version),
              "license": license} for name, version, license, _files, _file, links in FIXTURE_CRATES
             if links in ("all", side)]
-    rows += [{"name": name, "version": "0.11.0", "source": None, "checksum": None, "license": "AGPL-3.0-or-later"}
+    rows += [{"name": name, "version": "0.11.0", "source": None, "checksum": None, "license": "MIT"}
              for name, _folder in FIXTURE_WORKSPACE]
     return sorted(rows, key=lambda row: (row["name"], row["version"]))
 

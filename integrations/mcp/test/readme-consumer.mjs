@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // Copied outside the checkout with the installed package and public fixtures.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

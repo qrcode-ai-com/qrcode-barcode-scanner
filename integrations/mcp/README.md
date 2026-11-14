@@ -502,7 +502,7 @@ capacity shared with `scan_image`, and that a wrong directory setting stops
 the server. Links and the pipe are checked on macOS and Linux only.
 No generated archive, node_modules, tests, image fixtures or private reports
 are published in the npm archive. The source, runtime entry, schema and
-AGPL license are included.
+version-specific license are included.
 
 Adapter source: [integrations/mcp](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp).
 Source engine: [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0).
@@ -519,6 +519,19 @@ SDK API sources:
 
 Created and maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**,
 a product of **SuperNovae Studio**. The adapter is distributed under
-**AGPL-3.0-or-later**; see the packaged [LICENSE](LICENSE). The scanner engine
+**MIT for current project-authored source**; see [LICENSE](LICENSE). The published
+MCP archive retains its packaged license. The scanner engine
 and other components retain their own license notices. Review those materials
 for your intended distribution and deployment.
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->
