@@ -62,6 +62,20 @@ class LicensingTests(unittest.TestCase):
                 self.assertIn('third-party', text)
                 self.assertNotRegex(text, r'(?i)(needs|requires|need) (?:the |a )?commercial licen[cs]e')
 
+    def test_licensing_guide_links_work_from_a_flat_cli_archive(self):
+        guide = (ROOT / 'LICENSING.md').read_text()
+        targets = re.findall(r'\]\(([^)]+)\)', guide)
+        self.assertGreaterEqual(len(targets), 6)
+        for target in targets:
+            with self.subTest(target=target):
+                if target.startswith('https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'):
+                    self.assertTrue((ROOT / target.split('/blob/main/', 1)[1]).is_file())
+                elif not target.startswith('https://'):
+                    self.assertEqual(target, 'LICENSE', 'Only the adjacent LICENSE may be relative in the flat CLI archive')
+        cli_readme = (ROOT / 'distribution/cli/README.md').read_text()
+        self.assertNotIn('| `LICENSE` | the GNU Affero General Public License, version 3 |', cli_readme)
+        self.assertIn('MIT in current source, AGPL-3.0-or-later in published 0.11.0 archives', cli_readme)
+
     def test_pinned_public_binaries_keep_their_actual_agpl_metadata(self):
         self.assertIn("license=('AGPL-3.0-or-later')", (ROOT / 'distribution/aur/PKGBUILD').read_text())
         self.assertIn('license = AGPL-3.0-or-later', (ROOT / 'distribution/aur/.SRCINFO').read_text())

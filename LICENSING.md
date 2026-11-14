@@ -15,7 +15,7 @@ commercial license is not required for project-authored MIT source.
 ## Published versions and pinned dependencies
 
 The source change does not replace or relabel a published archive. Each archive retains its
-packaged license. The [dated license history](docs/guides/license-history.mdx) records earlier
+packaged license. The [dated license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) records earlier
 engine, adapter and portable-helper grants. Source, an installed package and a hosted listing
 can show different licenses until a new qualified version is published. Identify an unreleased
 source build by its exact commit and archive hash, not just its version.
@@ -28,8 +28,8 @@ qualification and owner approval.
 ## Third-party components and data
 
 Retain upstream licenses and notices. The copied rxing/ZXing reader source keeps its Apache-2.0
-notices and [license text](crates/qrcode-ai-scanner/LICENSE-APACHE-2.0), as described in
-[THIRD-PARTY.md](crates/qrcode-ai-scanner/THIRD-PARTY.md). UniFFI dependencies include MPL-2.0
+notices and [license text](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner/LICENSE-APACHE-2.0), as described in
+[THIRD-PARTY.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner/THIRD-PARTY.md). UniFFI dependencies include MPL-2.0
 components; other dependencies retain their declared licenses. Our MIT grant does not relicense
 those dependencies, third-party fixtures, datasets or the separate QR Code AI service.
 
@@ -42,8 +42,8 @@ new qualified artifact replaces the pin.
 ## Ask AI artwork
 
 The retained marks and badges use [Lobe Icons](https://github.com/lobehub/lobe-icons) under its
-[MIT license](docs/assets/actions/brands/LICENSE-Lobe-Icons.txt). Source revision and hashes are
-in [the provenance](docs/assets/actions/brands/provenance.json); each colored image embeds the
+[MIT license](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/actions/brands/LICENSE-Lobe-Icons.txt). Source revision and hashes are
+in [the provenance](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/actions/brands/provenance.json); each colored image embeds the
 notice. Trademarks remain with their owners and imply no endorsement. OpenAI uses a green
 display tint; Grok retains black. Vendored Cargokit keeps its upstream MIT notice.
 

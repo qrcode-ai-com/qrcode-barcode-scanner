@@ -105,7 +105,8 @@ actual installed adapter/runtime before publication. ClawHub validation,
 publication admission, OpenClaw discovery and real scan calls are separate gates.
 
 The authored bundle and skill source files in this checkout are MIT. The pinned published MCP
-adapter and scanner engine retain AGPL-3.0-or-later; `ENGINE-LICENSE` preserves
+adapter and scanner engine retain AGPL-3.0-or-later; Setup checks the installed engine’s package license and bundled notice together,
+and refuses a mismatch before loading native code. `ENGINE-LICENSE` preserves
 that license text. Installation does not relicense the engine.
 
 [OpenClaw bundles](https://docs.openclaw.ai/plugins/bundles) · [ClawHub publishing](https://docs.openclaw.ai/clawhub/publishing)

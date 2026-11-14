@@ -57,7 +57,7 @@ paths = ["docs/assets/actions/brands/provenance.json"]
 
 [[frozen]]
 why = "Dated license history and the exact legacy AGPL text; these never follow a new engine version."
-paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py"]
+paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py", "integrations/openclaw/test/runtime-license.mjs"]
 
 # ------------------------------------------------------------------ what a file follows
 
@@ -107,6 +107,7 @@ paths = [
   "docs/guides/choosing-a-surface.mdx",
   "docs/guides/nuxt-verify.mdx",
   "distribution/README.md",
+  "distribution/cli/README.md",
   "distribution/releases/README.md",
   "distribution/appimage/*",
   "distribution/aur/*",
@@ -265,6 +266,11 @@ match = "scanner: '0\\.11\\.0'|\"scanner\":\"0\\.11\\.0\"|scanner@0\\.11\\.0\"\\
 keep = "An entry of the package changelog: a new version adds one above it."
 paths = ["distribution/rpm/qrcode-barcode-scanner.spec"]
 match = '^\* \w{3} \w{3} \d{2} \d{4} |^- Package the published'
+
+[[line]]
+keep = "The immutable AGPL grant of published CLI 0.11.0 archives."
+paths = ["distribution/cli/README.md"]
+match = '^Published CLI 0\.11\.0 archives|AGPL-3\.0-or-later in published 0\.11\.0 archives'
 
 # ------------------------------------------------------------------ pinned values of the public release
 
