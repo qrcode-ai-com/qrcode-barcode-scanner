@@ -1,8 +1,10 @@
 """Public README action format, shared by documentation producers (stdlib only)."""
 import base64
+import copy
 import html
 import json
 import re
+import xml.etree.ElementTree as ET
 from urllib.parse import quote, urlencode, urlsplit
 
 START = '<!-- qrcode-ai-readme-actions:v2 -->'
@@ -84,7 +86,7 @@ def strip_actions(text):
 
 
 def action_block(prompt, installers=()):
-    badges = lambda rows: '\n'.join(f'[![{label}]({ASSETS}{key}-v1.svg)]({url})' for key, label, url in rows)
+    badges = lambda rows: '\n'.join(f'[![{label}]({ASSETS}{key}-v{2 if key in {p[0] for p in PROVIDERS} else 1}.svg)]({url})' for key, label, url in rows)
     installation = ''
     if installers:
         installation = ('\n\n' + badges(installers) + '\n\n'
@@ -109,9 +111,53 @@ def insert_actions(text, block):
     return clean[:heading.end()] + block + clean[heading.end():]
 
 
-def badge_svg(label):
-    # Original text-only artwork: no third-party brand geometry or remote fonts.
+SVG = 'http://www.w3.org/2000/svg'
+ET.register_namespace('', SVG)
+
+
+def _retained_svg(text):
+    # Build-time retained inputs only: standalone badges never fetch or execute anything.
+    if len(text) > 50000 or '<!' in text:
+        raise ValueError('Unsupported retained SVG')
+    root = ET.fromstring(text)
+    allowed = {'svg', 'title', 'metadata', 'rect', 'path', 'g', 'defs', 'linearGradient', 'radialGradient', 'stop'}
+    for node in root.iter():
+        if node.tag not in {f'{{{SVG}}}{name}' for name in allowed}:
+            raise ValueError('Unsupported SVG element')
+        for name, value in node.attrib.items():
+            if name.lower().startswith('on') or name.endswith('href') or 'javascript:' in value.lower():
+                raise ValueError('Active SVG is not supported')
+            if 'url(' in value and not re.fullmatch(r'url\(#[A-Za-z0-9_-]+\)', value):
+                raise ValueError('Only local SVG paint references are supported')
+    if root.tag != f'{{{SVG}}}svg':
+        raise ValueError('Expected an SVG root')
+    return root
+
+
+def brand_logo(svg, color, provider, license_text):
+    if provider not in {row[0] for row in PROVIDERS} or not re.fullmatch(r'#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})', color):
+        raise ValueError('Unknown provider or display color')
+    original = _retained_svg(svg)
+    root = ET.Element(f'{{{SVG}}}svg', {'width': '24', 'height': '24', 'viewBox': '0 0 24 24', 'data-ai-logo': provider})
+    ET.SubElement(root, f'{{{SVG}}}metadata').text = license_text
+    # A fixed light tile keeps original black/colored geometry visible in either host theme.
+    ET.SubElement(root, f'{{{SVG}}}rect', {'width': '24', 'height': '24', 'rx': '5', 'fill': '#fff'})
+    original.attrib.update({'x': '2', 'y': '2', 'width': '20', 'height': '20', 'color': color})
+    root.append(original)
+    return ET.tostring(root, encoding='unicode') + '\n'
+
+
+def badge_svg(label, logo=None):
+    # Keep legacy v1 text-only bytes exact; v2 embeds retained, licensed brand geometry.
     width = len(label) * 8 + 32
+    if logo is not None:
+        mark = copy.deepcopy(_retained_svg(logo))
+        mark.attrib.update({'x': '8', 'y': '6', 'width': '24', 'height': '24'})
+        width += 28
+        return (f'<svg xmlns="{SVG}" width="{width}" height="36" viewBox="0 0 {width} 36" role="img" aria-label="{html.escape(label)}">'
+                f'<title>{html.escape(label)}</title><rect x=".5" y=".5" width="{width - 1}" height="35" rx="18" fill="#18181b" stroke="#52525b"/>'
+                + ET.tostring(mark, encoding='unicode') +
+                f'<text x="{(width + 32) / 2:g}" y="23" fill="#fafafa" font-family="system-ui, sans-serif" font-size="13" font-weight="600" text-anchor="middle">{html.escape(label)}</text></svg>\n')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="36" viewBox="0 0 {width} 36" role="img" aria-label="{html.escape(label)}">'
             f'<title>{html.escape(label)}</title><rect x=".5" y=".5" width="{width - 1}" height="35" rx="18" fill="#18181b" stroke="#52525b"/>'
             f'<text x="{width / 2:g}" y="23" fill="#fafafa" font-family="system-ui, sans-serif" font-size="13" font-weight="600" text-anchor="middle">{html.escape(label)}</text></svg>\n')

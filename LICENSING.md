@@ -51,6 +51,17 @@ corresponding source is the same release's `qrcode-barcode-scanner-cli-X.Y.Z-sou
 are not bundled: each archive's `build-info.json` lists them with their `Cargo.lock`
 checksums, and its `SOURCE.md` gives their crates.io download address.
 
+## Ask AI brand artwork
+
+The retained assistant marks and their derived README badges use
+[Lobe Icons](https://github.com/lobehub/lobe-icons), under its retained
+[MIT license](docs/assets/actions/brands/LICENSE-Lobe-Icons.txt). Their pinned source
+revision and file hashes are in [the asset provenance](docs/assets/actions/brands/provenance.json).
+Each colored image embeds the license notice so a standalone badge retains its attribution.
+These marks identify the linked assistants; their trademarks remain with their owners and
+do not imply endorsement. The OpenAI knot uses a green display tint; Grok keeps its black mark.
+This artwork does not change the engine's dual-license terms.
+
 ## Contributions
 
 By submitting a contribution (e.g. a pull request) you agree that it is licensed under
