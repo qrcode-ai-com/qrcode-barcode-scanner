@@ -15,7 +15,7 @@ const stage = mkdtempSync(join(output, "bundle-stage-"));
 mkdirSync(join(stage, ".codex-plugin"));
 for (const file of [".codex-plugin/plugin.json", ".mcp.json", "package.json", "README.md", "LICENSE"]) copyFileSync(join(here, file), join(stage, file));
 mkdirSync(join(stage, "scripts"));
-copyFileSync(join(here, "scripts/setup.mjs"), join(stage, "scripts/setup.mjs"));
+for (const file of ["setup.mjs", "runtime-license.mjs"]) copyFileSync(join(here, "scripts", file), join(stage, "scripts", file));
 // The bundle still pins the published AGPL engine; its authored source is MIT.
 copyFileSync(join(source, "distribution/releases/historical-agpl-3.0.txt"), join(stage, "ENGINE-LICENSE"));
 cpSync(join(source, "skills/qrcode-barcode-scanner"), join(stage, "skills/qrcode-barcode-scanner"), { recursive: true });

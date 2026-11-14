@@ -260,15 +260,15 @@ code: the wording of messages may change.
 
 ## License and corresponding source
 
-The published CLI archives described here retain AGPL-3.0-or-later. Current
-project-authored source is MIT.
-The licensing guide packaged with each version describes its own grant. Next to the
-program, each archive holds:
+Published CLI 0.11.0 archives retain AGPL-3.0-or-later. Current project-authored
+source is MIT, and new candidate archives carry the license of their exact source
+commit. Read the license shipped in the archive you install; a current README does
+not change an older binary’s grant. Next to the program, each archive holds:
 
 | File | Content |
 |---|---|
-| `LICENSE` | the GNU Affero General Public License, version 3 |
-| `LICENSING.md` | the dual-licensing terms: AGPL-3.0-or-later or a commercial license |
+| `LICENSE` | the exact project license text for the build: MIT in current source, AGPL-3.0-or-later in published 0.11.0 archives |
+| `LICENSING.md` | the source grant, version boundary and third-party obligations for that build |
 | `THIRD-PARTY.md`, `LICENSE-APACHE-2.0` | the notices of the engine code derived from rxing, under Apache-2.0 |
 | `THIRD-PARTY-LICENSES.txt` | each third-party Rust crate linked into `qrscan`, with its version, license, crates.io source and checksum, then each license text once |
 | `COPYRIGHT-rust-std.html` | the copyright notices of the Rust standard library linked into `qrscan` |
@@ -294,9 +294,10 @@ Third-party crates are not bundled: `SOURCE.md` gives the crates.io download
 address of each crate listed in `build-info.json`, whose checksum there and in
 `Cargo.lock` identifies it.
 
-If you pass these binaries on, keep these files with them. The AGPL's
-conditions for conveying object code, in section 6 of `LICENSE`, include
-providing the corresponding source.
+Keep these files with redistributed binaries. For an MIT build, retain its
+copyright and permission notice and the third-party material. For an older AGPL
+build, the conditions for conveying object code in section 6 of its packaged
+`LICENSE` include providing the corresponding source.
 
 ## Updates
 

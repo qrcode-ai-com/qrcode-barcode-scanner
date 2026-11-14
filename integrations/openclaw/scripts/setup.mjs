@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
+import { assertRuntimeLicense } from "./runtime-license.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -28,7 +29,9 @@ assert.ok(npmCli, "Use Node with its matching npm installation");
 execFileSync(process.execPath, [npmCli, "install", "--prefix", runtime, "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", operand], { stdio: "inherit" });
 const packageFile = (name) => join(runtime, "node_modules", name, "package.json");
 assert.equal(JSON.parse(readFileSync(packageFile(MCP))).version, "0.2.0");
-assert.equal(JSON.parse(readFileSync(packageFile(ENGINE))).version, "0.11.0");
+const engineMetadata = JSON.parse(readFileSync(packageFile(ENGINE)));
+assert.equal(engineMetadata.version, "0.11.0");
+assertRuntimeLicense(engineMetadata, readFileSync(join(dirname(packageFile(ENGINE)), "LICENSE"), "utf8"), readFileSync(join(root, "ENGINE-LICENSE"), "utf8"));
 const require = createRequire(manifest);
 const engine = require(ENGINE);
 assert.equal(engine.version(), "0.11.0");

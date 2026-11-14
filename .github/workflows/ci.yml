@@ -341,6 +341,7 @@ jobs:
       - run: python3 scripts/dotnet-package.py --self-test
       - run: python3 scripts/test-dotnet-release.py
       - run: python3 scripts/test-licensing.py
+      - run: node integrations/openclaw/test/runtime-license.mjs
       - run: python3 scripts/build-readme-licensing.py --check
       - run: python3 scripts/test-readme-actions.py
       - run: python3 scripts/build-readme-actions.py --check

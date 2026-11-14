@@ -19,6 +19,7 @@
     ".mcp.json",
     "skills",
     "scripts/setup.mjs",
+    "scripts/runtime-license.mjs",
     "README.md",
     "LICENSE",
     "ENGINE-LICENSE"
