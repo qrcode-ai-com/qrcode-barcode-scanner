@@ -51,6 +51,10 @@ paths = ["docs/guides/migrate-to-qrcode-barcode-scanner.mdx"]
 why = "A dated source comparison: its release baseline and reviewed source hashes require a fresh factual review, not automatic version replacement."
 paths = ["docs/comparison.mdx"]
 
+[[frozen]]
+why = "Retained third-party brand provenance: upstream source hashes are independent of the engine release."
+paths = ["docs/assets/actions/brands/provenance.json"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]

@@ -1,0 +1,110 @@
+{
+  "repository": "https://github.com/lobehub/lobe-icons",
+  "revision": "a177c1e817204f8ddc0c8993610ca674fc6d9767",
+  "license": "MIT",
+  "notice": "Brand marks identify linked assistants; their trademarks belong to their owners and imply no endorsement. Upstream SVG bytes and geometry are retained. Presentation uses a light tile for legibility in either theme.",
+  "icons": [
+    {
+      "id": "chatgpt",
+      "file": "chatgpt.svg",
+      "source": "packages/static-svg/icons/openai.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/openai.svg",
+      "sha256": "a595df6b423920c67a7f8f73c063e4bfb72d415948097b6cac063a2366bb5186",
+      "bytes": 1687,
+      "colorSource": "src/OpenAI/style.ts",
+      "colorSourceSha256": "6f4e706e43e85ca5f9f47d1207b6e84d12723864cd566fe793a4ac5813e1d691",
+      "color": "#10A37F",
+      "sourceColor": "#000",
+      "displayNote": "Green display tint for the monochrome OpenAI knot; not a claim about the current primary corporate color."
+    },
+    {
+      "id": "claude",
+      "file": "claude.svg",
+      "source": "packages/static-svg/icons/claude-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/claude-color.svg",
+      "sha256": "a3101f3047a119aa11825ad9369510f0c472428c8c52d420e31bc62db44a8364",
+      "bytes": 1696,
+      "colorSource": "src/Claude/style.ts",
+      "colorSourceSha256": "da2a33caddebaf6666a3e60349b447ce9eaf8789318d584f932f72331a5cfd18",
+      "color": "#D97757"
+    },
+    {
+      "id": "gemini",
+      "file": "gemini.svg",
+      "source": "packages/static-svg/icons/gemini-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/gemini-color.svg",
+      "sha256": "8ab0a9bafec11f7e69bcb9fc4ffd8f1bc927d1ddcbbb6ff36dee5ae8b5a9d602",
+      "bytes": 2836,
+      "colorSource": "src/Gemini/style.ts",
+      "colorSourceSha256": "804bcbacf4f0508e7164c7e788d847b96283e76c3c33b9b78a9465ffcdeee1eb",
+      "color": "#fff"
+    },
+    {
+      "id": "grok",
+      "file": "grok.svg",
+      "source": "packages/static-svg/icons/grok.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/grok.svg",
+      "sha256": "9175fc90c22655160231976c849f25a03b888d7cc0e04c5f1b987b659bb07c95",
+      "bytes": 756,
+      "colorSource": "src/Grok/style.ts",
+      "colorSourceSha256": "a867ca4c7312065f10d5ced3f63d98e21160355796040d8da4f63472dddfdb8d",
+      "color": "#000"
+    },
+    {
+      "id": "perplexity",
+      "file": "perplexity.svg",
+      "source": "packages/static-svg/icons/perplexity-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/perplexity-color.svg",
+      "sha256": "8353f3ab20822f1a933224b0ea32cc39f0c32d5740f4af8c254b0f418e0a3a70",
+      "bytes": 603,
+      "colorSource": "src/Perplexity/style.ts",
+      "colorSourceSha256": "a809ebab13c7cbc2e36e768762f874db93ce8010ab57db48d7f5a0d76c00bb27",
+      "color": "#22B8CD"
+    },
+    {
+      "id": "copilot",
+      "file": "copilot.svg",
+      "source": "packages/static-svg/icons/copilot-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/copilot-color.svg",
+      "sha256": "50d59ef2ab0930de15d657dbd21628536b0fee1f2c88306cfb9970cc79b45b92",
+      "bytes": 2322,
+      "colorSource": "src/Copilot/style.ts",
+      "colorSourceSha256": "856afda017e4c75028da2dc98fc594b48757b9681a5845b535644a56f379ba0e",
+      "color": "#fff"
+    },
+    {
+      "id": "deepseek",
+      "file": "deepseek.svg",
+      "source": "packages/static-svg/icons/deepseek-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/deepseek-color.svg",
+      "sha256": "deba5f98a5c1796e20fcac3149bcd7eb8a32f0bdd04d048819400b1f28bd1439",
+      "bytes": 2164,
+      "colorSource": "src/DeepSeek/style.ts",
+      "colorSourceSha256": "946e07e2f72078a6722b2d0f4bf27a17a86787360202829d7e4a0b519a6a6015",
+      "color": "#4D6BFE"
+    },
+    {
+      "id": "meta-ai",
+      "file": "meta-ai.svg",
+      "source": "packages/static-svg/icons/metaai-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/metaai-color.svg",
+      "sha256": "5a2c8b2c71ddb4d6a44daee712cb6be02a09a29d649d21e0af1454bc331055b5",
+      "bytes": 4546,
+      "colorSource": "src/MetaAI/style.ts",
+      "colorSourceSha256": "746a7a256957d675bfc8465f0027fd518e62ca1505660b34cbf5236dfee0cffa",
+      "color": "#000"
+    },
+    {
+      "id": "qwen",
+      "file": "qwen.svg",
+      "source": "packages/static-svg/icons/qwen-color.svg",
+      "sourceUrl": "https://github.com/lobehub/lobe-icons/blob/a177c1e817204f8ddc0c8993610ca674fc6d9767/packages/static-svg/icons/qwen-color.svg",
+      "sha256": "a158a0e3ed5b541e4f91384ece02c3acf0a0d81b7b11a46d77bafb248b09e32c",
+      "bytes": 1016,
+      "colorSource": "src/Qwen/style.ts",
+      "colorSourceSha256": "c2ab40ecc7750bef75f99157865d39c165984ac4f936bfbbb2a7ba77ccb22159",
+      "color": "#082dff"
+    }
+  ],
+  "licenseSha256": "add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a"
+}

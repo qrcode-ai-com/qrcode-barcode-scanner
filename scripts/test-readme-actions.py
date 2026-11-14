@@ -112,6 +112,52 @@ class ReadmeActions(unittest.TestCase):
                 body = (ROOT / path).read_text()
                 self.assertEqual(set(canonical_links(path)) - prose_links(body), set())
 
+    def test_every_assistant_badge_embeds_its_colored_retained_logo_and_license(self):
+        import hashlib
+        import xml.etree.ElementTree as ET
+        manifest = json.loads((ROOT / 'docs/assets/actions/brands/provenance.json').read_text())
+        outputs = builder.outputs()
+        ns = {'s': 'http://www.w3.org/2000/svg'}
+        self.assertEqual({row['id'] for row in manifest['icons']}, {row[0] for row in builder.PROVIDERS})
+        for row in manifest['icons']:
+            with self.subTest(provider=row['id']):
+                original = (ROOT / 'docs/assets/actions/brands' / row['file']).read_bytes()
+                self.assertEqual(hashlib.sha256(original).hexdigest(), row['sha256'])
+                key = row['id']
+                self.assertTrue(f'docs/assets/actions/{key}-v2.svg' in outputs, 'Missing colored badge: ' + key)
+                logo = ET.fromstring(outputs[f'docs/assets/actions/{key}-logo-v1.svg'])
+                badge = ET.fromstring(outputs[f'docs/assets/actions/{key}-v2.svg'])
+                self.assertEqual(logo.attrib['data-ai-logo'], key)
+                self.assertEqual(badge.find('s:svg', ns).attrib['data-ai-logo'], key)
+                self.assertIn('Copyright (c) 2023 LobeHub', ''.join(badge.itertext()))
+                self.assertIn('Permission is hereby granted', ''.join(badge.itertext()))
+                # All original path geometry survives; this is a logo, not a text-only badge.
+                source_paths = [p.attrib['d'] for p in ET.fromstring(original).findall('.//s:path', ns)]
+                self.assertTrue(source_paths)
+                self.assertEqual([p.attrib['d'] for p in badge.findall('.//s:path', ns)], source_paths)
+                self.assertEqual(logo.find('s:svg', ns).attrib['color'], row['color'])
+                self.assertEqual(logo.find('s:rect', ns).attrib['fill'], '#fff')
+                self.assertFalse(badge.findall('.//s:image', ns))
+                self.assertFalse(badge.findall('.//s:script', ns))
+        # Legacy versioned image URLs keep their original text-only bytes.
+        from readme_actions import badge_svg
+        for key, label, *_ in builder.PROVIDERS:
+            self.assertEqual((ROOT / f'docs/assets/actions/{key}-v1.svg').read_text(), badge_svg('Ask ' + label))
+        for path in builder.maintained_readmes():
+            for key, *_ in builder.PROVIDERS:
+                self.assertTrue(f'/{key}-v2.svg' in outputs[path], path + ': missing colored ' + key)
+
+    def test_badge_inputs_reject_active_svg_and_external_paint(self):
+        from readme_actions import brand_logo
+        for body in ('<script/>', '<path onload="alert(1)"/>',
+                     '<path fill="url(https://invalid.example/track.svg)"/>', '<image href="https://invalid.example/track.svg"/>'):
+            with self.subTest(svg=body), self.assertRaises(ValueError):
+                brand_logo('<svg xmlns="http://www.w3.org/2000/svg">' + body + '</svg>', '#000', 'grok', 'MIT')
+        with self.assertRaises(ValueError):
+            brand_logo('<!DOCTYPE svg><svg/>', '#000', 'grok', 'MIT')
+        with self.assertRaises(ValueError):
+            brand_logo('<svg xmlns="http://www.w3.org/2000/svg"/>', '#12345', 'grok', 'MIT')
+
     def test_scope_and_context_cannot_be_ambiguous(self):
         self.assertIn('connected product', question('iOS app', 'https://qrcode-ai.com/', scope='qrcodeai'))
         for url in ('file:///private/x', 'http://example.com', 'https://token@example.com/'):

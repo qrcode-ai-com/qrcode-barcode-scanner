@@ -7,7 +7,7 @@ import re
 import subprocess
 import tomllib
 from readme_prose import canonical_links
-from readme_actions import PROVIDERS, action_block, badge_svg, insert_actions, mcp_links, question, strip_actions
+from readme_actions import PROVIDERS, action_block, badge_svg, brand_logo, insert_actions, mcp_links, question, strip_actions
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'
@@ -36,8 +36,14 @@ def outputs():
         prompt = question(f'{title} ({path})', REPOSITORY + path, urls, context=context)
         installers = mcp_links(config) if path in ('README.md', 'integrations/mcp/README.md') else ()
         result[path] = insert_actions(text, action_block(prompt, installers))
+    brand_root = ROOT / 'docs/assets/actions/brands'
+    marks = {row['id']: row for row in json.loads((brand_root / 'provenance.json').read_text())['icons']}
+    license_text = (brand_root / 'LICENSE-Lobe-Icons.txt').read_text()
     for key, label, *_ in PROVIDERS:
-        result[f'docs/assets/actions/{key}-v1.svg'] = badge_svg('Ask ' + label)
+        mark = marks[key]
+        logo = brand_logo((brand_root / mark['file']).read_text(), mark['color'], key, license_text)
+        result[f'docs/assets/actions/{key}-logo-v1.svg'] = logo
+        result[f'docs/assets/actions/{key}-v2.svg'] = badge_svg('Ask ' + label, logo)
     for key, label, _ in mcp_links(config):
         result[f'docs/assets/actions/{key}-v1.svg'] = badge_svg(label)
     return result
