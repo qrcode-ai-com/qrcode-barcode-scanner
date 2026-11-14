@@ -107,6 +107,7 @@ paths = [
   "docs/guides/choosing-a-surface.mdx",
   "docs/guides/nuxt-verify.mdx",
   "distribution/README.md",
+  "distribution/cli/README.md",
   "distribution/releases/README.md",
   "distribution/appimage/*",
   "distribution/aur/*",
