@@ -17,7 +17,6 @@ allow = [
   # MIT/Apache): an allowance is prunable ONLY once proven absent from ALL
   # five lockfile trees — CDLA-Permissive-2.0 died exactly that way, 2026-07-08.
   "MPL-2.0",
-  "AGPL-3.0-or-later",
 ]
 
 # allo-isolate 0.1.27 (flutter_rust_bridge hard dep) published with only

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 import { constants, readFileSync, realpathSync, statSync } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { delimiter, dirname, isAbsolute, parse, relative, resolve, sep } from "node:path";

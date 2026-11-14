@@ -61,6 +61,17 @@ Preserve historical package names, tags, schema IDs, licenses and wire contracts
 Newly named packages need real builds and consumer qualification. A repository
 rename or a documentation change does not publish or retire any artifact.
 
+## Source license amendment · 14 November 2026
+
+The owner chose MIT for current project-authored scanner source and future
+qualified artifacts. Read [LICENSING.md](LICENSING.md). Preserve upstream
+Apache/MIT/MPL notices and published archive terms: engine 0.11.0 and MCP
+0.3.1 remain AGPL in their retained archives; skill/bundle 0.2.0 retain MIT-0.
+Recipes wrapping those binaries must not relabel them as MIT. Tags, package
+publication and catalogue admission still require their own gates. All maintained
+README files carry the source/archive boundary through
+`scripts/build-readme-licensing.py`; CI checks their generated section.
+
 ## Current implementation
 
 A Rust workspace with five published runtime entry points and separate mobile

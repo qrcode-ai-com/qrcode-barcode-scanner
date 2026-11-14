@@ -24,7 +24,7 @@
     <Authors>QR Code AI</Authors>
     <Description>Read QR codes and barcodes from an image in .NET, in process: QR Code, Data Matrix, Aztec, PDF417, Code 128, EAN and more. The engine is inside the package, and its JSON report is returned unchanged.</Description>
     <PackageTags>qr-code;qrcode;barcode;scanner;reader;data-matrix;code128;ean</PackageTags>
-    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://qrcode-ai.com/en-US/qr-code-scanner/sdk/dotnet</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>

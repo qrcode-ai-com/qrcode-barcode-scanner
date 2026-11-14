@@ -33,9 +33,9 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
-# Dual-licensed AGPL-3.0-or-later OR commercial — see the repo-root LICENSING.md.
-# A closed-source app on the stores almost always needs the commercial license
-# (it links the AGPL Rust core): studio.supernovae@gmail.com.
+
+# First-party source is MIT; see LICENSE and the repo-root LICENSING.md.
+# Published archives retain the license shipped with their version.
 
 flutter:
   plugin:

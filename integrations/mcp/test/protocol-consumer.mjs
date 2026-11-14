@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 // This file is copied outside the checkout, beside only installed dependencies.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";

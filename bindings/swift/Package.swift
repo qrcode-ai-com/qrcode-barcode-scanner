@@ -4,9 +4,8 @@
 // crate `crates/qrcode-ai-scanner-uniffi`. SwiftPM versions are the repo's git
 // tags (vX.Y.Z) — there is no version field to sync (architecture plan §3.1).
 //
-// Dual-licensed AGPL-3.0-or-later OR commercial — see the repo-root
-// LICENSING.md. A native iOS app on the App Store is almost always closed-
-// source and needs the commercial license (contact studio.supernovae@gmail.com).
+// First-party source is MIT; see the repo-root LICENSE and LICENSING.md.
+// Retain third-party notices and check the license of any pinned published artifact.
 //
 // Generated, not committed: Sources/QrcodeAiScanner/*.swift (uniffi-bindgen-swift)
 // and the xcframework are produced in CI and git-ignored (architecture §1.3).

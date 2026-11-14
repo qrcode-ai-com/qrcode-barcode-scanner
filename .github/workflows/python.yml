@@ -80,7 +80,7 @@ jobs:
           maturin-version: ${{ env.MATURIN_VERSION }}
           command: sdist
           args: --out dist
-      # the wheel and the sdist read back: the AGPL text where PEP 639 puts it,
+      # the wheel and the sdist read back: the MIT text where PEP 639 puts it,
       # METADATA version + license expression, the type stubs, the exact wheel
       # file set, only git-tracked files in the sdist
       - name: inspect the wheel and the sdist
@@ -139,7 +139,7 @@ jobs:
           if-no-files-found: error
 
   # Every archive PyPI would receive, read back before anything publishes —
-  # on a branch dispatch too: the AGPL text in each wheel's
+  # on a branch dispatch too: the MIT text in each wheel's
   # .dist-info/licenses/ and at the sdist root (PEP 639), the METADATA version
   # and license expression, the type stubs, the exact file sets.
   inspect:
@@ -159,7 +159,7 @@ jobs:
           merge-multiple: true
       - run: python3 scripts/package-inspect.py archive dist/* --release-set --strict --quiet
       # The sdist as pip uses it where no wheel fits: a PEP 517 build in an
-      # isolated environment, whose wheel must carry the AGPL text like the
+      # isolated environment, whose wheel must carry the MIT text like the
       # ones built above. Pinned like every other maturin leg: the maturin of
       # MATURIN_VERSION (a build constraint, in both of pip's spellings: pip
       # >= 26.2 reads only PIP_BUILD_CONSTRAINT, pip < 25.3 only

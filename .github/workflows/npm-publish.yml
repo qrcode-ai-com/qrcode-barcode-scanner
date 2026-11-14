@@ -138,7 +138,7 @@ jobs:
           if-no-files-found: error
 
   # The npm packages assembled exactly as they publish, on every run: the
-  # per-target dirs napi generates — each given the AGPL LICENSE, since
+  # per-target dirs napi generates — each given the MIT LICENSE, since
   # `napi create-npm-dirs` writes only package.json + README — the main
   # package pinning every one of them, then every tarball packed once and read
   # back. The tarballs are the artifact `publish-native` uploads, unchanged.
@@ -166,7 +166,7 @@ jobs:
       # napi v3: scaffold the per-platform npm/<triple>/ dirs before artifacts
       - run: pnpm exec napi create-npm-dirs
       - run: pnpm exec napi artifacts
-      - name: the AGPL text in every platform package
+      - name: the MIT text in every platform package
         run: |
           set -euo pipefail
           for dir in npm/*/; do

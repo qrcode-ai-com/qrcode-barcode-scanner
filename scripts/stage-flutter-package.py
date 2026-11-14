@@ -377,8 +377,8 @@ def verify_staged(files, snapshot, revision, *, unpublished_example_lock=False):
 def fixture(version="0.9.0"):
     revision = "a" * 40
     original = b'[package]\nname = "qrcode-barcode-scanner"\nversion.workspace = true\nlicense.workspace = true\n'
-    workspace = b'[workspace.package]\nversion = "0.9.0"\nlicense = "AGPL-3.0-or-later"\n'
-    manifest = b'[package]\nname = "qrcode-barcode-scanner"\nversion = "0.9.0"\nlicense = "AGPL-3.0-or-later"\n'
+    workspace = b'[workspace.package]\nversion = "0.9.0"\nlicense = "MIT"\n'
+    manifest = b'[package]\nname = "qrcode-barcode-scanner"\nversion = "0.9.0"\nlicense = "MIT"\n'
     core = {"Cargo.toml": manifest, "Cargo.toml.orig": original, "LICENSE": b"license\n",
             "src/lib.rs": b"pub fn value() -> u32 { 1 }\n", "Cargo.lock": b"version = 4\n",
             ".cargo_vcs_info.json": json.dumps({"git": {"sha1": revision}, "path_in_vcs": CORE}).encode()}

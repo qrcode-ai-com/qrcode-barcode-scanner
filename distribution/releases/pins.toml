@@ -55,6 +55,10 @@ paths = ["docs/comparison.mdx"]
 why = "Retained third-party brand provenance: upstream source hashes are independent of the engine release."
 paths = ["docs/assets/actions/brands/provenance.json"]
 
+[[frozen]]
+why = "Dated license history and the exact legacy AGPL text; these never follow a new engine version."
+paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]

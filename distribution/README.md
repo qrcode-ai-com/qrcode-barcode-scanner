@@ -375,7 +375,7 @@ in `structuredContent` and JSON text. `qrscan://scan-report-schema` exposes the
 report schema; `qrscan://limits` exposes the active limits. The default image
 limits are 8 MiB decoded bytes, 4096 pixels per side and 16 million pixels,
 with at most two active scans. Tool errors carry `isError: true`; a valid empty
-detection is a successful report. The package includes its AGPL license and
+detection is a successful report. The published package includes its original license and
 [adapter documentation](https://github.com/supernovae-st/qrcode-barcode-scanner/blob/agents-v0.1.0/integrations/mcp/README.md).
 
 ## Skills: install from ClawHub or use the complete directory
@@ -418,8 +418,8 @@ and dependency symlink escapes. It accepts regular local images up to 10 MiB,
 uses exits **0** for detections, **1** for a valid report without detections,
 and **2** for an error. Read the installed `SKILL.md` for the complete contract.
 
-The skill's original text and helpers are **MIT-0**. The separately installed
-scanner engine and the MCP adapter are **AGPL-3.0-or-later**. The skill ZIP
+The skill's current project-authored text and helpers are **MIT**; published versions retain their original license. The separately installed
+pinned published scanner engine and MCP adapter retain **AGPL-3.0-or-later**. The skill ZIP
 contains no engine or image fixtures; installing it does not relicense the
 engine or exempt a consumer from the engine's terms.
 
@@ -454,7 +454,7 @@ docker run --rm --network none --read-only --cap-drop ALL \
 
 The default UID/GID is 65532; mounted images must be readable by it. Reports
 are written on the host through stdout redirection. The container retains the
-scanner's **AGPL-3.0-or-later** license and corresponding source references.
+pinned published scanner's **AGPL-3.0-or-later** license and corresponding source references.
 
 ## Read the report and choose a profile
 
@@ -497,3 +497,15 @@ are outside this distribution's native engine targets.
 </details>
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->

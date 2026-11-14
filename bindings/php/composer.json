@@ -2,7 +2,7 @@
     "name": "qrcode-ai-com/qrcode-barcode-scanner",
     "description": "Read QR codes and barcodes from images in PHP, through the installed qrscan command of the QR Code & Barcode Scanner engine.",
     "type": "library",
-    "license": "AGPL-3.0-or-later",
+    "license": "MIT",
     "keywords": [
         "qr code",
         "barcode",

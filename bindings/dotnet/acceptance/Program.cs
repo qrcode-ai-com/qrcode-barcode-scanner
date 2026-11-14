@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 //
 // Scan one image with the three profiles through the package's public API and write one JSON
 // report per profile, each exactly as the engine returned it, for

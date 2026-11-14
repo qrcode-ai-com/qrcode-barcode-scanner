@@ -1,6 +1,6 @@
 # Third-party source notices
 
-The scanner is licensed under AGPL-3.0-or-later. Two isolated parts of its rxing
+First-party scanner source is licensed under MIT. Two isolated parts of its rxing
 adapter derive from rxing 0.9.3 (`rxing-core/rxing`), a Rust port of ZXing, and
 retain their original Apache-2.0 copyright and license notices. The Apache
 license is included as `LICENSE-APACHE-2.0`.

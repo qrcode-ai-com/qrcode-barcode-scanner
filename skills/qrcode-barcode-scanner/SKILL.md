@@ -1,7 +1,7 @@
 ---
 name: qrcode-barcode-scanner
 description: Decode QR codes and barcodes from local images and report the scanner's original payload bytes, detections and scannability judgment. Use for supplied image files or generated QR checks.
-license: MIT-0
+license: MIT
 metadata:
   version: "0.2.0"
   engine: "@qrcode-ai-com/qrcode-barcode-scanner@0.11.0"

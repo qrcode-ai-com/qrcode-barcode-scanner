@@ -5,10 +5,9 @@ Thanks for considering a contribution! `qrcode-barcode-scanner` is one Rust core
 Python/PyO3, and Kotlin+Swift via UniFFI). Most changes land in the core; the façades
 stay thin.
 
-By contributing you agree that your work is **dual-licensed** under both
-**AGPL-3.0-or-later AND** SuperNovae Studio's commercial license (inbound = outbound,
-dual) — see [`LICENSING.md`](LICENSING.md). This keeps the project free for the
-community and sustainable.
+By contributing project-authored code or documentation, you license it under the
+[MIT License](LICENSE), matching this source tree. Keep third-party copyright and
+license notices intact; see [LICENSING.md](LICENSING.md) for the source and archive boundary.
 
 ## Build & test
 

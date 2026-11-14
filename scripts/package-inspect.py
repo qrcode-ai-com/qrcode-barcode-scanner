@@ -2,7 +2,7 @@
 """Pack what every publish job would ship, then inspect the archives themselves.
 
 Each target is packed or built locally the way its publish job does it, and
-the resulting archive is read back: the AGPL LICENSE text (byte-identical to
+the resulting archive is read back: the MIT LICENSE text (byte-identical to
 the root copy, where PEP 639 says it is for Python), the README, the type
 files, the version strings, the file set, and the absence of private or stray
 files. The file set is exact for npm packages and wheels (a Linux wheel may
@@ -124,9 +124,9 @@ NODE_DIR = ROOT / "crates" / "qrcode-ai-scanner-node"
 WASM_DIR = ROOT / "crates" / "qrcode-ai-scanner-wasm"
 PY_DIR = ROOT / "crates" / "qrcode-ai-scanner-py"
 FLUTTER_DIR = ROOT / "bindings" / "flutter"
-SPDX = "AGPL-3.0-or-later"
+SPDX = "MIT"
 
-# Every package root whose archive must carry the AGPL text. Each registry
+# Every package root whose archive must carry the MIT text. Each registry
 # packs from its own directory, so the root LICENSE never reaches an archive
 # by itself: none of the 0.9.0 archives held one.
 LICENSE_COPIES = (
@@ -505,7 +505,7 @@ def check_license(art: Artifact, data, where: str) -> None:
         return
     got = sha256(data)
     art.check(
-        "LICENSE is the AGPL text, byte-identical to the root LICENSE",
+        "LICENSE is the MIT text, byte-identical to the root LICENSE",
         got == want,
         f"{where} sha256 {got[:16]}…" + ("" if got == want else f" ≠ root {want[:16]}…"),
     )
@@ -4047,12 +4047,12 @@ def self_test() -> int:
         judge("main npm package built raw, no anomaly (control)", [raw_npm("tar-npm-clean", _npm_main(version), [])],
               PASS)
 
-        # The AGPL text where PEP 639 says it is, byte for byte.
+        # The MIT text where PEP 639 says it is, byte for byte.
         judge("win wheel with a CRLF LICENSE",
               [wheel("wheel-crlf", _clean_wheel(version) | {
                   f"{PY_MODULE}-{version}.dist-info/licenses/LICENSE": crlf})], FAIL, "LICENSE")
         no_root = {k: v for k, v in _clean_sdist(version).items() if k != "LICENSE"}
-        judge("sdist with the AGPL text only under qrcode-ai-scanner-py/",
+        judge("sdist with the MIT text only under qrcode-ai-scanner-py/",
               [sdist("sdist-py-license-only", no_root)], FAIL, "License-File")
         judge("sdist whose License-File is a CRLF copy",
               [sdist("sdist-crlf", _clean_sdist(version) | {"LICENSE": crlf})], FAIL, "License-File")
@@ -4534,7 +4534,7 @@ def self_test() -> int:
                 failed = [c["name"] for a in report for c in a["checks"] if not c["ok"]]
                 ok = (proc.returncode == 1 and b"UnicodeEncodeError" not in proc.stderr
                       and report[0]["status"] == FAIL
-                      and failed == ["LICENSE is the AGPL text, byte-identical to the root LICENSE"]
+                      and failed == ["LICENSE is the MIT text, byte-identical to the root LICENSE"]
                       and summary.read_text(encoding="utf-8") == rendered and not record.exists()
                       and "FAIL" in proc.stdout.decode("utf-8") and "FAIL" in proc.stderr.decode("utf-8"))
             except (OSError, ValueError, KeyError, IndexError):
@@ -5103,7 +5103,7 @@ def cli_self_test():
                 "--release-set", "--tag", tag, "--sums-sha256", qualified, *tree))
             # Not a vacuous pass: every class of check ran on every file of the set.
             wanted = {"cli": ("name is", "zip for the Windows target", "file set is exactly the release archive's",
-                              "members in bytewise order", "LICENSE is the AGPL text", "LICENSING.md is",
+                              "members in bytewise order", "LICENSE is the MIT text", "LICENSING.md is",
                               "COPYRIGHT-rust-std.html sha256", "build-info.json: schema", "build-info binary",
                               "build-info dependencies", "build-info links the anchors", "modes by policy",
                               "SOURCE.md states", "lists exactly build-info's linked registry crates",
@@ -5296,7 +5296,7 @@ def cli_self_test():
 
             # C5: the copies are their checkout files, the std notice the one build-info hashed.
             member_case("LICENSE with CRLF line ends", gnu_files | {"LICENSE": LICENSE.read_bytes().replace(
-                b"\n", b"\r\n")}, "LICENSE is the AGPL text")
+                b"\n", b"\r\n")}, "LICENSE is the MIT text")
             for member, source_path in CLI_COPIES.items():
                 if member != "LICENSE":
                     member_case(f"an altered {member}", gnu_files | {member: gnu_files[member] + b"\nedited\n"},

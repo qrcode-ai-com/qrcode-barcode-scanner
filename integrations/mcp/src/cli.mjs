@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 import { serveStdio, StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { createScannerServer, limitsFromEnvironment } from "./server.mjs";
 

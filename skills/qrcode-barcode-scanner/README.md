@@ -37,7 +37,7 @@ To prepare an image to supply to the agent without following its decoded URL, us
 
 A portable Agent Skill for local QR/barcode decoding and the original scanner
 judgment. The source in this directory is newly authored skill text and Node
-helpers under **MIT-0**; it includes no engine binary, dependency or fixture.
+helpers under **MIT**; it includes no engine binary, dependency or fixture.
 The separately installed scanner engine
 `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` retains **AGPL-3.0-or-later**. Installing
 this wrapper does not relicense that engine or exempt a consumer from its terms.
@@ -67,7 +67,7 @@ node scripts/test.mjs --engine-root ".qrcode-barcode-scanner-runtime" --fixture 
 
 The test requires the engine fixture whose payload is
 `https://qrcode-ai.com/c/v5q`. The engine repository supplies it at
-`fixtures/clean/gen_v5_q.png`; it is **not included in this MIT-0 bundle**.
+`fixtures/clean/gen_v5_q.png`; it is **not included in this MIT-authored bundle**.
 The test creates its own white PNG and invalid data in a temporary directory.
 It checks exact text/raw bytes, report markers, Full/Frame, valid no-detection,
 invalid input, stale/missing dependency, size limits, special filenames, ancestor
@@ -82,3 +82,15 @@ copying this directory.
 · [OpenClaw skills](https://docs.openclaw.ai/tools/skills)
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->
