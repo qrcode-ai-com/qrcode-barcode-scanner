@@ -154,8 +154,7 @@ Generating both from one commit is what keeps their contract checksums equal. Th
 ## License
 
 MIT for project-authored source: see [LICENSE](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE) and the
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md). A closed-source application needs the commercial
-license described there.
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md).
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
 

@@ -43,6 +43,32 @@ Decoding is fully client-side; optional destination checks use only the transpor
 [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript) uses the engine family for QR verification. To decode a
 saved QR image or a barcode label in the browser, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
 
+## Install and try the packaged example
+
+Use npm in a project directory to install the exact browser package:
+
+```sh
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0
+```
+
+No Rust toolchain or native addon is required. For working source, check the
+selected version on [npm](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm)
+before installation. The release's bundled WebAssembly and JavaScript files
+must stay together; a source README does not establish registry availability.
+
+To try image scanning without a bundler, use Python 3 as a local static server
+from that project directory:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm
+```
+
+Open [the local image example](http://127.0.0.1:8000/examples/headless.html)
+and import an image. The decoder runs in the packaged module worker. The
+[examples guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md)
+explains camera access, HTTPS and CSP requirements. Opening the HTML as a
+`file://` URL does not support the module-worker flow.
+
 ## Automatic loading, including module workers
 
 ```js

@@ -49,7 +49,29 @@ It runs locally, with no network requests.
 
 For a one-off image check, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) uses the same engine.
 
+## Install
+
+Use Rust 1.88 or later. Create a binary project and add the exact scanner
+version so that the dependency and the documentation can be reviewed together:
+
+```sh
+cargo new scan-label
+cd scan-label
+cargo add qrcode-barcode-scanner@=0.11.0
+curl -fsSL -o label.png \
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+```
+
+For working source, verify that the selected version exists on
+[crates.io](https://crates.io/crates/qrcode-barcode-scanner) before installation.
+Source revisions and registry releases have separate availability and licenses.
+
 ## Scan an image
+
+Save the following complete program as `src/main.rs`, then run
+`cargo run --release` from the project directory. The sample contains QR
+`https://qrc-ai.com/76xMa` and Code 128 `STOCK-4827`; compare the decoded
+values, rather than assuming a detection's array position.
 
 ```rust
 use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
@@ -126,8 +148,9 @@ limits and which results can be absent.
 Releases up to 0.10.1 were published as `qrcode-ai-scanner`.
 
 Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
-Commercial licensing is described in the
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md).
+Read the current
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+and the license packaged with the exact version you install.
 © SuperNovae Studio.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.

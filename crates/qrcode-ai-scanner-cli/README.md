@@ -46,7 +46,39 @@ symbol positions, and assess QR scannability from a terminal or script.
 Use `qrscan` to check a QR design from [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/cli) or decode a barcode from
 a saved image.
 
+## Install qrscan
+
+The [prebuilt archive guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/cli/README.md)
+explains how to download an executable for your system and verify its checksum.
+The [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md)
+also lists package-manager options and their individual delivery status.
+
+To compile the CLI with Rust 1.88 or later, install the exact crate version:
+
+```sh
+cargo install qrcode-barcode-scanner-cli@0.11.0 --locked
+qrscan --version
+```
+
+Keep Cargo's binary directory on your `PATH`. For working source, check the
+version on [crates.io](https://crates.io/crates/qrcode-barcode-scanner-cli)
+first; a source revision does not publish a package or change an existing
+archive's license.
+
 ## Scan a label
+
+Download a sample containing QR `https://qrc-ai.com/76xMa` and Code 128
+`STOCK-4827`, or place your own image at `label.png`:
+
+```sh
+curl -fsSL -o label.png \
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+qrscan label.png --profile fast --budget-ms 0
+```
+
+The JSON report should contain both payloads. An unbounded budget is useful
+for this reproducible sample check; use a workload-appropriate limit for
+untrusted input. The following options have different output purposes:
 
 ```sh
 qrscan label.png --pretty
@@ -101,8 +133,9 @@ installation.
 Releases up to 0.10.1 were published as `qrcode-ai-scanner-cli`; both install `qrscan`.
 
 Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
-Commercial licensing is described in the
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md).
+Read the current
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+and the license packaged with the exact version you install.
 © SuperNovae Studio.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
