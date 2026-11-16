@@ -25,6 +25,8 @@ on:
       - scripts/dotnet-package.py
       - scripts/dotnet-release.py
       - scripts/test-dotnet-release.py
+      - scripts/dotnet-readme.py
+      - scripts/test-dotnet-readme.py
       - scripts/check-publish-guards.py
       - scripts/native-floor.py
       - crates/qrcode-ai-scanner-uniffi/**
@@ -345,7 +347,9 @@ jobs:
           python-version: "3.14"
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Read the engine version from the workspace
         run: |
           version=$(python -c "import re, pathlib; print(re.search(r'(?m)^\[workspace\.package\]\r?\nversion = \"([^\"]+)\"', pathlib.Path('Cargo.toml').read_text())[1])")
@@ -407,6 +411,12 @@ jobs:
             --install "dotnet add package $PACKAGE --version $ENGINE_VERSION" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --receipt "receipt/acceptance-dotnet-package-$RID.json"
+      - name: Execute the README actually installed from the archive
+        run: |
+          archive=$(python -c "import pathlib, sys; print(next(pathlib.Path(sys.argv[1]).rglob('*.nupkg')).resolve())" "$RUNNER_TEMP/download")
+          python scripts/dotnet-readme.py --archive "$archive" --version "$ENGINE_VERSION" \
+            --rid "$RID" --out "$RUNNER_TEMP/readme-consumer"
+          cp "$RUNNER_TEMP/readme-consumer/receipt.json" "receipt/readme-dotnet-package-$RID.json"
       - name: Remove the package and close the receipt
         run: |
           cd "$RUNNER_TEMP/consumer"

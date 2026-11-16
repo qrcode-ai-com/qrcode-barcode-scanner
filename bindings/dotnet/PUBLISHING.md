@@ -32,8 +32,11 @@ Sources: [individual accounts](https://learn.microsoft.com/en-us/nuget/nuget-org
 
 Run `.github/workflows/dotnet.yml` on the exact proposed source commit. Require the binding
 checks (.NET 8 and 10), all five native-library floors, archive inspection and all five clean
-folder-feed consumers to pass. Review the archive's `package.json`, version, source commit,
-SHA-256 and native hashes. Check the package README's six links and the nuspec's public text.
+folder-feed consumers to pass, including the separate .NET 10 projects that execute the exact
+`Program.cs` from the installed package README on mixed, blank and malformed inputs. Require
+the README receipts to match the archive SHA-256 and source commit; they also retain the
+installed archive, README and extracted program hashes. Review the archive's `package.json`,
+version, source commit, SHA-256 and native hashes. Check the package README's six links and the nuspec's public text.
 A green branch rehearsal proves these steps; it does not exercise an OIDC upload or a public
 NuGet installation. The maintainer must separately authorize every tag and publication.
 
