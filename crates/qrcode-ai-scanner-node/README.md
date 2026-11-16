@@ -49,7 +49,42 @@ thread. Node.js 18 or later is required.
 The scanner grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/nodejs).
 Use the Node package for images already in your server or worker.
 
+## Install
+
+Use Node.js 18 or later with npm. From an empty project directory:
+
+```sh
+npm init --yes
+npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0
+curl -fsSL -o label.png \
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+```
+
+Keep optional dependencies enabled: npm selects one of these six native
+addons for the host, and an ARM64 musl addon is not provided:
+
+| Operating system | Processor | Native dependency suffix |
+|---|---|---|
+| macOS | Apple Silicon | `darwin-arm64` |
+| macOS | Intel x64 | `darwin-x64` |
+| GNU/Linux | ARM64 | `linux-arm64-gnu` |
+| GNU/Linux | x64 | `linux-x64-gnu` |
+| Linux with musl | x64 | `linux-x64-musl` |
+| Windows | x64 | `win32-x64-msvc` |
+
+No Rust compiler is needed to load these prebuilt addons. Operating-system
+requirements and actual consumer tests remain specific to the installed
+release. For working source, check its exact version on
+[npm](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner)
+before installation; source changes do not replace a published archive.
+
+In Windows PowerShell, use `curl.exe` in place of `curl` for the image download.
+
 ## Scan an image
+
+Save the following as `scan.mjs` and run `node scan.mjs`. The `.mjs` extension
+enables the ES module imports without changing the project's module setting.
+The sample contains QR `https://qrc-ai.com/76xMa` and Code 128 `STOCK-4827`.
 
 ```js
 import { readFile } from "node:fs/promises";
@@ -142,8 +177,9 @@ separate from a `[QRS-xxx]` scan fault. There is no WASI fallback.
 Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.
 
 Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
-Commercial licensing is described in the
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md).
+Read the current
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+and the license packaged with the exact version you install.
 © SuperNovae Studio.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.

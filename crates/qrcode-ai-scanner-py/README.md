@@ -50,7 +50,44 @@ returns the same versioned `ScanReport` as the Rust, Node.js and browser binding
 The scanner used by [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) can also check batches of saved QR designs and
 barcode photos from a Python workflow.
 
+## Install
+
+Create a virtual environment with CPython 3.8 or later. If your system names
+the interpreter `python3`, use that command to create the environment:
+
+```sh
+python -m venv .venv
+```
+
+Activate it with `source .venv/bin/activate` on macOS/Linux, or
+`.\.venv\Scripts\Activate.ps1` in Windows PowerShell. Then install the exact
+release as a prebuilt wheel:
+
+```sh
+python -m pip install --only-binary=:all: qrcode-barcode-scanner==0.11.0
+```
+
+The binary-only option prevents an unexpected Rust source build. If pip cannot
+find a compatible wheel, stop and check your interpreter and platform against
+the release's [PyPI files](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/#files).
+The release wheels cover macOS ARM64/x64, GNU/Linux ARM64/x64, musl Linux x64
+and Windows x64; wheel tags describe compatibility, not a test of every host.
+Reading working source does not establish that its version is on PyPI.
+
 ## Scan an image
+
+Download a sample image containing QR `https://qrc-ai.com/76xMa` and Code 128
+`STOCK-4827`:
+
+```sh
+curl -fsSL -o label.png \
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+```
+
+In Windows PowerShell, use `curl.exe` in place of `curl` for the download.
+Save the following as `scan.py` beside `label.png`, then run `python scan.py`
+with the virtual environment active. The example prints each decoded value
+and keeps an absent quality assessment distinct from a score of zero.
 
 ```python
 import qrcode_barcode_scanner as qr
@@ -131,8 +168,9 @@ covers the runtime-specific steps.
 [Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
 
 Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
-Commercial licensing is described in the
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/LICENSING.md).
+Read the current
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+and the license packaged with the exact version you install.
 © SuperNovae Studio.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
