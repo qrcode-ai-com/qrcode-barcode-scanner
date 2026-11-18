@@ -29,6 +29,15 @@ Help me understand QR Code & Barcode Scanner for PHP (bindings/php/README.md) fo
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/php-dark.png?v=1363efde8fa3">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/php-light.png?v=0fc159520eb8" alt="QR Code &amp; Barcode Scanner for PHP: read QR codes and barcodes from an image file in PHP" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use this command adapter when a PHP application can invoke a separately installed qrscan executable. It keeps the scanner out of the PHP process and returns the original report, leaving storage and business decisions to your application. The public source and tag do not by themselves establish Packagist availability; verify the registry before relying on the Composer command below.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner PHP guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/php) and [barcode scanner PHP guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/php) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
