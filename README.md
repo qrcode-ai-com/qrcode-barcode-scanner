@@ -43,24 +43,24 @@ To prepare a QR payload or a barcode label, use the [QR code generator](https://
 <p align="center">
   <a href="https://qrcode-ai.com/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.webp?v=1df0ffe28552">
-      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.webp?v=ac989cfaeec2">
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.gif?v=3cd8cf5833c5">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.gif?v=24618096bac7" alt="QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine" width="100%">
+      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.webp?v=d985b47951b2">
+      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.webp?v=052b21b30a25">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.gif?v=be9aea44041d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.gif?v=c695aae30138" alt="QR Code and Barcode Scanner: one Rust engine that reads QR codes and barcodes from images and frames, with QR quality diagnostics, for Rust, Node.js, the browser, Python, Go, PHP and the command line" width="100%">
     </picture>
   </a>
 </p>
 
 [Get started](#get-started) · [Examples](#examples) · [Compare scanners](docs/comparison.mdx) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/MIT-6366f1?style=flat-square&label=source%20license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/qrcode-ai-com/qrcode-barcode-scanner-rust/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/MIT-6366f1?style=flat-square&label=source%20license)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md)
 
 Scan QR codes and barcodes from images or camera frames, entirely on your device. One Rust engine reads mixed formats in the same image and reports each code's value and format, plus its position when available. It also scores how reliably a QR design can be read, a check [QR Code AI](https://qrcode-ai.com/) uses before export.
 
 **0.11.0 is released** for Rust, CLI, Node.js, browser WASM and Python.
-[Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0)
-· [Explore the examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md).
+[Install a package](#get-started) · [Release and CLI downloads](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/v0.11.0)
+· [Explore the examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md).
 
 ## Compare scanner options
 
@@ -78,54 +78,82 @@ qualification remain separate evidence. The engine's
 
 ## Examples
 
-To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
-Try it online, with nothing to install. The [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/web-vite) installs the published WebAssembly package 0.11.0 from npm and scans in your browser, on your device. The [notebook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/examples/notebooks) installs the Python package 0.11.0 from PyPI and scans in a Jupyter session.
+To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
+Try it online, with nothing to install. The [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/web-vite) installs the published WebAssembly package 0.11.0 from npm and scans in your browser, on your device. The [notebook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/notebooks) installs the Python package 0.11.0 from PyPI and scans in a Jupyter session.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0-r2/examples/web-vite) [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/demos-v0.11.0-r2/examples/web-vite) [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb)
 
 ### Scan a QR code and a Code 128 barcode in one image
 
-[![Selecting two QR copies and a Code 128 from a recorded scan](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/scan-replay.gif?v=d7ca463cf1ff)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/scan-replay.mp4)
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-replay-dark.gif?v=5b3451d49393">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-replay-light.gif?v=d1c03d71ff21" alt="Selecting two QR copies and a Code 128 from a recorded scan: each occurrence is outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
 
 Two QR copies share one payload. The Code 128 carries `STOCK-4827`.
 The report keeps their **three physical occurrences** separate.
 
-[MP4 video](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/scan-replay.mp4) · [Original reports and provenance](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/README.md)
+[Original reports and provenance](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md)
 
 <sub>Recorded 0.11 scan reports with an illustrative selection replay.</sub>
 
 ### From everyday labels to artistic QR designs
 
-![Real QR, matrix-code and barcode examples](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/gallery.png?v=83b9d449112b)
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-gallery-dark.gif?v=5b8222e400e4">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-gallery-light.gif?v=9b58563b8dbe" alt="Real QR, matrix-code and barcode examples: twelve fixtures, each read as the format it is labelled with" width="100%">
+    </picture>
+  </a>
+</p>
 
 QR Code, Micro QR, rMQR, Data Matrix, Aztec, PDF417 and linear barcodes.
-Browse the [original images and their reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/README.md).
+Browse the [original images and their reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md).
 
 <details>
 <summary><strong>Explore mixed codes and structured payloads</strong></summary>
 
-![A QR code and Code 128 decoded from the same image](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/mixed-codes.png?v=aa88a4d6acbc)
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
 
 This image returns QR `https://qrc-ai.com/76xMa` and Code 128 `STOCK-4827`.
 The replay above uses a different fixture: two QR copies containing
 `https://qrc-ai.com/occurrences`, beside the same barcode.
 
-![QR codes containing Wi-Fi, contact, SMS and GS1 Digital Link data](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/payloads.png?v=f9a81d8186b2)
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-payloads-dark.png?v=41f51b588864">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-payloads-light.png?v=72498caf0f3f" alt="QR codes containing Wi-Fi, contact, SMS and GS1 Digital Link data, with the fields the scanner returned" width="100%">
+    </picture>
+  </a>
+</p>
 
 A QR code can hold a URL, Wi-Fi settings, contact details or a message.
 The scanner returns the decoded fields. Your app decides what happens next.
 
-[Payload reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/scan-results.json) · [GS1 guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/concepts/gs1.mdx)
+[Payload reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/scan-results.json) · [GS1 guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/concepts/gs1.mdx)
 
 </details>
 
 ## Get started
 
 <p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#get-started">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/destinations-dark.png?v=aac80a06a2b0">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/destinations-light.png?v=4443be3d3592" alt="Where the scanner is published: crates.io, npm, PyPI, Go, Homebrew, Scoop, GitHub Releases, Debian, Arch Linux, Fedora, AppImage, a container image, MCP, OpenClaw, jsDelivr, UNPKG, esm.sh, docs.rs, deps.dev, Libraries.io and Lib.rs" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-dark.png?v=57c63428574b">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-light.png?v=6dbd5a8cf5ba" alt="One engine in the language you write: Rust on crates.io, Node.js and the browser on npm, Python on PyPI, Go, PHP, and the qrscan command line" width="100%">
     </picture>
   </a>
 </p>
@@ -134,11 +162,15 @@ Choose the runtime your application uses. All five packages are published as 0.1
 
 | Runtime | Package | Version |
 |---|---|---|
-| Rust | [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner/0.11.0) | 0.11.0 |
-| CLI | [`qrcode-barcode-scanner-cli`](https://crates.io/crates/qrcode-barcode-scanner-cli/0.11.0) | 0.11.0 |
-| Node.js | [`@qrcode-ai-com/qrcode-barcode-scanner`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner/v/0.11.0) | 0.11.0 |
-| Browser WASM | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0) | 0.11.0 |
-| Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) | 0.11.0 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-dark.png?v=31b5deebc32e"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-light.png?v=c5207721973f" alt="" width="24" height="24" align="absmiddle"></picture> Rust | [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner/0.11.0) | 0.11.0 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-terminal-dark.png?v=1e987f0ab278"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-terminal-light.png?v=2262d66bee6b" alt="" width="24" height="24" align="absmiddle"></picture> CLI | [`qrcode-barcode-scanner-cli`](https://crates.io/crates/qrcode-barcode-scanner-cli/0.11.0) | 0.11.0 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-nodejs-dark.png?v=cf2159524fc6"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-nodejs-light.png?v=6dd098480218" alt="" width="24" height="24" align="absmiddle"></picture> Node.js | [`@qrcode-ai-com/qrcode-barcode-scanner`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner/v/0.11.0) | 0.11.0 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-browser-dark.png?v=bbe2f3560a6d"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-browser-light.png?v=591e304cf9e9" alt="" width="24" height="24" align="absmiddle"></picture> Browser WASM | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm/v/0.11.0) | 0.11.0 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-python-dark.png?v=7469c3e0b4fb"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-python-light.png?v=308121255ab7" alt="" width="24" height="24" align="absmiddle"></picture> Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) | 0.11.0 |
+
+Go and PHP applications use a small package that drives the installed `qrscan` command and returns its
+report unchanged: <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-go-dark.png?v=b6dbac901176"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-go-light.png?v=1983a9eb7344" alt="" width="24" height="24" align="absmiddle"></picture> [QR Code & Barcode Scanner for Go](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-go)
+and <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-php-dark.png?v=3800932934c8"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-php-light.png?v=7bdd6884b3a4" alt="" width="24" height="24" align="absmiddle"></picture> [QR Code & Barcode Scanner for PHP](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-php).
 
 <details>
 <summary><strong>Native npm packages, browser CDNs and package indexes · 0.11.0</strong></summary>
@@ -154,6 +186,20 @@ Browser WASM from npm · [jsDelivr](https://cdn.jsdelivr.net/npm/@qrcode-ai-com/
 Rust API and package metadata · [docs.rs](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [deps.dev](https://deps.dev/npm/%40qrcode-ai-com%2Fqrcode-barcode-scanner/0.11.0) · [Libraries.io](https://libraries.io/npm/@qrcode-ai-com%2Fqrcode-barcode-scanner) · [Lib.rs](https://lib.rs/crates/qrcode-barcode-scanner).
 
 </details>
+
+The same engine reaches each of these destinations. The [distribution guide](distribution/README.md) lists what
+each one installs.
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-dark.png?v=aac80a06a2b0">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-light.png?v=4443be3d3592" alt="Where the scanner is published: crates.io, npm, PyPI, Go, Homebrew, Scoop, GitHub Releases, Debian, Arch Linux, Fedora, AppImage, a container image, MCP, OpenClaw, jsDelivr, UNPKG, esm.sh, docs.rs, deps.dev, Libraries.io and Lib.rs" width="100%">
+    </picture>
+  </a>
+</p>
+
+<sub>Language and platform names and logos belong to their owners. They identify a runtime or a destination and imply no endorsement.</sub>
 
 ### Command line
 
@@ -172,7 +218,7 @@ scoop bucket add qrcode-ai https://github.com/qrcode-ai-com/scoop-bucket
 scoop install qrcode-ai/qrcode-barcode-scanner
 ```
 
-For Debian 12 or Ubuntu 24.04, download the [Debian package 0.11.0-1](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/linux-packages-v0.11.0)
+For Debian 12 or Ubuntu 24.04, download the [Debian package 0.11.0-1](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/linux-packages-v0.11.0)
 for amd64 or arm64. Check its SHA-256 and install the local file with
 `sudo apt install ./qrcode-barcode-scanner_0.11.0-1_amd64.deb` (use the arm64
 file on ARM64).
@@ -182,7 +228,7 @@ On Arch Linux x86_64, install
 The [Arch install guide](distribution/aur/README.md) shows the commands and
 explains the conflict with packages that already provide `qrscan`.
 
-On Fedora 44, download the [RPM 0.11.0-1.fc44](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/rpm-packages-v0.11.0)
+On Fedora 44, download the [RPM 0.11.0-1.fc44](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/rpm-packages-v0.11.0)
 for x86_64 or aarch64, verify its SHA-256 and install it with
 `sudo dnf install ./qrcode-barcode-scanner-0.11.0-1.fc44.x86_64.rpm`
 (use the aarch64 file on ARM64).
@@ -194,18 +240,18 @@ You can also build with Cargo or download a
 cargo install qrcode-barcode-scanner-cli@0.11.0 --locked
 ```
 
-Try a [sample image with a QR code and a Code 128 barcode](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png).
+Try a [sample image with a QR code and a Code 128 barcode](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png).
 The JSON report includes the QR URL and Code 128 `STOCK-4827`.
 
 ```sh
 curl -fsSL -o mixed-codes.png \
-  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png
 qrscan mixed-codes.png --profile fast
 ```
 
 For a custom test label, create a Code 128 symbol with the
 [QR Code AI barcode generator](https://qrcode-ai.com/en-US/barcode-generator)
-and scan the exported PNG with `qrscan`. Use the [CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/cli.mdx)
+and scan the exported PNG with `qrscan`. Use the [CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/cli.mdx)
 for QR quality checks, scan profiles and JSON output.
 
 <details>
@@ -249,7 +295,7 @@ for (const detection of report.detections) {
 ```
 
 The package selects its native addon from six platform packages. Keep optional
-dependencies enabled. [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/node.mdx)
+dependencies enabled. [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/node.mdx)
 
 </details>
 
@@ -276,7 +322,7 @@ for (const detection of report.detections) {
 
 Use `scanner.scan_frame(rgba, width, height, "frame", 0)` for raw frames on the
 same instance. A zero budget means unbounded work. The supplied
-[image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/headless.js)
+[image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/headless.js)
 runs decoding in a worker and handles load and scan errors.
 
 </details>
@@ -297,7 +343,7 @@ for detection in report["detections"]:
     print(detection["symbology"], detection["content"]["text"])
 ```
 
-[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/python.mdx)
+[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/python.mdx)
 
 </details>
 
@@ -319,7 +365,7 @@ Native runtimes have their own builds. There are no alias or wrapper packages;
 the two CLI crate names install the same command, so run
 `cargo uninstall qrcode-ai-scanner-cli` before installing the new one.
 Update imports and lockfiles, then check that a report's `versions.scanner`
-is `"0.11.0"`. [Migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+is `"0.11.0"`. [Migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
 
 ## Camera scanning
 
@@ -330,7 +376,7 @@ Start or stop the camera, switch devices and pass frames to the same WASM used
 for image scanning. Repeated QR payloads can remain separate targets.
 Optional blur, dimming and highlights change the presentation only.
 
-[Camera example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/camera.js) · [Browser package](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/README.md) · [Image and SSR examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md)
+[Camera example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/camera.js) · [Browser package](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/README.md) · [Image and SSR examples](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md)
 
 <details>
 <summary><strong>Browser modules and measured geometry</strong></summary>
@@ -355,7 +401,7 @@ image scanning, not the browser camera API.
 A decoded link is never opened automatically. The destination module checks
 URLs only through a transport supplied by your app; observed redirects are
 not a safety verdict. The replay is not a camera-UI recording or a physical
-device qualification. [Media details](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/assets/readme/README.md)
+device qualification. [Media details](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md)
 
 </details>
 
@@ -375,9 +421,18 @@ and **Frame** for repeated decoding without scoring. `score: null` means no
 complete quality judgment was produced. Scan budgets set limits on work.
 
 These are software diagnostics informed by ISO 15415, not hardware certification.
-[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md) · [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) · [Architecture](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/ARCHITECTURE.md)
+[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/SCORING.md) · [Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/spec/01-report.md) · [Architecture](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/ARCHITECTURE.md)
 
 ## Supported formats
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-dark.gif?v=92fa0e8084df">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-light.gif?v=bdfe5fc5f9b3" alt="The code families the engine reads: QR codes, matrix and stacked codes such as Data Matrix, retail barcodes such as EAN-13, and other linear barcodes such as Code 128" width="100%">
+    </picture>
+  </a>
+</p>
 
 | Family | Formats |
 |---|---|
@@ -388,25 +443,25 @@ These are software diagnostics informed by ISO 15415, not hardware certification
 
 GS1 element strings and Digital Link payloads include parsing and validation
 details. Recall and geometry vary by format. Known limits include off-centre
-Aztec and some rotated Aztec/PDF417 scenes. [0.11 changelog](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/CHANGELOG.md)
+Aztec and some rotated Aztec/PDF417 scenes. [0.11 changelog](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/CHANGELOG.md)
 
 ## Documentation
 
 Current installation guides are linked below; report types, schemas and release examples stay pinned to 0.11.0.
 
-[Choose a runtime](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/choosing-a-surface.mdx) · [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/node.mdx) · [Python guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/api/python.mdx) · [Nuxt integration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/docs/guides/nuxt-verify.mdx)
+[Choose a runtime](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/guides/choosing-a-surface.mdx) · [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/) · [Node API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/node.mdx) · [Python guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/python.mdx) · [Nuxt integration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/guides/nuxt-verify.mdx)
 
-[Report types](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/bindings/report-types.d.ts) · [JSON Schema](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/scan-report.schema.json) · [Specification](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec/) · [Contributing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/CONTRIBUTING.md) · [Release runbook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/RELEASING.md)
+[Report types](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/bindings/report-types.d.ts) · [JSON Schema](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/spec/scan-report.schema.json) · [Specification](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0/spec/) · [Contributing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/CONTRIBUTING.md) · [Release runbook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/RELEASING.md)
 
 <details>
 <summary><strong>Build the released source</strong></summary>
 
-The packages above come from [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0)
+The packages above come from [v0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0)
 (`176ac96`), separately from the code currently on `main`. Check out the release
 tag for matching source:
 
 ```sh
-git clone --branch v0.11.0 --depth 1 https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git
+git clone --branch v0.11.0 --depth 1 https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git
 cd qrcode-barcode-scanner
 cargo build --release --locked -p qrcode-barcode-scanner-cli
 ```
@@ -420,17 +475,17 @@ The following agent integrations are published on scanner engine **0.11.0**:
 
 | Integration | Published version | Install or configure |
 | --- | --- | --- |
-| [MCP stdio adapter](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.1) | 0.3.1 | [npm installation and client configuration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/integrations/mcp) |
+| [MCP stdio adapter](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp/v/0.3.1) | 0.3.1 | [npm installation and client configuration](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/mcp) |
 | [ClawHub skill](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner) | 0.2.0 | `clawhub install qrcode-barcode-scanner --version 0.2.0` |
 | [OpenClaw plugin bundle](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner) | 0.2.0 | `openclaw plugins install clawhub:@qrcode-ai-com/qrcode-barcode-scanner@0.2.0` |
 
-The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.3.1) points clients to the same local stdio adapter published on npm. The [0.3.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/agents-v0.3.1) has signed npm provenance and passed fresh installs on Linux x64 with Node 22/24. Public 0.3.1 bytes and both SDK protocol clients were also checked on macOS ARM64 with Node 24; additional product clients need their own checks. The skill and bundle passed runtime calls in OpenClaw 2026.11.1 on macOS ARM64. The bundle pins adapter 0.2.0. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md) for install commands and tested clients.
+The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.qrcode-ai-com%2Fqrcode-barcode-scanner/versions/0.3.1) points clients to the same local stdio adapter published on npm. The [0.3.1 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/agents-v0.3.1) has signed npm provenance and passed fresh installs on Linux x64 with Node 22/24. Public 0.3.1 bytes and both SDK protocol clients were also checked on macOS ARM64 with Node 24; additional product clients need their own checks. The skill and bundle passed runtime calls in OpenClaw 2026.11.1 on macOS ARM64. The bundle pins adapter 0.2.0. See the [distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md) for install commands and tested clients.
 
-- The [public GHCR image](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/pkgs/container/qrcode-barcode-scanner) ships `qrscan` 0.11.0 for Linux AMD64 and ARM64. Pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner:0.11.0` and follow the [offline container example](distribution/docker/v0.11/README.md#run-the-public-image). Anonymous pulls and exact scan checks passed on [both native architectures](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42208687356).
+- The [public GHCR image](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/pkgs/container/qrcode-barcode-scanner) ships `qrscan` 0.11.0 for Linux AMD64 and ARM64. Pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner:0.11.0` and follow the [offline container example](distribution/docker/v0.11/README.md#run-the-public-image). Anonymous pulls and exact scan checks passed on [both native architectures](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/42208687356).
 - For a version-pinned install of the portable skill 0.2.0, use the [GitHub route for Codex](distribution/README.md#install-the-portable-skill-from-git-in-a-codex-project). [OpenCode setup](distribution/README.md#connect-the-published-mcp-adapter-to-opencode) uses the published npm adapter 0.3.1.
 - The [Docker Hub image](https://hub.docker.com/r/thibautmelen/qrcode-ai-scanner) is a historical mirror for 0.10.0. Its pinned digest is in the [historical installation guide](distribution/README.md#docker-run-the-local-cli).
 - Public Flutter package [`qr_barcode_scanner` 0.11.0](https://pub.dev/packages/qr_barcode_scanner/versions/0.11.0) is available under verified publisher `qrcode-ai.com`. Follow the [Flutter installation guide and native consumer limits](docs/api/flutter.mdx): the package compiles Rust at app-build time, the optimized Android emulator consumer passes, and the iOS simulator fast-budget check remains red.
-- [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.
+- [Kotlin](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0/bindings/kotlin/) and [Swift](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0/bindings/swift/) have separate source-build instructions and qualification limits. These are bindings, not mobile applications.
 
 </details>
 
@@ -438,8 +493,8 @@ The [Official MCP Registry entry](https://registry.modelcontextprotocol.io/v0.1/
 
 Developed by **Thibaut Mélen & Nicolas Cella** for [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk), a product of [SuperNovae Studio](https://github.com/supernovae-st).
 
-MIT for project-authored source; published archives retain their packaged license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
-· [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/SECURITY.md)
+MIT for project-authored source; published archives retain their packaged license. [Licensing](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md)
+· [Code of Conduct](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/CODE_OF_CONDUCT.md) · [Security policy](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/SECURITY.md)
 · Commercial enquiries: `studio.supernovae@gmail.com`.
 
 © SuperNovae Studio.
@@ -469,7 +524,7 @@ not qualify shipped-package performance; trace timings are exploratory.
 
 ### External corpus observations
 
-[`corpus-external.tsv`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/corpus-external.tsv) pins file hashes and measured
+[`corpus-external.tsv`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/corpus-external.tsv) pins file hashes and measured
 decode states. A state pin is not content truth for an unlabelled image. The
 corpora themselves are not vendored: they contain third-party test images and
 private production exports. The 13 October diagnostic used the same original
@@ -495,7 +550,7 @@ or a new comparative correctness/performance qualification.
 One historical ZXing wrong label was a **truth conflict** on `qrcode-2/13.png`:
 the upstream `.txt` reads "photograph", while independently executed external
 ZXing-C++ and C quirc readers confirmed "photography" on original-derived
-pixels. The [pinned text amendment](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/spec/corpus-truth-amendments.md#zxing-qrcode-2-13)
+pixels. The [pinned text amendment](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/spec/corpus-truth-amendments.md#zxing-qrcode-2-13)
 preserves the original image and truth hashes, uses the confirmed text in all
 corpus instruments and records the historical `known_wrong` disposition as
 `superseded` only when those exact inputs validate. Wrong and extra outputs

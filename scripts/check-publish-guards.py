@@ -249,7 +249,7 @@ MCP_REINSPECT_RUN = ('python3 scripts/mcp-release.py inspect "$PWD"/npm-mcp/*.tg
 MCP_REGISTRY_JOB = ("mcp-registry-publish.yml", "publish")
 MCP_REGISTRY_GUARD = "github.ref == 'refs/heads/main'"
 MCP_REGISTRY_CONTEXT = (MCP_REGISTRY_GUARD + " && github.event_name == 'workflow_dispatch'"
-                        " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'"
+                        " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'"
                         " && github.repository_id == '1126991539'")
 MCP_REGISTRY_INSPECT_RUN = "python3 scripts/mcp-registry-publish.py inspect"
 MCP_REGISTRY_PUBLISH_RUN = "python3 scripts/mcp-registry-publish.py publish"
@@ -1554,7 +1554,7 @@ def _dotnet_contract_problems(wf, publisher, first_publish):
     def fail(message, index=-1):
         out.append(("dotnet-contract", message, index))
     for condition in ("github.event_name == 'push'",
-                      "github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'",
+                      "github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'",
                       "github.repository_id == '1126991539'",
                       "needs.preflight.outputs.publish_allowed == 'true'"):
         if _conjunct(publisher.get("if"), {condition}):
@@ -1622,7 +1622,7 @@ def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> lis
         fail("bind the receipt to pack's digest and use only the empty npm credential configurations")
     if _conjunct(publisher.get("if"), {"needs.preflight.outputs.publish_allowed == 'true'"}):
         fail("publication must require the protected-environment preflight output")
-    for condition in ("github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'",
+    for condition in ("github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'",
                       "github.repository_id == '1126991539'"):
         if _conjunct(publisher.get("if"), {condition}):
             fail("publication must bind both the canonical repository name and immutable repository ID")
@@ -2300,7 +2300,7 @@ MUTATIONS = (
      "npm-mcp-publish.yml › publish [guard]"),
     ("MCP wrong environment", P, [(MCP_JOB[0], "    environment: npm-agents", "    environment: npm")], {}, 1,
      "npm-mcp-publish.yml › publish [environment]"),
-    ("MCP ignores canonical repository", P, [(MCP_JOB[0], " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner'", "")], {}, 1,
+    ("MCP ignores canonical repository", P, [(MCP_JOB[0], " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'", "")], {}, 1,
      "npm-mcp-publish.yml › publish [mcp-contract]"),
     ("MCP ignores immutable repository ID", P, [(MCP_JOB[0], " && github.repository_id == '1126991539'", "")], {}, 1,
      "npm-mcp-publish.yml › publish [mcp-contract]"),

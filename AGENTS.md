@@ -12,7 +12,7 @@ scanner engine and one package family: **QR Code & Barcode Scanner**.
 QR/barcode modes and SEO pages do not authorize
 separate scanner engines, product extractions or alias/wrapper packages.
 
-The source repository is `qrcode-ai-com/qrcode-barcode-scanner`. Its repository
+The source repository is `qrcode-ai-com/qrcode-barcode-scanner-rust`. Its repository
 identity, history and tags are retained from its previous names. The 0.11.0
 release is public: `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli`
 on crates.io (`qrscan` remains the command), `@qrcode-ai-com/qrcode-barcode-scanner`

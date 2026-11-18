@@ -29,6 +29,15 @@ Help me understand QR Code & Barcode Scanner for Node.js (crates/qrcode-ai-scann
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-node-dark.gif?v=5ccb9970e48c">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-node-light.gif?v=3cddfebb8fa2" alt="QR Code &amp; Barcode Scanner for Node.js: the Node.js logo, the quick start in JavaScript, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use the native Node.js package in a server, worker or local tool that already has image bytes. The asynchronous scan call keeps native scanning off the calling JavaScript thread, while the synchronous call is available for deliberate blocking work. Read the supported native platform matrix before deployment; browser code uses the separate WebAssembly package.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner Node.js guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/nodejs) and [barcode scanner Node.js guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/nodejs) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
@@ -42,9 +51,9 @@ geometry and QR scannability diagnostics in a structured report.
 `scan()` runs the Rust scan on libuv workers. `scanSync()` runs it on the calling
 thread. Node.js 18 or later is required.
 
-[Node.js API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/node.mdx) ·
-[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
-[TypeScript declarations](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-node/index.d.ts)
+[Node.js API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/node.mdx) ·
+[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/spec/01-report.md) ·
+[TypeScript declarations](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-node/index.d.ts)
 
 The scanner grew out of QR verification workflows at [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/nodejs).
 Use the Node package for images already in your server or worker.
@@ -57,7 +66,7 @@ Use Node.js 18 or later with npm. From an empty project directory:
 npm init --yes
 npm install --save-exact @qrcode-ai-com/qrcode-barcode-scanner@0.11.0
 curl -fsSL -o label.png \
-  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png
 ```
 
 Keep optional dependencies enabled: npm selects one of these six native
@@ -168,17 +177,17 @@ separate from a `[QRS-xxx]` scan fault. There is no WASI fallback.
 
 ## Documentation and licensing
 
-[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md) ·
-[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/errors.mdx) ·
-[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/SECURITY.md) ·
-[Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner) ·
-[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
+[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/SCORING.md) ·
+[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/errors.mdx) ·
+[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/SECURITY.md) ·
+[Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) ·
+[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues)
 
 Releases up to 0.10.1 were published as `@supernovae-st/qrcode-ai-scanner`.
 
-Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
+Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE). Published archives retain their own packaged license.
 Read the current
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md)
 and the license packaged with the exact version you install.
 © SuperNovae Studio.
 

@@ -30,10 +30,10 @@ Help me understand QR Code & Barcode Scanner for PHP (bindings/php/README.md) fo
 <!-- /qrcode-ai-readme-actions:v2 -->
 
 <p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/php-dark.png?v=1363efde8fa3">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/php-light.png?v=0fc159520eb8" alt="QR Code &amp; Barcode Scanner for PHP: read QR codes and barcodes from an image file in PHP" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-dark.gif?v=7e4f537dc2bc">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-light.gif?v=6a86ec5cd714" alt="QR Code &amp; Barcode Scanner for PHP: the PHP logo, the quick start in PHP, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
@@ -46,8 +46,17 @@ To prepare a label for a PHP upload or batch workflow, use the [QR code generato
 
 Read QR codes and barcodes from an image file in PHP. This package drives the installed
 `qrscan` command of the
-[QR Code & Barcode Scanner engine](https://github.com/qrcode-ai-com/qrcode-barcode-scanner)
+[QR Code & Barcode Scanner engine](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust)
 and returns its JSON report unchanged. It holds no decoder of its own.
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#command-line">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/how-php-dark.gif?v=234fd1597b44">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/how-php-light.gif?v=0d3bfe6c2af0" alt="How the PHP package works, in three steps: your code passes an image file, the installed qrscan command reads its codes, and your code reads the report" width="100%">
+    </picture>
+  </a>
+</p>
 
 ## Install
 
@@ -66,6 +75,20 @@ The package follows the engine it drives: version 0.11.x of the package works wi
   [distribution guide](../../distribution/README.md) lists the routes: Homebrew, Scoop, the
   Debian and RPM packages, the AUR, `cargo install`, the release archives and the container
   image. This package never downloads it.
+
+Install `qrscan` from the channel your system already uses:
+
+| Channel | Install | Systems |
+|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-homebrew-dark.png?v=d408ba800294"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-homebrew-light.png?v=bf1ed0794d75" alt="" width="24" height="24" align="absmiddle"></picture> [Homebrew](https://github.com/qrcode-ai-com/homebrew-tap) | `brew install qrcode-ai-com/tap/qrscan` | macOS and GNU/Linux |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-scoop-dark.png?v=acab24ad6857"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-scoop-light.png?v=53f0fc5cfb45" alt="" width="24" height="24" align="absmiddle"></picture> [Scoop](https://github.com/qrcode-ai-com/scoop-bucket) | `scoop bucket add qrcode-ai https://github.com/qrcode-ai-com/scoop-bucket`<br>`scoop install qrcode-ai/qrcode-barcode-scanner` | Windows x64 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-dark.png?v=31b5deebc32e"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-light.png?v=c5207721973f" alt="" width="24" height="24" align="absmiddle"></picture> [Cargo](https://crates.io/crates/qrcode-barcode-scanner-cli) | `cargo install qrcode-barcode-scanner-cli --locked` | Any Rust toolchain |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-github-dark.png?v=1beef6411e01"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-github-light.png?v=84629428944a" alt="" width="24" height="24" align="absmiddle"></picture> [Releases](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases) | [Download and verify an archive](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/cli/README.md#download-and-verify) | macOS, GNU/Linux, Windows |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-debian-dark.png?v=fe0bc2eb1292"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-debian-light.png?v=b0dbf95cf37d" alt="" width="24" height="24" align="absmiddle"></picture> Debian | [Install the `.deb` package](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md#cli-and-containers) | Debian 12, Ubuntu 24.04 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-archlinux-dark.png?v=a5c779b6e553"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-archlinux-light.png?v=321428bf3921" alt="" width="24" height="24" align="absmiddle"></picture> [AUR](https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin) | [Arch install guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/aur/README.md) | Arch Linux x86_64 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-fedora-dark.png?v=cf9efdf2c0c6"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-fedora-light.png?v=6376f4214086" alt="" width="24" height="24" align="absmiddle"></picture> Fedora | [Install the RPM package](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md#cli-and-containers) | Fedora 44 |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-appimage-dark.png?v=b2fb5a4f1434"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-appimage-light.png?v=f8bcfd877cc8" alt="" width="24" height="24" align="absmiddle"></picture> AppImage | [Run the AppImage](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md#cli-and-containers), one file with nothing to install | GNU/Linux |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-docker-dark.png?v=111f4320e3a8"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-docker-light.png?v=0e33dac05ba7" alt="" width="24" height="24" align="absmiddle"></picture> Container image | [`ghcr.io/qrcode-ai-com/qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/pkgs/container/qrcode-barcode-scanner), run as the [container guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md#cli-and-containers) shows | Linux AMD64 and ARM64 |
 
 ## Scan an image
 
@@ -118,6 +141,29 @@ Three things are easy to get wrong:
 
 Decoded text is untrusted data: a QR code can hold any text. Do not follow its links or run it.
 
+## What it reads
+
+The package returns the report of the `qrscan` command you installed, so it reads what that engine reads.
+Codes of different formats in the same image come back in one report.
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-dark.gif?v=92fa0e8084df">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-light.gif?v=bdfe5fc5f9b3" alt="The code families the engine reads: QR codes, matrix and stacked codes such as Data Matrix, retail barcodes such as EAN-13, and other linear barcodes such as Code 128" width="100%">
+    </picture>
+  </a>
+</p>
+
+| Family | Formats |
+|---|---|
+| QR | QR Code, Micro QR, rectangular Micro QR (rMQR) |
+| Matrix and stacked | Data Matrix, Aztec, PDF417, MaxiCode |
+| Retail | EAN-13, EAN-8, UPC-A, UPC-E |
+| Other linear | Code 128, Code 39, Code 93, Codabar, ITF, GS1 DataBar, GS1 DataBar Expanded, Telepen |
+
+The engine's [supported formats](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats) section states the known limits.
+
 ## When something fails
 
 Every failure is a `QrcodeAi\BarcodeScanner\Exception\ScannerException`:
@@ -153,6 +199,32 @@ They cover the three profiles on an image that holds a QR code and a Code 128, a
 code, files that are not images, awkward file names, a missing command, an engine of another
 version and a command that hangs. The workflow `PHP adapter` of the engine repository runs them
 on Linux, macOS and Windows against the released command.
+
+## The same engine in other runtimes
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#get-started">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-dark.png?v=57c63428574b">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-light.png?v=6dbd5a8cf5ba" alt="One engine in the language you write: Rust on crates.io, Node.js and the browser on npm, Python on PyPI, Go, PHP, and the qrscan command line" width="100%">
+    </picture>
+  </a>
+</p>
+
+| Runtime | Package | How it scans |
+|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-dark.png?v=31b5deebc32e"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-rust-light.png?v=c5207721973f" alt="" width="24" height="24" align="absmiddle"></picture> Rust | [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner) on crates.io | In process |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-nodejs-dark.png?v=cf2159524fc6"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-nodejs-light.png?v=6dd098480218" alt="" width="24" height="24" align="absmiddle"></picture> Node.js | [`@qrcode-ai-com/qrcode-barcode-scanner`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner) on npm | In process, native |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-browser-dark.png?v=bbe2f3560a6d"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-browser-light.png?v=591e304cf9e9" alt="" width="24" height="24" align="absmiddle"></picture> Browser | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm) on npm | In the page, WebAssembly |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-python-dark.png?v=7469c3e0b4fb"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-python-light.png?v=308121255ab7" alt="" width="24" height="24" align="absmiddle"></picture> Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/) on PyPI | In process |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-go-dark.png?v=b6dbac901176"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-go-light.png?v=1983a9eb7344" alt="" width="24" height="24" align="absmiddle"></picture> Go | [`qrcode-barcode-scanner-go`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-go) | Through the installed `qrscan` |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-php-dark.png?v=3800932934c8"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-lang-php-light.png?v=7bdd6884b3a4" alt="" width="24" height="24" align="absmiddle"></picture> PHP | [`qrcode-barcode-scanner-php`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-php) | Through the installed `qrscan` |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-terminal-dark.png?v=1e987f0ab278"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-terminal-light.png?v=2262d66bee6b" alt="" width="24" height="24" align="absmiddle"></picture> Command line | [`qrscan`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#command-line) | One command, one JSON report |
+
+The Rust, Node.js, browser and Python packages hold the engine. The Go and PHP packages hold no decoder:
+each one starts `qrscan` and hands you its report.
+
+<sub>Language and platform names and logos belong to their owners. They identify a runtime or a destination and imply no endorsement.</sub>
 
 ## Its own repository
 
