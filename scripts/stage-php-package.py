@@ -34,7 +34,7 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
 PACKAGE = "bindings/php"
 WORKFLOWS = "bindings/php/mirror"
 SCHEMA = "qrscan-php-stage/1"

@@ -5,7 +5,7 @@ other supported 2D formats. Its runtime bindings share the versioned scan-report
 contract. QR and barcode use cases do not require separate engine repositories.
 
 The source repository is
-[`qrcode-ai-com/qrcode-barcode-scanner`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner).
+[`qrcode-ai-com/qrcode-barcode-scanner-rust`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust).
 The repository retains its identity, commits and tags across renames.
 
 ## Package names
@@ -16,7 +16,7 @@ names: `qrcode-barcode-scanner` and `qrcode-barcode-scanner-cli` on crates.io,
 `qrcode-barcode-scanner` on PyPI, and `@qrcode-ai-com/qrcode-barcode-scanner`,
 its six platform packages and `@qrcode-ai-com/qrcode-barcode-scanner-wasm` on
 npm. These five runtime entry points are public in 0.11.0, as are the prebuilt
-CLI archives in the [v0.11.0 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/releases/tag/v0.11.0).
+CLI archives in the [v0.11.0 release](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/v0.11.0).
 The six native npm platform packages are automatic optional dependencies of the
 Node parent, not six additional SDKs. The browser package ships one portable
 WASM module. No 0.11.0 package uses a former name or an alias/wrapper package;

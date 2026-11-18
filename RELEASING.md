@@ -2,9 +2,10 @@
 
 ## Source identity and existing releases
 
-The source repository is `qrcode-ai-com/qrcode-barcode-scanner`, transferred
-from `supernovae-st/qrcode-barcode-scanner` (earlier `supernovae-st/qrcode-ai-scanner`)
-on 1 November 2026; the old addresses redirect. Release one
+The source repository is `qrcode-ai-com/qrcode-barcode-scanner-rust`. It was
+transferred from `supernovae-st/qrcode-barcode-scanner` (earlier `supernovae-st/qrcode-ai-scanner`)
+on 1 November 2026 and renamed from `qrcode-ai-com/qrcode-barcode-scanner` on
+18 November 2026; the old addresses redirect. Release one
 multiformat engine and its runtime bindings; no QR/barcode extraction is required.
 Published versions keep their package names, tags, registry artifacts and OCI
 image metadata; from 0.11.0 the packages are published under the
@@ -18,6 +19,19 @@ The transfer changed the GitHub OIDC identity every trusted publisher matches
 on: tokens now name owner `qrcode-ai-com` and repository
 `qrcode-barcode-scanner`. Package metadata already names that repository (npm
 provenance requires `repository.url` to match the building repository).
+
+The rename of 18 November 2026 changed that identity again: tokens now name
+repository `qrcode-barcode-scanner-rust`. No package, container image, Composer
+package, Go module or JitPack coordinate was renamed, and nothing was published
+by the rename. Two things are required before the next publication from a
+workflow, and neither is done by this revision: every trusted publisher that
+names repository `qrcode-barcode-scanner` (see the publishers below) must name
+`qrcode-barcode-scanner-rust`, and the package metadata that npm provenance
+compares (`repository.url`) must name it too. Until then a publishing job stops
+at authentication with nothing uploaded. The publication guards of the workflows
+name the new repository. Verification commands for artifacts built before the
+rename keep the name those artifacts were attested under, and dated records keep
+the name they were written with.
 
 From 0.11.0 the packages carry new names, and each new name needs a trusted
 publisher of its own: crates.io and npm can bind one only after the package's

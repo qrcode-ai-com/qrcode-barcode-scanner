@@ -429,7 +429,7 @@ jobs:
   publish:
     name: Publish the qualified NuGet archive
     needs: [preflight, binding, natives, pack, consumer]
-    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner' && github.repository_id == '1126991539' && needs.preflight.outputs.publish_allowed == 'true'
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust' && github.repository_id == '1126991539' && needs.preflight.outputs.publish_allowed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: nuget

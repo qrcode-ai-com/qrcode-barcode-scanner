@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   verify:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner' && github.repository_id == '1126991539'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust' && github.repository_id == '1126991539'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -29,7 +29,7 @@ jobs:
 
   publish:
     needs: [verify]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner' && github.repository_id == '1126991539' && needs.verify.outputs.missing == 'true'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust' && github.repository_id == '1126991539' && needs.verify.outputs.missing == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 6
     environment: mcp-registry
