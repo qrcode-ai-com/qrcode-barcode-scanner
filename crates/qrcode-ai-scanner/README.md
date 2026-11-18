@@ -29,6 +29,15 @@ Help me understand QR Code & Barcode Scanner for Rust (crates/qrcode-ai-scanner/
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-dark.gif?v=fb4d57fb11ee">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-light.gif?v=451e022b640c" alt="QR Code &amp; Barcode Scanner for Rust: the Rust logo, the quick start in Rust, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use the Rust library when your program needs to scan image bytes or RGBA frames in process and inspect the resulting detections. The report separates decoded content from its physical occurrences and keeps an unmeasured QR quality score distinct from a zero score. Start with the image example below, then choose profiles and input limits for your workload.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner Rust guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/rust) and [barcode scanner Rust guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/rust) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
@@ -43,11 +52,11 @@ results and suggestions for improving artistic or photo-captured codes.
 `qrcode-barcode-scanner` is the Rust core of [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/rust).
 It runs locally, with no network requests.
 
-[API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/rust.mdx) ·
-[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md) ·
-[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
+[API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/rust.mdx) ·
+[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/spec/01-report.md) ·
+[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/SCORING.md)
 
-For a one-off image check, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) uses the same engine.
+For a one-off image check, the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) uses the same engine.
 
 ## Install
 
@@ -59,7 +68,7 @@ cargo new scan-label
 cd scan-label
 cargo add qrcode-barcode-scanner@=0.11.0
 curl -fsSL -o label.png \
-  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png
 ```
 
 For working source, verify that the selected version exists on
@@ -140,16 +149,16 @@ limits and which results can be absent.
 
 ## Documentation and licensing
 
-[Architecture](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/ARCHITECTURE.md) ·
-[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/errors.mdx) ·
-[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/SECURITY.md) ·
-[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
+[Architecture](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/ARCHITECTURE.md) ·
+[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/errors.mdx) ·
+[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/SECURITY.md) ·
+[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues)
 
 Releases up to 0.10.1 were published as `qrcode-ai-scanner`.
 
-Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
+Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE). Published archives retain their own packaged license.
 Read the current
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md)
 and the license packaged with the exact version you install.
 © SuperNovae Studio.
 

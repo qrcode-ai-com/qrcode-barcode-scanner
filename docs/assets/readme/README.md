@@ -28,6 +28,15 @@ a selected measured QR quadrilateral. A barcode remains a segment, without an
 invented rectangular focus mask. Colors and selection controls are
 illustrative presentation, not object recognition or a new scanner capability.
 
+## Where the root README shows them
+
+Since 18 November 2026 the root README shows these fixtures and recorded reports through the four `examples-*`
+pictures in [`../brand/`](../brand/ABOUT.md), drawn in the QR Code AI visual style. Those pictures read
+[`scan-results.json`](scan-results.json), are rendered only when each fixture matches its recorded SHA-256, and
+follow the rules stated above: a QR code is outlined on its measured quadrilateral, a Code 128 on its measured
+segment, and the selection is presentation. They show no address a fixture encodes. The assets listed in the
+table are the earlier rendering; they stay here with their generator.
+
 ## Provenance
 
 - Source revision: `5767d3d262421037a1ae2c75824cac59c078a102`.

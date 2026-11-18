@@ -29,6 +29,15 @@ Help me understand QR Code & Barcode Scanner for Python (crates/qrcode-ai-scanne
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-dark.gif?v=05df706be1b2">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-light.gif?v=c050b0a71771" alt="QR Code &amp; Barcode Scanner for Python: the Python logo, the quick start in Python, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use the Python binding for image-processing scripts, notebooks and batch imports that need structured scanner output. Preserve barcode text exactly instead of coercing identifiers into numbers, and handle an empty detection list separately from invalid image bytes. Select the wheel and Python version supported by the release you install; the source README may describe upcoming changes.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner Python guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) and [barcode scanner Python guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
@@ -43,9 +52,9 @@ The distribution is `qrcode-barcode-scanner`; the import is
 `qrcode_barcode_scanner`. Python 3.8 or later is required. The PyO3 extension
 returns the same versioned `ScanReport` as the Rust, Node.js and browser bindings.
 
-[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/python.mdx) ·
-[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/v0.11.0/spec) ·
-[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/SCORING.md)
+[Python API](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/python.mdx) ·
+[Report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0/spec) ·
+[Scoring](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/SCORING.md)
 
 The scanner used by [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) can also check batches of saved QR designs and
 barcode photos from a Python workflow.
@@ -81,7 +90,7 @@ Download a sample image containing QR `https://qrc-ai.com/76xMa` and Code 128
 
 ```sh
 curl -fsSL -o label.png \
-  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/v0.11.0/fixtures/symbology/mixed-code128-qr.png
+  https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png
 ```
 
 In Windows PowerShell, use `curl.exe` in place of `curl` for the download.
@@ -159,17 +168,17 @@ Releases up to 0.9.0 were published as `qrcode-ai-scanner`.
 To migrate, uninstall the previous distribution, install this one and import
 `qrcode_barcode_scanner`. The rename itself changes no function name or report
 field. The
-[migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
+[migration guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/guides/migrate-to-qrcode-barcode-scanner.mdx)
 covers the runtime-specific steps.
 
-[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/errors.mdx) ·
-[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/SECURITY.md) ·
-[Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner) ·
-[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues)
+[Error codes](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/errors.mdx) ·
+[Security](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/SECURITY.md) ·
+[Source](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) ·
+[Report a bug](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues)
 
-Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE). Published archives retain their own packaged license.
+Source license: [MIT](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE). Published archives retain their own packaged license.
 Read the current
-[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md)
+[licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md)
 and the license packaged with the exact version you install.
 © SuperNovae Studio.
 

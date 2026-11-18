@@ -29,6 +29,15 @@ Help me understand @qrcode-ai-com/qrcode-barcode-scanner-wasm (crates/qrcode-ai-
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=b713c1cf7ce7">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=e281f829db83" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logos, the quick start, and a QR code and a barcode read from a camera" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use the browser WebAssembly package to decode QR codes and barcodes from imported image bytes or application-supplied frames. Its JavaScript entry points also expose camera, tracking and overlay helpers documented below; your page remains responsible for permissions and user interaction. Start with a worker-based image scan before adding a live-camera interface or optional destination transport.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner JavaScript guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript) and [barcode scanner JavaScript guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/javascript) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
@@ -41,7 +50,7 @@ QR decoding + scannability scoring for artistic / AI-generated QR codes.
 Decoding is fully client-side; optional destination checks use only the transport you supply.
 
 [QR Code AI](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript) uses the engine family for QR verification. To decode a
-saved QR image or a barcode label in the browser, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
+saved QR image or a barcode label in the browser, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml).
 
 ## Install and try the packaged example
 
@@ -65,7 +74,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory node_modules/@qrcode-ai
 
 Open [the local image example](http://127.0.0.1:8000/examples/headless.html)
 and import an image. The decoder runs in the packaged module worker. The
-[examples guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md)
+[examples guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/crates/qrcode-ai-scanner-wasm/examples/README.md)
 explains camera access, HTTPS and CSP requirements. Opening the HTML as a
 `file://` URL does not support the module-worker flow.
 
@@ -425,7 +434,7 @@ from the frame the decoder read. The overlay never reads the video for them: in
 pass a copy to `overlay.setFrameImage(image, frame)`, as the wiring above does.
 Pass an `ImageData` or an `ImageBitmap`, never a canvas.
 
-The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/wasm.mdx)
+The [browser API guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/api/wasm.mdx)
 covers each part in full. Checks in automated browsers do not qualify a
 physical camera or every mobile browser.
 
@@ -588,9 +597,9 @@ const handler = createDestinationEndpoint({
 The endpoint lets callers make your server send requests, even with that
 policy. Authenticate callers, limit their rate, keep URLs out of logs, and add
 your network's NAT64 prefix and denied ranges; the
-[security guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/concepts/security.mdx)
+[security guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/concepts/security.mdx)
 lists the policy and the operator's duties. Project-authored source in this checkout is MIT;
-the pinned published package retains its own license. The current [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSING.md) explains
+the pinned published package retains its own license. The current [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md) explains
 source, package and third-party terms.
 
 
@@ -633,7 +642,7 @@ context: `localhost` and `127.0.0.1` count as one on the machine that runs the
 browser; from another device, such as a phone, serve the folder over `https`.
 Run the server-rendering example with
 `node node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/examples/ssr.mjs`.
-[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md),
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md),
 also in the installed package, describes each example and the worker's
 messages.
 
@@ -643,7 +652,7 @@ Both example pages scan with no violation reported when a server sends
 `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src blob: data:`,
 plus a `style-src` hash of the image page's one inline `<style>` element, as a
 `Content-Security-Policy` header with every file of the package folder.
-[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
+[examples/README.md](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#content-security-policy)
 gives that exact policy, why each source is needed, and how the package's
 browser job found it in Playwright's Chromium and Firefox. For a policy of your
 own:
@@ -677,7 +686,7 @@ own:
   the loader finds its `.wasm` through `import.meta.url`, and the package's CI
   builds a fresh Vite application with a module worker from the installed
   package. The browser API guide lists the bundler settings, and
-  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
+  [Use a bundler](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#use-a-bundler)
   shows the example pages' imports by package name.
 - **Server rendering.** Importing `/auto`, `/camera`, `/camera-overlay` and
   `/destination` during server rendering compiles no WebAssembly, fetches
