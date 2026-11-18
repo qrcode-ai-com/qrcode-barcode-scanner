@@ -29,6 +29,15 @@ Help me understand QR Code & Barcode Scanner for Go (bindings/go/README.md) for 
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-dark.png?v=ef53bfd93e9f">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-light.png?v=72b77fa2be45" alt="QR Code &amp; Barcode Scanner for Go: read QR codes and barcodes from an image file in Go" width="100%">
+    </picture>
+  </a>
+</p>
+
 Use the Go adapter in an existing Go service, batch job or command that can start a local process. Install qrscan separately and keep its version compatible with the adapter. The adapter forwards the engine report rather than translating identifiers into numbers, which matters for barcode values with leading zeroes.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner Go guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/go) and [barcode scanner Go guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/go) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.

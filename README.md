@@ -40,7 +40,16 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode 
 
 To prepare a QR payload or a barcode label, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Keep the original payload with the exported image so that you can compare the scan result with the value you intended to encode.
 
-[![QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/readme/hero.png?v=d6458e19d08a)](https://qrcode-ai.com/)
+<p align="center">
+  <a href="https://qrcode-ai.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.webp?v=a9e4ba856a01">
+      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.webp?v=66b75f6a6960">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.gif?v=e85ce62520b5">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.gif?v=c93a11abfc2d" alt="QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine" width="100%">
+    </picture>
+  </a>
+</p>
 
 [Get started](#get-started) · [Examples](#examples) · [Compare scanners](docs/comparison.mdx) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
