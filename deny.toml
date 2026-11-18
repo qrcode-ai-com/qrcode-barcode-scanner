@@ -31,6 +31,16 @@ license-files = [{ path = "LICENSE", hash = 0 }]
 
 [advisories]
 yanked = "deny"
+# RUSTSEC-2026-0543 (in the advisory database since 2026-11-17) says chrono is
+# unmaintained. It is an informational notice: it reports no vulnerability and
+# names no patched release. chrono 0.4.45 is in all five lockfile trees for one
+# reason, rxing, whose latest release (0.9.4, 2026-11-08) still requires it, so
+# no update clears the notice today. This entry names that one advisory; a
+# vulnerability in chrono would carry another id and still fail the gate.
+# Remove it when rxing no longer depends on chrono.
+ignore = [
+  { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained: an informational notice with no patched release; rxing 0.9.4 still requires chrono (reviewed 2026-11-18)" },
+]
 
 [bans]
 # Duplicate transitive versions are a warn (a nudge to dedup), not a hard fail —
