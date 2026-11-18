@@ -32,8 +32,8 @@ Help me understand QR Code & Barcode Scanner for Go (bindings/go/README.md) for 
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-dark.png?v=ef53bfd93e9f">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-light.png?v=72b77fa2be45" alt="QR Code &amp; Barcode Scanner for Go: read QR codes and barcodes from an image file in Go" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-dark.png?v=9cab6eef91a6">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/go-light.png?v=84d8b0b6b090" alt="QR Code &amp; Barcode Scanner for Go: read QR codes and barcodes from an image file in Go" width="100%">
     </picture>
   </a>
 </p>

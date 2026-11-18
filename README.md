@@ -43,10 +43,10 @@ To prepare a QR payload or a barcode label, use the [QR code generator](https://
 <p align="center">
   <a href="https://qrcode-ai.com/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.webp?v=a9e4ba856a01">
-      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.webp?v=66b75f6a6960">
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.gif?v=e85ce62520b5">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.gif?v=c93a11abfc2d" alt="QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine" width="100%">
+      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.webp?v=1df0ffe28552">
+      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.webp?v=ac989cfaeec2">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-dark.gif?v=3cd8cf5833c5">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/scanner-hero-light.gif?v=24618096bac7" alt="QR Code and Barcode Scanner: local image and frame decoding, with QR quality diagnostics, powered by one Rust engine" width="100%">
     </picture>
   </a>
 </p>
@@ -120,6 +120,15 @@ The scanner returns the decoded fields. Your app decides what happens next.
 </details>
 
 ## Get started
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/destinations-dark.png?v=aac80a06a2b0">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/brand/destinations-light.png?v=4443be3d3592" alt="Where the scanner is published: crates.io, npm, PyPI, Go, Homebrew, Scoop, GitHub Releases, Debian, Arch Linux, Fedora, AppImage, a container image, MCP, OpenClaw, jsDelivr, UNPKG, esm.sh, docs.rs, deps.dev, Libraries.io and Lib.rs" width="100%">
+    </picture>
+  </a>
+</p>
 
 Choose the runtime your application uses. All five packages are published as 0.11.0:
 
