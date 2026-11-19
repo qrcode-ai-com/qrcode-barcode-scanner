@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/appimage-v0.11.0">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-appimage-dark.gif?v=095b1eb649ed">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-appimage-light.gif?v=9ce18305c427" alt="QR Code &amp; Barcode Scanner CLI as one Linux file: the AppImage logo, the commands that run the file, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # AppImage recipe
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -97,6 +106,18 @@ Download the [mixed fixture](https://raw.githubusercontent.com/qrcode-ai-com/qrc
 as `mixed-code128-qr.png`. The report of each profile contains the QR URL
 `https://qrc-ai.com/76xMa` and the Code 128 value `STOCK-4827`. The scanner runs on this computer
 and opens no link.
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
+
+The picture is that scan, recorded: both codes come back in the same report, each with its format
+and the place where the engine measured it.
 
 To remove it, delete the file. It writes nothing else on the machine.
 

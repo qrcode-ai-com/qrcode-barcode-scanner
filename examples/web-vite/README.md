@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=74f967bc6d23">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=1ab06a2a50e5" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logo, the quick start in the page, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Scan in the browser with Vite
 
 <!-- qrcode-ai-readme-actions:v2 -->

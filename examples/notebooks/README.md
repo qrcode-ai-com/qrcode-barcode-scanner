@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://pypi.org/project/qrcode-barcode-scanner/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-dark.gif?v=05df706be1b2">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-light.gif?v=c050b0a71771" alt="QR Code &amp; Barcode Scanner for Python: the Python logo, the quick start in Python, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Scan in a notebook
 
 <!-- qrcode-ai-readme-actions:v2 -->

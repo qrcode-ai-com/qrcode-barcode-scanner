@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-mcp">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-mcp-dark.gif?v=b585c4a58dad">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-mcp-light.gif?v=6bc9fb70ba28" alt="QR Code &amp; Barcode Scanner MCP: the MCP mark, the client configuration that starts the server, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner MCP
 
 <!-- qrcode-ai-readme-actions:v2 -->

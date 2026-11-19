@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-archives-dark.gif?v=bf8517ad6017">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-archives-light.gif?v=2d1ba5193f64" alt="Prebuilt qrscan for Linux, macOS and Windows: the GitHub mark, the commands that download, check and run an archive, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Prebuilt qrscan
 
 <!-- qrcode-ai-readme-actions:v2 -->

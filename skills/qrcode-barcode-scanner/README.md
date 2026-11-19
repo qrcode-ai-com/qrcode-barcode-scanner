@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-skill-dark.gif?v=f2c7b5523465">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-skill-light.gif?v=e9cbdde963d4" alt="QR Code &amp; Barcode Scanner skill: the commands that install the skill and scan a local image, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner skill · 0.2.0
 
 <!-- qrcode-ai-readme-actions:v2 -->

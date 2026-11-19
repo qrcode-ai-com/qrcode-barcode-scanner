@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-openclaw-dark.gif?v=0c0750974a75">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-openclaw-light.gif?v=de5b44add2f0" alt="QR Code &amp; Barcode Scanner for OpenClaw: the OpenClaw logo, the commands that install and enable the bundle, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner · OpenClaw bundle 0.2.0
 
 <!-- qrcode-ai-readme-actions:v2 -->

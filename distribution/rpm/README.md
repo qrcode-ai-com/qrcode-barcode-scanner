@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/rpm-packages-v0.11.0">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-fedora-dark.gif?v=32ff0d34d3da">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-fedora-light.gif?v=48020cbb3369" alt="QR Code &amp; Barcode Scanner CLI for Fedora: the Fedora logo, the dnf commands, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Fedora RPM recipe
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -81,6 +90,18 @@ for profile in fast frame full; do
 done
 sudo dnf remove qrcode-barcode-scanner
 ```
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
+
+The picture is that scan, recorded: both codes come back in the same report, each with its format
+and the place where the engine measured it.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
 

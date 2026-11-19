@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://aur.archlinux.org/packages/qrcode-barcode-scanner-bin">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-arch-dark.gif?v=4836acf6a379">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-arch-light.gif?v=a374de4180c7" alt="QR Code &amp; Barcode Scanner CLI for Arch Linux: the Arch Linux logo, the commands that build the AUR package, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Arch Linux package recipe
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -53,6 +62,18 @@ makepkg -si
 Check `qrscan --version` and scan the
 [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png)
 to exercise both formats.
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
+
+The picture is that scan, recorded: both codes come back in the same report, each with its format
+and the place where the engine measured it.
 
 The recipe is licensed under [0BSD](LICENSE). The executable retains its
 AGPL-3.0-or-later license, notices and build metadata. The release provides the

@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/pkgs/container/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-container-dark.gif?v=5edc12041125">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-container-light.gif?v=ae09c23a53de" alt="QR Code &amp; Barcode Scanner CLI in a container: the Docker logo, the commands that pull and run the image, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Scanner CLI container
 
 <!-- qrcode-ai-readme-actions:v2 -->
