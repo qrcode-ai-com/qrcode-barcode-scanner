@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-gallery-dark.gif?v=5b8222e400e4">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-gallery-light.gif?v=9b58563b8dbe" alt="Real QR, matrix-code and barcode examples: twelve fixtures, each read as the format it is labelled with" width="100%">
+    </picture>
+  </a>
+</p>
+
 # Examples
 
 <!-- qrcode-ai-readme-actions:v2 -->
