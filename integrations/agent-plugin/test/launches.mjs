@@ -87,7 +87,7 @@ export async function launches(stage) {
   const readme = await readFile(join(stage, 'README.md'), 'utf8');
   const web = readme.match(/\]\((https:\/\/cursor\.com\/install-mcp\?[^)\s]+)\)/g) ?? [];
   if (web.length !== 1) throw new Error(`README.md holds ${web.length} Cursor web install links, expected one`);
-  found['README.md · Add to Cursor'] = fromLink(web[0].slice(2, -1), 'README.md · Add to Cursor');
+  found['README.md · Cursor web link'] = fromLink(web[0].slice(2, -1), 'README.md · Cursor web link');
   const deep = readme.match(/cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?\S+/g) ?? [];
   if (deep.length !== 1) throw new Error(`README.md holds ${deep.length} cursor:// links, expected one`);
   found['README.md · cursor://'] = fromLink(deep[0].replace(/^cursor:\/\/anysphere\.cursor-deeplink/, 'https://cursor.invalid'), 'README.md · cursor://');

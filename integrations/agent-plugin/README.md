@@ -132,11 +132,9 @@ git clone --branch v0.3.0 https://github.com/qrcode-ai-com/qrcode-barcode-scanne
 
 To remove it, delete that folder and reload the window. The [Cursor QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/cursor) and the [Cursor barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/cursor) show the same steps.
 
-To add only the MCP server, use the install link. Cursor shows the command and asks you to confirm before it adds anything.
+To add only the MCP server, open [Cursor's install link for the qrscan server](https://cursor.com/install-mcp?name=qrscan&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyItLXllcyIsIi0taWdub3JlLXNjcmlwdHMiLCJAcXJjb2RlLWFpLWNvbS9xcmNvZGUtYmFyY29kZS1zY2FubmVyLW1jcEAwLjMuMSJdfQ%3D%3D). Cursor shows the command and asks you to confirm before it adds anything.
 
-[![Add to Cursor](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/cursor-v1.svg)](https://cursor.com/install-mcp?name=qrscan&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyItLXllcyIsIi0taWdub3JlLXNjcmlwdHMiLCJAcXJjb2RlLWFpLWNvbS9xcmNvZGUtYmFyY29kZS1zY2FubmVyLW1jcEAwLjMuMSJdfQ%3D%3D)
-
-GitHub does not open `cursor://` links, so the button uses Cursor's web link. The same install as a Cursor deeplink, to paste into a browser:
+GitHub does not open `cursor://` links, so that link is Cursor's web form. The same install as a Cursor deeplink, to paste into a browser:
 
 ```text
 cursor://anysphere.cursor-deeplink/mcp/install?name=qrscan&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyItLXllcyIsIi0taWdub3JlLXNjcmlwdHMiLCJAcXJjb2RlLWFpLWNvbS9xcmNvZGUtYmFyY29kZS1zY2FubmVyLW1jcEAwLjMuMSJdfQ==
