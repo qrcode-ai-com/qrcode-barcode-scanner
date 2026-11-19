@@ -1,3 +1,5 @@
+[![QR Code & Barcode Scanner for .NET: the .NET logo, the quick start in C#, and a QR code and a barcode being read](https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-dotnet-light.gif?v=f3081b461ba8)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust)
+
 # QR Code & Barcode Scanner for .NET
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -95,6 +97,11 @@ The values each option takes are those of the engine: see the
 
 ## Read the report
 
+[![A QR code and Code 128 decoded from the same image, each outlined where the engine measured it](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples)
+
+The picture is a recorded scan of one image that holds a QR code and a Code 128 barcode. Both come
+back in the same report, each with its format and the place where the engine measured it.
+
 `report.Json` is the exact text the engine returned. Nothing is renamed, rounded or
 recalculated, so decode it yourself for the payload, the measured places and the trace. It
 follows the engine's [report contract](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/spec/01-report.md). The other members read the
@@ -129,6 +136,42 @@ Every refusal is one exception type, `ScanException`. Its message is the engine'
 | `EngineFault` | A fault inside the engine itself, not a refusal of your input. | `null` |
 
 The codes are listed in the engine's [error catalog](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/v0.11.0/docs/api/errors.mdx).
+
+## What it reads
+
+The package holds the engine, so it reads what the engine reads.
+Codes of different formats in the same image come back in one report.
+
+[![The code families the engine reads: QR codes, matrix and stacked codes such as Data Matrix, retail barcodes such as EAN-13, and other linear barcodes such as Code 128](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-light.gif?v=bdfe5fc5f9b3)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats)
+
+| Family | Formats |
+|---|---|
+| QR | QR Code, Micro QR, rectangular Micro QR (rMQR) |
+| Matrix and stacked | Data Matrix, Aztec, PDF417, MaxiCode |
+| Retail | EAN-13, EAN-8, UPC-A, UPC-E |
+| Other linear | Code 128, Code 39, Code 93, Codabar, ITF, GS1 DataBar, GS1 DataBar Expanded, Telepen |
+
+The engine's [supported formats](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats) section states the known limits.
+
+## The same engine in other runtimes
+
+[![One engine in the language you write: Rust on crates.io, Node.js and the browser on npm, Python on PyPI, Go, PHP, and the qrscan command line](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-light.png?v=6dbd5a8cf5ba)](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#get-started)
+
+| Runtime | Package | How it scans |
+|---|---|---|
+| Rust | [`qrcode-barcode-scanner`](https://crates.io/crates/qrcode-barcode-scanner) on crates.io | In process |
+| Node.js | [`@qrcode-ai-com/qrcode-barcode-scanner`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner) on npm | In process, native |
+| Browser | [`@qrcode-ai-com/qrcode-barcode-scanner-wasm`](https://www.npmjs.com/package/@qrcode-ai-com/qrcode-barcode-scanner-wasm) on npm | In the page, WebAssembly |
+| Python | [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/) on PyPI | In process |
+| Go | [`qrcode-barcode-scanner-go`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-go) | Through the installed `qrscan` |
+| PHP | [`qrcode-barcode-scanner-php`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-php) | Through the installed `qrscan` |
+| Command line | [`qrscan`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#command-line) | One command, one JSON report |
+
+The Rust, Node.js, browser and Python packages hold the engine. The Go and PHP packages hold no decoder:
+each one starts `qrscan` and hands you its report.
+
+Language and platform names and logos belong to their owners. They identify a runtime or a destination
+and imply no endorsement.
 
 ## How it is built
 
