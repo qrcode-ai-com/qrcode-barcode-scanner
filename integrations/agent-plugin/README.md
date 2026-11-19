@@ -225,11 +225,19 @@ Pi loads the skill from `skills/` and the extension `pi/extension.js`, which reg
 
 ### OpenCode
 
+With OpenCode 2, add the plugin from its repository:
+
 ```sh
 opencode plugin add github:qrcode-ai-com/qrcode-barcode-scanner-plugin#v0.3.0
 ```
 
-The plugin adds the `qrscan` server and the skill to OpenCode's configuration when the server starts. It supports the OpenCode 2 plugin API and the OpenCode 1 object entry point, which OpenCode 1.18.29 and later read. To remove it, run `opencode plugin remove` with the same package. The [OpenCode QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/opencode) and the [OpenCode barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/opencode) show the same step.
+With OpenCode 1, clone the repository at its tag and name the folder in `opencode.json`:
+
+```json
+{ "plugin": ["file:///absolute/path/to/qrcode-barcode-scanner-plugin"] }
+```
+
+The plugin adds the `qrscan` server and the skill folder to OpenCode's configuration when OpenCode starts. A server or skill you already named the same way is left as it is. To remove it, run `opencode plugin remove github:qrcode-ai-com/qrcode-barcode-scanner-plugin#v0.3.0` with OpenCode 2, or delete the entry with OpenCode 1. The [OpenCode QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/opencode) and the [OpenCode barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/opencode) show the same step.
 
 ### Devin
 
