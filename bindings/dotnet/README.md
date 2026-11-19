@@ -18,16 +18,13 @@
 
 Choose an AI assistant to explain this destination using its public sources. Gemini opens gemini.google.com. Gemini, Copilot, DeepSeek, Meta AI and Qwen require pasting the prompt below; the other links include it in their URL. Sign-in or a manual paste may still be required. Check the answer against the documentation.
 
-<details>
-<summary>Copy the plain-text prompt</summary>
+**Copy the plain-text prompt**
 
 Use the code block's copy control, or select its complete text, then paste it into your assistant.
 
 ```text
 Help me understand QR Code & Barcode Scanner for .NET (bindings/dotnet/README.md) for QR Code & Barcode Scanner, the open-source scanner. Source documentation; publication is not implied. Provided README context (verify against the sources): Use this binding when a C# service or desktop application already holds image bytes and needs the scanner report without starting a subprocess. The managed package loads its bundled native library on the supported operating systems. Its target framework, native runtime floors and unpublished NuGet status below are part of the installation contract. Read the public documentation below. Explain what this destination does, its documented installation or access steps, a minimal example if supported, prerequisites, limitations and license. Distinguish published packages from working source and preparation. Cite your sources; if a page is unavailable or a fact cannot be checked, say so. Do not invent installation commands, benchmark results or comparisons. Answer in my language. Public sources: https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/dotnet/README.md https://qrcode-ai.com/en-US/qr-code-scanner https://qrcode-ai.com/en-US/barcode-scanner https://qrcode-ai.com/en-US/qr-code-scanner/sdk/dotnet https://qrcode-ai.com/en-US/barcode-scanner/sdk/dotnet https://qrcode-ai.com/en-US/qr-code-generator https://qrcode-ai.com/en-US/barcode-generator
 ```
-
-</details>
 
 <!-- /qrcode-ai-readme-actions:v2 -->
 
