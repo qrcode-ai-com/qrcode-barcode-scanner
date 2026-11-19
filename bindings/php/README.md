@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-dark.gif?v=7e4f537dc2bc">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-light.gif?v=6a86ec5cd714" alt="QR Code &amp; Barcode Scanner for PHP: the PHP logo, the quick start in PHP, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner for PHP
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -28,15 +37,6 @@ Help me understand QR Code & Barcode Scanner for PHP (bindings/php/README.md) fo
 </details>
 
 <!-- /qrcode-ai-readme-actions:v2 -->
-
-<p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-dark.gif?v=7e4f537dc2bc">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-php-light.gif?v=6a86ec5cd714" alt="QR Code &amp; Barcode Scanner for PHP: the PHP logo, the quick start in PHP, and a QR code and a barcode being read" width="100%">
-    </picture>
-  </a>
-</p>
 
 Use this command adapter when a PHP application can invoke a separately installed qrscan executable. It keeps the scanner out of the PHP process and returns the original report, leaving storage and business decisions to your application. The public source and tag do not by themselves establish Packagist availability; verify the registry before relying on the Composer command below.
 

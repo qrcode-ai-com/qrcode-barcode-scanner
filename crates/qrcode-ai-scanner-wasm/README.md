@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=b713c1cf7ce7">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=e281f829db83" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logos, the quick start, and a QR code and a barcode read from a camera" width="100%">
+    </picture>
+  </a>
+</p>
+
 # @qrcode-ai-com/qrcode-barcode-scanner-wasm
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -28,15 +37,6 @@ Help me understand @qrcode-ai-com/qrcode-barcode-scanner-wasm (crates/qrcode-ai-
 </details>
 
 <!-- /qrcode-ai-readme-actions:v2 -->
-
-<p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=b713c1cf7ce7">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=e281f829db83" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logos, the quick start, and a QR code and a barcode read from a camera" width="100%">
-    </picture>
-  </a>
-</p>
 
 Use the browser WebAssembly package to decode QR codes and barcodes from imported image bytes or application-supplied frames. Its JavaScript entry points also expose camera, tracking and overlay helpers documented below; your page remains responsible for permissions and user interaction. Start with a worker-based image scan before adding a live-camera interface or optional destination transport.
 
