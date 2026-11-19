@@ -22,6 +22,7 @@ GUIDES = {
     'playground/README.md': ('sdk/javascript', 'JavaScript'),
     'integrations/mcp/README.md': ('mcp', 'MCP'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
+    'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }
