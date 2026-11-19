@@ -85,7 +85,7 @@ def strip_actions(text):
     return before + after[2:]
 
 
-def action_block(prompt, installers=()):
+def action_block(prompt, installers=(), markdown_only=False):
     badges = lambda rows: '\n'.join(f'[![{label}]({ASSETS}{key}-v{2 if key in {p[0] for p in PROVIDERS} else 1}.svg)]({url})' for key, label, url in rows)
     installation = ''
     if installers:
@@ -97,10 +97,28 @@ def action_block(prompt, installers=()):
             'Gemini opens gemini.google.com. Gemini, Copilot, DeepSeek, Meta AI and Qwen require '
             'pasting the prompt below; the other links include it in their URL. Sign-in or a manual '
             'paste may still be required. Check the answer against the documentation.\n\n'
-            '<details>\n<summary>Copy the plain-text prompt</summary>\n\n'
-            'Use the code block\'s copy control, or select its complete text, then paste it into your assistant.\n\n'
-            '```text\n' + prompt + '\n```\n\n</details>'
+            + ('**Copy the plain-text prompt**\n\n' if markdown_only else '<details>\n<summary>Copy the plain-text prompt</summary>\n\n')
+            + 'Use the code block\'s copy control, or select its complete text, then paste it into your assistant.\n\n'
+            '```text\n' + prompt + '\n```' + ('' if markdown_only else '\n\n</details>')
             + installation + '\n\n' + END + '\n\n')
+
+
+def html_tags(text):
+    """The HTML tags of a Markdown page, outside its code and its comments.
+
+    A registry that renders a README with HTML disabled shows each of them as text.
+    """
+    kept, fence = [], None
+    for line in re.sub(r'<!--.*?-->', '', text, flags=re.S).splitlines():
+        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if fence is not None:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= fence[1] and not marker[2].strip():
+                fence = None
+        elif marker and not (marker[1][0] == '`' and '`' in marker[2]):
+            fence = (marker[1][0], len(marker[1]))
+        else:
+            kept.append(re.sub(r'(`+).*?\1', '', line))
+    return re.findall(r'</?[A-Za-z][\w-]*(?:\s[^<>]*)?/?>', '\n'.join(kept))
 
 
 def insert_actions(text, block):

@@ -7,7 +7,7 @@ from pathlib import Path
 import unittest
 from urllib.parse import parse_qs, urlsplit, unquote
 from readme_prose import canonical_links, prose_links
-from readme_actions import action_block, ai_links, insert_actions, mcp_links, question, strip_actions
+from readme_actions import action_block, ai_links, html_tags, insert_actions, mcp_links, question, strip_actions
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('builder', ROOT / 'scripts/build-readme-actions.py')
@@ -56,6 +56,32 @@ class ReadmeActions(unittest.TestCase):
         self.assertIn('```text\nExplain this destination.\n```', block)
         self.assertNotIn('Google AI Studio', block)
         self.assertIn('](https://gemini.google.com/)', block)
+
+    def test_a_page_shown_without_html_gets_its_prompt_unfolded(self):
+        original = '# .NET\n\nNatural description.\n'
+        block = action_block('Explain this destination.', markdown_only=True)
+        self.assertEqual(html_tags(block), [])
+        self.assertIn('**Copy the plain-text prompt**', block)
+        self.assertIn('```text\nExplain this destination.\n```', block)
+        rendered = insert_actions(original, block)
+        self.assertEqual(strip_actions(rendered), original)
+        self.assertEqual(insert_actions(insert_actions(original, action_block('Explain this destination.')), block), rendered)
+
+    def test_html_tags_are_found_outside_code_and_comments_only(self):
+        self.assertEqual(html_tags('<details>\n<summary>Copy</summary>\n\n</details>'),
+                         ['<details>', '<summary>', '</summary>', '</details>'])
+        self.assertEqual(html_tags('A <sub>note</sub> and <img src="a.png" alt="">.'), ['<sub>', '</sub>', '<img src="a.png" alt="">'])
+        self.assertEqual(html_tags('<!-- a marker -->\n\nText with `List<string>` and <https://example.com/>.'), [])
+        self.assertEqual(html_tags('```xml\n<PackageReference Include="A" />\n```\n\n~~~~\n<b>\n~~~\n</b>\n~~~~\n'), [])
+        self.assertEqual(html_tags('```xml\n<a>\n```\n\n<b>bold</b>'), ['<b>', '</b>'])
+
+    def test_the_readme_packed_for_nuget_holds_no_html(self):
+        outputs = builder.outputs()
+        self.assertIn('bindings/dotnet/README.md', builder.MARKDOWN_ONLY)
+        for path in builder.MARKDOWN_ONLY:
+            self.assertEqual(html_tags(outputs[path]), [], path)
+            self.assertEqual(outputs[path].count('### Ask AI'), 1)
+        self.assertIn('<details>', outputs['README.md'])
 
     def test_previous_action_blocks_upgrade_without_duplicating_or_rewriting_the_body(self):
         body = '# Scanner\n\nA natural introduction.\n'

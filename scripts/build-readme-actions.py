@@ -11,6 +11,9 @@ from readme_actions import PROVIDERS, action_block, badge_svg, brand_logo, inser
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'
+# nuget.org renders a README with HTML disabled and removes its comments: a tag would be shown as text.
+# The README packed for it gets its prompt unfolded, and holds no HTML of its own.
+MARKDOWN_ONLY = {'bindings/dotnet/README.md'}
 
 
 def maintained_readmes():
@@ -35,7 +38,7 @@ def outputs():
         context = re.sub(r'[`<>*]', '', context)[:500]
         prompt = question(f'{title} ({path})', REPOSITORY + path, urls, context=context)
         installers = mcp_links(config) if path in ('README.md', 'integrations/mcp/README.md') else ()
-        result[path] = insert_actions(text, action_block(prompt, installers))
+        result[path] = insert_actions(text, action_block(prompt, installers, markdown_only=path in MARKDOWN_ONLY))
     brand_root = ROOT / 'docs/assets/actions/brands'
     marks = {row['id']: row for row in json.loads((brand_root / 'provenance.json').read_text())['icons']}
     license_text = (brand_root / 'LICENSE-Lobe-Icons.txt').read_text()
