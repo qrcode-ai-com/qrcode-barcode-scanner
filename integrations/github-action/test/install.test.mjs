@@ -17,7 +17,8 @@ test('each runner maps to the archive published for it, and the others are refus
   assert.equal(targetFor('darwin', 'arm64'), 'aarch64-apple-darwin');
   assert.equal(targetFor('darwin', 'x64'), 'x86_64-apple-darwin');
   assert.equal(targetFor('win32', 'x64'), 'x86_64-pc-windows-msvc');
-  assert.throws(() => targetFor('linux', 'x64', undefined), /musl/);
+  // null, not undefined: undefined would read this host's own glibc.
+  assert.throws(() => targetFor('linux', 'x64', null), /musl/);
   assert.throws(() => targetFor('linux', 'x64', '2.27'), /glibc 2\.28 or later; this runner has 2\.27/);
   assert.throws(() => targetFor('win32', 'arm64'), /no qrscan archive is published for win32 arm64/);
   assert.throws(() => targetFor('freebsd', 'x64'), InstallError);
