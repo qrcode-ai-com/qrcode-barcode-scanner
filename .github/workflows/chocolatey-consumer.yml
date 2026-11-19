@@ -1,8 +1,17 @@
 name: Chocolatey Windows consumer
 
-# Local package qualification only. No registry uploads or secrets.
+# Qualifies the package built here or, on request, the version the Chocolatey Community
+# Repository serves. No registry uploads or secrets.
 on:
   workflow_dispatch:
+    inputs:
+      source:
+        description: The package built here, or the one the Community Repository serves
+        type: choice
+        options:
+          - local-package
+          - community-feed
+        default: local-package
   push:
     branches: [codex/chocolatey-consumer]
 
@@ -17,13 +26,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Pack, install, scan and uninstall
+      - name: Install, scan and uninstall
         shell: pwsh
-        run: ./distribution/chocolatey/test.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'Chocolatey consumer')
-      - name: Save the qualified candidate and receipt
+        env:
+          PACKAGE_SOURCE: ${{ inputs.source || 'local-package' }}
+        run: ./distribution/chocolatey/test.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'Chocolatey consumer') -Source $env:PACKAGE_SOURCE
+      - name: Save the package and receipt
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: chocolatey-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          name: chocolatey-${{ inputs.source || 'local-package' }}-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/Chocolatey consumer/packages/*.nupkg
             ${{ runner.temp }}/Chocolatey consumer/receipt.json

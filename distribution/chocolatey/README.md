@@ -65,6 +65,16 @@ Community Repository admission requires a separate submission, moderation, and
 a clean install from the public feed. This recipe and its local test do not
 establish availability in that feed.
 
+To test the package the Community Repository serves, add `-Source community-feed`.
+The consumer then builds nothing. It reads the status and the hash the feed
+declares for this version, downloads one copy to compare it with that hash, lets
+Chocolatey install from the feed, and runs the same checks. The receipt names
+the feed and the status it reported.
+
+```powershell
+./distribution/chocolatey/test.ps1 -WorkDirectory "$env:TEMP/qrscan-chocolatey-feed" -Source community-feed
+```
+
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
 
 <!-- qrscan-source-license:v1 -->
