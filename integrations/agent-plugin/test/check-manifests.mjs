@@ -61,16 +61,24 @@ const read = (path) => readFile(join(stage, path), 'utf8');
 const json = async (path) => JSON.parse(await read(path));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+// A published schema, fetched once per run (three tries: a schema host can be slow to answer).
+const fetched = new Map();
 async function schema(url) {
   const file = cache && join(cache, url.replace(/^https:\/\//, '').replaceAll('/', '_'));
-  let text;
-  if (file && existsSync(file)) text = await readFile(file, 'utf8');
-  else {
-    const answer = await fetch(url, { redirect: 'follow' });
-    expect(answer.ok, `${url} answered ${answer.status}`);
-    text = await answer.text();
-    if (file) { await mkdir(cache, { recursive: true }); await writeFile(file, text); }
+  let text = fetched.get(url);
+  if (text === undefined && file && existsSync(file)) text = await readFile(file, 'utf8');
+  for (let attempt = 1; text === undefined; attempt += 1) {
+    try {
+      const answer = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(30000) });
+      expect(answer.ok, `${url} answered ${answer.status}`);
+      text = await answer.text();
+    } catch (error) {
+      if (attempt === 3) throw new Error(`${url}: ${error.cause?.code ?? error.message}`);
+      await new Promise((done) => setTimeout(done, 2000 * attempt));
+    }
   }
+  fetched.set(url, text);
+  if (file && !existsSync(file)) { await mkdir(cache, { recursive: true }); await writeFile(file, text); }
   return { body: JSON.parse(text), sha256: createHash('sha256').update(text).digest('hex').slice(0, 12) };
 }
 // A validator for BODY, with the other published schemas it references loaded too.
