@@ -117,6 +117,18 @@ Without a budget the profile's own applies, and a busy machine can cut the scan 
 
 ## Read the report
 
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
+
+The picture is a recorded scan of one image that holds a QR code and a Code 128 barcode. Both come
+back in the same report, each with its format and the place where the engine measured it.
+
 `$report->data` is the engine's report as a PHP array, and `$report->json` is the exact text the
 engine printed. Nothing is renamed, rounded or recalculated. Keep `json` when you store the
 report: a PHP array cannot tell an empty object from an empty list.
