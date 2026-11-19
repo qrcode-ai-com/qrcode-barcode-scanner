@@ -10,7 +10,7 @@ from readme_prose import canonical_links
 from readme_actions import PROVIDERS, action_block, badge_svg, brand_logo, insert_actions, mcp_links, question, strip_actions
 
 ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'
+REPOSITORY = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/'
 # nuget.org renders a README with HTML disabled and removes its comments: a tag would be shown as text.
 # The README packed for it gets its prompt unfolded, and holds no HTML of its own.
 MARKDOWN_ONLY = {'bindings/dotnet/README.md'}

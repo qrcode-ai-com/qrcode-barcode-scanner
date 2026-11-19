@@ -33,6 +33,15 @@ name the new repository. Verification commands for artifacts built before the
 rename keep the name those artifacts were attested under, and dated records keep
 the name they were written with.
 
+Since 19 November 2026 the links and pictures of the maintained documents name
+`qrcode-barcode-scanner-rust`: the README generators
+(`scripts/build-readme-actions.py`, `scripts/readme_actions.py`,
+`scripts/readme_licensing.py`) write that address. A command that was run against a
+published artifact (an archive download, a pinned fixture, a pinned skill tree) keeps
+the address it was run with, which still resolves. The package manifests, the packaging
+recipes and the release tooling still name the former repository: they change with
+the two requirements above, in the release that follows.
+
 From 0.11.0 the packages carry new names, and each new name needs a trusted
 publisher of its own: crates.io and npm can bind one only after the package's
 first version exists, while PyPI accepts a pending publisher before it. The
@@ -794,7 +803,7 @@ performs them):
    One recorded exception, decided by the owner on 10 November 2026: the
    first upload of `qr_barcode_scanner` 0.11.0 may use the `flutter-stage`
    artifact of the `Flutter candidate qualification` workflow,
-   [run 43268594217](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/43268594217),
+   [run 43268594217](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/43268594217),
    on revision `02ecb7bd0e893d3de3a41de58f6e09f6b32a30a4`. Its four jobs
    passed: stage, Dart host and pub.dev dry run, Android APK build, unsigned
    iOS build. The archive SHA-256 is
@@ -814,7 +823,7 @@ performs them):
 
    This replaces the stage of revision `1695072` named here first. A device
    check of those sources
-   ([run 42715677751](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/actions/runs/42715677751))
+   ([run 42715677751](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/42715677751))
    passed the example's integration test on an Android emulator with NDK 28.2
    and found both 64-bit libraries aligned for 16 KB memory pages, but
    aligned to 4 KB when built with NDK 27.0. The package README of `1695072`

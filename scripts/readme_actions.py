@@ -9,7 +9,7 @@ from urllib.parse import quote, urlencode, urlsplit
 
 START = '<!-- qrcode-ai-readme-actions:v2 -->'
 END = '<!-- /qrcode-ai-readme-actions:v2 -->'
-ASSETS = 'https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner/main/docs/assets/actions/'
+ASSETS = 'https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/'
 PROVIDERS = (
     ('chatgpt', 'ChatGPT', 'https://chatgpt.com/', 'q'),
     ('claude', 'Claude', 'https://claude.ai/new', 'q'),
