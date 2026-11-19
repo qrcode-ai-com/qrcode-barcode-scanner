@@ -56,12 +56,15 @@ writeFileSync(join(stage, 'dist', 'qrcode-barcode-scanner_bg.wasm'), wasm);
 for (const file of ['build-info.json', 'LICENSE', 'LICENSE-APACHE-2.0', 'THIRD-PARTY.md']) {
   copyFileSync(join(enginePackage, file), join(stage, 'dist', 'engine', file));
 }
-copyFileSync(join(here, 'package.json'), join(stage, 'package.json'));
-copyFileSync(join(here, 'CHANGELOG.md'), join(stage, 'CHANGELOG.md'));
+// Text from the checkout gets LF lines: a Windows checkout may hold CRLF, and the VSIX must not
+// depend on where it was built.
+const text = (path) => readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+writeFileSync(join(stage, 'package.json'), text(join(here, 'package.json')));
+writeFileSync(join(stage, 'CHANGELOG.md'), text(join(here, 'CHANGELOG.md')));
 copyFileSync(join(here, 'images', 'icon.png'), join(stage, 'images', 'icon.png'));
-writeFileSync(join(stage, 'README.md'), marketplaceReadme(readFileSync(join(here, 'README.md'), 'utf8')));
+writeFileSync(join(stage, 'README.md'), marketplaceReadme(text(join(here, 'README.md'))));
 
-const mit = readFileSync(join(here, 'LICENSE'), 'utf8');
+const mit = text(join(here, 'LICENSE'));
 writeFileSync(join(stage, 'LICENSE.md'), `# Licenses of this extension
 
 This extension holds two kinds of code under two licenses.

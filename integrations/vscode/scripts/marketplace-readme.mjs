@@ -11,7 +11,8 @@ export function marketplaceReadme(text) {
     if (row.length > 0) out.push(row.join(' · '));
     row = [];
   };
-  for (const line of text.split('\n')) {
+  // A Windows checkout may hold CRLF lines; the packed README uses LF on every platform.
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
     const badge = BADGE.exec(line);
     if (badge) {
       row.push(`[Ask ${badge[1]}](${badge[3]})`);

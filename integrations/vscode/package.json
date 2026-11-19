@@ -118,7 +118,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/build.mjs && node --test test/scan-core.test.mjs test/extension.test.mjs",
+    "test": "node scripts/build.mjs && node --test test/readme.test.mjs test/scan-core.test.mjs test/extension.test.mjs",
     "package": "node scripts/package.mjs",
     "test:vsix": "node --test test/vsix.test.mjs"
   },
