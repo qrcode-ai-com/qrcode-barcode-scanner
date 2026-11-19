@@ -49,11 +49,17 @@ package [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scann
 and scans a sample image with it. The scanner is a local Rust engine: every image is decoded in
 the session that runs the notebook.
 
-[![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb)
+[![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/demos-v0.11.0-r2/examples/notebooks/scan-images.ipynb)
 
-The badge opens the notebook on [mybinder.org](https://mybinder.org/), a free public service
+The first badge opens the notebook on [mybinder.org](https://mybinder.org/), a free public service
 with no account. It prepares a session with the package already installed, which can take a few
 minutes, and the session ends after about ten minutes of inactivity.
+
+The second badge opens it in [Google Colab](https://colab.research.google.com/). Colab runs code
+only for a signed-in Google account, and its first code cell installs the package into the Colab
+runtime: choose **Runtime › Run all**. Colab warns that the notebook was not written by Google.
+The notebook installs the package, downloads the sample image and scans it; it reads no Drive
+file.
 
 ## Run it on your machine
 
