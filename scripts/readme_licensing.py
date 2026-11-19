@@ -3,7 +3,7 @@ import re
 
 START = '<!-- qrscan-source-license:v1 -->'
 END = '<!-- /qrscan-source-license:v1 -->'
-ROOT = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'
+ROOT = 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/'
 
 
 def license_section():

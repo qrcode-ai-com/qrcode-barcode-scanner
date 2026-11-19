@@ -17,7 +17,7 @@ spec.loader.exec_module(builder)
 
 class ReadmeActions(unittest.TestCase):
     def test_prefill_routes_keep_exact_text_and_paste_routes_use_only_official_homepages(self):
-        prompt = question('Flutter & café', 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/bindings/flutter/README.md')
+        prompt = question('Flutter & café', 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/bindings/flutter/README.md')
         expected = [('chatgpt.com', '/', 'q'), ('claude.ai', '/new', 'q'),
                     ('gemini.google.com', '/', None), ('grok.com', '/', 'q'), ('www.perplexity.ai', '/', 'q'),
                     ('copilot.com', '/', None), ('chat.deepseek.com', '/', None),

@@ -12,7 +12,7 @@ The [MCP stdio adapter 0.3.1](https://www.npmjs.com/package/@qrcode-ai-com/qrcod
 [ClawHub skill 0.2.0](https://clawhub.ai/qrcode-ai-com/skills/qrcode-barcode-scanner)
 and [OpenClaw bundle 0.2.0](https://clawhub.ai/qrcode-ai-com/plugins/qrcode-barcode-scanner)
 reuse the published scanner 0.11.0. See the
-[distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/distribution/README.md)
+[distribution guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md)
 for installation and exact qualification scope. Adapter 0.3.1 was installed
 and tested on Linux x64 with Node.js 22/24 and on macOS ARM64 with Node.js 24. The skill and bundle
 were installed and exercised through OpenClaw 2026.11.1 on macOS ARM64; the
@@ -25,10 +25,10 @@ each additional product client.
 
 | Artifact | Use |
 |---|---|
-| [`spec/scan-report.schema.json`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/spec/scan-report.schema.json) | validate any report you receive or mock |
-| [`spec/examples/*.json`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec/examples) | real binary outputs, each from a committed fixture (`spec/README.md` § Examples): clean URL, artistic, rescued occlusion, wifi / MECARD / SMS / crypto / GS1 Digital Link payloads, ECI 4 and ECI 899, Hanzi, GS1 under FNC1, transparent designs, other symbologies, no-detection |
+| [`spec/scan-report.schema.json`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/spec/scan-report.schema.json) | validate any report you receive or mock |
+| [`spec/examples/*.json`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/spec/examples) | real binary outputs, each from a committed fixture (`spec/README.md` § Examples): clean URL, artistic, rescued occlusion, wifi / MECARD / SMS / crypto / GS1 Digital Link payloads, ECI 4 and ECI 899, Hanzi, GS1 under FNC1, transparent designs, other symbologies, no-detection |
 | `report-types.d.ts` (in both npm packages) | typed access in JS/TS tools |
-| [`spec/`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec) markdown | the normative semantics (≈15 min read) |
+| [`spec/`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/spec) markdown | the normative semantics (≈15 min read) |
 
 ## Invariants you can rely on
 

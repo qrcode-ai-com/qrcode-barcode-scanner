@@ -68,7 +68,7 @@ class LicensingTests(unittest.TestCase):
         self.assertGreaterEqual(len(targets), 6)
         for target in targets:
             with self.subTest(target=target):
-                if target.startswith('https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/'):
+                if target.startswith('https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/'):
                     self.assertTrue((ROOT / target.split('/blob/main/', 1)[1]).is_file())
                 elif not target.startswith('https://'):
                     self.assertEqual(target, 'LICENSE', 'Only the adjacent LICENSE may be relative in the flat CLI archive')

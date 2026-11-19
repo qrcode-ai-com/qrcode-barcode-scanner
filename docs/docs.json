@@ -78,12 +78,12 @@
       "anchors": [
         {
           "anchor": "Normative spec",
-          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner/tree/main/spec",
+          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/spec",
           "icon": "scale-balanced"
         },
         {
           "anchor": "GitHub",
-          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
+          "href": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust",
           "icon": "github"
         },
         {
@@ -96,7 +96,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner",
+      "github": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust",
       "website": "https://qrcode-ai.com"
     }
   }
