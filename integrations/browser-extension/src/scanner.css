@@ -1,0 +1,169 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --panel: #f4f5fb;
+  --border: #d5d9e8;
+  --text: #101629;
+  --muted: #545f7a;
+  --accent: #6a4fd8;
+  --accent-text: #ffffff;
+  --ok: #0f7f76;
+  --warn: #8a5a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #070a16;
+    --panel: #101629;
+    --border: #29304b;
+    --text: #f5f5ff;
+    --muted: #a2aec7;
+    --accent: #a98bff;
+    --accent-text: #070a16;
+    --ok: #43dfd2;
+    --warn: #f0b875;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* On body, not :root: Chrome gives extension pages a body font size of 75%. */
+body {
+  margin: 0;
+  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 20px 20px;
+}
+
+html[data-view='popup'] main { width: 400px; padding: 12px 14px 14px; }
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+h1 { flex: 1; margin: 0; font-size: 17px; }
+
+button, select, .open {
+  font: inherit;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#choose, #allow-site {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+button.quiet { padding: 4px 10px; font-size: 13px; }
+
+.drop {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 18px 14px;
+  text-align: center;
+  background: var(--panel);
+}
+
+.drop p { margin: 0 0 10px; color: var(--muted); }
+
+.drop.over { border-color: var(--accent); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.controls { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+
+#source {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+#source p { margin: 0 0 6px; }
+
+#source-title { font-weight: 600; }
+
+.address {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+#summary { margin: 0 0 10px; font-weight: 600; }
+
+#result[data-state='error'] #summary { color: var(--warn); }
+
+#detections { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.detection {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--panel);
+}
+
+.detection .meta { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+
+.detection .format { color: var(--ok); font-weight: 600; }
+
+.detection .text {
+  display: block;
+  margin: 0 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.detection .note { margin: 0 0 8px; color: var(--warn); font-size: 13px; }
+
+.detection .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.open { text-decoration: none; display: inline-block; }
+
+details { margin-top: 12px; }
+
+#report-json {
+  max-height: 260px;
+  overflow: auto;
+  font-size: 11px;
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+footer { margin-top: 14px; color: var(--muted); font-size: 12px; }
+
+footer p { margin: 0 0 6px; }
+
+footer a { color: var(--accent); }
+
+footer code { overflow-wrap: anywhere; }

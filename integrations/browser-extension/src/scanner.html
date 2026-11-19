@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR Code &amp; Barcode Scanner</title>
+  <link rel="stylesheet" href="scanner.css">
+  <script type="module" src="scanner.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/icon-32.png" width="24" height="24" alt="">
+      <h1>QR Code &amp; Barcode Scanner</h1>
+      <button id="open-tab" type="button" class="quiet" hidden>Open in a tab</button>
+    </header>
+
+    <section id="source" hidden aria-live="polite">
+      <p id="source-title">Image from the page</p>
+      <p id="source-url" class="address"></p>
+      <p id="source-message"></p>
+      <button id="allow-site" type="button" hidden>Allow</button>
+    </section>
+
+    <div id="drop" class="drop">
+      <p>Drop an image here, paste a screenshot, or</p>
+      <button id="choose" type="button">Choose an image</button>
+      <input id="file" type="file" class="sr-only" tabindex="-1" aria-label="Image file"
+        accept="image/png,image/jpeg,image/webp,image/gif">
+    </div>
+
+    <p class="controls">
+      <label for="profile">Profile</label>
+      <select id="profile">
+        <option value="full">full, the most thorough</option>
+        <option value="fast">fast, for clear images</option>
+        <option value="frame">frame, the quickest</option>
+      </select>
+    </p>
+
+    <section id="result" data-state="loading" data-scan="0" aria-live="polite">
+      <p id="summary">Loading the scanner...</p>
+      <ol id="detections"></ol>
+    </section>
+
+    <details id="report">
+      <summary>Full report (JSON)</summary>
+      <pre id="report-json" data-scan="0" data-profile=""></pre>
+    </details>
+
+    <footer>
+      <p>
+        Every image is read inside your browser by
+        <span id="package-name">@qrcode-ai-com/qrcode-barcode-scanner-wasm</span>
+        <span id="package-version"></span>, engine <span id="engine-version">not loaded</span>.
+        Nothing is uploaded. WebAssembly module SHA-256 <code id="wasm-sha256"></code>.
+      </p>
+      <p>
+        On the web, QR Code AI offers the same engine as a
+        <a href="https://qrcode-ai.com/en-US/qr-code-scanner"
+          target="_blank" rel="noopener">QR code scanner</a>
+        and a
+        <a href="https://qrcode-ai.com/en-US/barcode-scanner"
+          target="_blank" rel="noopener">barcode scanner</a>,
+        explains this extension in its
+        <a href="https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension"
+          target="_blank" rel="noopener">QR code guide</a>
+        and
+        <a href="https://qrcode-ai.com/en-US/barcode-scanner/integrations/browser-extension"
+          target="_blank" rel="noopener">barcode guide</a>,
+        and makes test images with its
+        <a href="https://qrcode-ai.com/en-US/qr-code-generator"
+          target="_blank" rel="noopener">QR code generator</a>
+        and
+        <a href="https://qrcode-ai.com/en-US/barcode-generator"
+          target="_blank" rel="noopener">barcode generator</a>.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>
