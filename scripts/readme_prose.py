@@ -20,6 +20,7 @@ GUIDES = {
     'examples/notebooks/README.md': ('sdk/python', 'Python'),
     'examples/web-vite/README.md': ('sdk/javascript', 'JavaScript'),
     'playground/README.md': ('sdk/javascript', 'JavaScript'),
+    'integrations/browser-extension/README.md': ('integrations/browser-extension', 'browser extension'),
     'integrations/mcp/README.md': ('mcp', 'MCP'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
