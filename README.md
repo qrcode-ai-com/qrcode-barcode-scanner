@@ -1,3 +1,14 @@
+<p align="center">
+  <a href="https://qrcode-ai.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.webp?v=c361fd13b9b8">
+      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.webp?v=bb7cc90509a1">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.gif?v=69ccb830870b">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.gif?v=419d4d83b0f4" alt="QR Code and Barcode Scanner: one Rust engine that reads QR codes and barcodes from images and frames, with QR quality diagnostics, for Rust, Node.js, the browser, Python, Go, PHP and the command line" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -39,17 +50,6 @@ Use the scanner to import a QR screenshot, inspect a product label or process ca
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI’s browser scanning entry points. For the corresponding development route, the [QR code scanner SDK guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk) and [barcode scanner SDK guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk) connect this documentation to the two product journeys. If a product page is unavailable, the instructions and references in this README remain the starting point for this source directory.
 
 To prepare a QR payload or a barcode label, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Keep the original payload with the exported image so that you can compare the scan result with the value you intended to encode.
-
-<p align="center">
-  <a href="https://qrcode-ai.com/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.webp?v=d985b47951b2">
-      <source type="image/webp" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.webp?v=052b21b30a25">
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-dark.gif?v=be9aea44041d">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/scanner-hero-light.gif?v=c695aae30138" alt="QR Code and Barcode Scanner: one Rust engine that reads QR codes and barcodes from images and frames, with QR quality diagnostics, for Rust, Node.js, the browser, Python, Go, PHP and the command line" width="100%">
-    </picture>
-  </a>
-</p>
 
 [Get started](#get-started) · [Examples](#examples) · [Compare scanners](docs/comparison.mdx) · [Camera scanning](#camera-scanning) · [Documentation](#documentation) · [Distribution guide](distribution/README.md)
 
@@ -115,8 +115,7 @@ The report keeps their **three physical occurrences** separate.
 QR Code, Micro QR, rMQR, Data Matrix, Aztec, PDF417 and linear barcodes.
 Browse the [original images and their reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md).
 
-<details>
-<summary><strong>Explore mixed codes and structured payloads</strong></summary>
+### Each code outlined where the engine measured it
 
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
@@ -131,6 +130,8 @@ This image returns QR `https://qrc-ai.com/76xMa` and Code 128 `STOCK-4827`.
 The replay above uses a different fixture: two QR copies containing
 `https://qrc-ai.com/occurrences`, beside the same barcode.
 
+### Structured payloads
+
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/README.md">
     <picture>
@@ -144,8 +145,6 @@ A QR code can hold a URL, Wi-Fi settings, contact details or a message.
 The scanner returns the decoded fields. Your app decides what happens next.
 
 [Payload reports](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/assets/readme/scan-results.json) · [GS1 guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/docs/concepts/gs1.mdx)
-
-</details>
 
 ## Get started
 
@@ -201,7 +200,47 @@ each one installs.
 
 <sub>Language and platform names and logos belong to their owners. They identify a runtime or a destination and imply no endorsement.</sub>
 
+### Rust
+
+The engine is a Rust crate. Add it to your project and scan an image in process:
+
+<p align="center">
+  <a href="https://crates.io/crates/qrcode-barcode-scanner">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-dark.gif?v=fb4d57fb11ee">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-light.gif?v=451e022b640c" alt="QR Code &amp; Barcode Scanner for Rust: the Rust logo, the quick start in src/main.rs, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
+```sh
+cargo add qrcode-barcode-scanner@=0.11.0
+```
+
+```rust
+use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
+
+let scanner = Scanner::builder().profile(ScanProfile::Full).build();
+let report = scanner.scan(ImageInput::encoded(&image_bytes))?;
+
+for detection in &report.detections {
+    println!("{:?}: {}", detection.symbology, detection.content.text);
+}
+```
+
+Use encoded images or raw `ImageInput::rgba8(&frame, width, height)`.
+An empty `detections` list is a valid scan result. [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/)
+
 ### Command line
+
+<p align="center">
+  <a href="https://crates.io/crates/qrcode-barcode-scanner-cli">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-cli-dark.gif?v=e84805b8f980">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-cli-light.gif?v=1dc243096583" alt="The qrscan command line: a terminal that scans an image, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
 
 Install the prebuilt `qrscan` 0.11.0 binary on macOS or GNU/Linux with the
 [QR Code AI Homebrew tap](https://github.com/qrcode-ai-com/homebrew-tap).
@@ -253,29 +292,6 @@ For a custom test label, create a Code 128 symbol with the
 [QR Code AI barcode generator](https://qrcode-ai.com/en-US/barcode-generator)
 and scan the exported PNG with `qrscan`. Use the [CLI reference](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/cli.mdx)
 for QR quality checks, scan profiles and JSON output.
-
-<details>
-<summary><strong>Rust example</strong></summary>
-
-```sh
-cargo add qrcode-barcode-scanner@=0.11.0
-```
-
-```rust
-use qrcode_barcode_scanner::{ImageInput, ScanProfile, Scanner};
-
-let scanner = Scanner::builder().profile(ScanProfile::Full).build();
-let report = scanner.scan(ImageInput::encoded(&image_bytes))?;
-
-for detection in &report.detections {
-    println!("{:?}: {}", detection.symbology, detection.content.text);
-}
-```
-
-Use encoded images or raw `ImageInput::rgba8(&frame, width, height)`.
-An empty `detections` list is a valid scan result. [Rust API](https://docs.rs/qrcode-barcode-scanner/0.11.0/qrcode_barcode_scanner/)
-
-</details>
 
 <details>
 <summary><strong>Node.js example</strong></summary>

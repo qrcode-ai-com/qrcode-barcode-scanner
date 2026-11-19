@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-go-dark.gif?v=387ba4179215">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-go-light.gif?v=01a3ad72d88e" alt="QR Code &amp; Barcode Scanner for Go: the Go logo, the quick start in Go, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner for Go
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -28,15 +37,6 @@ Help me understand QR Code & Barcode Scanner for Go (bindings/go/README.md) for 
 </details>
 
 <!-- /qrcode-ai-readme-actions:v2 -->
-
-<p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-go-dark.gif?v=387ba4179215">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-go-light.gif?v=01a3ad72d88e" alt="QR Code &amp; Barcode Scanner for Go: the Go logo, the quick start in Go, and a QR code and a barcode being read" width="100%">
-    </picture>
-  </a>
-</p>
 
 Use the Go adapter in an existing Go service, batch job or command that can start a local process. Install qrscan separately and keep its version compatible with the adapter. The adapter forwards the engine report rather than translating identifiers into numbers, which matters for barcode values with leading zeroes.
 

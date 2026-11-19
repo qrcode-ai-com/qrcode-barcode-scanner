@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-dark.gif?v=fb4d57fb11ee">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-light.gif?v=451e022b640c" alt="QR Code &amp; Barcode Scanner for Rust: the Rust logo, the quick start in Rust, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
 # QR Code & Barcode Scanner for Rust
 
 <!-- qrcode-ai-readme-actions:v2 -->
@@ -28,15 +37,6 @@ Help me understand QR Code & Barcode Scanner for Rust (crates/qrcode-ai-scanner/
 </details>
 
 <!-- /qrcode-ai-readme-actions:v2 -->
-
-<p align="center">
-  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-dark.gif?v=fb4d57fb11ee">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-rust-light.gif?v=451e022b640c" alt="QR Code &amp; Barcode Scanner for Rust: the Rust logo, the quick start in Rust, and a QR code and a barcode being read" width="100%">
-    </picture>
-  </a>
-</p>
 
 Use the Rust library when your program needs to scan image bytes or RGBA frames in process and inspect the resulting detections. The report separates decoded content from its physical occurrences and keeps an unmeasured QR quality score distinct from a zero score. Start with the image example below, then choose profiles and input limits for your workload.
 
