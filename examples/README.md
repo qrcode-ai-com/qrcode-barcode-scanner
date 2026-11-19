@@ -49,11 +49,12 @@ Barcode Scanner, at an exact version, and scans a sample image.
 
 | Example | What it shows | Run it online |
 | --- | --- | --- |
-| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner/tree/demos-v0.11.0-r2/examples/web-vite) |
-| [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. | [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) |
+| [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/demos-v0.11.0-r2/examples/web-vite) |
+| [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. | [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/demos-v0.11.0-r2/examples/notebooks/scan-images.ipynb) |
 
 The online links open the tag `demos-v0.11.0-r2`, so they keep running the same files while `main`
-changes. You need no account on either host.
+changes. StackBlitz and Binder need no account; Colab runs the notebook for a signed-in Google
+account.
 
 Other examples live with the package they belong to:
 
@@ -71,10 +72,12 @@ Other examples live with the package they belong to:
 3. Open each online link once before publishing it. The first time StackBlitz opens a revision
    it clones this whole repository, which took more than four minutes on 10 November 2026; later
    visits started in about half a minute. Binder builds one image per revision on each of its
-   hosts, so the first visitor on a host waits for that build.
+   hosts, so the first visitor on a host waits for that build. Colab runs code only for a
+   signed-in Google account: open the notebook there and choose **Runtime › Run all**.
 4. Judge both from the tag with the
    [destination acceptance contract](../distribution/acceptance/README.md): the web page program
-   for StackBlitz, the notebook session program for Binder.
+   for StackBlitz, the notebook session program for Binder. Colab has no program: read the
+   three profiles and the links in the run you made by hand.
 5. Point the buttons of this file, of each example's README and of the main README at the new
    tag.
 

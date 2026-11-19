@@ -79,9 +79,9 @@ qualification remain separate evidence. The engine's
 ## Examples
 
 To scan a QR code from an image or read a barcode label, run the [browser image example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/crates/qrcode-ai-scanner-wasm/examples/README.md#scan-an-image-headlesshtml) or the [command-line quick start](#command-line).
-Try it online, with nothing to install. The [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/web-vite) installs the published WebAssembly package 0.11.0 from npm and scans in your browser, on your device. The [notebook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/notebooks) installs the Python package 0.11.0 from PyPI and scans in a Jupyter session.
+Try it online, with nothing to install. The [Vite example](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/web-vite) installs the published WebAssembly package 0.11.0 from npm and scans in your browser, on your device. The [notebook](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/notebooks) installs the Python package 0.11.0 from PyPI and scans in a Jupyter session, on Binder or on Google Colab.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/demos-v0.11.0-r2/examples/web-vite) [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/demos-v0.11.0-r2/examples/web-vite) [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/demos-v0.11.0-r2/examples/notebooks/scan-images.ipynb)
 
 ### Scan a QR code and a Code 128 barcode in one image
 
