@@ -1,0 +1,82 @@
+name: integration-vscode
+
+# The VS Code extension in integrations/vscode: install its locked development dependencies,
+# test the scan logic and the commands, then package the VSIX and check it. Nothing is
+# published: no publishing permission, no secret, no registry token.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "integrations/vscode/**"
+      - "fixtures/symbology/**"
+      - "fixtures/degraded/exif6-rotated-qr.jpg"
+      - "fixtures/artistic/blob-style-monkey-logo.webp"
+      - "scripts/packed-node-consumer.mjs"
+      - "spec/scan-report.schema.json"
+      - ".github/workflows/integration-vscode.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+        node: ["22", "24"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: install the locked development dependencies
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: scan logic and commands
+        run: npm test
+
+  package:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: package the VSIX with vsce, without publishing
+        run: |
+          set -euo pipefail
+          node --version
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run package
+      - name: check the VSIX and test its unpacked copy
+        run: npm run test:vsix
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: qrcode-barcode-scanner-vsix
+          path: |
+            integrations/vscode/out/*.vsix
+            integrations/vscode/out/package-receipt.json
+          if-no-files-found: error
+          retention-days: 14
