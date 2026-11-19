@@ -1,0 +1,30 @@
+{
+  "name": "@qrcode-ai-com/qrcode-barcode-scanner-plugin",
+  "version": "0.3.0",
+  "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "QR Code AI",
+    "url": "https://qrcode-ai.com/"
+  },
+  "homepage": "https://qrcode-ai.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "keywords": ["pi-package", "opencode", "qr code", "barcode", "qr scanner", "barcode scanner", "mcp", "agent skill"],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "exports": {
+    "./server": "./opencode/plugin.mjs"
+  },
+  "pi": {
+    "skills": ["./skills"],
+    "extensions": ["./pi/extension.js"]
+  }
+}

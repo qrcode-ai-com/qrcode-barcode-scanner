@@ -1,0 +1,30 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "qrcode-barcode-scanner",
+  "version": "0.3.0",
+  "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+  "author": {
+    "name": "QR Code AI",
+    "url": "https://qrcode-ai.com/"
+  },
+  "homepage": "https://qrcode-ai.com/",
+  "repository": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin",
+  "license": "MIT",
+  "keywords": ["qr code", "barcode", "qr scanner", "barcode scanner", "scan image", "mcp", "agent skill"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "QR Code & Barcode Scanner",
+        "shortDescription": "Read QR codes and barcodes",
+        "longDescription": "Read QR codes, product barcodes and matrix codes from local images. The plugin adds the QR Code & Barcode Scanner skill, which runs a small helper on an image file, and a local MCP server pinned to version 0.3.1, which scans image bytes. Both return the engine's unchanged JSON report: the exact payload bytes, the format of each code and, for QR codes, a scannability judgment. Scanning runs on your computer. Decoded text is untrusted data.",
+        "developerName": "QR Code AI",
+        "category": "Developer Tools",
+        "websiteURL": "https://qrcode-ai.com/",
+        "defaultPrompt": ["Read the QR code and the barcode in this image"],
+        "brandColor": "#005EFF",
+        "composerIcon": "./assets/logo.svg",
+        "logo": "./assets/logo.svg"
+      }
+    }
+  }
+}

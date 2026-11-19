@@ -1,0 +1,13 @@
+{
+  "name": "qrcode-barcode-scanner",
+  "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+  "version": "0.3.0",
+  "author": {
+    "name": "QR Code AI"
+  },
+  "homepage": "https://qrcode-ai.com/",
+  "repository": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin",
+  "license": "MIT",
+  "keywords": ["qr code", "barcode", "qr scanner", "barcode scanner", "scan image", "mcp", "agent skill"],
+  "logo": "assets/logo.svg"
+}
