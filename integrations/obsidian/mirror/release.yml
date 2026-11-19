@@ -1,0 +1,65 @@
+name: Release
+
+# Obsidian installs a plugin from the GitHub release whose tag is the version in manifest.json,
+# with no "v": it downloads main.js, manifest.json and styles.css from it. A tag such as 1.0.0
+# builds main.js from this tree, runs the tests and opens a DRAFT release with the three files.
+# A maintainer reads it and publishes it; nothing is published by this workflow.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  draft:
+    name: Draft the release of the tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: The tag is the plugin version
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          test "$GITHUB_REF_NAME" = "$version" || { echo "::error::tag $GITHUB_REF_NAME is not manifest.json version $version"; exit 1; }
+          node -e "const v=require('./versions.json'); if (!v[process.argv[1]]) process.exit(1)" "$version" \
+            || { echo "::error::versions.json has no entry for $version"; exit 1; }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx playwright-core install --with-deps chromium webkit
+      - name: Tests on the mixed fixture, in Node and in both browser engines
+        env:
+          QRSCAN_OBSIDIAN_BROWSERS: required
+        run: npm test
+      - run: npm run build
+      - name: Open the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "QR Code and Barcode Scanner $GITHUB_REF_NAME for Obsidian, built from $(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])") of the engine repository."
+            echo
+            echo "main.js embeds the published engine WebAssembly module, which keeps its own license: see ENGINE-LICENSE."
+            echo
+            echo '```text'
+            sha256sum main.js manifest.json styles.css
+            echo '```'
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" main.js manifest.json styles.css \
+            --draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"

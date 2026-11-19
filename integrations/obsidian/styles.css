@@ -1,0 +1,27 @@
+/* QR Code and Barcode Scanner · the result window. */
+.qrcode-barcode-scanner-codes {
+  padding-inline-start: var(--size-4-4);
+}
+
+.qrcode-barcode-scanner-codes li {
+  margin-block-end: var(--size-4-2);
+}
+
+.qrcode-barcode-scanner-format {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.qrcode-barcode-scanner-text {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.qrcode-barcode-scanner-note {
+  display: block;
+  color: var(--text-warning);
+  font-size: var(--font-ui-small);
+}
