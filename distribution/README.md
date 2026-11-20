@@ -326,24 +326,25 @@ pulled anonymously and ran the exact-content regression checks. The public
 
 These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
 SHA-256 of its checksum list, and its checks run in this repository. None of these destinations
-serves the scanner yet. Each recipe README says what its registry still needs, usually an account
-or a review in that registry.
+serves the scanner yet. Four destinations received pull requests on 20 November 2026 (conda-forge
+two, one per recipe) and wait for review by their maintainers; the other nine are prepared. Each
+recipe README says what its registry still needs, usually an account or a review in that registry.
 
-| Destination | Recipe | Checked here |
-| --- | --- | --- |
-| Snap Store | [snap](snap/README.md) | packed, installed and judged on amd64 and arm64 |
-| Artifact Hub | [artifacthub](artifacthub/README.md) | index composed against the pinned GHCR digests |
-| JSR | [jsr](jsr/README.md) | `jsr publish --dry-run` and a Deno scan of the staged module |
-| Glama | [glama](glama/README.md) | MCP container built and judged offline on amd64 and arm64 |
-| conda-forge | [conda-forge](conda-forge/README.md) | recipe schema and the test script against the published wheel |
-| Nixpkgs | [nix](nix/README.md) | evaluated against nixos-unstable, with the crate hash recorded |
-| openSUSE Build Service | [obs](obs/README.md) | `rpmspec`, `rpmlint` and the service file |
-| Launchpad PPA | [ppa](ppa/README.md) | source package built with `debuild -S`, then `lintian` |
-| Alpine Linux | [alpine](alpine/README.md) | `apkbuild-lint`, `abuild sanitycheck` and `abuild fetch verify` |
-| Termux User Repository | [termux](termux/README.md) | the termux-packages linter |
-| MacPorts | [macports](macports/README.md) | Portfile tests, with the crate list equal to `Cargo.lock` |
-| FreeBSD ports | [freebsd](freebsd/README.md) | crates and distinfo equal to `Cargo.lock`, port variables read by `bmake` |
-| MSYS2 | [msys2](msys2/README.md) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
+| Destination | Recipe | State | Checked here |
+| --- | --- | --- | --- |
+| Snap Store | [snap](snap/README.md) | prepared | packed, installed and judged on amd64 and arm64 |
+| Artifact Hub | [artifacthub](artifacthub/README.md) | prepared | index composed against the pinned GHCR digests |
+| JSR | [jsr](jsr/README.md) | prepared | `jsr publish --dry-run` and a Deno scan of the staged module |
+| Glama | [glama](glama/README.md) | prepared | MCP container built and judged offline on amd64 and arm64 |
+| conda-forge | [conda-forge](conda-forge/README.md) | submitted: [CLI](https://github.com/conda-forge/staged-recipes/pull/35745), [Python](https://github.com/conda-forge/staged-recipes/pull/35746) | recipe schema and the test script against the published wheel |
+| Nixpkgs | [nix](nix/README.md) | prepared | evaluated against nixos-unstable, with the crate hash recorded |
+| openSUSE Build Service | [obs](obs/README.md) | prepared | `rpmspec`, `rpmlint` and the service file |
+| Launchpad PPA | [ppa](ppa/README.md) | prepared | source package built with `debuild -S`, then `lintian` |
+| Alpine Linux | [alpine](alpine/README.md) | prepared | `apkbuild-lint`, `abuild sanitycheck` and `abuild fetch verify` |
+| Termux User Repository | [termux](termux/README.md) | [submitted](https://github.com/termux-user-repository/tur/pull/3114) | the termux-packages linter |
+| MacPorts | [macports](macports/README.md) | [submitted](https://github.com/macports/macports-ports/pull/36975) | Portfile tests, with the crate list equal to `Cargo.lock` |
+| FreeBSD ports | [freebsd](freebsd/README.md) | prepared | crates and distinfo equal to `Cargo.lock`, port variables read by `bmake` |
+| MSYS2 | [msys2](msys2/README.md) | [submitted](https://github.com/msys2/MINGW-packages/pull/33763) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
 
 No Rust build of these recipes ran here: each registry compiles the package in its own builders.
 

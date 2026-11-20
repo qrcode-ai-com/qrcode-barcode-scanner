@@ -51,7 +51,7 @@ tests:
         - qrscan
 
 about:
-  homepage: https://qrcode-ai.com/en-US/qr-code-scanner/cli
+  homepage: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
   summary: Offline QR code and barcode scanner for the command line (qrscan)
   description: |
     qrscan reads every QR code and barcode in an image file and prints a JSON report. It works
@@ -65,7 +65,7 @@ about:
     - crates/qrcode-ai-scanner/THIRD-PARTY.md
     - THIRDPARTY.yml
   repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
-  documentation: https://qrcode-ai.com/en-US/qr-code-scanner/cli
+  documentation: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/crates/qrcode-ai-scanner-cli/README.md
 
 extra:
   recipe-maintainers:

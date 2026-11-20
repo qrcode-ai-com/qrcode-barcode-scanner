@@ -6,8 +6,8 @@ package:
   version: ${{ version }}
 
 source:
-  # The published PyPI source distribution of 0.11.0, built with maturin.
-  - url: https://files.pythonhosted.org/packages/57/3d/4a7101be8ef675b887c2ca781054b2ed12a85932be03d100750bbe773fe4/qrcode_barcode_scanner-${{ version }}.tar.gz
+  # The published PyPI source distribution, built with maturin.
+  - url: https://pypi.org/packages/source/q/qrcode-barcode-scanner/qrcode_barcode_scanner-${{ version }}.tar.gz
     sha256: 1ca488eaa04eec33022cf7211221c888b2ea8b00d3889e68b2ae8e5e066d1f03
   # The test image of tag v0.11.0: a QR code and a Code 128 in one picture.
   - url: https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v${{ version }}/fixtures/symbology/mixed-code128-qr.png
@@ -20,7 +20,8 @@ build:
   script:
     # The sdist keeps the rxing overflow checks in its own release profile; no panic=abort.
     - ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
-    - cargo-bundle-licenses --manifest-path qrcode-ai-scanner-py/Cargo.toml --format yaml --output ./THIRDPARTY.yml
+    # cargo-bundle-licenses reads the crate of the current directory; it takes no --manifest-path.
+    - cd qrcode-ai-scanner-py && cargo-bundle-licenses --format yaml --output ../THIRDPARTY.yml
 
 requirements:
   build:
@@ -57,7 +58,7 @@ tests:
       - python test_scan.py test-fixture/mixed-code128-qr.png
 
 about:
-  homepage: https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python
+  homepage: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
   summary: Offline QR code and barcode scanning for Python, with QR scannability scores
   description: |
     qrcode_barcode_scanner reads every QR code and barcode in image bytes and returns the
@@ -70,7 +71,7 @@ about:
     - qrcode-ai-scanner/THIRD-PARTY.md
     - THIRDPARTY.yml
   repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
-  documentation: https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python
+  documentation: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/api/python.mdx
 
 extra:
   recipe-maintainers:

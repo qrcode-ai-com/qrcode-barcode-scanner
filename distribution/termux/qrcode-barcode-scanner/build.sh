@@ -1,4 +1,4 @@
-TERMUX_PKG_HOMEPAGE=https://qrcode-ai.com/en-US/qr-code-scanner/cli
+TERMUX_PKG_HOMEPAGE=https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
 TERMUX_PKG_DESCRIPTION="Offline QR code and barcode scanner for the command line (qrscan)"
 TERMUX_PKG_LICENSE="AGPL-3.0-or-later"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSING.md, crates/qrcode-ai-scanner/LICENSE-APACHE-2.0, crates/qrcode-ai-scanner/THIRD-PARTY.md"
