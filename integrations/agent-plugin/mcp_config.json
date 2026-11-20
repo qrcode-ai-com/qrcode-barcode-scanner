@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "qrscan": {
+      "command": "npx",
+      "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "qrcode-ai-com",
+  "owner": {
+    "name": "QR Code AI"
+  },
+  "metadata": {
+    "description": "The QR Code & Barcode Scanner extension from QR Code AI.",
+    "version": "0.3.0",
+    "homepage": "https://qrcode-ai.com/"
+  },
+  "extensions": [
+    {
+      "name": "qrcode-barcode-scanner",
+      "source": "./junie/qrcode-barcode-scanner",
+      "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+      "version": "0.3.0",
+      "author": {
+        "name": "QR Code AI"
+      },
+      "homepage": "https://qrcode-ai.com/",
+      "keywords": [
+        "qr code",
+        "barcode",
+        "qr scanner",
+        "barcode scanner",
+        "scan image",
+        "mcp",
+        "agent skill"
+      ]
+    }
+  ]
+}
