@@ -1,0 +1,9 @@
+<services>
+  <!-- Run once per version, by the maintainer, with `osc service manualrun`. -->
+  <service name="download_files" mode="manual" />
+  <service name="cargo_vendor" mode="manual">
+    <param name="src">qrcode-barcode-scanner-cli-0.11.0-source.tar.gz</param>
+    <param name="compression">zst</param>
+    <param name="update">false</param>
+  </service>
+</services>
