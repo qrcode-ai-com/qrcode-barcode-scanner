@@ -1,0 +1,148 @@
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=74f967bc6d23">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=1ab06a2a50e5" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logo, the quick start in the page, and a QR code and a barcode being read" width="100%">
+    </picture>
+  </a>
+</p>
+
+# QR Code & Barcode Scanner · JSR package
+
+<!-- qrcode-ai-readme-actions:v2 -->
+
+### Ask AI
+
+[![ChatGPT](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/chatgpt-v2.svg)](https://chatgpt.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20%C2%B7%20JSR%20package%20%28distribution%2Fjsr%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20%40qrcode-ai-com%2Fqrcode-barcode-scanner%20on%20JSR%20is%20the%20WebAssembly%20build%20of%20the%20QR%20code%20and%20barcode%20scanning%20engine%2C%20version%200.11.0.%20It%20is%20the%20npm%20package%20%40qrcode-ai-com%2Fqrcode-barcode-scanner-wasm%400.11.0%2C%20staged%20for%20JSR%3A%20the%20WebAssembly%20file%20and%20the%20JavaScript%20are%20the%20npm%20bytes%2C%20and%20only%20the%20type%20references%20change.%20It%20runs%20in%20Deno%20and%20in%20the%20browser%2C%20offline%3B%20the%20image%20never%20leaves%20the%20process.%20The%20package%20is%20not%20published%20on%20JSR%20yet.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner-rust%2Fblob%2Fmain%2Fdistribution%2Fjsr%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Claude](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/claude-v2.svg)](https://claude.ai/new?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20%C2%B7%20JSR%20package%20%28distribution%2Fjsr%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20%40qrcode-ai-com%2Fqrcode-barcode-scanner%20on%20JSR%20is%20the%20WebAssembly%20build%20of%20the%20QR%20code%20and%20barcode%20scanning%20engine%2C%20version%200.11.0.%20It%20is%20the%20npm%20package%20%40qrcode-ai-com%2Fqrcode-barcode-scanner-wasm%400.11.0%2C%20staged%20for%20JSR%3A%20the%20WebAssembly%20file%20and%20the%20JavaScript%20are%20the%20npm%20bytes%2C%20and%20only%20the%20type%20references%20change.%20It%20runs%20in%20Deno%20and%20in%20the%20browser%2C%20offline%3B%20the%20image%20never%20leaves%20the%20process.%20The%20package%20is%20not%20published%20on%20JSR%20yet.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner-rust%2Fblob%2Fmain%2Fdistribution%2Fjsr%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Gemini](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/gemini-v2.svg)](https://gemini.google.com/)
+[![Grok](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/grok-v2.svg)](https://grok.com/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20%C2%B7%20JSR%20package%20%28distribution%2Fjsr%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20%40qrcode-ai-com%2Fqrcode-barcode-scanner%20on%20JSR%20is%20the%20WebAssembly%20build%20of%20the%20QR%20code%20and%20barcode%20scanning%20engine%2C%20version%200.11.0.%20It%20is%20the%20npm%20package%20%40qrcode-ai-com%2Fqrcode-barcode-scanner-wasm%400.11.0%2C%20staged%20for%20JSR%3A%20the%20WebAssembly%20file%20and%20the%20JavaScript%20are%20the%20npm%20bytes%2C%20and%20only%20the%20type%20references%20change.%20It%20runs%20in%20Deno%20and%20in%20the%20browser%2C%20offline%3B%20the%20image%20never%20leaves%20the%20process.%20The%20package%20is%20not%20published%20on%20JSR%20yet.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner-rust%2Fblob%2Fmain%2Fdistribution%2Fjsr%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Perplexity](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/perplexity-v2.svg)](https://www.perplexity.ai/?q=Help%20me%20understand%20QR%20Code%20%26%20Barcode%20Scanner%20%C2%B7%20JSR%20package%20%28distribution%2Fjsr%2FREADME.md%29%20for%20QR%20Code%20%26%20Barcode%20Scanner%2C%20the%20open-source%20scanner.%20Source%20documentation%3B%20publication%20is%20not%20implied.%20Provided%20README%20context%20%28verify%20against%20the%20sources%29%3A%20%40qrcode-ai-com%2Fqrcode-barcode-scanner%20on%20JSR%20is%20the%20WebAssembly%20build%20of%20the%20QR%20code%20and%20barcode%20scanning%20engine%2C%20version%200.11.0.%20It%20is%20the%20npm%20package%20%40qrcode-ai-com%2Fqrcode-barcode-scanner-wasm%400.11.0%2C%20staged%20for%20JSR%3A%20the%20WebAssembly%20file%20and%20the%20JavaScript%20are%20the%20npm%20bytes%2C%20and%20only%20the%20type%20references%20change.%20It%20runs%20in%20Deno%20and%20in%20the%20browser%2C%20offline%3B%20the%20image%20never%20leaves%20the%20process.%20The%20package%20is%20not%20published%20on%20JSR%20yet.%20Read%20the%20public%20documentation%20below.%20Explain%20what%20this%20destination%20does%2C%20its%20documented%20installation%20or%20access%20steps%2C%20a%20minimal%20example%20if%20supported%2C%20prerequisites%2C%20limitations%20and%20license.%20Distinguish%20published%20packages%20from%20working%20source%20and%20preparation.%20Cite%20your%20sources%3B%20if%20a%20page%20is%20unavailable%20or%20a%20fact%20cannot%20be%20checked%2C%20say%20so.%20Do%20not%20invent%20installation%20commands%2C%20benchmark%20results%20or%20comparisons.%20Answer%20in%20my%20language.%20Public%20sources%3A%20https%3A%2F%2Fgithub.com%2Fqrcode-ai-com%2Fqrcode-barcode-scanner-rust%2Fblob%2Fmain%2Fdistribution%2Fjsr%2FREADME.md%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-scanner%2Fsdk%2Fjavascript%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fqr-code-generator%20https%3A%2F%2Fqrcode-ai.com%2Fen-US%2Fbarcode-generator)
+[![Copilot](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/copilot-v2.svg)](https://copilot.com/)
+[![DeepSeek](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/deepseek-v2.svg)](https://chat.deepseek.com/)
+[![Meta AI](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/meta-ai-v2.svg)](https://www.meta.ai/)
+[![Qwen](https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/actions/qwen-v2.svg)](https://qwen.ai/)
+
+Choose an AI assistant to explain this destination using its public sources. Gemini opens gemini.google.com. Gemini, Copilot, DeepSeek, Meta AI and Qwen require pasting the prompt below; the other links include it in their URL. Sign-in or a manual paste may still be required. Check the answer against the documentation.
+
+<details>
+<summary>Copy the plain-text prompt</summary>
+
+Use the code block's copy control, or select its complete text, then paste it into your assistant.
+
+```text
+Help me understand QR Code & Barcode Scanner · JSR package (distribution/jsr/README.md) for QR Code & Barcode Scanner, the open-source scanner. Source documentation; publication is not implied. Provided README context (verify against the sources): @qrcode-ai-com/qrcode-barcode-scanner on JSR is the WebAssembly build of the QR code and barcode scanning engine, version 0.11.0. It is the npm package @qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0, staged for JSR: the WebAssembly file and the JavaScript are the npm bytes, and only the type references change. It runs in Deno and in the browser, offline; the image never leaves the process. The package is not published on JSR yet. Read the public documentation below. Explain what this destination does, its documented installation or access steps, a minimal example if supported, prerequisites, limitations and license. Distinguish published packages from working source and preparation. Cite your sources; if a page is unavailable or a fact cannot be checked, say so. Do not invent installation commands, benchmark results or comparisons. Answer in my language. Public sources: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/jsr/README.md https://qrcode-ai.com/en-US/qr-code-scanner https://qrcode-ai.com/en-US/barcode-scanner https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript https://qrcode-ai.com/en-US/barcode-scanner/sdk/javascript https://qrcode-ai.com/en-US/qr-code-generator https://qrcode-ai.com/en-US/barcode-generator
+```
+
+</details>
+
+<!-- /qrcode-ai-readme-actions:v2 -->
+
+`@qrcode-ai-com/qrcode-barcode-scanner` on JSR is the WebAssembly build of the QR code and barcode scanning engine, version 0.11.0. It is the npm package `@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0`, staged for JSR: the WebAssembly file and the JavaScript are the npm bytes, and only the type references change. It runs in Deno and in the browser, offline; the image never leaves the process. The package is not published on JSR yet.
+
+The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) let you try the engine in a browser first. For the API and the report fields, read the [QR code scanner JavaScript guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript) and the [barcode scanner JavaScript guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/javascript).
+
+To make a test image with a known payload, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), and keep the payload you encoded to compare it with the scan.
+
+## Use it, once it is published
+
+```js
+import init, { scan_image } from 'jsr:@qrcode-ai-com/qrcode-barcode-scanner@0.11.0';
+
+await init();
+const bytes = await Deno.readFile('photo.png');
+const report = scan_image(bytes, 'full', null, null, 0);
+for (const code of report.detections) {
+  console.log(code.symbology, code.content.text);
+}
+```
+
+Run it with `deno run --allow-read --allow-net=jsr.io scan.js`: the module loads its WebAssembly file from next to itself. `scan_image` takes the image bytes, a profile (`fast`, `frame` or `full`), an optional largest dimension, an optional pixel limit and a time budget in milliseconds, where 0 means no limit. The report lists each code with its format, its text, its raw bytes and its position. The subpaths `./auto`, `./camera`, `./camera-overlay` and `./destination` hold the browser helpers of the npm package; the camera modules need a page with a camera.
+
+## How it is tested
+
+The [staging script](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/jsr/stage-jsr-package.py) downloads the npm tarball, checks its integrity, its name, its version, its license and the SHA-256 of the WebAssembly file, and writes `jsr.json` and a record of every file it changed. Its self-test checks five refusals. On the staged folder, `npx jsr publish --dry-run` (jsr 0.14.3 with Deno 2.9.6) ended with "Success Dry run complete", without signing in. Deno then scanned the [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png) through the staged module with [scan-with-deno.mjs](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/jsr/scan-with-deno.mjs), and `scripts/destination-acceptance.py reports --kind package` found both codes in the fast, frame and full reports.
+
+## Publish it
+
+Publication is the owner's step, with a JSR account (sign in with GitHub).
+
+1. On jsr.io, create the scope `@qrcode-ai-com` and the package `qrcode-barcode-scanner` in it.
+2. Stage the package: `python3 distribution/jsr/stage-jsr-package.py stage --out /tmp/jsr-qrscan`.
+3. In `/tmp/jsr-qrscan`, run `npx jsr publish --dry-run`, then `npx jsr publish`. The second command opens the browser to authorize the upload.
+4. Read it back: `deno run --allow-read --allow-net=jsr.io distribution/jsr/scan-with-deno.mjs IMAGE OUT_DIR`, then judge the three reports with `scripts/destination-acceptance.py reports --kind package`.
+
+## How it works
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/how-browser-dark.gif?v=32206e525b2c">
+    <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/how-browser-light.gif?v=248e5382e6cc" alt="How the browser package works, in three steps: install and initialize, pass an image or a camera frame to the engine in the page, and read the report" width="100%">
+  </picture>
+</p>
+
+The picture shows the three steps of this package: initialize the engine, pass it the image bytes, and read the report.
+
+## What it returns
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#examples">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-dark.png?v=385593c1c18d">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/examples-mixed-light.png?v=7f958679adcc" alt="A QR code and Code 128 decoded from the same image, each outlined where the engine measured it" width="100%">
+    </picture>
+  </a>
+</p>
+
+The picture is a recorded scan of one image that holds a QR code and a Code 128 barcode. Both come back in the same report, each with its format, its exact text and the place where the engine measured it.
+
+## What it reads
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-dark.gif?v=92fa0e8084df">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/formats-light.gif?v=bdfe5fc5f9b3" alt="The code families the engine reads: QR codes, matrix and stacked codes such as Data Matrix, retail barcodes such as EAN-13, and other linear barcodes such as Code 128" width="100%">
+    </picture>
+  </a>
+</p>
+
+The same engine reads every destination’s images, so codes of different formats in one image come back in one report.
+
+- QR: QR Code, Micro QR, rectangular Micro QR (rMQR)
+- Matrix and stacked: Data Matrix, Aztec, PDF417, MaxiCode
+- Retail: EAN-13, EAN-8, UPC-A, UPC-E
+- Other linear: Code 128, Code 39, Code 93, Codabar, ITF, GS1 DataBar, GS1 DataBar Expanded, Telepen
+
+The engine’s [supported formats](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#supported-formats) section states the known limits.
+
+## The same engine in other runtimes
+
+<p align="center">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust#get-started">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-dark.png?v=57c63428574b">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/runtimes-light.png?v=6dbd5a8cf5ba" alt="One engine in the language you write: Rust on crates.io, Node.js and the browser on npm, Python on PyPI, Go, PHP, and the qrscan command line" width="100%">
+    </picture>
+  </a>
+</p>
+
+The Rust, Node.js, browser and Python packages hold the engine. The Go and PHP packages hold no decoder: each one starts `qrscan` and hands you its report. Every route is listed in the [scanner repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust).
+
+## License
+
+This package is the WebAssembly engine 0.11.0. Its files and its npm release are licensed AGPL-3.0-or-later, and the package keeps the license, the third-party notices and the Apache-2.0 text of the retained reader code. The staging files in the engine repository are project source, available under the MIT License described below. They do not change the license of the package.
+
+Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**.
+
+<!-- qrscan-source-license:v1 -->
+
+## Source license
+
+Project-authored scanner code and documentation in this checkout are available under the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE). You may use, modify and redistribute this source in open-source or proprietary applications, including commercial products, while preserving the copyright and permission notice. Thibaut Mélen & Nicolas Cella develop QR Code AI at SuperNovae Studio.
+
+Retained third-party code, dependencies, artwork and test data keep their own licenses and notices. The [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md) explains these component boundaries; the project license does not assign a license to an unrelated platform or service.
+
+Published archives retain the license shipped with their version. A pinned engine, adapter or bundle may therefore have different terms from this working source. Read its packaged license and the [license history](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/guides/license-history.mdx) before reuse. The source change does not replace an archive or publish a new version.
+
+<!-- /qrscan-source-license:v1 -->
