@@ -323,7 +323,9 @@ nothing. `--channel chrome` runs an installed Chrome in place of Playwright's Ch
 `--wait` sets how long the page may take to appear, 300 seconds by default.
 
 The workflow [`demos.yml`](../../.github/workflows/demos.yml) runs this on
-[`examples/web-vite`](../../examples/web-vite/), built and served on the runner.
+[`examples/web-vite`](../../examples/web-vite/), built and served on the runner, and
+[`pages.yml`](../../.github/workflows/pages.yml) runs it on the page it publishes on GitHub Pages,
+after each deployment.
 
 ## Run it in a notebook session
 

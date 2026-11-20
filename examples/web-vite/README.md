@@ -54,6 +54,11 @@ published WebAssembly package
 The button opens this folder in StackBlitz, which installs it and runs it in your browser. You
 need no account. The folder stands alone: it depends on nothing else in this repository.
 
+The workflow [`pages.yml`](../../.github/workflows/pages.yml) publishes the built page on GitHub
+Pages, at <https://qrcode-ai-com.github.io/qrcode-barcode-scanner-rust/>. It builds this folder
+from `main` with `npm run build -- --base /qrcode-barcode-scanner-rust/`, the path of that
+address. That page follows `main`; the button opens a fixed tag.
+
 ## Run it on your machine
 
 You need Node.js 20.19 or later, or 22.12 or later.
@@ -112,7 +117,8 @@ install gets the same files.
 The workflow [`demos.yml`](../../.github/workflows/demos.yml) installs this folder from its
 lockfile, builds it, serves it and scans the sample through the page with the `fast`, `frame` and
 `full` profiles. The [destination acceptance contract](../../distribution/acceptance/README.md)
-judges the three reports.
+judges the three reports. After each deployment, `pages.yml` scans through the published page at
+its public address and judges it the same way.
 
 ## License
 
