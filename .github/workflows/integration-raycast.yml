@@ -1,0 +1,60 @@
+name: Integration · Raycast
+
+# The Raycast extension under integrations/raycast. It is checked the way the Raycast store
+# builds it (type check, ESLint and Prettier with the Raycast config, `ray build` for
+# distribution, which needs no Raycast account), then its tests run with the published qrscan,
+# downloaded and checked by the GitHub Action's installer, on the mixed fixture in the three
+# profiles. `ray lint` is not run: it asks the Raycast store about the author. Nothing is
+# published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-raycast.yml
+      - integrations/raycast/**
+      - integrations/github-action/src/**
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-raycast-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  extension:
+    name: Build and test the extension on macOS
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: integrations/raycast
+      - name: Type check, ESLint and Prettier
+        working-directory: integrations/raycast
+        run: |
+          npm run typecheck
+          npx eslint src
+          npx prettier --check src package.json
+      - name: Build for distribution
+        working-directory: integrations/raycast
+        run: npx ray build --non-interactive --environment dist --output "$RUNNER_TEMP/raycast-build"
+      - name: Install the published qrscan
+        id: qrscan
+        run: echo "path=$(node integrations/github-action/src/install-cli.mjs "$RUNNER_TEMP/qrscan")" >> "$GITHUB_OUTPUT"
+      - name: Tests, with the published qrscan on the mixed fixture
+        working-directory: integrations/raycast
+        env:
+          QRSCAN: ${{ steps.qrscan.outputs.path }}
+          QRSCAN_RAYCAST_LIVE: required
+        run: npm test

@@ -1,0 +1,10 @@
+{
+  "id": "qrcode-barcode-scanner",
+  "name": "QR Code and Barcode Scanner",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Read QR codes and barcodes in an image of your vault and insert the decoded text into a note. The scan runs on your device.",
+  "author": "QR Code AI",
+  "authorUrl": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/obsidian",
+  "isDesktopOnly": false
+}

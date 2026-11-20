@@ -1,0 +1,37 @@
+{
+  "name": "qrcode-barcode-scanner-browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that reads QR codes and barcodes with the published WASM",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/browser-extension"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "config": {
+    "wasmSha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build-for-amo": "node scripts/build.mjs",
+    "inspect": "node scripts/inspect.mjs build",
+    "test": "node --test test/unit.test.mjs",
+    "test:chromium": "node test/chromium.mjs",
+    "test:firefox-page": "node test/firefox-page.mjs",
+    "test:reproduce": "node test/reproduce.mjs",
+    "lint:firefox": "node scripts/lint-firefox.mjs"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "playwright": "1.61.0",
+    "web-ext": "10.8.0"
+  }
+}

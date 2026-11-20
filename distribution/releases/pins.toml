@@ -133,6 +133,14 @@ paths = [
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
   ".github/workflows/ecosystem-checks.yml",
+  ".github/workflows/integration-agent-plugin.yml",
+  ".github/workflows/integration-automation-js.yml",
+  ".github/workflows/integration-browser-extension.yml",
+  ".github/workflows/integration-github-action.yml",
+  ".github/workflows/integration-obsidian.yml",
+  ".github/workflows/integration-python-hosts.yml",
+  ".github/workflows/integration-raycast.yml",
+  ".github/workflows/integration-vscode.yml",
 ]
 
 [[file]]

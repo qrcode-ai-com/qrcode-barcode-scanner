@@ -1,0 +1,3 @@
+# Built by `npm run build`: the release attaches it, the repository does not hold it.
+main.js
+node_modules/

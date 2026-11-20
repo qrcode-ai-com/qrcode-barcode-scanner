@@ -1,0 +1,28 @@
+{
+  "name": "@qrcode-ai-com/piece-qrcode-barcode-scanner-harness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Builds and runs the Activepieces piece outside the Activepieces monorepo: type check, the monorepo's bundle settings, and an end-to-end decode.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs && node --test piece.test.mjs",
+    "test:built": "node --test piece.test.mjs"
+  },
+  "devDependencies": {
+    "@activepieces/pieces-framework": "0.32.0",
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "@types/node": "22.19.1",
+    "deepmerge-ts": "8.0.2",
+    "esbuild": "0.28.1",
+    "ipaddr.js": "2.3.0",
+    "nanoid": "3.3.18",
+    "tslib": "2.6.2",
+    "typescript": "5.9.2",
+    "zod": "4.3.6"
+  }
+}

@@ -1,0 +1,106 @@
+name: Integration · GitHub Action
+
+# The GitHub Action under integrations/github-action, run from its local path on GitHub-hosted
+# runners. It downloads the published qrscan of its pinned release for the runner, checks it
+# against the release's SHA256SUMS and the hashes it pins, and scans the mixed fixture in the
+# three profiles. Two failing cases must fail with their own result: a payload that is not in
+# the image, and a file that is not an image. The action's own repository is written from this
+# one by scripts/stage-action-satellite.py; its self-test runs here. Nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-github-action.yml
+      - integrations/github-action/**
+      - scripts/stage-action-satellite.py
+      - scripts/satellite_stage.py
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-github-action-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit:
+    name: Unit tests and the action's own repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Unit tests, then the published engine through the action's installer
+        working-directory: integrations/github-action
+        env:
+          QRSCAN_ACTION_LIVE: "1"
+        run: npm test
+      - run: python3 scripts/stage-action-satellite.py --self-test
+      - name: Stage this commit and run its tests where they will run
+        run: |
+          python3 scripts/stage-action-satellite.py stage --out "$RUNNER_TEMP/staged"
+          python3 scripts/stage-action-satellite.py verify "$RUNNER_TEMP/staged"
+          cd "$RUNNER_TEMP/staged"
+          test -f action.yml
+          test -f .github/workflows/test.yml
+          test -f test/fixtures/mixed-code128-qr.png
+          npm test
+
+  scan:
+    name: Scan · ${{ matrix.runner }} · ${{ matrix.profile }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+        profile: [fast, frame, full]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan the mixed fixture
+        id: mixed
+        uses: ./integrations/github-action
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: |
+            https://qrc-ai.com/76xMa
+            STOCK-4827
+          profile: ${{ matrix.profile }}
+      - name: A payload that is not in the image
+        id: mismatch
+        continue-on-error: true
+        uses: ./integrations/github-action
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: STOCK-0000
+          profile: ${{ matrix.profile }}
+      - name: A file that is not an image
+        id: unreadable
+        continue-on-error: true
+        uses: ./integrations/github-action
+        with:
+          files: integrations/github-action/README.md
+          profile: ${{ matrix.profile }}
+      - name: Judge the three results
+        env:
+          MIXED_RESULT: ${{ steps.mixed.outputs.result }}
+          MIXED_REPORT: ${{ steps.mixed.outputs.report }}
+          MISMATCH_OUTCOME: ${{ steps.mismatch.outcome }}
+          MISMATCH_RESULT: ${{ steps.mismatch.outputs.result }}
+          UNREADABLE_OUTCOME: ${{ steps.unreadable.outcome }}
+          UNREADABLE_RESULT: ${{ steps.unreadable.outputs.result }}
+        run: node integrations/github-action/test/judge-ci.mjs
+      # The action writes only under RUNNER_TEMP: the checkout is left as it was.
+      - name: Nothing was written into the checkout
+        run: test -z "$(git status --porcelain)"

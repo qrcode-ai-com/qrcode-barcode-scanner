@@ -1,0 +1,12 @@
+# The QR Code & Barcode Scanner MCP server as a goose extension.
+# Copy the `qrscan` entry under `extensions:` in ~/.config/goose/config.yaml.
+extensions:
+  qrscan:
+    type: stdio
+    name: qrscan
+    enabled: true
+    cmd: npx
+    args: ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+    env_keys: []
+    envs: {}
+    timeout: 300

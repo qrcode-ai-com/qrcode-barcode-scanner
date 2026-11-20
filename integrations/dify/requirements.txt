@@ -1,0 +1,2 @@
+dify_plugin==0.11.1
+qrcode-barcode-scanner==0.11.0

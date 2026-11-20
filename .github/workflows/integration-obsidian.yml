@@ -1,0 +1,73 @@
+name: Integration · Obsidian
+
+# The Obsidian plugin under integrations/obsidian. Its tests build main.js with the published
+# WebAssembly engine inside, load it the way Obsidian does against a stand-in for the Obsidian
+# API, and scan the mixed fixture in the three profiles, in Node and in Playwright's Chromium and
+# WebKit with every request refused. The plugin's own repository is written from this one by
+# scripts/stage-obsidian-satellite.py; its self-test and the staged tree's tests run here.
+# Nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-obsidian.yml
+      - integrations/obsidian/**
+      - scripts/stage-obsidian-satellite.py
+      - scripts/satellite_stage.py
+      - fixtures/symbology/mixed-code128-qr.png
+      - distribution/releases/historical-agpl-3.0.txt
+      - crates/qrcode-ai-scanner/LICENSE-APACHE-2.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-obsidian-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plugin:
+    name: Build and test the plugin, and its own repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: integrations/obsidian
+      - run: npm run typecheck
+        working-directory: integrations/obsidian
+      - name: Install Playwright's Chromium and WebKit
+        working-directory: integrations/obsidian
+        run: npx playwright-core install --with-deps chromium webkit
+      - name: Tests on the mixed fixture, in Node and in both browser engines
+        working-directory: integrations/obsidian
+        env:
+          QRSCAN_OBSIDIAN_BROWSERS: required
+        run: npm test
+      - run: python3 scripts/stage-obsidian-satellite.py --self-test
+      - name: Stage this commit and run its checks where they will run
+        env:
+          QRSCAN_OBSIDIAN_BROWSERS: required
+        run: |
+          python3 scripts/stage-obsidian-satellite.py stage --out "$RUNNER_TEMP/staged"
+          python3 scripts/stage-obsidian-satellite.py verify "$RUNNER_TEMP/staged"
+          cd "$RUNNER_TEMP/staged"
+          test -f .github/workflows/test.yml
+          test -f .github/workflows/release.yml
+          test -f ENGINE-LICENSE
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+          test -s main.js
+      - name: Nothing was written into the checkout but ignored files
+        run: test -z "$(git status --porcelain)"

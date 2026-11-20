@@ -1,0 +1,120 @@
+name: Integration · agent plugin
+
+# integrations/agent-plugin is one plugin root for fourteen agent clients; its own repository,
+# qrcode-ai-com/qrcode-barcode-scanner-plugin, is written from a commit of this one by
+# scripts/stage-agent-plugin-satellite.py. This workflow stages that tree from this commit,
+# checks every manifest against its published JSON schema, then starts the pinned MCP server with
+# each client configuration and scans the mixed fixture in the three profiles, and runs the
+# skill's helper the same way. The destination acceptance contract judges every route, removal
+# included. Nothing is built from the engine's Rust source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-agent-plugin.yml
+      - integrations/agent-plugin/**
+      - skills/qrcode-barcode-scanner/**
+      - scripts/stage-agent-plugin-satellite.py
+      - docs/favicon.svg
+      - LICENSE
+      - distribution/readme-actions.json
+      - integrations/mcp/package.json
+      - distribution/acceptance/drivers/mcp-server.mjs
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-agent-plugin-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The engine the skill pins and the MCP adapter 0.3.1 brings with it.
+  ENGINE_VERSION: 0.11.0
+
+jobs:
+  manifests:
+    name: Stage the plugin repository and check its manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - run: python3 scripts/stage-agent-plugin-satellite.py --self-test
+      - name: Stage this commit and check the tree against it
+        run: |
+          python3 scripts/stage-agent-plugin-satellite.py stage --out "$RUNNER_TEMP/plugin"
+          python3 scripts/stage-agent-plugin-satellite.py verify "$RUNNER_TEMP/plugin"
+      # Development dependencies only, at exact versions, outside the checkout.
+      - name: Install the JSON Schema validator
+        run: npm install --prefix "$RUNNER_TEMP/tools" --ignore-scripts --no-audit --no-fund --save-exact ajv@8.20.0 ajv-formats@3.0.1
+      - name: Check every manifest against its published schema
+        run: node integrations/agent-plugin/test/check-manifests.mjs "$RUNNER_TEMP/plugin" --tools "$RUNNER_TEMP/tools"
+      # Pi and OpenCode install the tree as an npm package: it must pack the entry points and the skill.
+      - name: Pack the staged tree as an npm package, without publishing it
+        run: |
+          cd "$RUNNER_TEMP/plugin"
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/pack.json"
+          python3 - "$RUNNER_TEMP/pack.json" <<'PY'
+          import json, sys
+          files = {row["path"] for row in json.load(open(sys.argv[1]))[0]["files"]}
+          need = {"package.json", "opencode/plugin.mjs", "pi/extension.js", "LICENSE", "README.md",
+                  "skills/qrcode-barcode-scanner/SKILL.md", "skills/qrcode-barcode-scanner/scripts/scan.mjs"}
+          missing = sorted(need - files)
+          print(f"{len(files)} files packed; missing: {missing or 'none'}")
+          sys.exit(1 if missing else 0)
+          PY
+
+  launch:
+    name: Every client launch · Node.js ${{ matrix.node }} · ${{ matrix.runner }}
+    needs: manifests
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            node: "22"
+          - runner: ubuntu-24.04
+            node: "24"
+          - runner: macos-15
+            node: "24"
+    env:
+      NAME: agent-plugin-node${{ matrix.node }}-${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Stage this commit
+        run: python3 scripts/stage-agent-plugin-satellite.py stage --out "$RUNNER_TEMP/plugin"
+      # A new, empty HOME: npx finds no earlier copy and downloads as on a user's first start.
+      - name: Start every client configuration and scan through it
+        run: node integrations/agent-plugin/test/check-launch.mjs "$RUNNER_TEMP/plugin" "$RUNNER_TEMP/launch" --version "$ENGINE_VERSION"
+      - name: Keep the receipts
+        if: always()
+        run: |
+          mkdir -p receipt
+          if [ -d "$RUNNER_TEMP/launch/receipts" ]; then cp -R "$RUNNER_TEMP/launch/receipts/." receipt/; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: ${{ env.NAME }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90

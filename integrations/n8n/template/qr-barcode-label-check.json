@@ -1,0 +1,436 @@
+{
+  "name": "Check QR codes and barcodes in label images against an expected value",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Check QR codes and barcodes before you publish them\n\nThis workflow reads every label image in a folder, decodes its QR codes and barcodes on this n8n instance, and compares what it read with the value you expect.\n\nEach image ends in one of four results: **Expected value found**, **Wrong value**, **No code found** or **Unreadable image**.\n\n### Requirements\n- Self-hosted n8n with the community node `@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner` 0.1.0 (Settings, Community Nodes, Install). n8n Cloud cannot install it.\n- The images in a folder this n8n may read.\n\nThe scan runs locally with the open-source QR Code & Barcode Scanner engine: no API key, no upload, and decoded links are never opened.",
+        "height": 560,
+        "width": 420,
+        "color": 4
+      },
+      "id": "a8aa6315-fc9d-57fe-861a-a0d866f03f63",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Setup\n1. Open **Settings** and set `expectedText` to the value your labels must carry, and `imageFiles` to the image files to check, as a path or a pattern such as `/home/node/.n8n-files/labels/*.png`.\n2. n8n reads files only from the folders it allows. The default is `~/.n8n-files`; `N8N_RESTRICT_FILE_ACCESS_TO` changes it.\n3. Click **Execute workflow**.",
+        "height": 200,
+        "width": 520,
+        "color": 6
+      },
+      "id": "7a078ddc-ed0b-5a76-a115-761b0adfe214",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Scan\nThe scanner reads the binary field `data` of each file. Profile **Frame** decodes without scoring. Choose **Full** to also score QR scannability.\n\nA corrupt image goes to the error output instead of stopping the run.",
+        "height": 320,
+        "width": 300,
+        "color": 7
+      },
+      "id": "06083fae-e039-58b5-ac8c-c4488cdf491c",
+      "name": "Scan section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Results\nEach branch writes one item per image with its `status`: the file name and what was read, or, for an unreadable image, the error and its code. Connect a spreadsheet, a chat message or a ticket after them.",
+        "height": 140,
+        "width": 560,
+        "color": 7
+      },
+      "id": "aebb2c0e-3ea1-5cc0-a3f2-7f645fd5b54d",
+      "name": "Results section",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        900,
+        -320
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "5dbed8f6-2db1-5491-ab66-11f494a65e84",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8425ac91-d587-5c95-abe0-120effcf877e",
+              "name": "expectedText",
+              "value": "STOCK-4827",
+              "type": "string"
+            },
+            {
+              "id": "59f75750-6021-5766-a1a3-0cb36727f697",
+              "name": "imageFiles",
+              "value": "/home/node/.n8n-files/labels/*.png",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b258644-6fe5-53a1-8ccc-cb5ef4c82f74",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.imageFiles }}",
+        "options": {}
+      },
+      "id": "20c8ffbe-bac4-5f34-bda1-5c893302e1d3",
+      "name": "Read label images",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "profile": "frame",
+        "output": "image",
+        "options": {
+          "includeReport": false
+        }
+      },
+      "id": "8ae3e610-31c6-5e1b-a008-def38afe2433",
+      "name": "Scan QR codes and barcodes",
+      "type": "@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner.qrcodeBarcodeScanner",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "2a6ff816-c3da-50cb-bcc2-e06d9267fed5",
+                    "leftValue": "={{ $json.count }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No code found"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9b0e5689-b2de-5615-9db5-c51879848ebe",
+                    "leftValue": "={{ $json.texts }}",
+                    "rightValue": "={{ $('Settings').first().json.expectedText }}",
+                    "operator": {
+                      "type": "array",
+                      "operation": "contains",
+                      "rightType": "any"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Expected value found"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Wrong value"
+        }
+      },
+      "id": "d6b9b68e-c50c-5eaf-b623-3390ae2bfe5c",
+      "name": "Compare with the expected value",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        920,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d2ec64c2-2a72-5070-86af-ffd9754ed73f",
+              "name": "file",
+              "value": "={{ $json.image.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "44deddc5-461f-54ff-b296-8461063d17e4",
+              "name": "status",
+              "value": "no code",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a6ff816-c3da-50cb-bcc2-e06d9267fed5",
+      "name": "No code found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8b5fb5b-668a-5a38-80a1-8b8a08be3e17",
+              "name": "file",
+              "value": "={{ $json.image.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "a8e91c58-4040-5288-9fbd-dacf6940551f",
+              "name": "status",
+              "value": "expected value found",
+              "type": "string"
+            },
+            {
+              "id": "a45a2878-a7f5-517b-b782-c3fadf8cd128",
+              "name": "found",
+              "value": "={{ $json.texts }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b0e5689-b2de-5615-9db5-c51879848ebe",
+      "name": "Expected value found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a33df8f-9462-5848-8d73-0213395ad81f",
+              "name": "file",
+              "value": "={{ $json.image.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "6573c455-7b76-5e07-87bb-1db692cc5951",
+              "name": "status",
+              "value": "wrong value",
+              "type": "string"
+            },
+            {
+              "id": "8f4fb69b-1685-5af0-a79a-b9c0d2a93f39",
+              "name": "found",
+              "value": "={{ $json.texts }}",
+              "type": "array"
+            },
+            {
+              "id": "f859bea4-7035-5477-9e33-21de31ba8053",
+              "name": "expected",
+              "value": "={{ $('Settings').first().json.expectedText }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b75bfd7e-70a5-5a18-ae83-3ba8183b56b1",
+      "name": "Wrong value",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1b404756-d88f-5761-85c4-bf324166c36c",
+              "name": "status",
+              "value": "unreadable image",
+              "type": "string"
+            },
+            {
+              "id": "d2e73af4-e167-5aac-b4da-13bdc8e45462",
+              "name": "error",
+              "value": "={{ $json.error }}",
+              "type": "string"
+            },
+            {
+              "id": "ce3fbbc3-3c90-51fd-862a-1b254ed75a7b",
+              "name": "code",
+              "value": "={{ $json.code }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a43a2f27-75c9-5ff2-a8c2-789fc7c242d7",
+      "name": "Unreadable image",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        920,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Read label images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read label images": {
+      "main": [
+        [
+          {
+            "node": "Scan QR codes and barcodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan QR codes and barcodes": {
+      "main": [
+        [
+          {
+            "node": "Compare with the expected value",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unreadable image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare with the expected value": {
+      "main": [
+        [
+          {
+            "node": "No code found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expected value found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wrong value",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

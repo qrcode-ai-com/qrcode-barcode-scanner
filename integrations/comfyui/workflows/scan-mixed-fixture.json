@@ -1,0 +1,23 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "mixed-code128-qr.png"
+    },
+    "_meta": {
+      "title": "Load the mixed sample"
+    }
+  },
+  "2": {
+    "class_type": "QRCodeAIScanCodes",
+    "inputs": {
+      "image": ["1", 0],
+      "profile": "fast",
+      "budget_ms": 0,
+      "expected_text": "STOCK-4827"
+    },
+    "_meta": {
+      "title": "Scan QR Codes and Barcodes"
+    }
+  }
+}

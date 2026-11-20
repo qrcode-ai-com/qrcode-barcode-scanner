@@ -1,0 +1,5 @@
+# Left out of the archive the Comfy Registry serves: what a ComfyUI user never runs.
+tests/
+mirror/
+.github/
+SOURCE.json

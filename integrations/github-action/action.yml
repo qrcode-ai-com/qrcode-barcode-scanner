@@ -1,0 +1,59 @@
+name: QR Code & Barcode Scanner
+description: Read QR codes and barcodes in your repository's images with qrscan, and fail when an expected payload is missing.
+author: QR Code AI · SuperNovae Studio
+branding:
+  icon: maximize
+  color: blue
+
+inputs:
+  files:
+    description: >-
+      Glob patterns of the images to scan, one per line, relative to the workspace. `**` crosses
+      folders, `*` and `?` stay inside one; a line that starts with `!` leaves files out.
+    required: true
+  expected:
+    description: >-
+      Payloads that must be decoded, one per line. Each one must be the exact text of a code found
+      in at least one of the files.
+    required: false
+    default: ''
+  profile:
+    description: The scan profile, `fast`, `frame` or `full`.
+    required: false
+    default: full
+  budget-ms:
+    description: The time budget of one scan in milliseconds; `0` means no budget, the reproducible choice for CI.
+    required: false
+    default: '0'
+  fail-on:
+    description: >-
+      When the step fails besides a fault or an unreadable image: `missing` (an expected payload
+      was not found), `no-code` (that, or a file holds no code), or `never`.
+    required: false
+    default: missing
+  max-files:
+    description: The most files one run may scan.
+    required: false
+    default: '100'
+  version:
+    description: The qrscan release to install. Versions pinned in this action need nothing else.
+    required: false
+    default: 0.11.0
+  sums-sha256:
+    description: The sha256 of the SHA256SUMS file of a version this action does not pin.
+    required: false
+    default: ''
+
+outputs:
+  result:
+    description: '`pass`, `missing`, `no-code`, `unreadable`, `no-files` or `fault`.'
+  report:
+    description: The compact JSON report of the run, one entry per file with its decoded codes.
+  report-path:
+    description: The path of the full JSON report, with each file's complete qrscan scan report.
+  qrscan-path:
+    description: The path of the installed qrscan executable.
+
+runs:
+  using: node24
+  main: src/index.mjs
