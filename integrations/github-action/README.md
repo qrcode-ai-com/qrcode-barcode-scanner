@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-archives-dark.gif?v=bf8517ad6017">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-archives-light.gif?v=2d1ba5193f64" alt="Prebuilt qrscan for Linux, macOS and Windows: the GitHub mark, the commands that download, check and run an archive, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-action-dark.gif?v=8c859f96e637">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-action-light.gif?v=907eabc0c90d" alt="QR Code &amp; Barcode Scanner for GitHub Actions: the GitHub mark, the workflow steps that check the codes on label images, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
