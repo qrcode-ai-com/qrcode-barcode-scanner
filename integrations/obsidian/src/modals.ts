@@ -77,7 +77,7 @@ export class ImageSuggestModal extends SuggestModal<TFile> {
   }
 
   renderSuggestion(file: TFile, el: HTMLElement): void {
-    el.createEl('div', { text: file.name });
+    el.createDiv({ text: file.name });
     el.createEl('small', { text: file.path });
   }
 

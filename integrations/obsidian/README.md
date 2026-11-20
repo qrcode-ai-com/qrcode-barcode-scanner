@@ -44,7 +44,7 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barc
 
 To make a test image, encode a known text with the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), save the picture in your vault and embed it in a note. The plugin should give back exactly the text you encoded, leading zeros included.
 
-Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-obsidian`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian), has been public since 20 November 2026, and its tests pass there. Since 20 November 2026 the plugin is listed in [Obsidian's community plugins](https://community.obsidian.md/plugins/qrcode-barcode-scanner), version 1.0.1, under the QR Code AI organization. To run a change before it is released, build it from this folder and install it by hand, as written below.
+Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-obsidian`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian), has been public since 20 November 2026, and its tests pass there. Since 20 November 2026 the plugin is listed in [Obsidian's community plugins](https://community.obsidian.md/plugins/qrcode-barcode-scanner), under the QR Code AI organization. To run a change before it is released, build it from this folder and install it by hand, as written below.
 
 ## How it works
 
@@ -84,7 +84,7 @@ The plugin adds two commands and one menu item:
 - **Scan the open image** reads the image open in the current tab.
 - **Scan for QR codes and barcodes**, in the menu of an image file, reads that file.
 
-The window shows each code with its format and its exact text. **Insert into** writes them at the cursor of the note, on lines of their own. With the mixed test image, the list looks like this:
+The window shows each code with its format and its exact text. **Insert into** writes them at the cursor of the note, on lines of their own. **Copy** writes the same text to the system clipboard instead. With the mixed test image, the list looks like this:
 
 ```markdown
 - QR Code: `https://qrc-ai.com/76xMa`
@@ -144,6 +144,8 @@ The plugin reads PNG, JPEG, WebP and GIF files. The engine's [supported formats]
 
 The plugin makes no network request, needs no account and collects nothing. The engine runs inside Obsidian, from the module embedded in `main.js`, so the plugin works offline.
 
+Only **Copy** uses the system clipboard: when you choose it, the plugin writes the codes there, in the Markdown it would insert. The plugin never reads the clipboard, and nothing else in it writes there.
+
 It uses no Node.js or Electron module, so the manifest allows mobile. The scan holds Obsidian while it runs: on the test image it takes about half a second on a recent Mac. `main.js` weighs about 3 MB, because the engine travels inside it.
 
 ## Tests
@@ -169,7 +171,7 @@ python3 scripts/stage-obsidian-satellite.py stage --out /absolute/empty/folder
 python3 scripts/stage-obsidian-satellite.py verify /absolute/empty/folder
 ```
 
-The stage reads one commit, checks the manifest against the community directory rules and writes `SOURCE.json` with the sha256 of every file. The workflows of [mirror/](mirror/test.yml) become the repository's own: its tests, and a release that a tag such as `1.0.0` starts. That release builds `main.js`, runs the tests and opens a draft with `main.js`, `manifest.json` and `styles.css`.
+The stage reads one commit, checks the manifest against the community directory rules and writes `SOURCE.json` with the sha256 of every file. The workflows of [mirror/](mirror/test.yml) become the repository's own: its tests, and a release that a tag such as `1.0.0` starts. That release builds `main.js`, runs the tests, attests the build provenance of `main.js` and `styles.css`, and opens a draft with `main.js`, `manifest.json` and `styles.css`. To check a downloaded file against its attestation: `gh attestation verify main.js --repo qrcode-ai-com/qrcode-barcode-scanner-obsidian`.
 
 ## Licenses of what you install
 

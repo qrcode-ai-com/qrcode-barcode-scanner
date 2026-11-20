@@ -6,7 +6,7 @@ import {
   blankPng, buildMain, clipboard, CODE128, EXPECTED, loadPlugin, mixedFixture, network, obsidian, QR, until,
 } from './helpers.mjs';
 
-const { FakeEditor, MarkdownView, Modal, Notice, createApp, createMenu, reset } = obsidian;
+const { FakeEditor, FakeElement, MarkdownView, Modal, Notice, createApp, createMenu, reset } = obsidian;
 const manifest = { id: 'qrcode-barcode-scanner', name: 'QR Code and Barcode Scanner', version: '1.0.0' };
 
 let Plugin;
@@ -171,6 +171,9 @@ test('several images open a picker, the one on the cursor line first', async () 
   assert.equal(picker.placeholder, 'Choose the image to scan');
   assert.deepEqual(picker.getSuggestions('').map((file) => file.path), ['attachments/mixed.png', 'first.png']);
   assert.deepEqual(picker.getSuggestions('FIRST').map((file) => file.path), ['first.png']);
+  const row = new FakeElement('div');
+  picker.renderSuggestion(picker.getSuggestions('')[0], row);
+  assert.deepEqual(row.children.map((child) => [child.tag, child.text]), [['div', 'mixed.png'], ['small', 'attachments/mixed.png']]);
   picker.onChooseSuggestion(picker.getSuggestions('')[0]);
   const modal = await resultWindow();
   assert.equal(modal.titleEl.text, 'Codes in mixed.png');
@@ -227,4 +230,29 @@ test('the settings tab saves the chosen profile and format', async () => {
   await dropdowns[0].select('fast');
   await dropdowns[1].select('callout');
   assert.deepEqual(plugin.saved, { profile: 'fast', format: 'callout' });
+});
+
+test('the settings tab declares the same settings for the settings search of Obsidian 1.13', async () => {
+  const { plugin } = await setUp({ data: { profile: 'frame', format: 'callout' } });
+  const [tab] = plugin.settingTabs;
+  const definitions = tab.getSettingDefinitions();
+  assert.deepEqual(definitions.map(({ name, control }) => [name, control.type, control.key, control.options, control.defaultValue]), [
+    ['Scan profile', 'dropdown', 'profile', { full: 'Full', fast: 'Fast', frame: 'Frame' }, 'full'],
+    ['Inserted text', 'dropdown', 'format', { list: 'List', callout: 'Callout' }, 'list'],
+  ]);
+  assert.deepEqual(definitions.map(({ desc }) => typeof desc === 'string' && desc.length > 0), [true, true]);
+  assert.deepEqual(definitions.map(({ control }) => tab.getControlValue(control.key)), ['frame', 'callout']);
+
+  // display(), which Obsidian before 1.13 calls, shows the same names, options and values.
+  tab.display();
+  const dropdowns = tab.containerEl.children.flatMap((child) => child.dropdowns);
+  assert.deepEqual(dropdowns.map((dropdown) => [dropdown.name, dropdown.options, dropdown.value]),
+    definitions.map(({ name, control }) => [name, control.options, tab.getControlValue(control.key)]));
+
+  await tab.setControlValue('profile', 'fast');
+  await tab.setControlValue('format', 'list');
+  assert.deepEqual(plugin.saved, { profile: 'fast', format: 'list' });
+  assert.deepEqual(plugin.settings, { profile: 'fast', format: 'list' });
+  await tab.setControlValue('profile', 'nonsense');
+  assert.deepEqual(plugin.saved, { profile: 'full', format: 'list' }, 'an unknown value is saved as the default');
 });
