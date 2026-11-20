@@ -113,12 +113,22 @@ jobs:
           printf '%s\n' 'EXTRACT_SUFX?=.tar.gz' 'GREP?=grep' 'WRKDIR?=/wrkdir' \
             'CARGO_TARGET_DIR?=/wrkdir/target' 'all:' >"$stub/bsd.port.mk"
           cd distribution/freebsd/graphics/qrcode-barcode-scanner
-          test "$(bmake -m "$stub" -V PORTNAME)" = qrcode-barcode-scanner
-          test "$(bmake -m "$stub" -V DISTVERSION)" = 0.11.0
-          test "$(bmake -m "$stub" -V DISTFILES)" = qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
-          test "$(bmake -m "$stub" -V LICENSE)" = AGPLv3+
-          test "$(bmake -m "$stub" -V USES)" = cargo
-          test "$(bmake -m "$stub" -V CARGO_CRATES | wc -w)" -eq 263
+          # Portable bmake prints a value unexpanded with -V; -v expands it, as FreeBSD make does.
+          expect() {
+            got=$(bmake -m "$stub" -v "$1")
+            printf '%s = %s\n' "$1" "$got"
+            [ "$got" = "$2" ] || { echo "expected $1 = $2" >&2; return 1; }
+          }
+          expect PORTNAME qrcode-barcode-scanner
+          expect DISTVERSION 0.11.0
+          expect DISTFILES qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
+          expect MASTER_SITES https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0/
+          expect LICENSE AGPLv3+
+          expect USES cargo
+          expect CARGO_BUILD_ARGS '--package qrcode-barcode-scanner-cli'
+          crates=$(bmake -m "$stub" -v CARGO_CRATES | wc -w)
+          echo "CARGO_CRATES: $crates crates"
+          test "$crates" -eq 263
           bmake -m "$stub" -n post-test
 
   alpine:
@@ -265,4 +275,6 @@ jobs:
           makepkg-mingw --printsrcinfo | tee SRCINFO.txt
           grep -qF 'license = spdx:AGPL-3.0-or-later' SRCINFO.txt
           grep -qF 'pkgver = 0.11.0' SRCINFO.txt
+          # makepkg looks for the strip of the environment before it does anything else.
+          pacman -Sy --noconfirm --needed mingw-w64-ucrt-x86_64-binutils
           MINGW_ARCH=ucrt64 makepkg-mingw --verifysource --nodeps
