@@ -36,3 +36,8 @@ override_dh_auto_install:
 
 override_dh_auto_clean:
 	rm -rf target debian/cargo-home debian/scan-*.json
+
+# dh_clean deletes *.orig files, but every vendored crate keeps the Cargo.toml.orig that its
+# .cargo-checksum.json lists: without it cargo refuses the vendored sources.
+override_dh_clean:
+	dh_clean -XCargo.toml.orig

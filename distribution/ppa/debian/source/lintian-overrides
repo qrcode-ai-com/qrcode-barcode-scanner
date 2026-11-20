@@ -1,0 +1,7 @@
+# The orig-vendor component holds the crates of Cargo.lock exactly as cargo vendor wrote them:
+# cargo checks each crate against its .cargo-checksum.json, so no file is removed. These files
+# are never built or installed on Linux: Windows import libraries of the winapi crates, test
+# DLLs of libloading, and a coverage report shipped in the oorandom crate.
+qrcode-barcode-scanner source: unpack-message-for-orig qrcode-barcode-scanner_0.11.0.orig-vendor.tar.xz . ar failed for vendor/winapi-*-pc-windows-gnu-0.4.0/lib/*.a
+qrcode-barcode-scanner source: source-contains-prebuilt-windows-binary [vendor/libloading-0.8.9/tests/*.dll]
+qrcode-barcode-scanner source: source-is-missing [vendor/oorandom-11.1.5/tarpaulin-report.html]
