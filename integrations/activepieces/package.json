@@ -1,0 +1,53 @@
+{
+  "name": "@qrcode-ai-com/piece-qrcode-barcode-scanner",
+  "version": "0.1.0",
+  "description": "Activepieces piece that reads QR codes and barcodes in image files with the open-source QR Code AI engine, on the worker.",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/activepieces",
+  "keywords": [
+    "activepieces",
+    "activepieces-piece",
+    "qr-code",
+    "barcode",
+    "scanner",
+    "decoder"
+  ],
+  "author": {
+    "name": "SuperNovae Studio",
+    "email": "contact@supernovae.studio",
+    "url": "https://qrcode-ai.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/activepieces"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json && cp package.json dist/",
+    "lint": "eslint 'src/**/*.ts'"
+  },
+  "bundleDeps": [
+    "dayjs",
+    "deepmerge-ts",
+    "expr-eval",
+    "ipaddr.js",
+    "lru-cache",
+    "nanoid",
+    "semver",
+    "tslib",
+    "yallist",
+    "zod"
+  ],
+  "dependencies": {
+    "@activepieces/pieces-framework": "workspace:*",
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "tslib": "2.6.2"
+  }
+}

@@ -1,0 +1,63 @@
+{
+	"name": "@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner",
+	"version": "0.1.0",
+	"description": "n8n community node that reads QR codes and barcodes in binary images, locally, with the QR Code & Barcode Scanner engine",
+	"license": "MIT",
+	"homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/n8n",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"qr-code",
+		"barcode",
+		"barcode-scanner",
+		"qr-code-scanner",
+		"scanner"
+	],
+	"author": {
+		"name": "SuperNovae Studio",
+		"email": "contact@supernovae.studio",
+		"url": "https://qrcode-ai.com/"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+		"directory": "integrations/n8n"
+	},
+	"bugs": {
+		"url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"test": "node --test test/*.test.mjs",
+		"prepublishOnly": "n8n-node prerelease"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": false,
+		"credentials": [],
+		"nodes": [
+			"dist/nodes/QrcodeBarcodeScanner/QrcodeBarcodeScanner.node.js"
+		]
+	},
+	"dependencies": {
+		"@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+	},
+	"devDependencies": {
+		"@n8n/node-cli": "0.57.4",
+		"eslint": "9.32.0",
+		"n8n-workflow": "2.16.0",
+		"prettier": "3.6.2",
+		"typescript": "5.9.2"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

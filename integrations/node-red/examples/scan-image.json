@@ -1,0 +1,102 @@
+[
+  {
+    "id": "f0c1a7e2b3d40001",
+    "type": "comment",
+    "name": "Scan an image file for QR codes and barcodes",
+    "info": "Set the inject node's payload to the path of an image on the Node-RED host, or wire any node that\nputs image bytes in msg.payload (file in, http request, MQTT). The scan node returns the report in\nmsg.payload and the decoded texts in msg.texts. Decoded links are never opened.",
+    "x": 250,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "f0c1a7e2b3d40002",
+    "type": "inject",
+    "name": "image path",
+    "props": [{ "p": "payload" }],
+    "repeat": "",
+    "once": false,
+    "topic": "",
+    "payload": "/data/mixed-code128-qr.png",
+    "payloadType": "str",
+    "x": 130,
+    "y": 120,
+    "wires": [["f0c1a7e2b3d40003"]]
+  },
+  {
+    "id": "f0c1a7e2b3d40003",
+    "type": "qrcode-barcode-scanner",
+    "name": "",
+    "property": "payload",
+    "profile": "frame",
+    "budgetMs": "",
+    "x": 330,
+    "y": 120,
+    "wires": [["f0c1a7e2b3d40004"]]
+  },
+  {
+    "id": "f0c1a7e2b3d40004",
+    "type": "switch",
+    "name": "any code?",
+    "property": "texts.length",
+    "propertyType": "msg",
+    "rules": [{ "t": "gt", "v": "0", "vt": "num" }, { "t": "else" }],
+    "checkall": "false",
+    "repair": false,
+    "outputs": 2,
+    "x": 530,
+    "y": 120,
+    "wires": [["f0c1a7e2b3d40005"], ["f0c1a7e2b3d40006"]]
+  },
+  {
+    "id": "f0c1a7e2b3d40005",
+    "type": "debug",
+    "name": "decoded texts",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "texts",
+    "targetType": "msg",
+    "x": 730,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "f0c1a7e2b3d40006",
+    "type": "debug",
+    "name": "no code in the image",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload.detections",
+    "targetType": "msg",
+    "x": 750,
+    "y": 140,
+    "wires": []
+  },
+  {
+    "id": "f0c1a7e2b3d40007",
+    "type": "catch",
+    "name": "scan errors",
+    "scope": ["f0c1a7e2b3d40003"],
+    "uncaught": false,
+    "x": 330,
+    "y": 200,
+    "wires": [["f0c1a7e2b3d40008"]]
+  },
+  {
+    "id": "f0c1a7e2b3d40008",
+    "type": "debug",
+    "name": "scan error",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "error",
+    "targetType": "msg",
+    "x": 530,
+    "y": 200,
+    "wires": []
+  }
+]

@@ -1,0 +1,108 @@
+name: integration-automation-js
+
+# The n8n node, the Node-RED node and the Activepieces piece on the published WebAssembly engine:
+# each host's own build, lint and tests, then the three packed tarballs installed outside the
+# checkout and run on the mixed fixture. No publishing permissions and no secrets.
+# Untrusted event fields are never interpolated into shell scripts.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "integrations/automation-js-core/**"
+      - "integrations/n8n/**"
+      - "integrations/node-red/**"
+      - "integrations/activepieces/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - ".github/workflows/integration-automation-js.yml"
+  push:
+    branches: [main]
+    paths:
+      - "integrations/automation-js-core/**"
+      - "integrations/n8n/**"
+      - "integrations/node-red/**"
+      - "integrations/activepieces/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - ".github/workflows/integration-automation-js.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  hosts:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: shared scan core
+        working-directory: integrations/automation-js-core
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm ci --ignore-scripts --no-audit --no-fund
+          node sync.mjs --check
+          npm test
+      - name: n8n node (build, n8n lint, tests, pack)
+        working-directory: integrations/n8n
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm run lint
+          npm test
+          mkdir -p "$RUNNER_TEMP/packs"
+          npm pack --pack-destination "$RUNNER_TEMP/packs"
+      - name: Node-RED node (runtime tests, pack)
+        working-directory: integrations/node-red
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm pack --pack-destination "$RUNNER_TEMP/packs"
+      - name: Activepieces piece (reproduced bundler, tests)
+        working-directory: integrations/activepieces/test
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+      # The archive to publish: Activepieces' own bundler and framework source, from a sparse
+      # checkout at the revision stage.mjs pins.
+      - name: Activepieces piece (Activepieces bundler, tests, pack)
+        working-directory: integrations/activepieces/test
+        run: |
+          set -euo pipefail
+          revision="$(node --input-type=module -e "import { ACTIVEPIECES_REVISION } from '../stage.mjs'; console.log(ACTIVEPIECES_REVISION)")"
+          checkout="$RUNNER_TEMP/activepieces"
+          git init -q "$checkout"
+          git -C "$checkout" remote add origin https://github.com/activepieces/activepieces.git
+          git -C "$checkout" sparse-checkout set packages/cli packages/pieces/framework packages/core/utils packages/core/piece-types
+          git -C "$checkout" fetch -q --depth 1 --filter=blob:none origin "$revision"
+          git -C "$checkout" checkout -q FETCH_HEAD
+          node build.mjs --activepieces "$checkout"
+          npm run test:built
+          cp build/qrcode-ai-com-piece-qrcode-barcode-scanner-0.1.0.tgz "$RUNNER_TEMP/packs/"
+      - name: packed consumers outside the checkout
+        run: |
+          set -euo pipefail
+          packs="$RUNNER_TEMP/packs"
+          node integrations/automation-js-core/test/packed-consumers.mjs \
+            --n8n "$packs/qrcode-ai-com-n8n-nodes-qrcode-barcode-scanner-0.1.0.tgz" \
+            --node-red "$packs/qrcode-ai-com-node-red-qrcode-barcode-scanner-0.1.0.tgz" \
+            --activepieces "$packs/qrcode-ai-com-piece-qrcode-barcode-scanner-0.1.0.tgz" \
+            --out "$packs/receipt.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: qrscan-automation-js-node-${{ matrix.node }}
+          path: ${{ runner.temp }}/packs/
+          if-no-files-found: error
+          retention-days: 14

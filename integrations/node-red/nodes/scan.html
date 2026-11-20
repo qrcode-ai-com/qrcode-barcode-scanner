@@ -1,0 +1,93 @@
+<!-- SPDX-License-Identifier: MIT -->
+<script type="text/javascript">
+  RED.nodes.registerType('qrcode-barcode-scanner', {
+    category: 'parser',
+    color: '#8fb4d9',
+    defaults: {
+      name: { value: '' },
+      property: { value: 'payload', required: true, validate: RED.validators.typedInput('msg') },
+      profile: { value: 'frame', required: true },
+      budgetMs: {
+        value: '',
+        validate: function (value) {
+          return value === '' || (/^\d+$/.test(String(value)) && Number(value) <= 60000);
+        },
+      },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-qrcode',
+    paletteLabel: 'qr & barcode scan',
+    label: function () {
+      return this.name || 'qr & barcode scan';
+    },
+    labelStyle: function () {
+      return this.name ? 'node_label_italic' : '';
+    },
+    oneditprepare: function () {
+      $('#node-input-property').typedInput({ default: 'msg', types: ['msg'] });
+    },
+  });
+</script>
+
+<script type="text/html" data-template-name="qrcode-barcode-scanner">
+  <div class="form-row">
+    <label for="node-input-property"><i class="fa fa-sign-in"></i> Image</label>
+    <input type="text" id="node-input-property" style="width: 70%" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-profile"><i class="fa fa-sliders"></i> Profile</label>
+    <select id="node-input-profile" style="width: 70%">
+      <option value="frame">frame: decode without scoring</option>
+      <option value="fast">fast: decode and score with a short budget</option>
+      <option value="full">full: decode and score QR scannability</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-budgetMs"><i class="fa fa-clock-o"></i> Budget (ms)</label>
+    <input type="text" id="node-input-budgetMs" placeholder="profile default" style="width: 70%" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Name" style="width: 70%" />
+  </div>
+</script>
+
+<script type="text/html" data-help-name="qrcode-barcode-scanner">
+  <p>Reads QR codes and barcodes in an image, on this machine, with the QR Code &amp; Barcode Scanner engine.</p>
+
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">buffer | string</span></dt>
+    <dd>The encoded image bytes (PNG, JPEG, WebP or GIF), or the path of an image file. A relative path starts
+      from the Node-RED working directory. At most 8 MiB and 4096 pixels per side.</dd>
+    <dt class="optional">profile <span class="property-type">string</span></dt>
+    <dd>Overrides the configured profile: <code>frame</code>, <code>fast</code> or <code>full</code>.</dd>
+    <dt class="optional">budgetMs <span class="property-type">number</span></dt>
+    <dd>Overrides the profile's time budget, from 0 to 60000 milliseconds. 0 removes the budget. It is not a hard timeout.</dd>
+  </dl>
+
+  <h3>Outputs</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt>
+    <dd>The complete scanner report, unchanged: detections, scores, hints, trace and versions.</dd>
+    <dt>texts <span class="property-type">array</span></dt>
+    <dd>The decoded texts, one per code, in report order. An image without a code gives an empty array.</dd>
+    <dt>codes <span class="property-type">array</span></dt>
+    <dd>One object per code: <code>symbology</code>, <code>text</code>, the exact bytes in base64 as <code>raw</code>,
+      <code>charset</code> and the parsed <code>payload</code>.</dd>
+  </dl>
+
+  <h3>Details</h3>
+  <p>The engine runs in a worker thread, so a long scan does not block the other flows. Decoded content is untrusted
+    data: the node never opens a decoded link. A corrupt image, a missing file or an input over the limits raises an
+    error that a Catch node receives, with a code such as <code>QRS-001</code> or <code>QRSCAN_INPUT_LIMIT</code>.</p>
+  <p>The <code>frame</code> profile decodes without scoring and leaves <code>payload.score</code> null. Use
+    <code>full</code> to measure the scannability of a QR code.</p>
+
+  <h3>References</h3>
+  <ul>
+    <li><a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/node-red#readme">README and example flow</a></li>
+    <li><a href="https://qrcode-ai.com/en-US/qr-code-scanner/integrations/node-red">QR code scanner guide for Node-RED</a></li>
+  </ul>
+</script>
