@@ -64,7 +64,7 @@ qrscan prints a JSON report on stdout. It exits with 0 when it found at least on
 
 ## How it is tested
 
-`scripts/check-packaging-recipes.py` validates both recipes against the JSON schema of the recipe format (commit `7be6ba9f` of `prefix-dev/recipe-format`), and checks the version, the license, the archive digest and the test. `test_scan.py` passed on this Mac against the published wheel 0.11.0. The build itself has not run: it compiles Rust, so it runs in the conda-forge CI after submission, or with `rattler-build build --recipe recipes/qrcode-barcode-scanner-cli/recipe.yaml` on a machine that may compile.
+`scripts/check-packaging-recipes.py` validates both recipes against the JSON schema of the recipe format (commit `7be6ba9f` of `prefix-dev/recipe-format`), and checks the version, the license, the archive digest and the test. `test_scan.py` passed against the published wheel 0.11.0 when the recipe was written. The build itself has not run: it compiles Rust, so it runs in the conda-forge CI after submission, or with `rattler-build build --recipe recipes/qrcode-barcode-scanner-cli/recipe.yaml` on a machine that may compile.
 
 ## Submit it
 

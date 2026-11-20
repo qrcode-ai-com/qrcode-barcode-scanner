@@ -62,7 +62,7 @@ The container needs no network and writes nothing. It has no allowed directory, 
 
 ## How it is tested
 
-The workflow `.github/workflows/integration-glama.yml` of the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) stages this folder, builds the container on amd64 and arm64 runners, and starts it the way a client would, with no network and a read-only file system. The MCP driver of `distribution/acceptance` lists the tools, calls `scan_image` on the [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png) with the fast, frame and full profiles, and requires both codes in each report. The job then removes the image and checks the receipt. On a Mac, the same lockfile installed MCP 0.3.1 and the driver read both payloads in the three profiles.
+The workflow `.github/workflows/integration-glama.yml` of the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) stages this folder, builds the container on amd64 and arm64 runners, and starts it the way a client would, with no network and a read-only file system. The MCP driver of `distribution/acceptance` lists the tools, calls `scan_image` on the [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png) with the fast, frame and full profiles, and requires both codes in each report. The job then removes the image and checks the receipt. When the folder was written, the same lockfile installed MCP 0.3.1 outside a container, and the driver read both payloads in the three profiles.
 
 ## Publish it
 
