@@ -44,7 +44,7 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barc
 
 To make a test image, encode a known text with the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), save the picture in your vault and embed it in a note. The plugin should give back exactly the text you encoded, leading zeros included.
 
-Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-obsidian`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian), has been public since 20 November 2026, and its tests pass there. The plugin is not listed in Obsidian's community plugins yet. Until it is, build it from this folder and install it by hand, as written below.
+Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-obsidian`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian), has been public since 20 November 2026, and its tests pass there. Since 20 November 2026 the plugin is listed in [Obsidian's community plugins](https://community.obsidian.md/plugins/qrcode-barcode-scanner), version 1.0.1, under the QR Code AI organization. To run a change before it is released, build it from this folder and install it by hand, as written below.
 
 ## How it works
 
@@ -65,7 +65,9 @@ The picture shows the three steps of the package route. In Obsidian they are:
 
 ## Install
 
-Build `main.js` with Node.js 22 or later, in this folder: `integrations/obsidian` of the engine repository, or the root of the plugin repository.
+In Obsidian, open **Settings → Community plugins**, choose **Browse**, search for **QR Code and Barcode Scanner**, then install and enable it. Obsidian downloads the release files of the plugin's repository.
+
+To install a build of this folder instead, build `main.js` with Node.js 22 or later, in this folder: `integrations/obsidian` of the engine repository, or the root of the plugin repository.
 
 ```sh
 npm ci
@@ -73,8 +75,6 @@ npm run build
 ```
 
 Then copy `main.js`, `manifest.json` and `styles.css` into the folder `.obsidian/plugins/qrcode-barcode-scanner/` of your vault. Restart Obsidian, open **Settings → Community plugins** and turn on **QR Code and Barcode Scanner**.
-
-Once the plugin is listed, you will find it in **Settings → Community plugins → Browse** under the same name.
 
 ## Use
 
