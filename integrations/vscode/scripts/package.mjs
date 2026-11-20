@@ -19,7 +19,9 @@ const vsce = join(dirname(require.resolve('@vscode/vsce/package.json')), 'vsce')
 
 // One timestamp for every entry makes the VSIX reproducible: the same sources, engine and Node
 // give the same bytes, on a laptop or in a shallow CI checkout. SOURCE_DATE_EPOCH wins;
-// otherwise a fixed date, 2026-11-20 00:00 UTC.
+// otherwise a fixed date, 2026-11-20 00:00 UTC. ZIP stores that date as an MS-DOS date and time
+// with no time zone, written in the zone vsce runs in, so vsce runs in UTC: a build in UTC+4 and
+// the publish lane's rebuild on a UTC runner then give the same bytes.
 const epoch = process.env.SOURCE_DATE_EPOCH || '1795132800';
 
 execFileSync(process.execPath, [join(here, 'scripts', 'build.mjs'), stage], { stdio: 'inherit' });
@@ -29,7 +31,7 @@ rmSync(vsix, { force: true });
 execFileSync(process.execPath, [vsce, 'package', '--no-dependencies', '--out', vsix], {
   cwd: stage,
   stdio: 'inherit',
-  env: { ...process.env, SOURCE_DATE_EPOCH: epoch },
+  env: { ...process.env, SOURCE_DATE_EPOCH: epoch, TZ: 'UTC' },
 });
 
 const bytes = readFileSync(vsix);
