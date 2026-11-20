@@ -80,6 +80,7 @@ one process.
 | Language | Package | Version | Works with |
 | --- | --- | --- | --- |
 | Go | [`github.com/qrcode-ai-com/qrcode-barcode-scanner-go`](https://pkg.go.dev/github.com/qrcode-ai-com/qrcode-barcode-scanner-go@v0.11.0) | 0.11.0 | `qrscan` 0.11.x |
+| PHP | [`qrcode-ai-com/qrcode-barcode-scanner`](https://packagist.org/packages/qrcode-ai-com/qrcode-barcode-scanner#v0.11.0) | 0.11.0 | `qrscan` 0.11.x |
 
 ```sh
 go get github.com/qrcode-ai-com/qrcode-barcode-scanner-go@v0.11.0
@@ -91,6 +92,17 @@ guide is [`bindings/go`](../bindings/go/README.md). It is served from its own re
 which is generated from this one and never edited by hand. Version 0.11.0 was installed through
 the public Go proxy in an empty module, on Linux, macOS and Windows, and read the mixed fixture
 in the three profiles.
+
+```sh
+composer require qrcode-ai-com/qrcode-barcode-scanner:^0.11
+```
+
+The PHP package needs PHP 8.2 or later with `proc_open` enabled and the JSON extension, which
+PHP 8 always includes; it depends on no other Composer package. Its guide is [`bindings/php`](../bindings/php/README.md). Packagist reads it from its own repository,
+[`qrcode-ai-com/qrcode-barcode-scanner-php`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-php),
+which is generated from this one and never edited by hand. Version 0.11.0 was installed from
+Packagist with Composer 2 in an empty project, then, with PHP 8.4 and the 0.11.0 `qrscan` release
+archive for Linux ARM64, it read the mixed fixture in the three profiles.
 
 ## Browser CDNs and package indexes
 

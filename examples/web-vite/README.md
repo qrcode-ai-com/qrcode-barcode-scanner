@@ -57,7 +57,9 @@ need no account. The folder stands alone: it depends on nothing else in this rep
 The workflow [`pages.yml`](../../.github/workflows/pages.yml) publishes the built page on GitHub
 Pages, at <https://qrcode-ai-com.github.io/qrcode-barcode-scanner-rust/>. It builds this folder
 from `main` with `npm run build -- --base /qrcode-barcode-scanner-rust/`, the path of that
-address. That page follows `main`; the button opens a fixed tag.
+address. That page follows `main`; the button opens a fixed tag. The same page, built with
+`--base ./`, also runs in the Hugging Face Space
+[`ThibautMELEN/qrcode-barcode-scanner`](https://huggingface.co/spaces/ThibautMELEN/qrcode-barcode-scanner).
 
 ## Run it on your machine
 
