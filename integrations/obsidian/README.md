@@ -84,7 +84,7 @@ The plugin adds two commands and one menu item:
 - **Scan the open image** reads the image open in the current tab.
 - **Scan for QR codes and barcodes**, in the menu of an image file, reads that file.
 
-The window shows each code with its format and its exact text. **Insert into** writes them at the cursor of the note, on lines of their own. With the mixed test image, the list looks like this:
+The window shows each code with its format and its exact text. **Insert into** writes them at the cursor of the note, on lines of their own. **Copy** writes the same text to the system clipboard instead. With the mixed test image, the list looks like this:
 
 ```markdown
 - QR Code: `https://qrc-ai.com/76xMa`
@@ -143,6 +143,8 @@ The plugin reads PNG, JPEG, WebP and GIF files. The engine's [supported formats]
 ## On your device, on desktop and mobile
 
 The plugin makes no network request, needs no account and collects nothing. The engine runs inside Obsidian, from the module embedded in `main.js`, so the plugin works offline.
+
+Only **Copy** uses the system clipboard: when you choose it, the plugin writes the codes there, in the Markdown it would insert. The plugin never reads the clipboard, and nothing else in it writes there.
 
 It uses no Node.js or Electron module, so the manifest allows mobile. The scan holds Obsidian while it runs: on the test image it takes about half a second on a recent Mac. `main.js` weighs about 3 MB, because the engine travels inside it.
 
