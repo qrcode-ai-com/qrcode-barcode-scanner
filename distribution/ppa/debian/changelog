@@ -1,0 +1,6 @@
+qrcode-barcode-scanner (0.11.0-1~ppa1~ubuntu24.04.1) noble; urgency=medium
+
+  * Build qrscan 0.11.0 from the v0.11.0 release source archive, with the
+    crates of its Cargo.lock vendored, for the QR Code AI PPA.
+
+ -- QR Code AI <contact@qrcode-ai.com>  Fri, 20 Nov 2026 00:00:00 +0000

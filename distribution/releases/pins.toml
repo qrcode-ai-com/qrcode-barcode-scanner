@@ -133,7 +133,14 @@ paths = [
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
   ".github/workflows/ecosystem-checks.yml",
-  ".github/workflows/integration-*.yml",
+  ".github/workflows/integration-agent-plugin.yml",
+  ".github/workflows/integration-automation-js.yml",
+  ".github/workflows/integration-browser-extension.yml",
+  ".github/workflows/integration-github-action.yml",
+  ".github/workflows/integration-obsidian.yml",
+  ".github/workflows/integration-python-hosts.yml",
+  ".github/workflows/integration-raycast.yml",
+  ".github/workflows/integration-vscode.yml",
 ]
 
 [[file]]
@@ -155,6 +162,32 @@ paths = ["distribution/acceptance/README.md"]
 [[file]]
 held = "the reviewed public MCP configuration, updated only after its own publication"
 paths = ["distribution/readme-actions.json"]
+
+[[file]]
+held = "the packaging recipes of each channel, checked by scripts/check-packaging-recipes.py and moved when that channel is published again"
+paths = [
+  "distribution/alpine/**",
+  "distribution/artifacthub/**",
+  "distribution/conda-forge/**",
+  "distribution/freebsd/**",
+  "distribution/glama/Dockerfile",
+  "distribution/glama/README.md",
+  "distribution/glama/glama.json",
+  "distribution/glama/package.json",
+  "distribution/jsr/**",
+  "distribution/macports/**",
+  "distribution/msys2/**",
+  "distribution/nix/**",
+  "distribution/obs/**",
+  "distribution/ppa/**",
+  "distribution/snap/**",
+  "distribution/termux/**",
+  "scripts/check-packaging-recipes.py",
+  "scripts/stage-glama-package.py",
+  ".github/workflows/integration-glama.yml",
+  ".github/workflows/integration-packaging-lint.yml",
+  ".github/workflows/integration-snap.yml",
+]
 
 # ------------------------------------------------------------------ lines held by a destination
 

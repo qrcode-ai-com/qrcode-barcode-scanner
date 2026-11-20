@@ -1,0 +1,9 @@
+# Artifact Hub repository metadata for oci://ghcr.io/qrcode-ai-com/qrcode-barcode-scanner.
+# It is pushed as an OCI artifact under the tag `artifacthub.io` of that image (README.md).
+# repositoryID comes from the Artifact Hub control panel once the repository is added there.
+# Do not push this file while it still holds the placeholder below.
+repositoryID: REPLACE-WITH-THE-ARTIFACT-HUB-REPOSITORY-ID
+owners:
+  # The email must be the one of the Artifact Hub account that adds the repository.
+  - name: QR Code AI
+    email: contact@qrcode-ai.com

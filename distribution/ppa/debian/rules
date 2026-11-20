@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+# Builds qrscan offline from the release source archive and the vendored crates of its
+# Cargo.lock (the orig-vendor component). Ubuntu 24.04 and 26.04 ship rustc 1.91 as the
+# versioned rustc-1.91 and cargo-1.91 packages; the crate needs 1.88 or newer.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export PATH := /usr/lib/rust-1.91/bin:$(PATH)
+export CARGO_HOME := $(CURDIR)/debian/cargo-home
+# Keep the workspace release profile: it checks integer overflow in the rxing reader, and the
+# engine catches reader panics, so panic=abort must never be set.
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir -p $(CARGO_HOME)
+	printf '%s\n' '[source.crates-io]' 'replace-with = "vendored-sources"' '' \
+		'[source.vendored-sources]' 'directory = "$(CURDIR)/vendor"' \
+		>$(CARGO_HOME)/config.toml
+
+override_dh_auto_build:
+	cargo build --release --frozen --offline -p qrcode-barcode-scanner-cli
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cargo test --release --frozen --offline -p qrcode-barcode-scanner-cli
+	set -e; for profile in fast frame full; do \
+		target/release/qrscan --profile $$profile --budget-ms 0 \
+			fixtures/symbology/mixed-code128-qr.png >debian/scan-$$profile.json; \
+		grep -qF '"text": "https://qrc-ai.com/76xMa"' debian/scan-$$profile.json; \
+		grep -qF '"text": "STOCK-4827"' debian/scan-$$profile.json; \
+	done
+endif
+
+override_dh_auto_install:
+	install -Dm0755 target/release/qrscan debian/qrcode-barcode-scanner/usr/bin/qrscan
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home debian/scan-*.json
+
+# dh_clean deletes *.orig files, but every vendored crate keeps the Cargo.toml.orig that its
+# .cargo-checksum.json lists: without it cargo refuses the vendored sources.
+override_dh_clean:
+	dh_clean -XCargo.toml.orig

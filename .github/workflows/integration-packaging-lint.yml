@@ -1,0 +1,280 @@
+name: integration-packaging-lint
+
+# Lints the packaging recipes of qrscan 0.11.0 (distribution/<channel>) with each host's own
+# tools, without compiling anything: no Rust build, no upload, no secret. A source package is
+# prepared where the host's tool needs one (the Launchpad source package vendors the crates of
+# Cargo.lock; the Nix job fetches them to compute the vendor hash), but nothing is built from it.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "distribution/snap/**"
+      - "distribution/artifacthub/**"
+      - "distribution/jsr/**"
+      - "distribution/glama/**"
+      - "distribution/conda-forge/**"
+      - "distribution/nix/**"
+      - "distribution/obs/**"
+      - "distribution/ppa/**"
+      - "distribution/alpine/**"
+      - "distribution/termux/**"
+      - "distribution/macports/**"
+      - "distribution/freebsd/**"
+      - "distribution/msys2/**"
+      - "scripts/check-packaging-recipes.py"
+      - "scripts/stage-glama-package.py"
+      - ".github/workflows/integration-packaging-lint.yml"
+      - ".github/workflows/integration-snap.yml"
+      - ".github/workflows/integration-glama.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-packaging-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_URL: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
+  SOURCE_SHA256: 8e5e09f0ec8d93ae49ca35615c05bb1d326448b6de9757cef86ef48d7bf3a96d
+
+jobs:
+  recipes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: install the linters
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'PyYAML==6.0.3' 'jsonschema==4.26.0'
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bmake shellcheck tcl
+          curl --fail --silent --show-error --location --proto '=https' \
+            --output "$RUNNER_TEMP/actionlint.tar.gz" \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" \
+            | sha256sum --check --strict -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+      - name: fetch the release source archive and the conda recipe schema
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' \
+            --output "$RUNNER_TEMP/source.tar.gz" "$SOURCE_URL"
+          echo "$SOURCE_SHA256  $RUNNER_TEMP/source.tar.gz" | sha256sum --check --strict -
+          curl --fail --silent --show-error --location --proto '=https' \
+            --output "$RUNNER_TEMP/recipe-schema.json" \
+            https://raw.githubusercontent.com/prefix-dev/recipe-format/7be6ba9f7085359eda3c3c18e405fe6247142cf8/schema.json
+          echo "b397b07052b42508f00b08578d48ef206570b514f0d55707ef3967648bbf52bd  $RUNNER_TEMP/recipe-schema.json" \
+            | sha256sum --check --strict -
+      - name: check every recipe against the release manifest and the archive
+        run: |
+          set -euo pipefail
+          python scripts/check-packaging-recipes.py --self-test
+          python scripts/check-packaging-recipes.py --archive "$RUNNER_TEMP/source.tar.gz" \
+            --conda-schema "$RUNNER_TEMP/recipe-schema.json"
+      - name: run the self-tests of the staging scripts and the recipe harnesses
+        run: |
+          set -euo pipefail
+          python distribution/artifacthub/compose-index.py --self-test
+          python distribution/jsr/stage-jsr-package.py --self-test
+          python scripts/stage-glama-package.py --self-test
+          sh distribution/snap/test-launcher.sh
+          tclsh distribution/macports/test-portfile.tcl
+      - name: shellcheck the shell recipes and scripts
+        run: |
+          set -euo pipefail
+          # Recipe files set variables their build tool reads (SC2034) and read variables it sets
+          # (SC2154); makepkg runs each function with errexit, so a failed cd stops it (SC2164).
+          shellcheck -s sh -e SC2034,SC2154 distribution/alpine/APKBUILD
+          shellcheck -s bash -e SC2034,SC2154,SC2164 \
+            distribution/msys2/mingw-w64-qrcode-barcode-scanner/PKGBUILD
+          shellcheck -s bash -e SC2034,SC2154 distribution/termux/qrcode-barcode-scanner/build.sh
+          shellcheck distribution/ppa/prepare-source.sh distribution/ppa/debian/tests/scan-mixed-fixture \
+            distribution/snap/launcher/qrscan-launcher distribution/snap/test-launcher.sh \
+            distribution/conda-forge/recipes/qrcode-barcode-scanner-cli/test-scan.sh
+      - name: actionlint the packaging workflows
+        run: |
+          "$RUNNER_TEMP/actionlint" .github/workflows/integration-packaging-lint.yml \
+            .github/workflows/integration-snap.yml .github/workflows/integration-glama.yml
+      - name: read the FreeBSD port with bmake
+        run: |
+          set -euo pipefail
+          # bsd.port.mk is the ports tree's; this stand-in defines only what the Makefile reads.
+          # -m replaces the system makefile folder, so it also needs an empty sys.mk.
+          stub="$RUNNER_TEMP/freebsd-mk"
+          mkdir -p "$stub"
+          : >"$stub/sys.mk"
+          printf '%s\n' 'EXTRACT_SUFX?=.tar.gz' 'GREP?=grep' 'WRKDIR?=/wrkdir' \
+            'CARGO_TARGET_DIR?=/wrkdir/target' 'all:' >"$stub/bsd.port.mk"
+          cd distribution/freebsd/graphics/qrcode-barcode-scanner
+          # Portable bmake prints a value unexpanded with -V; -v expands it, as FreeBSD make does.
+          expect() {
+            got=$(bmake -m "$stub" -v "$1")
+            printf '%s = %s\n' "$1" "$got"
+            [ "$got" = "$2" ] || { echo "expected $1 = $2" >&2; return 1; }
+          }
+          expect PORTNAME qrcode-barcode-scanner
+          expect DISTVERSION 0.11.0
+          expect DISTFILES qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
+          expect MASTER_SITES https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0/
+          expect LICENSE AGPLv3+
+          expect USES cargo
+          expect CARGO_BUILD_ARGS '--package qrcode-barcode-scanner-cli'
+          crates=$(bmake -m "$stub" -v CARGO_CRATES | wc -w)
+          echo "CARGO_CRATES: $crates crates"
+          test "$crates" -eq 263
+          bmake -m "$stub" -n post-test
+
+  alpine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: apkbuild-lint, then fetch and verify the source with abuild
+        run: |
+          set -euo pipefail
+          docker run -d --name alpine -v "$PWD/distribution/alpine:/recipe:ro" \
+            alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f \
+            sleep infinity
+          docker exec alpine apk add --no-cache abuild atools
+          docker exec alpine cp -R /recipe /work
+          docker exec -w /work alpine apkbuild-lint APKBUILD
+          docker exec -w /work alpine abuild -F sanitycheck
+          docker exec -w /work alpine abuild -F fetch verify
+          docker rm -f alpine
+
+  opensuse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: expand the spec with the cargo macros and rpmlint it
+        run: |
+          set -euo pipefail
+          docker run -d --name obs -v "$PWD/distribution/obs:/recipe:ro" \
+            opensuse/tumbleweed@sha256:873ddd8d2a548bbd38c9d8485bd710ab6d17d013cacb38a252005f634b3ab187 \
+            sleep infinity
+          docker exec obs zypper --non-interactive install --no-recommends rpm-build rpmlint \
+            cargo-packaging libxml2-tools
+          docker exec obs rpmspec -P /recipe/qrcode-barcode-scanner.spec | tee expanded.spec
+          grep -qE '^Version: +0\.11\.0$' expanded.spec
+          grep -qE '^License: +AGPL-3\.0-or-later' expanded.spec
+          docker exec obs rpmlint /recipe/qrcode-barcode-scanner.spec
+          docker exec obs xmllint --noout /recipe/_service
+          docker rm -f obs
+
+  nix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: parse and evaluate the derivation against nixpkgs, and fetch its crates
+        run: |
+          set -euo pipefail
+          docker run -d --name nix -v "$PWD/distribution/nix:/recipe:ro" \
+            nixos/nix:2.28.4@sha256:85169a7ff4ac6928b70b15ced20c74770e07e8fbc7f97e92f64c1fca47ea9486 \
+            sleep infinity
+          docker exec nix nix-instantiate --parse /recipe/package.nix >/dev/null
+          attribute() {
+            docker exec nix nix-instantiate --eval --strict --json /recipe/ci.nix -A "$1"
+          }
+          test "$(attribute pname)" = '"qrcode-barcode-scanner"'
+          test "$(attribute version)" = '"0.11.0"'
+          test "$(attribute meta.license.spdxId)" = '"AGPL-3.0-or-later"'
+          test "$(attribute meta.mainProgram)" = '"qrscan"'
+          docker exec nix nix-instantiate /recipe/ci.nix
+          # Fetching the crates downloads them and computes the vendor hash; nothing is compiled.
+          # With the lib.fakeHash placeholder this fails and prints the hash for cargoHash; with the
+          # recorded hash it must succeed.
+          status=0
+          docker exec nix nix-build --option sandbox false --no-out-link /recipe/ci.nix -A cargoDeps \
+            >cargo-deps.log 2>&1 || status=$?
+          tail -n 20 cargo-deps.log
+          if grep -qF 'cargoHash = lib.fakeHash;' distribution/nix/package.nix; then
+            grep -E 'got: +sha256-' cargo-deps.log
+          else
+            test "$status" -eq 0
+          fi
+          docker rm -f nix
+
+  ppa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: prepare the unsigned noble source package and lintian it
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cargo-1.91 debhelper devscripts \
+            dpkg-dev lintian xz-utils
+          PATH="/usr/lib/rust-1.91/bin:$PATH" sh distribution/ppa/prepare-source.sh noble "$RUNNER_TEMP/ppa"
+          ls -l "$RUNNER_TEMP/ppa"
+          # The clean of the source build must keep every Cargo.toml.orig that the vendored
+          # checksums list, or Launchpad's offline build refuses the vendored crates.
+          expected=$(tar -tJf "$RUNNER_TEMP/ppa/qrcode-barcode-scanner_0.11.0.orig-vendor.tar.xz" \
+            | grep -c '/Cargo.toml.orig$')
+          test "$(find "$RUNNER_TEMP/ppa/qrcode-barcode-scanner-0.11.0/vendor" -name Cargo.toml.orig | wc -l)" \
+            -eq "$expected"
+          lintian --fail-on error --info "$RUNNER_TEMP/ppa/qrcode-barcode-scanner_0.11.0-1~ppa1~ubuntu24.04.1_source.changes"
+
+  termux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: run the termux-packages build script linter
+        run: |
+          set -euo pipefail
+          tree="$RUNNER_TEMP/termux-packages"
+          git init --quiet "$tree"
+          git -C "$tree" remote add origin https://github.com/termux/termux-packages
+          git -C "$tree" fetch --quiet --depth 1 --filter=blob:none origin \
+            2509fe96789c8f87254f50d1e2f24043cc5cf5f1
+          git -C "$tree" sparse-checkout set --no-cone /scripts /repo.json
+          git -C "$tree" checkout --quiet FETCH_HEAD
+          mkdir -p "$tree/packages/qrcode-barcode-scanner"
+          cp distribution/termux/qrcode-barcode-scanner/build.sh "$tree/packages/qrcode-barcode-scanner/"
+          cd "$tree"
+          ./scripts/lint-packages.sh packages/qrcode-barcode-scanner/build.sh
+
+  msys2:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      # makepkg refuses a PKGBUILD with CRLF line endings, which a Windows checkout writes by default.
+      - name: keep the line endings of the repository
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: print the source info and verify the source archive with makepkg-mingw
+        shell: C:\msys64\usr\bin\bash.exe --login -eo pipefail {0}
+        env:
+          MSYSTEM: UCRT64
+          CHERE_INVOKING: "1"
+          MINGW_ARCH: ucrt64 clang64 clangarm64
+        run: |
+          cd distribution/msys2/mingw-w64-qrcode-barcode-scanner
+          makepkg-mingw --printsrcinfo | tee SRCINFO.txt
+          grep -qF 'license = spdx:AGPL-3.0-or-later' SRCINFO.txt
+          grep -qF 'pkgver = 0.11.0' SRCINFO.txt
+          # makepkg looks for the strip of the environment before it does anything else.
+          pacman -Sy --noconfirm --needed mingw-w64-ucrt-x86_64-binutils
+          MINGW_ARCH=ucrt64 makepkg-mingw --verifysource --nodeps

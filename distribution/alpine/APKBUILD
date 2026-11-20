@@ -1,0 +1,54 @@
+# Contributor: Thibaut Melen <contact@qrcode-ai.com>
+# Maintainer: Thibaut Melen <contact@qrcode-ai.com>
+pkgname=qrcode-barcode-scanner
+pkgver=0.11.0
+pkgrel=0
+pkgdesc="Offline QR code and barcode scanner for the command line (qrscan)"
+url="https://qrcode-ai.com/en-US/qr-code-scanner/cli"
+arch="x86_64 aarch64"
+license="AGPL-3.0-or-later"
+makedepends="
+	cargo
+	cargo-auditable
+	"
+subpackages="$pkgname-doc"
+source="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v$pkgver/qrcode-barcode-scanner-cli-$pkgver-source.tar.gz"
+builddir="$srcdir/qrcode-barcode-scanner-cli-$pkgver-source"
+
+# The release archive holds the whole workspace and its Cargo.lock; only the qrscan crate is
+# built. Keep the workspace release profile: it checks integer overflow in the rxing reader, and
+# the engine catches reader panics, so never set CARGO_PROFILE_RELEASE_PANIC=abort.
+
+prepare() {
+	default_prepare
+
+	cargo fetch --target="$CTARGET" --locked
+}
+
+build() {
+	cargo auditable build --release --frozen -p qrcode-barcode-scanner-cli
+}
+
+check() {
+	cargo test --frozen -p qrcode-barcode-scanner-cli
+
+	# The mixed fixture holds a QR code and a Code 128: every profile must read both.
+	for profile in fast frame full; do
+		./target/release/qrscan --profile "$profile" --budget-ms 0 \
+			fixtures/symbology/mixed-code128-qr.png > "scan-$profile.json"
+		grep -qF '"text": "https://qrc-ai.com/76xMa"' "scan-$profile.json"
+		grep -qF '"text": "STOCK-4827"' "scan-$profile.json"
+	done
+}
+
+package() {
+	install -Dm755 target/release/qrscan -t "$pkgdir"/usr/bin/
+	install -Dm644 LICENSE LICENSING.md \
+		crates/qrcode-ai-scanner/LICENSE-APACHE-2.0 \
+		crates/qrcode-ai-scanner/THIRD-PARTY.md \
+		-t "$pkgdir"/usr/share/licenses/$pkgname/
+}
+
+sha512sums="
+b84de0d7c2a8081a76dce13386d1890d3c97602675ad6b9b6efed197ed176ce18dfa58b8917706a50d932d7f2b44b95dba59382d8f10842ed1ea88cb18035716  qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
+"

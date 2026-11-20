@@ -1,0 +1,88 @@
+# Snap Store recipe for qrscan 0.11.0. It repacks the published Linux release archives of tag
+# v0.11.0 without rebuilding them: each archive and its qrscan executable are checked against the
+# SHA-256 of the release manifest before anything is installed. Build it from this folder with
+# `snapcraft pack` on Ubuntu 24.04, or `snapcraft remote-build`; see README.md.
+name: qrcode-barcode-scanner
+title: QR Code & Barcode Scanner
+version: '0.11.0'
+summary: Offline QR code and barcode scanner for the command line
+description: |
+  qrscan reads every QR code and barcode in an image file and prints a JSON report. It works
+  offline: no account, no upload and no network access.
+
+  It reads QR Code, Micro QR, rMQR, Data Matrix, Aztec, PDF417, MaxiCode, EAN-13, EAN-8, UPC-A,
+  UPC-E, Code 128, Code 39, Code 93, Codabar, ITF, GS1 DataBar, GS1 DataBar Expanded and Telepen.
+  The report keeps the payload bytes, the position of each code and a QR scannability score.
+
+  The snap runs as `qrcode-barcode-scanner.qrscan`. It reads images in your home folder, except
+  hidden files and folders. Connect the removable-media interface to read /media and /mnt.
+
+  The 0.11.0 program is licensed AGPL-3.0-or-later. Its license texts, third-party notices and
+  source reference are in $SNAP/usr/share/doc/qrcode-barcode-scanner.
+license: AGPL-3.0-or-later
+website: https://qrcode-ai.com/en-US/qr-code-scanner/cli
+source-code: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
+issues: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues
+contact: contact@qrcode-ai.com
+base: core24
+grade: stable
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  qrscan:
+    command: bin/qrscan-launcher
+    plugs:
+      - home
+      - removable-media
+
+parts:
+  qrscan:
+    plugin: nil
+    build-packages:
+      - ca-certificates
+      - curl
+    override-pull: |
+      set -eu
+      base=https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0
+      case "$CRAFT_ARCH_BUILD_FOR" in
+        amd64)
+          triple=x86_64-unknown-linux-gnu
+          archive_sha256=b7c6669e332c7cc688228077b70d87f52154052e345992bd358aad6d6c7d3298
+          executable_sha256=77965589784699138d2b512f94067528eba552536160560daed191de824ea01c
+          ;;
+        arm64)
+          triple=aarch64-unknown-linux-gnu
+          archive_sha256=d5b5eff8ed336ef82a76865fd16e9a087afd5b1574b537747aea6d105ae7c5aa
+          executable_sha256=d010a03064011f8775fc6f0add357cbbc634366d4b96dc0b892ab2c6047b271a
+          ;;
+        *)
+          echo "qrscan 0.11.0 has no release archive for $CRAFT_ARCH_BUILD_FOR" >&2
+          exit 1
+          ;;
+      esac
+      archive="qrcode-barcode-scanner-cli-0.11.0-$triple"
+      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+        --retry 3 --output "$archive.tar.gz" "$base/$archive.tar.gz"
+      echo "$archive_sha256  $archive.tar.gz" | sha256sum --check --strict -
+      rm -rf release
+      mkdir release
+      tar -xzf "$archive.tar.gz" -C release --strip-components=1
+      echo "$executable_sha256  release/qrscan" | sha256sum --check --strict -
+      rm "$archive.tar.gz"
+    override-build: |
+      set -eu
+      install -Dm755 "$CRAFT_PART_SRC/release/qrscan" "$CRAFT_PART_INSTALL/bin/qrscan"
+      doc="$CRAFT_PART_INSTALL/usr/share/doc/qrcode-barcode-scanner"
+      for file in LICENSE LICENSE-APACHE-2.0 THIRD-PARTY.md THIRD-PARTY-LICENSES.txt \
+          COPYRIGHT-rust-std.html LICENSING.md SOURCE.md build-info.json README.md; do
+        install -Dm644 "$CRAFT_PART_SRC/release/$file" "$doc/$file"
+      done
+  launcher:
+    plugin: dump
+    source: launcher
+    organize:
+      qrscan-launcher: bin/qrscan-launcher

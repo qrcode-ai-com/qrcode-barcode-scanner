@@ -1,0 +1,6 @@
+-------------------------------------------------------------------
+Fri Nov 20 00:00:00 UTC 2026 - QR Code AI <contact@qrcode-ai.com>
+
+- Initial package of qrcode-barcode-scanner 0.11.0: the qrscan
+  command, built from the v0.11.0 release source archive with the
+  crates of its Cargo.lock vendored.

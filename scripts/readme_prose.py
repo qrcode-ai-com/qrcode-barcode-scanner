@@ -44,6 +44,14 @@ for _path in ('crates/qrcode-ai-scanner-cli', 'distribution/appimage', 'distribu
               'distribution/chocolatey', 'distribution/cli', 'distribution/debian',
               'distribution/docker', 'distribution/rpm'):
     GUIDES[f'{_path}/README.md'] = ('cli', 'command line')
+# The packaging recipes, one folder per channel.
+for _path in ('distribution/alpine', 'distribution/conda-forge', 'distribution/freebsd',
+              'distribution/macports', 'distribution/msys2', 'distribution/nix', 'distribution/obs',
+              'distribution/ppa', 'distribution/snap', 'distribution/termux'):
+    GUIDES[f'{_path}/README.md'] = ('cli', 'command line')
+GUIDES['distribution/artifacthub/README.md'] = ('docker', 'Docker')
+GUIDES['distribution/glama/README.md'] = ('mcp', 'MCP')
+GUIDES['distribution/jsr/README.md'] = ('sdk/javascript', 'JavaScript')
 
 
 def canonical_links(path):

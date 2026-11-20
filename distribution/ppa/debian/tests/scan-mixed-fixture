@@ -1,0 +1,10 @@
+#!/bin/sh
+# The installed qrscan reads the QR code and the Code 128 of the mixed fixture in every profile.
+set -eu
+for profile in fast frame full; do
+  qrscan --profile "$profile" --budget-ms 0 fixtures/symbology/mixed-code128-qr.png \
+    >"$AUTOPKGTEST_TMP/scan-$profile.json"
+  grep -qF '"text": "https://qrc-ai.com/76xMa"' "$AUTOPKGTEST_TMP/scan-$profile.json"
+  grep -qF '"text": "STOCK-4827"' "$AUTOPKGTEST_TMP/scan-$profile.json"
+  echo "ok $profile"
+done
