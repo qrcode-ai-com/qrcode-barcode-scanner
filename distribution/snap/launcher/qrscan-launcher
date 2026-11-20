@@ -1,0 +1,35 @@
+#!/bin/sh
+# Runs qrscan inside the snap. When qrscan cannot read the image (exit 2) and the path is not
+# readable from inside the confinement, it says which folders the snap can read. The exit
+# status and the output of qrscan are never changed.
+"$SNAP/bin/qrscan" "$@"
+status=$?
+[ "$status" -eq 2 ] || exit "$status"
+
+# The image is the one argument that is neither an option nor the value of an option.
+image=
+expect_value=0
+for argument in "$@"; do
+  if [ "$expect_value" -eq 1 ]; then
+    expect_value=0
+    continue
+  fi
+  case "$argument" in
+    --profile | --budget-ms | --score-skip-axes | --score-preset | --score-skip-checks | \
+      --alpha-background | --alpha-palette)
+      expect_value=1
+      ;;
+    -*) ;;
+    *) [ -n "$image" ] || image=$argument ;;
+  esac
+done
+
+if [ -n "$image" ] && [ ! -r "$image" ]; then
+  cat >&2 <<'HINT'
+qrscan (snap): this image cannot be read from inside the snap.
+The snap reads files in your home folder, except hidden files and folders.
+To read /media and /mnt, run: sudo snap connect qrcode-barcode-scanner:removable-media
+The snap has its own /tmp: copy the image into your home folder and try again.
+HINT
+fi
+exit "$status"
