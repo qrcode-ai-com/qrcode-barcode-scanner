@@ -66,11 +66,11 @@ The workflow `.github/workflows/integration-glama.yml` of the [engine repository
 
 ## Publish it
 
-The files are staged into their own repository, `qrcode-ai-com/qrcode-barcode-scanner-mcp`, because Glama reads `glama.json` and the Dockerfile at the root of a repository. The owner creates that repository and pushes it:
+The files are staged into their own repository, [`qrcode-ai-com/qrcode-barcode-scanner-mcp`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-mcp), because Glama reads `glama.json` and the Dockerfile at the root of a repository. That repository has been public since 20 November 2026. Glama does not list the server yet. To publish a new stage:
 
 1. In the engine repository, run `python3 scripts/stage-glama-package.py stage --out /tmp/qrscan-mcp-glama`, then `python3 scripts/stage-glama-package.py verify /tmp/qrscan-mcp-glama`.
-2. Create the public repository `qrcode-ai-com/qrcode-barcode-scanner-mcp` and push the staged folder to its `main` branch.
-3. On glama.ai, signed in with the GitHub account `ThibautMelen`, add the server from that repository and claim it. Glama builds the Dockerfile and lists the tools it reads.
+2. Copy the staged folder over a clean checkout of `qrcode-ai-com/qrcode-barcode-scanner-mcp` and push it to its `main` branch.
+3. On glama.ai, signed in with the GitHub account `ThibautMelen`, add the server from that repository and claim it. This is needed only the first time. Glama builds the Dockerfile and lists the tools it reads.
 
 ## How it works
 

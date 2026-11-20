@@ -1,6 +1,7 @@
 version: 0.1.0
 type: plugin
 author: qrcode-ai-com
+contact: contact@qrcode-ai.com
 name: qrcode-barcode-scanner
 label:
   en_US: QR Code & Barcode Scanner

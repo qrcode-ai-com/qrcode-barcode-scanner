@@ -44,7 +44,7 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barc
 
 To make a test image, encode a known text with the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), save the picture in your vault and embed it in a note. The plugin should give back exactly the text you encoded, leading zeros included.
 
-The plugin is not listed in Obsidian's community plugins yet. Until it is, build it from this folder and install it by hand, as written below.
+Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-obsidian`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian), has been public since 20 November 2026, and its tests pass there. The plugin is not listed in Obsidian's community plugins yet. Until it is, build it from this folder and install it by hand, as written below.
 
 ## How it works
 

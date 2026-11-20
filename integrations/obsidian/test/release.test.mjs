@@ -29,6 +29,9 @@ test('manifest.json follows the community directory rules', () => {
   assert.doesNotMatch(manifest.description, /^(this|a) plugin|obsidian/i);
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
   assert.equal(manifest.isDesktopOnly, false);
+  // The directory review follows authorUrl: an HTTPS page of the author, never a repository.
+  assert.match(manifest.authorUrl, /^https:\/\/[^/]+\//);
+  assert.doesNotMatch(manifest.authorUrl, /github\.com\/[^/]+\/[^/]+/);
 });
 
 test('the plugin version is the same in manifest.json, package.json and versions.json', () => {

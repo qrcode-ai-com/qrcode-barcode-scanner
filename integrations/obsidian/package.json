@@ -1,11 +1,11 @@
 {
   "name": "qrcode-barcode-scanner-obsidian",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Obsidian plugin that reads QR codes and barcodes in vault images with the QR Code & Barcode Scanner WASM engine",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/obsidian",
+  "homepage": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-obsidian",
   "repository": {
     "type": "git",
     "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",

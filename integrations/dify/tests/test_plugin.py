@@ -91,6 +91,9 @@ def test_the_manifest_meets_the_daemon_and_marketplace_rules():
     assert (PLUGIN_ROOT / manifest["privacy"]).is_file()
     assert (PLUGIN_ROOT / "_assets" / manifest["icon"]).is_file()
     assert manifest["repo"] == "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-dify"
+    # The marketplace validator (dify-marketplace-toolkit, checks/manifest.py) blocks a package
+    # whose manifest has no contact email.
+    assert re.fullmatch(r"[^@\s]+@[^@\s]+\.[a-z]+", manifest["contact"])
     assert "permission" not in manifest["resource"], "the plugin calls back into nothing in Dify"
     for path in manifest["plugins"]["tools"]:
         assert (PLUGIN_ROOT / path).is_file()

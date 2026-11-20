@@ -322,6 +322,31 @@ shows how to scan an image locally using the verified index digest. Both
 pulled anonymously and ran the exact-content regression checks. The public
 0.10 GHCR and Docker Hub images and 0.1 agent archives remain available below.
 
+## Recipes prepared for other package managers
+
+These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
+SHA-256 of its checksum list, and its checks run in this repository. None of these destinations
+serves the scanner yet. Each recipe README says what its registry still needs, usually an account
+or a review in that registry.
+
+| Destination | Recipe | Checked here |
+| --- | --- | --- |
+| Snap Store | [snap](snap/README.md) | packed, installed and judged on amd64 and arm64 |
+| Artifact Hub | [artifacthub](artifacthub/README.md) | index composed against the pinned GHCR digests |
+| JSR | [jsr](jsr/README.md) | `jsr publish --dry-run` and a Deno scan of the staged module |
+| Glama | [glama](glama/README.md) | MCP container built and judged offline on amd64 and arm64 |
+| conda-forge | [conda-forge](conda-forge/README.md) | recipe schema and the test script against the published wheel |
+| Nixpkgs | [nix](nix/README.md) | evaluated against nixos-unstable, with the crate hash recorded |
+| openSUSE Build Service | [obs](obs/README.md) | `rpmspec`, `rpmlint` and the service file |
+| Launchpad PPA | [ppa](ppa/README.md) | source package built with `debuild -S`, then `lintian` |
+| Alpine Linux | [alpine](alpine/README.md) | `apkbuild-lint`, `abuild sanitycheck` and `abuild fetch verify` |
+| Termux User Repository | [termux](termux/README.md) | the termux-packages linter |
+| MacPorts | [macports](macports/README.md) | Portfile tests, with the crate list equal to `Cargo.lock` |
+| FreeBSD ports | [freebsd](freebsd/README.md) | crates and distinfo equal to `Cargo.lock`, port variables read by `bmake` |
+| MSYS2 | [msys2](msys2/README.md) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
+
+No Rust build of these recipes ran here: each registry compiles the package in its own builders.
+
 <details>
 <summary>Historical installations: agent 0.1.0 and engine 0.10.0</summary>
 

@@ -46,9 +46,10 @@ To make a test image with a known value, use the [QR code generator](https://qrc
 
 ## Status
 
-The node is built and tested in the engine repository. It is not on the Comfy Registry yet, and
-its own repository, `qrcode-ai-com/qrcode-barcode-scanner-comfyui`, is not created yet. Until
-both exist, the commands below that name them do not work.
+The node is built and tested in the engine repository. Its own repository,
+[`qrcode-ai-com/qrcode-barcode-scanner-comfyui`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-comfyui),
+has been public since 20 November 2026, and its tests pass there. The node is not on the Comfy
+Registry yet: until it is, the commands below that install it from the registry do not work.
 
 ## Install
 
