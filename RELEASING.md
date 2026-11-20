@@ -636,6 +636,12 @@ this packaging step does not establish remote SwiftPM consumer readiness.
 - JitPack builds the Android AAR from any ref on demand, a branch snapshot
   included, outside Actions (jitpack.yml: Rust 1.88.0, locked Cargo builds): neither
   the tag guard nor the inspection applies to it.
+- `pages.yml › deploy` publishes the browser example `examples/web-vite` on
+  GitHub Pages from `main`: no registry, no release. It holds `pages: write`
+  and `id-token: write` in one pinned `actions/deploy-pages` step, with no
+  checkout, in the `github-pages` environment (keep its deployment rule at
+  `main`); `verify` then scans through the page at its public address.
+  `scripts/check-publish-guards.py` holds the workflow to that shape.
 
 **Accepted residuals**, each with its reason:
 - `pypa/gh-action-pypi-publish` is pinned by commit, but at run time it pulls

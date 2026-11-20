@@ -131,6 +131,17 @@ mint registry tokens). Every privileged job must:
                adapter. It requires its separate protected environment,
                canonical repository, read-only preflight and the exact
                rechecking helper. No other job inherits this exception.
+  Pages        pages.yml > deploy serves the browser example examples/web-vite
+               on GitHub Pages: no registry, no release. It deploys from main
+               of the canonical repository, after build, in the github-pages
+               environment, with exactly pages write and id-token write, as
+               one pinned actions/deploy-pages step without inputs and no
+               checkout, so no code of this repository holds that token and
+               no versions gate applies. The workflow runs on a push to main
+               or a dispatch only. build holds contents read and pages read,
+               restores no cache, installs from the lockfile and uploads
+               examples/web-vite/dist and nothing else; verify reads only.
+               No other job inherits this exception.
   concurrency  join publish-${{ github.workflow }}-${{ github.ref }}, never
                cancelling, so a re-run on the tag waits instead of racing
 
@@ -253,6 +264,13 @@ MCP_REGISTRY_CONTEXT = (MCP_REGISTRY_GUARD + " && github.event_name == 'workflow
                         " && github.repository_id == '1126991539'")
 MCP_REGISTRY_INSPECT_RUN = "python3 scripts/mcp-registry-publish.py inspect"
 MCP_REGISTRY_PUBLISH_RUN = "python3 scripts/mcp-registry-publish.py publish"
+# GitHub Pages serves the browser example: deploy holds the Pages token in one pinned step.
+PAGES_WORKFLOW = "pages.yml"
+PAGES_JOB = (PAGES_WORKFLOW, "deploy")
+PAGES_GUARD = "github.ref == 'refs/heads/main'"
+PAGES_CONTEXT = PAGES_GUARD + " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'"
+PAGES_DIST = "examples/web-vite/dist"
+PAGES_URL = "${{ steps.deployment.outputs.page_url }}"
 GUARD = "startsWith(github.ref, 'refs/tags/v')"
 CONCURRENCY = "publish-${{ github.workflow }}-${{ github.ref }}"
 OCI_JOB = ("oci-publish.yml", "publish")
@@ -440,6 +458,7 @@ INSPECTION = {
     MCP_JOB: "pack",
     MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
+    PAGES_JOB: "build",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
     ("npm-publish.yml", "publish-wasm"): "build-wasm",
@@ -1719,6 +1738,73 @@ def _mcp_registry_contract_problems(wf: dict) -> list:
     return out
 
 
+def _pages_contract_problems(wf: dict) -> list:
+    """Bind the Pages exception to its three jobs: build uploads the example, deploy holds the
+    token in one pinned step, verify reads."""
+    workflow, deploy_name = PAGES_JOB
+    out = []
+
+    def fail(job, message, step=-1):
+        out.append(Finding(workflow, job, "pages-contract", message, step))
+
+    on = wf.get("on")
+    push = on.get("push") if isinstance(on, dict) else None
+    if not isinstance(on, dict) or set(on) != {"push", "workflow_dispatch"} or on["workflow_dispatch"] is not None \
+            or not isinstance(push, dict) or set(push) - {"branches", "paths"} or push.get("branches") != ["main"]:
+        fail("(workflow)", "run on a push to main or a dispatch, with no inputs, and on no other event")
+    jobs = wf["jobs"]
+    if set(jobs) != {"build", deploy_name, "verify"}:
+        fail("(workflow)", f"require exactly build, {deploy_name} and verify, got {sorted(jobs)}")
+    deploy = jobs.get(deploy_name) if isinstance(jobs.get(deploy_name), dict) else {}
+    expected = {
+        "needs": ["build"],
+        "if": PAGES_CONTEXT,
+        "environment": {"name": "github-pages", "url": PAGES_URL},
+        "outputs": {"page_url": PAGES_URL},
+    }
+    shape = {key: deploy.get(key) for key in expected}
+    if shape != expected or set(deploy) - set(expected) - {"name", "runs-on", "timeout-minutes", "concurrency",
+                                                          "permissions", "steps"}:
+        fail(deploy_name, f"deploy needs build alone, from canonical main ({PAGES_CONTEXT}), into github-pages, "
+                          "with no key but name, runs-on, timeout-minutes, concurrency, permissions and steps")
+    steps = deploy.get("steps") if isinstance(deploy.get("steps"), list) else []
+    step = steps[0] if len(steps) == 1 and isinstance(steps[0], dict) else {}
+    if set(step) - {"name"} != {"id", "uses"} or step.get("id") != "deployment" or \
+            _uses(step)[0] != "actions/deploy-pages":
+        fail(deploy_name, "one step, `id: deployment` and actions/deploy-pages with no inputs: no checkout, no "
+                          "other code holds the Pages token, and the artifact deployed is build's")
+    build = jobs.get("build") if isinstance(jobs.get("build"), dict) else {}
+    if build.get("permissions") != {"contents": "read", "pages": "read"}:
+        fail("build", f"permissions {build.get('permissions')!r}: want exactly contents read and pages read")
+    uploads = []
+    for i, step in enumerate(_steps(build)):
+        action, ref = _uses(step)
+        given = step.get("with") if isinstance(step.get("with"), dict) else {}
+        if step.get("uses") is not None and not SHA.fullmatch(ref):
+            fail("build", f"{step.get('uses')} is not pinned by commit SHA", i)
+        if action == "actions/checkout" and str(given.get("persist-credentials")) != "false":
+            fail("build", "actions/checkout without `persist-credentials: false`", i)
+        if what := _cache(step):
+            fail("build", f"{what}: deploy serves what this job builds", i)
+        if action == "actions/upload-pages-artifact":
+            uploads.append(i)
+            if given != {"path": PAGES_DIST}:
+                fail("build", f"upload {PAGES_DIST} and nothing else, under the default name: got {given!r}", i)
+        elif action == "actions/upload-artifact":
+            fail("build", "the Pages artifact is the one upload of this job", i)
+        if "${{" in str(step.get("run") or ""):
+            fail("build", "a `${{ }}` interpolated into a script: pass the value through env", i)
+        for line in _code_lines(step.get("run")):
+            if hit := _unlocked(line):
+                fail("build", hit[1], i)
+    if len(uploads) != 1:
+        fail("build", f"one actions/upload-pages-artifact step, got {len(uploads)}")
+    verify = jobs.get("verify") if isinstance(jobs.get("verify"), dict) else {}
+    if "deploy" not in _needs(verify) or verify.get("permissions") != {"contents": "read"}:
+        fail("verify", "verify needs deploy and reads only (contents read)")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1733,7 +1819,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     mcp = (workflow, job_id) == MCP_JOB
     dotnet = (workflow, job_id) == DOTNET_JOB
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
-    guard = MCP_REGISTRY_GUARD if mcp_registry else MCP_GUARD if mcp else OCI_GUARD if oci else GUARD
+    pages = (workflow, job_id) == PAGES_JOB
+    guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
+             else OCI_GUARD if oci else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -1749,8 +1837,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag("needs", f"needs {needs}: must include {consumer!r}, the clean installed-package gate")
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
-    allowed_environments = ({"mcp-registry"} if mcp_registry else {"npm-agents"} if mcp
-                            else {"nuget"} if dotnet else {"container"} if oci else ENVIRONMENTS)
+    allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
+                            else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"container"} if oci
+                            else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1764,6 +1853,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif mcp_registry or dotnet:
         if perms != {"contents": "read", "id-token": "write"}:
             flag("permissions", "this publisher needs exactly contents read and id-token write")
+    elif pages:
+        if perms != {"pages": "write", "id-token": "write"}:
+            flag("permissions", "the Pages deployment needs exactly pages write and id-token write")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -1848,7 +1940,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
                      else OCI_GATE_RUN if oci else GATE_RUN)
-    if set(gate) - {"run", "name", "working-directory"} or str(gate.get("run", "")).strip() != required_gate:
+    # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
+    if not pages and (set(gate) - {"run", "name", "working-directory"} or
+                      str(gate.get("run", "")).strip() != required_gate):
         flag("gate", f"the first step after the checkout must be exactly `{required_gate}`, with no other key")
     first_publish = min((i for i, _ in publishing), default=len(steps))
     if oci:
@@ -1918,6 +2012,8 @@ def check(workflows: pathlib.Path) -> tuple:
     for name, wf in load_workflows(workflows):
         if name == MCP_REGISTRY_JOB[0]:
             findings += _mcp_registry_contract_problems(wf)
+        if name == PAGES_WORKFLOW:
+            findings += _pages_contract_problems(wf)
         top = wf.get("permissions")
         if not (isinstance(top, dict) and not _write_permissions(top)) and top != "read-all":
             findings.append(Finding(name, "(workflow)", "permissions",
@@ -2373,6 +2469,54 @@ MUTATIONS = (
     ("Official MCP Registry replaces the rechecking helper", P,
      [(MCP_REGISTRY_JOB[0], MCP_REGISTRY_PUBLISH_RUN, "mcp-publisher publish server.json")], {}, 1,
      "mcp-registry-publish.yml › publish [gate]"),
+    # GitHub Pages serves the browser example from main: one pinned step holds its token.
+    ("Pages deploys from any branch", P,
+     [(PAGES_WORKFLOW, f"    if: {PAGES_CONTEXT}\n", "    if: github.repository != ''\n")], {}, 1,
+     "pages.yml › deploy [guard]"),
+    ("Pages deploys from a fork too", P, [(PAGES_WORKFLOW, f"    if: {PAGES_CONTEXT}\n", f"    if: {PAGES_GUARD}\n")],
+     {}, 1, "pages.yml › deploy [pages-contract]"),
+    ("Pages runs on pull requests", P,
+     [(PAGES_WORKFLOW, "on:\n  workflow_dispatch:\n", "on:\n  workflow_dispatch:\n  pull_request:\n")], {}, 1,
+     "pages.yml › (workflow) [pages-contract]"),
+    ("Pages runs on a push to another branch", P,
+     [(PAGES_WORKFLOW, "    branches: [main]\n", "    branches: [main, next]\n")], {}, 1,
+     "pages.yml › (workflow) [pages-contract]"),
+    ("Pages deploy grants contents write", P,
+     [(PAGES_WORKFLOW, "      pages: write\n", "      contents: write\n      pages: write\n")], {}, 1,
+     "pages.yml › deploy [permissions]"),
+    ("Pages deploy outside github-pages", P, [(PAGES_WORKFLOW, "      name: github-pages\n", "      name: release\n")],
+     {}, 1, "pages.yml › deploy [environment]"),
+    ("Pages deploy without the build", P, [(PAGES_WORKFLOW, "    needs: [build]\n", "")], {}, 1,
+     "pages.yml › deploy [needs]"),
+    ("Pages deploy checks out the repository", P,
+     [(PAGES_WORKFLOW, "    steps:\n      - id: deployment\n",
+       f"    steps:\n      - uses: {CHECKOUT}\n        with:\n          persist-credentials: false\n"
+       "      - id: deployment\n")], {}, 1, "pages.yml › deploy [pages-contract]"),
+    ("Pages deploy picks another artifact", P,
+     [(PAGES_WORKFLOW, "# v5.0.1\n\n  verify:\n",
+       "# v5.0.1\n        with:\n          artifact_name: other\n\n  verify:\n")], {}, 1,
+     "pages.yml › deploy [pages-contract]"),
+    ("Pages deploy on a floating tag", P,
+     [(PAGES_WORKFLOW, "        uses: actions/deploy-pages@", "        uses: actions/deploy-pages@v5 #")], {}, 1,
+     "pages.yml › deploy [unpinned-action]"),
+    ("Pages deploy cancels in progress", P,
+     [(PAGES_WORKFLOW, "-${{ github.ref }}\n      cancel-in-progress: false\n",
+       "-${{ github.ref }}\n      cancel-in-progress: true\n")], {}, 1, "pages.yml › deploy [concurrency]"),
+    ("Pages build writes to Pages", P, [(PAGES_WORKFLOW, "      pages: read\n", "      pages: write\n")], {}, 1,
+     "pages.yml › build [pages-contract]"),
+    ("Pages build restores the npm cache", P,
+     [(PAGES_WORKFLOW, "          package-manager-cache: false\n", "          package-manager-cache: true\n")], {}, 1,
+     "pages.yml › build [pages-contract] (step 2)"),
+    ("Pages build installs without the lockfile", P,
+     [(PAGES_WORKFLOW, "          npm ci\n          npm run build", "          npm install\n          npm run build")],
+     {}, 1, "pages.yml › build [pages-contract] (step 6)"),
+    ("Pages build uploads the whole example", P,
+     [(PAGES_WORKFLOW, f"          path: {PAGES_DIST}\n", "          path: examples/web-vite\n")], {}, 1,
+     "pages.yml › build [pages-contract] (step 7)"),
+    ("Pages verify writes", P,
+     [(PAGES_WORKFLOW, "      contents: read\n    steps:\n", "      contents: write\n    steps:\n")], {}, 1,
+     "pages.yml › verify [pages-contract]"),
+    ("pages.yml as reviewed", P, [], {}, 0, "pages.yml › deploy, "),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),
