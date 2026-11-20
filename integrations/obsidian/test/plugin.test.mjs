@@ -231,3 +231,28 @@ test('the settings tab saves the chosen profile and format', async () => {
   await dropdowns[1].select('callout');
   assert.deepEqual(plugin.saved, { profile: 'fast', format: 'callout' });
 });
+
+test('the settings tab declares the same settings for the settings search of Obsidian 1.13', async () => {
+  const { plugin } = await setUp({ data: { profile: 'frame', format: 'callout' } });
+  const [tab] = plugin.settingTabs;
+  const definitions = tab.getSettingDefinitions();
+  assert.deepEqual(definitions.map(({ name, control }) => [name, control.type, control.key, control.options, control.defaultValue]), [
+    ['Scan profile', 'dropdown', 'profile', { full: 'Full', fast: 'Fast', frame: 'Frame' }, 'full'],
+    ['Inserted text', 'dropdown', 'format', { list: 'List', callout: 'Callout' }, 'list'],
+  ]);
+  assert.deepEqual(definitions.map(({ desc }) => typeof desc === 'string' && desc.length > 0), [true, true]);
+  assert.deepEqual(definitions.map(({ control }) => tab.getControlValue(control.key)), ['frame', 'callout']);
+
+  // display(), which Obsidian before 1.13 calls, shows the same names, options and values.
+  tab.display();
+  const dropdowns = tab.containerEl.children.flatMap((child) => child.dropdowns);
+  assert.deepEqual(dropdowns.map((dropdown) => [dropdown.name, dropdown.options, dropdown.value]),
+    definitions.map(({ name, control }) => [name, control.options, tab.getControlValue(control.key)]));
+
+  await tab.setControlValue('profile', 'fast');
+  await tab.setControlValue('format', 'list');
+  assert.deepEqual(plugin.saved, { profile: 'fast', format: 'list' });
+  assert.deepEqual(plugin.settings, { profile: 'fast', format: 'list' });
+  await tab.setControlValue('profile', 'nonsense');
+  assert.deepEqual(plugin.saved, { profile: 'full', format: 'list' }, 'an unknown value is saved as the default');
+});
