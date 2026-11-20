@@ -1,0 +1,32 @@
+version: 0.1.0
+type: plugin
+author: qrcode-ai-com
+name: qrcode-barcode-scanner
+label:
+  en_US: QR Code & Barcode Scanner
+description:
+  en_US: Read the QR codes and barcodes of an image inside the plugin runtime, with the open-source QR Code & Barcode Scanner engine. Returns the decoded texts and the engine's JSON report.
+icon: icon.svg
+resource:
+  memory: 536870912
+plugins:
+  tools:
+    - provider/qrcode_barcode_scanner.yaml
+meta:
+  version: 0.0.1
+  arch:
+    - amd64
+    - arm64
+  runner:
+    language: python
+    version: "3.12"
+    entrypoint: main
+  minimum_dify_version: null
+created_at: 2026-11-20T00:00:00+00:00
+privacy: PRIVACY.md
+repo: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-dify
+tags:
+  - image
+  - utilities
+  - productivity
+verified: false

@@ -1,0 +1,290 @@
+# Draft of the Dify Marketplace template "Uploaded Image QR and Barcode Reader" (destination
+# expansion-26). Prepared only: it has not been imported into a Dify instance. It uses the tool of
+# this plugin, qrcode-ai-com/qrcode-barcode-scanner, and no model. TEMPLATE.md says how it becomes
+# the submitted template once the plugin is on the Marketplace.
+app:
+  description: 'Upload an image and read its QR codes and barcodes with the QR Code & Barcode Scanner plugin. Three branches: codes found, no code, and a file the scanner cannot read. No model key needed.'
+  icon: 🔎
+  icon_background: '#E0EAFF'
+  mode: workflow
+  name: Uploaded Image QR and Barcode Reader
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: tool
+      id: start-source-scan-target
+      source: start
+      sourceHandle: source
+      target: scan
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: tool
+        targetType: if-else
+      id: scan-source-found-target
+      source: scan
+      sourceHandle: source
+      target: found
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: tool
+        targetType: end
+      id: scan-fail-branch-unreadable-target
+      source: scan
+      sourceHandle: fail-branch
+      target: unreadable
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: end
+      id: found-true-codes-target
+      source: found
+      sourceHandle: 'true'
+      target: codes
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: end
+      id: found-false-empty-target
+      source: found
+      sourceHandle: 'false'
+      target: empty
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: The image to read.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - image
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          label: Image
+          options: []
+          required: true
+          type: file
+          variable: image
+      height: 90
+      id: start
+      position:
+        x: 30
+        y: 260
+      positionAbsolute:
+        x: 30
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Reads every QR code and barcode of the image inside the plugin runtime.
+        error_strategy: fail-branch
+        provider_id: qrcode-ai-com/qrcode-barcode-scanner/qrcode_barcode_scanner
+        provider_name: qrcode-ai-com/qrcode-barcode-scanner/qrcode_barcode_scanner
+        provider_type: builtin
+        selected: false
+        title: Scan QR codes and barcodes
+        tool_configurations:
+          budget_ms:
+            type: constant
+            value: 0
+          profile:
+            type: constant
+            value: fast
+        tool_label: Scan QR codes and barcodes
+        tool_name: scan_image
+        tool_node_version: '2'
+        tool_parameters:
+          image:
+            type: variable
+            value:
+            - start
+            - image
+        type: tool
+      height: 116
+      id: scan
+      position:
+        x: 334
+        y: 260
+      positionAbsolute:
+        x: 334
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: '>'
+            id: found-at-least-one
+            value: '0'
+            varType: number
+            variable_selector:
+            - scan
+            - count
+          id: 'true'
+          logical_operator: and
+        desc: At least one code was read.
+        selected: false
+        title: Codes found?
+        type: if-else
+      height: 126
+      id: found
+      position:
+        x: 638
+        y: 200
+      positionAbsolute:
+        x: 638
+        y: 200
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: The decoded texts, their number and the engine's report.
+        outputs:
+        - value_selector:
+          - scan
+          - texts
+          value_type: array[string]
+          variable: texts
+        - value_selector:
+          - scan
+          - count
+          value_type: number
+          variable: count
+        - value_selector:
+          - scan
+          - text
+          value_type: string
+          variable: summary
+        - value_selector:
+          - scan
+          - json
+          value_type: array[object]
+          variable: report
+        selected: false
+        title: Codes
+        type: end
+      height: 90
+      id: codes
+      position:
+        x: 942
+        y: 140
+      positionAbsolute:
+        x: 942
+        y: 140
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: No code in the image. When complete is false, the time budget cut the scan.
+        outputs:
+        - value_selector:
+          - scan
+          - text
+          value_type: string
+          variable: summary
+        - value_selector:
+          - scan
+          - complete
+          value_type: boolean
+          variable: complete
+        selected: false
+        title: No code found
+        type: end
+      height: 90
+      id: empty
+      position:
+        x: 942
+        y: 300
+      positionAbsolute:
+        x: 942
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: The scanner refused the file, for instance one that is not an image or is too large.
+        outputs:
+        - value_selector:
+          - scan
+          - error_message
+          value_type: string
+          variable: error
+        selected: false
+        title: File not readable
+        type: end
+      height: 90
+      id: unreadable
+      position:
+        x: 638
+        y: 420
+      positionAbsolute:
+        x: 638
+        y: 420
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8
