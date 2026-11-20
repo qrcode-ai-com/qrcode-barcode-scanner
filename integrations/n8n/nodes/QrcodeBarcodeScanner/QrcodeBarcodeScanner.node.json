@@ -1,0 +1,13 @@
+{
+	"node": "@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner.qrcodeBarcodeScanner",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Utility"],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/n8n#readme"
+			}
+		]
+	}
+}
