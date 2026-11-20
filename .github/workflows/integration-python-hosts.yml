@@ -1,0 +1,231 @@
+name: Integrations · Python hosts
+
+# The ComfyUI node, the Dify tool plugin, the Apify actor and the napari plugin under integrations/,
+# and the Streamlit app under examples/streamlit, all on the published engine wheel
+# qrcode-barcode-scanner 0.11.0. Each runs its own tests, which read the mixed fixture in the fast,
+# frame and full profiles through the integration's own entry point; the destination acceptance
+# driver judges those three reports, then the scanner is removed and must be gone. The ComfyUI node
+# and the Dify plugin are also staged as the tree of their own repository, which must verify and
+# pass its own tests. Nothing is built from the engine's Rust source, no host application runs
+# (ComfyUI, Dify, the Apify platform, a napari window, Streamlit Community Cloud) and nothing is
+# published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-python-hosts.yml
+      - integrations/comfyui/**
+      - integrations/dify/**
+      - integrations/apify/**
+      - integrations/napari/**
+      - examples/streamlit/**
+      - scripts/satellite_stage.py
+      - scripts/stage-comfyui-satellite.py
+      - scripts/stage-dify-satellite.py
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - fixtures/clean/gen_v5_q.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-python-hosts-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The engine wheel every integration pins, and the version its reports must name.
+  ENGINE_VERSION: 0.11.0
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  hosts:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ComfyUI provides torch, NumPy and Pillow; the tests install the CPU build of torch.
+          - name: ComfyUI node
+            folder: integrations/comfyui
+            install: >-
+              python -m pip install -r integrations/comfyui/requirements.txt &&
+              python -m pip install -r integrations/comfyui/tests/requirements.txt
+              --extra-index-url https://download.pytorch.org/whl/cpu
+            identifier: qrcode-barcode-scanner-nodes@0.1.0
+            uninstall: python -m pip uninstall -y qrcode-barcode-scanner
+            gone: python -c "import qrcode_barcode_scanner"
+          # The Dify plugin runtime is Python 3.12.
+          - name: Dify tool plugin
+            folder: integrations/dify
+            install: >-
+              python -m pip install -r integrations/dify/requirements.txt
+              -r integrations/dify/tests/requirements.txt
+            identifier: qrcode-ai-com/qrcode-barcode-scanner@0.1.0
+            uninstall: python -m pip uninstall -y qrcode-barcode-scanner
+            gone: python -c "import qrcode_barcode_scanner"
+          # The actor's image is apify/actor-python:3.12; its main runs here without Docker.
+          - name: Apify actor
+            folder: integrations/apify
+            install: >-
+              python -m pip install -r integrations/apify/requirements.txt
+              -r integrations/apify/tests/requirements.txt
+            identifier: qrcode-barcode-scanner@0.1
+            uninstall: python -m pip uninstall -y qrcode-barcode-scanner
+            gone: python -c "import qrcode_barcode_scanner"
+          # The wheel built in the step below is what the tests import.
+          - name: napari plugin
+            folder: integrations/napari
+            install: >-
+              python -m pip install "$(ls dist/napari_qrcode_barcode_scanner-*.whl)"
+              -r integrations/napari/tests/requirements.txt
+            identifier: napari-qrcode-barcode-scanner@0.1.0
+            uninstall: python -m pip uninstall -y napari-qrcode-barcode-scanner
+            gone: python -c "import napari_qrcode_barcode_scanner"
+          - name: Streamlit app
+            folder: examples/streamlit
+            install: >-
+              python -m pip install -r examples/streamlit/requirements.txt
+              -r examples/streamlit/tests/requirements.txt
+            identifier: examples/streamlit/streamlit_app.py
+            uninstall: python -m pip uninstall -y qrcode-barcode-scanner
+            gone: python -c "import qrcode_barcode_scanner"
+    env:
+      FOLDER: ${{ matrix.folder }}
+      INSTALL: ${{ matrix.install }}
+      IDENTIFIER: ${{ matrix.identifier }}
+      UNINSTALL: ${{ matrix.uninstall }}
+      GONE: ${{ matrix.gone }}
+      DESTINATION: ${{ matrix.name }} from this checkout (not published)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      # The sdist and the wheel a PyPI upload would carry, checked the way PyPI reads them.
+      - name: Build the napari plugin's distributions
+        if: matrix.folder == 'integrations/napari'
+        run: |
+          python -m pip install build==1.3.0 twine==7.0.0
+          python -m build --outdir dist integrations/napari
+          python -m twine check --strict dist/*
+      - name: Install the integration's requirements and the test tools
+        run: |
+          eval "$INSTALL"
+          python -m pip check
+          python -c "import qrcode_barcode_scanner, importlib.metadata as m; print(m.version('qrcode-barcode-scanner'))" |
+            grep -Fx "$ENGINE_VERSION"
+      # One run of the whole suite. With the two variables set, its acceptance test also writes the
+      # three reports, read from the staged copy of the checked fixture.
+      - name: Run the tests and write the acceptance reports
+        run: |
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          QRSCAN_ACCEPTANCE_IMAGE="$image" QRSCAN_ACCEPTANCE_DIR="$RUNNER_TEMP/reports" \
+            python -m pytest -q -p no:cacheprovider "$FOLDER/tests"
+          ls "$RUNNER_TEMP/reports"
+      - name: Judge the three reports
+        run: |
+          mkdir -p receipt
+          receipt="receipt/acceptance-${FOLDER//\//-}.json"
+          echo "RECEIPT=$receipt" >> "$GITHUB_ENV"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "python -m pytest $FOLDER/tests" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "$DESTINATION" \
+            --identifier "$IDENTIFIER" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/$FOLDER" \
+            --install "$INSTALL" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "$receipt"
+      - name: Remove it and close the receipt
+        run: |
+          eval "$UNINSTALL"
+          python scripts/destination-acceptance.py removed --gone "$GONE" --uninstall "$UNINSTALL" --receipt "$RECEIPT"
+          python scripts/destination-acceptance.py check "$RECEIPT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: acceptance-${{ strategy.job-index }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The node and the plugin each live in a repository of their own, written from a commit of this
+  # one by a program. Its self-test stages this commit and refuses five altered trees; the staged
+  # tree is then installed and tested the way its own workflow does it, in a folder named like
+  # that repository.
+  satellites:
+    name: Satellite · ${{ matrix.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: qrcode-barcode-scanner-comfyui
+            script: scripts/stage-comfyui-satellite.py
+            install: >-
+              python -m pip install -r requirements.txt &&
+              python -m pip install -r tests/requirements.txt
+              --extra-index-url https://download.pytorch.org/whl/cpu
+          - repository: qrcode-barcode-scanner-dify
+            script: scripts/stage-dify-satellite.py
+            install: python -m pip install -r requirements.txt -r tests/requirements.txt
+    env:
+      REPOSITORY: ${{ matrix.repository }}
+      SCRIPT: ${{ matrix.script }}
+      INSTALL: ${{ matrix.install }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: python "$SCRIPT" --self-test
+      - name: Stage this commit and verify the tree
+        run: |
+          python "$SCRIPT" stage --out "$RUNNER_TEMP/$REPOSITORY"
+          python "$SCRIPT" verify "$RUNNER_TEMP/$REPOSITORY"
+          test -f "$RUNNER_TEMP/$REPOSITORY/.github/workflows/tests.yml"
+          test -f "$RUNNER_TEMP/$REPOSITORY/tests/fixtures/symbology/mixed-code128-qr.png"
+      - name: Install and run the staged tree's own tests
+        working-directory: ${{ runner.temp }}/${{ matrix.repository }}
+        run: |
+          eval "$INSTALL"
+          python -m pip check
+          python -m pytest -q -p no:cacheprovider tests
+      # The registry's own checks on the node: its metadata and the security scan, then the archive
+      # a publish would upload, which must leave the tests and the workflows out.
+      - name: Validate and pack the node with the Comfy CLI
+        if: matrix.repository == 'qrcode-barcode-scanner-comfyui'
+        working-directory: ${{ runner.temp }}/${{ matrix.repository }}
+        env:
+          DO_NOT_TRACK: "1"
+        run: |
+          python -m pip install comfy-cli==1.28.0
+          git init -q -b main
+          git -c user.name=stage -c user.email=stage@example.com add -A
+          git -c user.name=stage -c user.email=stage@example.com commit -q -m stage
+          comfy --skip-prompt --no-enable-telemetry node validate
+          comfy --skip-prompt --no-enable-telemetry node pack
+          python -m zipfile -l node.zip
+          python - <<'PY'
+          import zipfile
+          names = zipfile.ZipFile("node.zip").namelist()
+          assert {"__init__.py", "qrscan_node.py", "pyproject.toml", "LICENSE"} <= set(names), names
+          assert not [name for name in names if name.startswith(("tests/", ".github/", "mirror/"))], names
+          PY
