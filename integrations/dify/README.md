@@ -48,8 +48,11 @@ To make a test image with a known value, use the [QR code generator](https://qrc
 
 The plugin is built and tested in the engine repository. Its own repository,
 [`qrcode-ai-com/qrcode-barcode-scanner-dify`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-dify),
-has been public since 20 November 2026, and its tests pass there. It is not on the Dify Marketplace
-yet.
+has been public since 20 November 2026, and its tests pass there. Its package 0.1.0, built with the
+`dify-plugin` command line 0.6.15, was submitted to the Dify Marketplace the same day as
+[pull request 3862](https://github.com/langgenius/dify-plugins/pull/3862) of
+`langgenius/dify-plugins`. Its checks wait for a maintainer to approve the run of a first-time
+contributor, and it is not on the Marketplace before a maintainer merges it.
 
 ## Install
 
