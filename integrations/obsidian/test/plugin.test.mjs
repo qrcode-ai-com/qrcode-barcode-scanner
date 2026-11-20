@@ -6,7 +6,7 @@ import {
   blankPng, buildMain, clipboard, CODE128, EXPECTED, loadPlugin, mixedFixture, network, obsidian, QR, until,
 } from './helpers.mjs';
 
-const { FakeEditor, MarkdownView, Modal, Notice, createApp, createMenu, reset } = obsidian;
+const { FakeEditor, FakeElement, MarkdownView, Modal, Notice, createApp, createMenu, reset } = obsidian;
 const manifest = { id: 'qrcode-barcode-scanner', name: 'QR Code and Barcode Scanner', version: '1.0.0' };
 
 let Plugin;
@@ -171,6 +171,9 @@ test('several images open a picker, the one on the cursor line first', async () 
   assert.equal(picker.placeholder, 'Choose the image to scan');
   assert.deepEqual(picker.getSuggestions('').map((file) => file.path), ['attachments/mixed.png', 'first.png']);
   assert.deepEqual(picker.getSuggestions('FIRST').map((file) => file.path), ['first.png']);
+  const row = new FakeElement('div');
+  picker.renderSuggestion(picker.getSuggestions('')[0], row);
+  assert.deepEqual(row.children.map((child) => [child.tag, child.text]), [['div', 'mixed.png'], ['small', 'attachments/mixed.png']]);
   picker.onChooseSuggestion(picker.getSuggestions('')[0]);
   const modal = await resultWindow();
   assert.equal(modal.titleEl.text, 'Codes in mixed.png');
