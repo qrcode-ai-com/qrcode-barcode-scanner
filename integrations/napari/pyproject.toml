@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "napari-qrcode-barcode-scanner"
+version = "0.1.0"
+description = "Read the QR codes and barcodes of a napari image layer with the QR Code & Barcode Scanner engine."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Thibaut Mélen" }, { name = "Nicolas Cella" }]
+requires-python = ">=3.10"
+# The napari plugin convention: napari and a Qt backend are the user's, not dependencies.
+dependencies = [
+    "numpy>=1.24",
+    "magicgui>=0.8",
+    "qrcode-barcode-scanner==0.11.0",
+]
+keywords = ["napari", "qr-code", "barcode", "scanner", "decoder"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: napari",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+[project.optional-dependencies]
+all = ["napari[all]"]
+
+[project.urls]
+Homepage = "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/napari"
+Source = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/napari"
+"Bug Tracker" = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+
+[project.entry-points."napari.manifest"]
+napari-qrcode-barcode-scanner = "napari_qrcode_barcode_scanner:napari.yaml"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+napari_qrcode_barcode_scanner = ["napari.yaml"]
