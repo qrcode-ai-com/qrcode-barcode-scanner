@@ -1,0 +1,3 @@
+Tests: scan-mixed-fixture
+Depends: @
+Restrictions: superficial

@@ -1,0 +1,49 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: qrcode-barcode-scanner
+Upstream-Contact: QR Code AI <contact@qrcode-ai.com>
+Source: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-source.tar.gz
+Comment: The 0.11.0 release is licensed AGPL-3.0-or-later. The engine includes
+ reader code derived from rxing 0.9.3 (Apache-2.0); see
+ crates/qrcode-ai-scanner/THIRD-PARTY.md. The vendor/ component holds the
+ crates.io crates of Cargo.lock, each under the license its Cargo.toml declares.
+
+Files: *
+Copyright: SuperNovae Studio (QR Code AI), Thibaut Mélen and Nicolas Cella
+License: AGPL-3.0-or-later
+
+Files: vendor/*
+Copyright: the authors of each vendored crate, as stated in its Cargo.toml
+License: Apache-2.0 and MIT and BSD-3-Clause and ISC and Zlib
+Comment: Each crate keeps the license expression of its Cargo.toml and its own
+ license files inside vendor/<crate>. The Fedora package of the same release
+ states the combined expression AGPL-3.0-or-later AND Apache-2.0 AND
+ BSD-3-Clause AND ISC AND MIT AND Zlib.
+
+Files: debian/*
+Copyright: QR Code AI / SuperNovae Studio
+License: AGPL-3.0-or-later
+
+License: AGPL-3.0-or-later
+ This program is free software: you can redistribute it and/or modify it
+ under the terms of the GNU Affero General Public License as published by the
+ Free Software Foundation, either version 3 of the License, or (at your option)
+ any later version.
+ .
+ The full text is in LICENSE at the top of the source tree.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0. On Debian and Ubuntu systems
+ the full text is in /usr/share/common-licenses/Apache-2.0.
+
+License: MIT
+ The full text ships with each crate that uses it, in vendor/<crate>.
+
+License: BSD-3-Clause
+ On Debian and Ubuntu systems the full text is in
+ /usr/share/common-licenses/BSD; each crate also ships its own copy.
+
+License: ISC
+ The full text ships with each crate that uses it, in vendor/<crate>.
+
+License: Zlib
+ The full text ships with each crate that uses it, in vendor/<crate>.

@@ -1,0 +1,23 @@
+Source: qrcode-barcode-scanner
+Section: utils
+Priority: optional
+Maintainer: QR Code AI <contact@qrcode-ai.com>
+Build-Depends: debhelper-compat (= 13),
+               cargo-1.91,
+               rustc-1.91
+Standards-Version: 4.7.0
+Homepage: https://qrcode-ai.com/en-US/qr-code-scanner/cli
+Vcs-Browser: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
+Vcs-Git: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git
+Rules-Requires-Root: no
+
+Package: qrcode-barcode-scanner
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: offline QR code and barcode scanner
+ qrscan reads every QR code and barcode in an image file and prints a JSON
+ report. It works offline: no account, no upload and no network access.
+ .
+ It reads QR Code, Micro QR, rMQR, Data Matrix, Aztec, PDF417, MaxiCode and
+ the common linear barcodes. The report keeps the payload bytes and the
+ position of each code, and gives each QR code a scannability score.
