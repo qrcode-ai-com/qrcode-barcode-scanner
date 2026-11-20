@@ -12,7 +12,7 @@
     "theme": "dark"
   },
   "pricing": "Free",
-  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/vscode",
+  "homepage": "https://qrcode-ai.com/",
   "repository": {
     "type": "git",
     "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",

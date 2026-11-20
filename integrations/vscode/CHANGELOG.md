@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 · not published
+## 0.1.0
 
 - First version of the extension. The command **Scan QR codes and barcodes** reads PNG, JPEG,
   WebP, GIF and uncompressed BMP files from the Explorer, the editor title or the Command
