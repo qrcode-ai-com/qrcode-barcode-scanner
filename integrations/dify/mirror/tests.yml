@@ -1,0 +1,32 @@
+name: Tests
+
+# The plugin's own tests, run in its own repository against the published engine wheel and the
+# pinned dify_plugin SDK. This tree is written from the engine repository by
+# scripts/stage-dify-satellite.py; edit it there.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The Dify plugin runtime is Python 3.12 on Linux amd64 and arm64.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install the plugin's requirements and the test tools
+        run: |
+          python -m pip install -r requirements.txt -r tests/requirements.txt
+          python -m pip check
+      - name: Run the tests
+        run: python -m pytest -q tests

@@ -1,0 +1,3 @@
+# What the tests need beside the plugin's own requirements (dify_plugin brings PyYAML and httpx).
+pillow==13.0.0
+pytest==9.2.0

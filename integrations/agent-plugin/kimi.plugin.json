@@ -1,0 +1,21 @@
+{
+  "name": "qrcode-barcode-scanner",
+  "version": "0.3.0",
+  "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+  "keywords": ["qr code", "barcode", "qr scanner", "barcode scanner", "scan image", "mcp", "agent skill"],
+  "homepage": "https://qrcode-ai.com/",
+  "license": "MIT",
+  "interface": {
+    "displayName": "QR Code & Barcode Scanner",
+    "shortDescription": "Read QR codes and barcodes in local images.",
+    "developerName": "QR Code AI",
+    "websiteURL": "https://qrcode-ai.com/"
+  },
+  "skills": "./skills/",
+  "mcpServers": {
+    "qrscan": {
+      "command": "npx",
+      "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+    }
+  }
+}

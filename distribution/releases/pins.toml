@@ -133,6 +133,7 @@ paths = [
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
   ".github/workflows/ecosystem-checks.yml",
+  ".github/workflows/integration-*.yml",
 ]
 
 [[file]]

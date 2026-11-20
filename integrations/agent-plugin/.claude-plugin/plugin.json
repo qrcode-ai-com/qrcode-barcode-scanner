@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "qrcode-barcode-scanner",
+  "version": "0.3.0",
+  "description": "Read QR codes and barcodes in local images with the QR Code & Barcode Scanner skill and its pinned local MCP server.",
+  "author": {
+    "name": "QR Code AI",
+    "url": "https://qrcode-ai.com/"
+  },
+  "homepage": "https://qrcode-ai.com/",
+  "repository": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin",
+  "license": "MIT",
+  "keywords": ["qr code", "barcode", "qr scanner", "barcode scanner", "scan image", "mcp", "agent skill"]
+}

@@ -1,0 +1,29 @@
+{
+  "//": "The piece's compiler settings inside the Activepieces monorepo (tsconfig.base.json, then the piece's tsconfig.json and tsconfig.lib.json), with this harness's node_modules standing in for the workspace.",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["es2022", "dom"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@activepieces/pieces-framework": ["node_modules/@activepieces/pieces-framework"],
+      "tslib": ["node_modules/tslib"]
+    },
+    "typeRoots": ["node_modules/@types"],
+    "types": ["node"]
+  },
+  "files": ["../src/index.ts"]
+}

@@ -1,0 +1,6 @@
+# What the tests need beside the node's own requirements. ComfyUI itself provides torch, NumPy
+# and Pillow; the tests install them to build IMAGE tensors the way ComfyUI's LoadImage does.
+torch==2.15.0
+numpy==2.5.5
+pillow==13.0.0
+pytest==9.2.0

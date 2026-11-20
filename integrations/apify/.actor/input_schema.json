@@ -1,0 +1,46 @@
+{
+    "$schema": "https://apify.com/schemas/v1/input.ide.json",
+    "title": "Images to scan",
+    "description": "Give image URLs, upload image files, or both. Each image becomes one dataset item.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "imageUrls": {
+            "title": "Image URLs",
+            "type": "array",
+            "description": "Public http or https addresses of PNG, JPEG, WebP or GIF images, up to 8 MiB each. A key-value store record address is read with the run's own access.",
+            "editor": "stringList",
+            "prefill": [
+                "https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png"
+            ]
+        },
+        "imageFiles": {
+            "title": "Image files",
+            "type": "array",
+            "description": "Upload images to a key-value store of your account, or give the address of a record that already holds one.",
+            "editor": "fileupload",
+            "items": {
+                "type": "string"
+            }
+        },
+        "profile": {
+            "title": "Scan profile",
+            "type": "string",
+            "description": "fast suits uploads and gives a reduced quality score. frame suits camera frames and gives no score. full searches deepest, which artistic QR codes need, and gives the full score.",
+            "editor": "select",
+            "enum": ["fast", "frame", "full"],
+            "enumTitles": ["Fast: uploads, reduced score", "Frame: camera frames, no score", "Full: deepest search, full score"],
+            "default": "fast"
+        },
+        "budgetMs": {
+            "title": "Time budget per image (ms)",
+            "type": "integer",
+            "description": "Stop the scan of one image after this many milliseconds. 0 means no budget. A cut scan is marked complete: false.",
+            "editor": "number",
+            "minimum": 0,
+            "maximum": 60000,
+            "default": 0,
+            "unit": "ms"
+        }
+    }
+}

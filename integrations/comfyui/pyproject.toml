@@ -1,0 +1,27 @@
+[project]
+name = "qrcode-barcode-scanner-nodes"
+version = "0.1.0"
+description = "Read QR codes and barcodes from ComfyUI images with the QR Code & Barcode Scanner engine: decoded texts, a match check and the engine's JSON report."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+classifiers = [
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-comfyui"
+Documentation = "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/comfyui"
+"Bug Tracker" = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+Source = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/comfyui"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.comfy]
+PublisherId = "qrcode-ai-com"
+DisplayName = "QR Code & Barcode Scanner"
+Icon = "https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/favicon.svg"

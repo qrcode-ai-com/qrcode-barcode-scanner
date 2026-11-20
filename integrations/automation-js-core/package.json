@@ -1,0 +1,21 @@
+{
+  "name": "@qrcode-ai-com/automation-js-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared scan core copied into the n8n, Node-RED and Activepieces integrations; never published",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "node sync.mjs",
+    "check": "node sync.mjs --check",
+    "test": "node sync.mjs --dist && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "@types/node": "22.19.1",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,12 @@
+# Left out of the .difypkg: what the plugin runtime never runs.
+tests/
+template/
+mirror/
+.github/
+SOURCE.json
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.difypkg

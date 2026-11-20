@@ -1,0 +1,51 @@
+{
+  "name": "@qrcode-ai-com/node-red-qrcode-barcode-scanner",
+  "version": "0.1.0",
+  "description": "Node-RED node that reads QR codes and barcodes in image buffers or files, locally, with the QR Code & Barcode Scanner engine",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/node-red",
+  "keywords": [
+    "node-red",
+    "qr-code",
+    "barcode",
+    "barcode-scanner",
+    "qr-code-scanner",
+    "scanner"
+  ],
+  "author": {
+    "name": "SuperNovae Studio",
+    "email": "contact@supernovae.studio",
+    "url": "https://qrcode-ai.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/node-red"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "node-red": {
+    "version": ">=5.0.0",
+    "nodes": {
+      "qrcode-barcode-scanner": "nodes/scan.js"
+    }
+  },
+  "files": [
+    "nodes",
+    "examples"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "node-red": "5.0.10",
+    "node-red-node-test-helper": "0.3.6"
+  }
+}
