@@ -52,7 +52,7 @@ To call the engine from your own code instead of an agent, start from the [QR co
 
 ## Status
 
-This folder is the source of the plugin. Its own repository, `qrcode-ai-com/qrcode-barcode-scanner-plugin`, is written from it by [`scripts/stage-agent-plugin-satellite.py`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/scripts/stage-agent-plugin-satellite.py) and is not published yet. The commands below name that repository and its tag `v0.3.0`, so they work once it exists. No client directory lists the plugin yet.
+This folder is the source of the plugin. Its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-plugin`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin), is written from it by [`scripts/stage-agent-plugin-satellite.py`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/scripts/stage-agent-plugin-satellite.py). It has been public since 20 November 2026, with its release [`v0.3.0`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin/releases/tag/v0.3.0), which the commands below name. No client directory lists the plugin yet.
 
 ## What the plugin holds
 
