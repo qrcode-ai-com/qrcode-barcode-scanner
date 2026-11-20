@@ -327,8 +327,8 @@ pulled anonymously and ran the exact-content regression checks. The public
 These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
 SHA-256 of its checksum list, and its checks run in this repository. None of these destinations
 serves the scanner yet, except Glama, which lists the MCP server since 20 November 2026. Four
-destinations received pull requests that day (conda-forge two, one per recipe) and wait for review
-by their maintainers; the other eight are prepared. Each
+destinations received pull requests that day (conda-forge two, one per recipe). Three wait for
+review by their maintainers; MSYS2 closed its pull request unmerged. The other eight are prepared. Each
 recipe README says what its registry still needs, usually an account or a review in that registry.
 
 | Destination | Recipe | State | Checked here |
@@ -345,7 +345,7 @@ recipe README says what its registry still needs, usually an account or a review
 | Termux User Repository | [termux](termux/README.md) | [submitted](https://github.com/termux-user-repository/tur/pull/3114) | the termux-packages linter |
 | MacPorts | [macports](macports/README.md) | [submitted](https://github.com/macports/macports-ports/pull/36975) | Portfile tests, with the crate list equal to `Cargo.lock` |
 | FreeBSD ports | [freebsd](freebsd/README.md) | prepared | crates and distinfo equal to `Cargo.lock`, port variables read by `bmake` |
-| MSYS2 | [msys2](msys2/README.md) | [submitted](https://github.com/msys2/MINGW-packages/pull/33763) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
+| MSYS2 | [msys2](msys2/README.md) | [closed unmerged](https://github.com/msys2/MINGW-packages/pull/33763) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
 
 No Rust build of these recipes ran here: each registry compiles the package in its own builders.
 
