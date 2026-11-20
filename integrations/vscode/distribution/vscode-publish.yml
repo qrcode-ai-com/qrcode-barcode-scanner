@@ -4,8 +4,8 @@ name: vscode-publish
 # integrations/vscode/scripts/stage-distribution.mjs; never edited by hand.
 # A tag vscode-v<version> rebuilds the VSIX from the engine revision named in
 # vscode/SOURCE.json, refuses it unless its SHA-256 is the staged one, then publishes
-# that same file to the Visual Studio Marketplace (Trusted Publishing, no token) and
-# to Open VSX (the OVSX_PAT secret of the open-vsx environment).
+# that same file to the Visual Studio Marketplace and to Open VSX, both with Trusted
+# Publishing: GitHub OIDC, no stored token.
 on:
   push:
     tags: ["vscode-v*"]
@@ -115,6 +115,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: open-vsx
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,17 +130,18 @@ jobs:
         with:
           name: vsix
           path: ${{ runner.temp }}/vsix
-      - name: publish the checked VSIX to Open VSX
+      - name: publish the checked VSIX to Open VSX with Trusted Publishing
         working-directory: vscode
         env:
           WANT: ${{ needs.build.outputs.sha256 }}
           VSIX: ${{ runner.temp }}/vsix/${{ needs.build.outputs.vsix }}
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           set -euo pipefail
           node --version
           npm --version
           echo "$WANT  $VSIX" | sha256sum --check
           npm ci --ignore-scripts --no-audit --no-fund
-          # ovsx reads the token from OVSX_PAT: it never appears on a command line.
-          node node_modules/ovsx/bin/ovsx publish --packagePath "$VSIX"
+          # Open VSX trades the job's OIDC ID token for a short-lived token, only for the
+          # trusted publisher registered on the qrcode-ai-com namespace. The flag makes the
+          # job fail rather than look for a stored token.
+          node node_modules/ovsx/bin/ovsx publish --trusted-publishing --packagePath "$VSIX"
