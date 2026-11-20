@@ -1,0 +1,17 @@
+identity:
+  author: qrcode-ai-com
+  name: qrcode_barcode_scanner
+  label:
+    en_US: QR Code & Barcode Scanner
+  description:
+    en_US: Read QR codes and barcodes from images. The engine runs inside the plugin runtime; no image leaves it.
+  icon: icon.svg
+  tags:
+    - image
+    - utilities
+    - productivity
+tools:
+  - tools/scan_image.yaml
+extra:
+  python:
+    source: provider/qrcode_barcode_scanner.py

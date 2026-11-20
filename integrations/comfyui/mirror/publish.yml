@@ -1,0 +1,45 @@
+name: Publish to the Comfy Registry
+
+# Publishes the version in pyproject.toml to registry.comfy.org under the publisher qrcode-ai-com.
+# The tree is written from the engine repository by scripts/stage-comfyui-satellite.py; a new
+# version is a new stage with a raised `version`. The registry key is this repository's secret
+# REGISTRY_ACCESS_TOKEN, created by the publisher's owner; no other repository holds it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [pyproject.toml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-comfyui'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: comfy-registry
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      # The staged tree names the engine commit it came from; refuse a tree edited by hand.
+      - name: Check the tree is a stage
+        run: test -f SOURCE.json && test -f .comfyignore && test -f requirements.txt
+      # comfy-cli at an exact version (Comfy-Org/publish-node-action installs whatever is newest).
+      - name: Install comfy-cli
+        run: python -m pip install comfy-cli==1.28.0 ruff==0.17.6
+      - name: Validate and publish
+        env:
+          REGISTRY_ACCESS_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+        run: |
+          comfy --skip-prompt --no-enable-telemetry env
+          comfy node validate
+          comfy node publish --token "$REGISTRY_ACCESS_TOKEN"

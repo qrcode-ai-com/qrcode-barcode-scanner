@@ -1,0 +1,13 @@
+name: napari-qrcode-barcode-scanner
+display_name: QR Code & Barcode Scanner
+visibility: public
+categories: ["Measurement", "Utilities"]
+contributions:
+  commands:
+    - id: napari-qrcode-barcode-scanner.scan_codes
+      python_name: napari_qrcode_barcode_scanner._widget:scan_codes
+      title: Scan QR codes and barcodes
+  widgets:
+    - command: napari-qrcode-barcode-scanner.scan_codes
+      display_name: Scan QR codes and barcodes
+      autogenerate: true

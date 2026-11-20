@@ -1,0 +1,38 @@
+{
+    "$schema": "https://apify.com/schemas/v1/dataset.ide.json",
+    "actorSpecification": 1,
+    "fields": {
+        "type": "object",
+        "properties": {
+            "source": {"type": "string", "description": "The image address, as given in the input."},
+            "input": {"type": "string", "enum": ["imageUrls", "imageFiles"], "description": "The input field the address came from."},
+            "ok": {"type": "boolean", "description": "False when the image could not be fetched or decoded."},
+            "count": {"type": "integer", "description": "The number of codes read."},
+            "texts": {"type": "array", "items": {"type": "string"}, "description": "The decoded texts, in the engine's order."},
+            "codes": {"type": "array", "description": "Each code's symbology and decoded text."},
+            "complete": {"type": "boolean", "description": "False when the time budget cut the scan or the image was not read."},
+            "error": {"type": ["string", "null"], "description": "Why the image was not read, with the engine's QRS- code when it has one."},
+            "report": {"type": ["object", "null"], "description": "The engine's full report: detections, geometry, score, trace and versions."}
+        },
+        "required": ["source", "input", "ok", "count", "texts", "codes", "complete", "error", "report"]
+    },
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+                "fields": ["source", "ok", "count", "texts", "complete", "error"]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "source": {"label": "Image", "format": "link"},
+                    "ok": {"label": "Read", "format": "boolean"},
+                    "count": {"label": "Codes", "format": "number"},
+                    "texts": {"label": "Decoded texts", "format": "array"},
+                    "complete": {"label": "Complete", "format": "boolean"},
+                    "error": {"label": "Error", "format": "text"}
+                }
+            }
+        }
+    }
+}
