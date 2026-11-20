@@ -38,6 +38,9 @@ Their build-info.json records dependencies and checksums; SOURCE.md identifies t
 source and registry crates. Keep this material with redistributed archives. AUR, AppImage and
 container recipes pinned to older public CLI bytes retain that CLI's actual license until a
 new qualified artifact replaces the pin.
+The MCP Bundle built from `distribution/mcpb` holds the published MCP server, engine and native
+packages unchanged, under their published AGPL-3.0-or-later terms, with the Apache-2.0 and MIT
+dependencies they install; its LICENSE.md lists each part, and its SOURCE.md names their source.
 
 ## Ask AI artwork
 

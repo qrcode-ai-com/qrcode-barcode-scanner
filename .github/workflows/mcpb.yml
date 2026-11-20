@@ -1,0 +1,221 @@
+name: mcpb
+
+# The MCP Bundle (.mcpb) of the published MCP server 0.3.1, for Claude Desktop and other MCPB
+# hosts. scripts/build-mcpb-bundle.py builds it from distribution/mcpb and the npm registry's
+# archives, pinned by the lockfile: the server, the scanner engine 0.11.0 and its six native
+# packages. Nothing is compiled. The bundle is built twice, in two time zones, and the files must
+# be equal; then it is installed and driven over MCP stdio as a host does, on Linux, macOS and
+# Windows runners and offline in glibc and musl containers (distribution/mcpb/check).
+#
+# On a pull request or a dispatch, the bundle is a workflow artifact: nothing is published. On a
+# tag mcpb-v<version>, `attest`, in the protected environment mcpb, builds the tagged commit again,
+# requires the same bytes and records their build provenance in GitHub's attestations. No job
+# creates or edits a release: the owner attaches the attested file (RELEASING.md § MCP Bundle).
+# Untrusted event fields are never interpolated into shell scripts.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/mcpb.yml
+      - distribution/mcpb/**
+      - scripts/build-mcpb-bundle.py
+      - integrations/vscode/images/icon.png
+      - fixtures/symbology/mixed-code128-qr.png
+  push:
+    tags:
+      - "mcpb-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: Build the bundle twice
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Builder self-test
+        run: python3 scripts/build-mcpb-bundle.py --self-test
+      - name: Build, then build again in another time zone without the download cache
+        id: build
+        run: |
+          set -euo pipefail
+          python3 -c 'import sys, zlib; print("python", sys.version.split()[0], "zlib", zlib.ZLIB_RUNTIME_VERSION)'
+          python3 scripts/build-mcpb-bundle.py build --out "$RUNNER_TEMP/first" --cache "$RUNNER_TEMP/cache"
+          TZ=Asia/Dubai python3 scripts/build-mcpb-bundle.py build --out "$RUNNER_TEMP/second"
+          first=$(sha256sum "$RUNNER_TEMP"/first/*.mcpb | cut -d' ' -f1)
+          second=$(sha256sum "$RUNNER_TEMP"/second/*.mcpb | cut -d' ' -f1)
+          echo "first build  $first"
+          echo "second build $second"
+          test "$first" = "$second"
+          (cd "$RUNNER_TEMP/first" && sha256sum --strict --check ./*-SHA256SUMS)
+          python3 scripts/build-mcpb-bundle.py verify "$RUNNER_TEMP"/first/*.mcpb --cache "$RUNNER_TEMP/cache"
+          echo "sha256=$first" >> "$GITHUB_OUTPUT"
+          mkdir artifact
+          cp "$RUNNER_TEMP"/first/* artifact/
+          ls -l artifact
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: mcpb-bundle
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+  consume:
+    name: Install and scan · ${{ matrix.label }} · Node ${{ matrix.node }}
+    needs: bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, label: linux-x64, node: "22" }
+          - { runner: ubuntu-24.04, label: linux-x64, node: "24" }
+          - { runner: ubuntu-24.04-arm, label: linux-arm64, node: "22" }
+          - { runner: macos-15, label: darwin-arm64, node: "22" }
+          - { runner: macos-15, label: darwin-arm64, node: "24" }
+          - { runner: macos-15-intel, label: darwin-x64, node: "22" }
+          - { runner: windows-2025, label: win32-x64, node: "22" }
+          - { runner: windows-2025, label: win32-x64, node: "24" }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      LABEL: ${{ matrix.label }}
+      NODE_LINE: ${{ matrix.node }}
+      BUNDLE_SHA256: ${{ needs.bundle.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mcpb-bundle
+          path: bundle
+          digest-mismatch: error
+      - name: The pinned MCPB tool, from its lockfile
+        working-directory: distribution/mcpb/check
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install the bundle as a host does and drive its server over MCP stdio
+        run: |
+          set -euo pipefail
+          node --version
+          node -p 'process.platform + "-" + process.arch' | grep -qx "$LABEL"
+          (cd bundle && sha256sum --strict --check ./*-SHA256SUMS)
+          test "$(sha256sum bundle/*.mcpb | cut -d' ' -f1)" = "$BUNDLE_SHA256"
+          mkdir -p receipts
+          node distribution/mcpb/check/consumer.mjs bundle/*.mcpb fixtures/symbology/mixed-code128-qr.png \
+            --receipt "receipts/mcpb-$LABEL-node$NODE_LINE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: mcpb-consumer-${{ matrix.label }}-node${{ matrix.node }}
+          path: receipts/
+          if-no-files-found: ignore
+
+  # No network inside the container: the bundle must start and scan with what it carries. The
+  # musl image runs the linux-x64-musl native package.
+  offline:
+    name: Offline in a container · ${{ matrix.libc }}
+    needs: bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - libc: glibc
+            image: node:22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e
+          - libc: musl
+            image: node:22-alpine@sha256:2c752226d477b4a886378baa95b9af252be59301b725fdb0b7e15208131505a8
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      IMAGE: ${{ matrix.image }}
+      LIBC: ${{ matrix.libc }}
+      BUNDLE_SHA256: ${{ needs.bundle.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mcpb-bundle
+          path: bundle
+          digest-mismatch: error
+      - name: The pinned MCPB tool, from its lockfile
+        working-directory: distribution/mcpb/check
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install and scan with no network
+        run: |
+          set -euo pipefail
+          test "$(sha256sum bundle/*.mcpb | cut -d' ' -f1)" = "$BUNDLE_SHA256"
+          mkdir -p receipts
+          cp fixtures/symbology/mixed-code128-qr.png bundle/
+          docker run --rm --network none --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$PWD/distribution/mcpb/check,dst=/check,readonly" \
+            --mount "type=bind,src=$PWD/bundle,dst=/in,readonly" \
+            --mount "type=bind,src=$PWD/receipts,dst=/out" \
+            "$IMAGE" sh -euc '
+              node --version
+              ldd --version 2>&1 | head -n 1 || true
+              node /check/consumer.mjs /in/qrcode-barcode-scanner-*.mcpb /in/mixed-code128-qr.png \
+                --receipt "/out/mcpb-offline-$0.json"' "$LIBC"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: mcpb-offline-${{ matrix.libc }}
+          path: receipts/
+          if-no-files-found: ignore
+
+  # The tag only: the build provenance of the judged bundle, in the protected environment mcpb.
+  # Nothing is uploaded to a release.
+  attest:
+    name: Attest the bundle
+    if: startsWith(github.ref, 'refs/tags/mcpb-v')
+    needs: [bundle, consume, offline]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: mcpb
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/build-mcpb-bundle.py gate --ref "$GITHUB_REF"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mcpb-bundle
+          path: mcpb
+          digest-mismatch: error
+      - name: The bundle about to be attested is the build of this commit, the one the consumers judged
+        env:
+          BUNDLE_SHA256: ${{ needs.bundle.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          bundles=("$PWD"/mcpb/*.mcpb)
+          if [ "${#bundles[@]}" -ne 1 ]; then exit 1; fi
+          test "$(sha256sum "${bundles[0]}" | cut -d' ' -f1)" = "$BUNDLE_SHA256"
+          python3 scripts/build-mcpb-bundle.py verify "${bundles[0]}"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: mcpb/*.mcpb

@@ -1,0 +1,73 @@
+{
+  "manifest_version": "0.3",
+  "name": "qrcode-barcode-scanner",
+  "display_name": "QR Code & Barcode Scanner",
+  "version": "0.3.1",
+  "description": "Read QR codes and barcodes in images on your computer, offline. One report per image, with every code's format and exact text.",
+  "long_description": "This bundle runs the published MCP server `@qrcode-ai-com/qrcode-barcode-scanner-mcp` 0.3.1 and the native QR Code & Barcode Scanner engine 0.11.0 on your computer. Everything it needs is inside the bundle: it installs nothing and makes no network request.\n\nThe tool `scan_image` reads the codes in an image sent as base64 bytes and returns the scanner's JSON report: each code's format, its exact text and payload bytes, and where it was found. It reads QR Code, Micro QR, rMQR, Data Matrix, Aztec, PDF417, MaxiCode, EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Code 93, Codabar, ITF, GS1 DataBar, GS1 DataBar Expanded and Telepen. Several codes in one image come back in one report. The full profile also scores how well a QR code scans, artistic and AI-generated codes included.\n\nThe server reads no file until you allow a folder. Choose one or more folders in the extension's settings to enable `scan_file`, which reads an image by its path inside those folders only. Sending a path instead of base64 avoids image bytes that a model copies wrongly.\n\nDecoded text comes from the image: treat it as untrusted data. The server never opens a link it decodes and sends no telemetry.\n\nNative scanner builds are included for macOS (Apple silicon and Intel), Windows x64, and Linux x64 (glibc and musl) and arm64 (glibc). Node.js 22.19 or later on the 22 line, or 24 or later, runs the server.\n\nThe MCP server and the scanner engine in this bundle are licensed AGPL-3.0-or-later, the MCP SDK Apache-2.0, zod MIT. LICENSE.md lists every component and SOURCE.md names the source of each.",
+  "author": {
+    "name": "QR Code AI",
+    "url": "https://qrcode-ai.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
+  },
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/mcp",
+  "documentation": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/mcpb/README.md",
+  "support": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/launch.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/launch.mjs",
+        "${user_config.allowed_directories}"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "scan_image",
+      "description": "Decode the QR codes and barcodes in base64 image bytes and return the complete scanner report. The frame profile decodes without scoring; full also scores QR codes. Never opens links or reads files."
+    },
+    {
+      "name": "scan_file",
+      "description": "Read one local image file by absolute path and return the same report as scan_image. Offered only when at least one folder is allowed; files outside the allowed folders are refused."
+    }
+  ],
+  "keywords": [
+    "qr-code",
+    "barcode",
+    "scanner",
+    "data-matrix",
+    "pdf417",
+    "code128",
+    "ean13",
+    "artistic-qr",
+    "offline",
+    "local"
+  ],
+  "license": "AGPL-3.0-or-later AND Apache-2.0 AND MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": "^22.19.0 || >=24.0.0"
+    }
+  },
+  "user_config": {
+    "allowed_directories": {
+      "type": "directory",
+      "title": "Folders the scanner may read",
+      "description": "Optional. The tool scan_file reads image files by path inside these folders only. Leave empty to scan only images sent inline: the server then reads no file.",
+      "multiple": true,
+      "required": false
+    }
+  }
+}
