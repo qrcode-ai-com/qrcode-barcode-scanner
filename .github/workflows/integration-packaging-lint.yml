@@ -106,8 +106,10 @@ jobs:
         run: |
           set -euo pipefail
           # bsd.port.mk is the ports tree's; this stand-in defines only what the Makefile reads.
+          # -m replaces the system makefile folder, so it also needs an empty sys.mk.
           stub="$RUNNER_TEMP/freebsd-mk"
           mkdir -p "$stub"
+          : >"$stub/sys.mk"
           printf '%s\n' 'EXTRACT_SUFX?=.tar.gz' 'GREP?=grep' 'WRKDIR?=/wrkdir' \
             'CARGO_TARGET_DIR?=/wrkdir/target' 'all:' >"$stub/bsd.port.mk"
           cd distribution/freebsd/graphics/qrcode-barcode-scanner
@@ -184,7 +186,8 @@ jobs:
           test "$(attribute meta.mainProgram)" = '"qrscan"'
           docker exec nix nix-instantiate /recipe/ci.nix
           # Fetching the crates downloads them and computes the vendor hash; nothing is compiled.
-          # With the lib.fakeHash placeholder this fails and prints the hash for cargoHash.
+          # With the lib.fakeHash placeholder this fails and prints the hash for cargoHash; with the
+          # recorded hash it must succeed.
           status=0
           docker exec nix nix-build --option sandbox false --no-out-link /recipe/ci.nix -A cargoDeps \
             >cargo-deps.log 2>&1 || status=$?
@@ -211,6 +214,12 @@ jobs:
             dpkg-dev lintian xz-utils
           PATH="/usr/lib/rust-1.91/bin:$PATH" sh distribution/ppa/prepare-source.sh noble "$RUNNER_TEMP/ppa"
           ls -l "$RUNNER_TEMP/ppa"
+          # The clean of the source build must keep every Cargo.toml.orig that the vendored
+          # checksums list, or Launchpad's offline build refuses the vendored crates.
+          expected=$(tar -tJf "$RUNNER_TEMP/ppa/qrcode-barcode-scanner_0.11.0.orig-vendor.tar.xz" \
+            | grep -c '/Cargo.toml.orig$')
+          test "$(find "$RUNNER_TEMP/ppa/qrcode-barcode-scanner-0.11.0/vendor" -name Cargo.toml.orig | wc -l)" \
+            -eq "$expected"
           lintian --fail-on error --info "$RUNNER_TEMP/ppa/qrcode-barcode-scanner_0.11.0-1~ppa1~ubuntu24.04.1_source.changes"
 
   termux:
@@ -239,6 +248,9 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 20
     steps:
+      # makepkg refuses a PKGBUILD with CRLF line endings, which a Windows checkout writes by default.
+      - name: keep the line endings of the repository
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
