@@ -1,6 +1,6 @@
 # Nixpkgs derivation for qrscan 0.11.0, for pkgs/by-name/qr/qrcode-barcode-scanner/package.nix.
-# It builds the CLI crate from the release source archive of tag v0.11.0. cargoHash is a
-# placeholder: the first nix-build prints the real hash to put here (README.md).
+# It builds the CLI crate from the release source archive of tag v0.11.0. cargoHash is the hash
+# of the vendored crates of its Cargo.lock, as fetchCargoVendor computed it (README.md).
 {
   lib,
   rustPlatform,
@@ -16,7 +16,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     hash = "sha256-jl4J8OyNk65JyjVhXAW7HTJkSLbel1fO+G70jXvzqW0=";
   };
 
-  cargoHash = lib.fakeHash;
+  cargoHash = "sha256-S2QS0odAxMEtgWdh8j79kRajXJ0r85rIrF+0bU5FLTI=";
 
   # The archive holds the whole workspace; only the qrscan crate is built and tested. The
   # workspace release profile stays as it is (overflow checks in the rxing reader, no panic=abort).

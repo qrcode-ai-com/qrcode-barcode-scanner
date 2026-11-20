@@ -48,18 +48,18 @@ To make a test image with a known payload, use the [QR code generator](https://q
 
 [package.nix](package.nix) uses `rustPlatform.buildRustPackage`. It builds only the `qrcode-barcode-scanner-cli` crate from the [release source archive](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v0.11.0/qrcode-barcode-scanner-cli-0.11.0-source.tar.gz) of tag v0.11.0, with the exact crates of its `Cargo.lock`. It keeps the workspace release profile: integer overflow stays checked in the rxing reader, and `panic=abort` is never set, because the engine catches reader panics. The install check runs the installed qrscan. The check scans the [mixed QR and Code 128 sample](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/v0.11.0/fixtures/symbology/mixed-code128-qr.png) with the fast, frame and full profiles and no time budget, and requires both payloads, `https://qrc-ai.com/76xMa` and `STOCK-4827`, in each report. Its metadata gives the license `agpl3Plus`, the main program `qrscan`, and Linux and macOS as platforms.
 
-`cargoHash` is still `lib.fakeHash`. The first build of the crates prints the real hash, which replaces the placeholder. [ci.nix](ci.nix) evaluates the derivation against a pinned nixpkgs revision for the lint workflow; it is not part of the submission.
+`cargoHash` is the hash of the vendored crates of `Cargo.lock`. The lint workflow computed it with the `fetchCargoVendor` of nixpkgs, and each run checks that the fetch still gives it. [ci.nix](ci.nix) evaluates the derivation against a pinned nixpkgs revision for the lint workflow; it is not part of the submission.
 
 ## How it is tested
 
-The `nix` job of `.github/workflows/integration-packaging-lint.yml` parses the file, evaluates the name, the version, the license and the main program against nixos-unstable, instantiates the derivation, and fetches the crates, which prints the value of `cargoHash`. Fetching the crates compiles nothing. `scripts/check-packaging-recipes.py` checks the source hash against the release archive.
+The `nix` job of `.github/workflows/integration-packaging-lint.yml` parses the file, evaluates the name, the version, the license and the main program against nixos-unstable, instantiates the derivation, and fetches the crates against `cargoHash`. Fetching the crates compiles nothing. `scripts/check-packaging-recipes.py` checks the source hash against the release archive.
 
 ## Submit it
 
 Submission is the owner's step, with his GitHub account and a Nixpkgs maintainer entry.
 
 1. In a checkout of `NixOS/nixpkgs`, copy package.nix to `pkgs/by-name/qr/qrcode-barcode-scanner/package.nix`.
-2. Run `nix-build -A qrcode-barcode-scanner`. It fails once and prints `got: sha256-...`; put that value in `cargoHash` and build again. The install check must pass.
+2. Run `nix-build -A qrcode-barcode-scanner`. If the vendoring of nixpkgs changed, the build stops with `got: sha256-...`; put that value in `cargoHash` and build again. The install check must pass.
 3. Add the owner to `maintainers/maintainer-list.nix` if needed, and to `meta.maintainers`.
 4. Run `nixpkgs-review` on the change, then open the pull request with the commit title `qrcode-barcode-scanner: init at 0.11.0`. Read the current AI section of the Nixpkgs contributing guide before opening it.
 
