@@ -23,6 +23,7 @@ GUIDES = {
     'integrations/activepieces/README.md': ('integrations/activepieces', 'Activepieces'),
     'integrations/agent-plugin/README.md': ('integrations', 'agent integrations'),
     'integrations/github-action/README.md': ('integrations/github-actions', 'GitHub Actions'),
+    'integrations/browser-extension/README.md': ('integrations/browser-extension', 'browser extension'),
     'integrations/mcp/README.md': ('mcp', 'MCP'),
     'integrations/n8n/README.md': ('integrations/n8n', 'n8n'),
     'integrations/n8n/template/README.md': ('integrations/n8n', 'n8n'),

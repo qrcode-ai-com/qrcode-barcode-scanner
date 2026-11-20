@@ -1,0 +1,112 @@
+name: integration-browser-extension
+
+# The browser extension of integrations/browser-extension, checked the way its README describes:
+# installed from its own lockfile, built into the three store zips and the source zip, inspected,
+# linted for Firefox, run in Playwright's Chromium (the extension loaded) and Firefox (its page),
+# judged by the repository's page and acceptance judges, and rebuilt from the source zip. It uses
+# the published WASM package: nothing is built from this repository's Rust source, and nothing is
+# uploaded to a store.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-browser-extension.yml
+      - integrations/browser-extension/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-browser-extension.yml
+      - integrations/browser-extension/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-browser-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension:
+    name: Browser extension · build, inspect and test
+    runs-on: ubuntu-24.04
+    # On an Apple Silicon laptop the build, the checks and both browser tests took 41 s on
+    # 20 November 2026. The browser download with its system packages took 188 s and more on these
+    # runners for wasm-browser.yml; no timing from this job exists yet.
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/browser-extension
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Install Playwright's Chromium and Firefox
+        run: node node_modules/playwright/cli.js install --with-deps chromium firefox
+      - name: Build the store zips and the source zip
+        run: npm run build
+      - name: Inspect the archives
+        run: npm run inspect
+      - name: Unit tests
+        run: npm test
+      - name: Firefox add-on linter
+        run: npm run lint:firefox
+      - name: The Chrome build in Playwright's Chromium
+        run: npm run test:chromium
+      - name: The Firefox build's page in Playwright's Firefox
+        run: npm run test:firefox-page
+      - name: Judge the page records and the reports
+        working-directory: .
+        run: |
+          set -euo pipefail
+          here=integrations/browser-extension
+          version=$(node -p "require('./$here/build/build-receipt.json').scanner.version")
+          mkdir -p "$RUNNER_TEMP/receipts"
+          for record in popup menu firefox-page; do
+            reports="$here/build/acceptance/$record"
+            python3 scripts/check-demo-page.py "$reports/page.json" \
+              --example "$here" --page-key integrations/browser-extension
+            case "$record" in
+              firefox-page) driver="node test/firefox-page.mjs" ;;
+              *) driver="node test/chromium.mjs" ;;
+            esac
+            python3 scripts/destination-acceptance.py reports --kind page \
+              --produced-by "$driver" \
+              --fast "$reports/fast.json" --frame "$reports/frame.json" \
+              --full "$reports/full.json" \
+              --destination "$here, $record, on the runner" \
+              --identifier "@qrcode-ai-com/qrcode-barcode-scanner-wasm" --version "$version" \
+              --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/$here" \
+              --install "npm ci --ignore-scripts && npm run build" \
+              --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              --receipt "$RUNNER_TEMP/receipts/$record.json"
+          done
+      - name: Rebuild from the source zip and compare
+        run: npm run test:reproduce
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: browser-extension
+          path: |
+            integrations/browser-extension/build/*.zip
+            integrations/browser-extension/build/*.json
+            integrations/browser-extension/build/store-assets
+            integrations/browser-extension/build/acceptance
+            ${{ runner.temp }}/receipts
+          if-no-files-found: error
