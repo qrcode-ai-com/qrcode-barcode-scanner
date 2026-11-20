@@ -58,6 +58,19 @@ test('the VSIX holds exactly the extension files, and stays small', () => {
   }
 });
 
+test('every entry is dated SOURCE_DATE_EPOCH in UTC, whatever the time zone of the build', () => {
+  // ZIP stores an MS-DOS date and time with no time zone, and the packager writes them in the
+  // zone it runs in. A build in UTC+4 then differs from the publish lane's rebuild in UTC.
+  const receipt = JSON.parse(readFileSync(join(here, 'out', 'package-receipt.json'), 'utf8'));
+  const epoch = resolve(receipt.vsix) === vsixPath ? receipt.sourceDateEpoch : Number(process.env.SOURCE_DATE_EPOCH || 1795132800);
+  const when = new Date(epoch * 1000);
+  const dosDate = ((when.getUTCFullYear() - 1980) << 9) | ((when.getUTCMonth() + 1) << 5) | when.getUTCDate();
+  const dosTime = (when.getUTCHours() << 11) | (when.getUTCMinutes() << 5) | (when.getUTCSeconds() >> 1);
+  for (const entry of entries) {
+    assert.deepEqual([entry.name, entry.dosDate, entry.dosTime], [entry.name, dosDate, dosTime]);
+  }
+});
+
 test('the manifest names one universal extension of the proposed publisher', () => {
   const xml = text('extension.vsixmanifest');
   const identity = /<Identity ([^>]+)\/>/.exec(xml)[1];

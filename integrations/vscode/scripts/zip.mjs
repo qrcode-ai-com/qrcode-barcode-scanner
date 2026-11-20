@@ -30,6 +30,9 @@ export function zipEntries(bytes) {
     entries.push({
       name: buffer.toString('utf8', at + 46, at + 46 + nameLength),
       method: buffer.readUInt16LE(at + 10),
+      // MS-DOS time and date of the entry, as stored: ZIP gives them no time zone.
+      dosTime: buffer.readUInt16LE(at + 12),
+      dosDate: buffer.readUInt16LE(at + 14),
       crc: buffer.readUInt32LE(at + 16),
       compressedSize: buffer.readUInt32LE(at + 20),
       size: buffer.readUInt32LE(at + 24),
