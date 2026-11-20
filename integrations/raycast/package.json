@@ -1,0 +1,86 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "qrcode-barcode-scanner",
+  "title": "QR Code & Barcode Scanner",
+  "description": "Read the QR codes and barcodes in an image selected in Finder or copied to the clipboard, on your Mac, with qrscan.",
+  "icon": "icon.png",
+  "author": "qrcode-ai-com",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "keywords": [
+    "qr code",
+    "barcode",
+    "scanner",
+    "ean",
+    "code 128",
+    "data matrix"
+  ],
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "commands": [
+    {
+      "name": "scan-image",
+      "title": "Scan Image for Codes",
+      "subtitle": "QR Code & Barcode Scanner",
+      "description": "Read the QR codes and barcodes in the image selected in Finder, or in the image on the clipboard.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "qrscanPath",
+      "type": "textfield",
+      "required": false,
+      "title": "qrscan Path",
+      "description": "The full path of the qrscan program. When empty, the extension looks in /opt/homebrew/bin, /usr/local/bin and ~/.cargo/bin.",
+      "placeholder": "/opt/homebrew/bin/qrscan"
+    },
+    {
+      "name": "profile",
+      "type": "dropdown",
+      "required": false,
+      "title": "Scan Profile",
+      "description": "Full searches longest and reads the most damaged codes. Fast and Frame stop sooner.",
+      "default": "full",
+      "data": [
+        {
+          "title": "Full",
+          "value": "full"
+        },
+        {
+          "title": "Fast",
+          "value": "fast"
+        },
+        {
+          "title": "Frame",
+          "value": "frame"
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "publish": "npx @raycast/api@latest publish"
+  },
+  "dependencies": {
+    "@raycast/api": "2.13.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "2.2.0",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "esbuild": "0.28.2",
+    "eslint": "9.39.5",
+    "prettier": "3.10.1",
+    "typescript": "5.9.3"
+  }
+}

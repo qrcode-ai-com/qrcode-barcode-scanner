@@ -20,9 +20,12 @@ GUIDES = {
     'examples/notebooks/README.md': ('sdk/python', 'Python'),
     'examples/web-vite/README.md': ('sdk/javascript', 'JavaScript'),
     'playground/README.md': ('sdk/javascript', 'JavaScript'),
+    'integrations/github-action/README.md': ('integrations/github-actions', 'GitHub Actions'),
     'integrations/mcp/README.md': ('mcp', 'MCP'),
+    'integrations/obsidian/README.md': ('integrations/obsidian', 'Obsidian'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
+    'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }
