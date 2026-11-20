@@ -44,7 +44,7 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barc
 
 To make a test image, encode a known text with the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), commit the picture, and list the text as an expected payload. The action then proves on every push that the image still says what you meant.
 
-The action has been public since 20 November 2026 in its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-action`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-action), with the release [`v1.0.0`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-action/releases/tag/v1.0.0) and the tag `v1`. It is not listed on GitHub Marketplace yet. A workflow of the engine repository also runs it from its folder, `./integrations/github-action`.
+The action has been public since 20 November 2026 in its own repository, [`qrcode-ai-com/qrcode-barcode-scanner-action`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-action), with the release [`v1.0.0`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-action/releases/tag/v1.0.0) and the tag `v1`. Since 20 November 2026 it is listed on [GitHub Marketplace](https://github.com/marketplace/actions/qr-code-barcode-scanner), in the Testing and Utilities categories. A workflow of the engine repository also runs it from its folder, `./integrations/github-action`.
 
 ## How it works
 

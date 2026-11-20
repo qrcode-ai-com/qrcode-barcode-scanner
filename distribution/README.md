@@ -326,8 +326,9 @@ pulled anonymously and ran the exact-content regression checks. The public
 
 These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
 SHA-256 of its checksum list, and its checks run in this repository. None of these destinations
-serves the scanner yet. Four destinations received pull requests on 20 November 2026 (conda-forge
-two, one per recipe) and wait for review by their maintainers; the other nine are prepared. Each
+serves the scanner yet, except Glama, which lists the MCP server since 20 November 2026. Four
+destinations received pull requests that day (conda-forge two, one per recipe). Three wait for
+review by their maintainers; MSYS2 closed its pull request unmerged. The other eight are prepared. Each
 recipe README says what its registry still needs, usually an account or a review in that registry.
 
 | Destination | Recipe | State | Checked here |
@@ -335,7 +336,7 @@ recipe README says what its registry still needs, usually an account or a review
 | Snap Store | [snap](snap/README.md) | prepared | packed, installed and judged on amd64 and arm64 |
 | Artifact Hub | [artifacthub](artifacthub/README.md) | prepared | index composed against the pinned GHCR digests |
 | JSR | [jsr](jsr/README.md) | prepared | `jsr publish --dry-run` and a Deno scan of the staged module |
-| Glama | [glama](glama/README.md) | prepared | MCP container built and judged offline on amd64 and arm64 |
+| Glama | [glama](glama/README.md) | [listed](https://glama.ai/mcp/servers/qrcode-ai-com/qrcode-barcode-scanner-mcp) | MCP container built and judged offline on amd64 and arm64 |
 | conda-forge | [conda-forge](conda-forge/README.md) | submitted: [CLI](https://github.com/conda-forge/staged-recipes/pull/35745), [Python](https://github.com/conda-forge/staged-recipes/pull/35746) | recipe schema and the test script against the published wheel |
 | Nixpkgs | [nix](nix/README.md) | prepared | evaluated against nixos-unstable, with the crate hash recorded |
 | openSUSE Build Service | [obs](obs/README.md) | prepared | `rpmspec`, `rpmlint` and the service file |
@@ -344,7 +345,7 @@ recipe README says what its registry still needs, usually an account or a review
 | Termux User Repository | [termux](termux/README.md) | [submitted](https://github.com/termux-user-repository/tur/pull/3114) | the termux-packages linter |
 | MacPorts | [macports](macports/README.md) | [submitted](https://github.com/macports/macports-ports/pull/36975) | Portfile tests, with the crate list equal to `Cargo.lock` |
 | FreeBSD ports | [freebsd](freebsd/README.md) | prepared | crates and distinfo equal to `Cargo.lock`, port variables read by `bmake` |
-| MSYS2 | [msys2](msys2/README.md) | [submitted](https://github.com/msys2/MINGW-packages/pull/33763) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
+| MSYS2 | [msys2](msys2/README.md) | [closed unmerged](https://github.com/msys2/MINGW-packages/pull/33763) | `makepkg-mingw --printsrcinfo` for three environments and `--verifysource` |
 
 No Rust build of these recipes ran here: each registry compiles the package in its own builders.
 
