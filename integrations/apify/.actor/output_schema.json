@@ -1,0 +1,12 @@
+{
+    "$schema": "https://apify.com/schemas/v1/output.ide.json",
+    "actorOutputSchemaVersion": 1,
+    "title": "Scan results",
+    "properties": {
+        "results": {
+            "type": "string",
+            "title": "Scan results",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        }
+    }
+}

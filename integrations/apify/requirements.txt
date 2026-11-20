@@ -1,0 +1,3 @@
+apify==4.3.0
+httpx==0.28.1
+qrcode-barcode-scanner==0.11.0

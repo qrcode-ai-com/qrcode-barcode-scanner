@@ -1,0 +1,19 @@
+{
+    "$schema": "https://apify.com/schemas/v1/actor.ide.json",
+    "actorSpecification": 1,
+    "name": "qrcode-barcode-scanner",
+    "title": "QR Code & Barcode Scanner",
+    "description": "Read every QR code and barcode in images given by URL or uploaded to a key-value store. One dataset item per image, with the decoded texts and the engine's full report.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "minMemoryMbytes": 256,
+    "defaultMemoryMbytes": 512,
+    "maxMemoryMbytes": 4096,
+    "inputSchema": "./input_schema.json",
+    "outputSchema": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "dockerfile": "../Dockerfile",
+    "readme": "../README.md"
+}
