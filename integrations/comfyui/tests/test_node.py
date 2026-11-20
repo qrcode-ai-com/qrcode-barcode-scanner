@@ -1,5 +1,6 @@
 """The node through its own entry point, with real torch tensors and the published engine wheel."""
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -49,6 +50,16 @@ def test_the_package_registers_one_node_with_consistent_outputs(node_package):
     assert len(node.RETURN_NAMES) == len(node.RETURN_TYPES) == len(node.OUTPUT_TOOLTIPS)
     assert callable(getattr(node, node.FUNCTION))
     assert node.OUTPUT_NODE is True
+
+
+def test_the_folder_imported_as_a_lone_module_loads_and_registers_nothing():
+    """What pytest does before it runs tests/ in a clone whose folder name has dashes."""
+    spec = importlib.util.spec_from_file_location(
+        "__init__", NODE_ROOT / "__init__.py", submodule_search_locations=None)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.__package__ == ""
+    assert not hasattr(module, "NODE_CLASS_MAPPINGS")
 
 
 @pytest.mark.parametrize("profile", PROFILES)
