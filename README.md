@@ -192,13 +192,26 @@ each one installs.
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/README.md">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-dark.png?v=aac80a06a2b0">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-light.png?v=4443be3d3592" alt="Where the scanner is published: crates.io, npm, PyPI, Go, Homebrew, Scoop, GitHub Releases, Debian, Arch Linux, Fedora, AppImage, a container image, MCP, OpenClaw, jsDelivr, UNPKG, esm.sh, docs.rs, deps.dev, Libraries.io and Lib.rs" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-dark.png?v=ea362e26e0d4">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/destinations-light.png?v=9cba7c70eae5" alt="Where the scanner is published and listed: crates.io, npm, PyPI, Go, Homebrew, Scoop, GitHub Releases, Debian, Arch Linux, Fedora, AppImage, a container image, MCP, OpenClaw, jsDelivr, UNPKG, esm.sh, docs.rs, deps.dev, Libraries.io, Lib.rs, the GitHub Marketplace, the Obsidian community plugins, the Comfy Registry and Glama" width="100%">
     </picture>
   </a>
 </p>
 
-<sub>Language and platform names and logos belong to their owners. They identify a runtime or a destination and imply no endorsement.</sub>
+Four directories list it, so you can add it from inside the tool you work in:
+
+| Listed in | Entry | What it does there |
+|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-github-dark.png?v=1beef6411e01"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-github-light.png?v=84629428944a" alt="" width="24" height="24" align="absmiddle"></picture> GitHub Marketplace | [`qr-code-barcode-scanner`](https://github.com/marketplace/actions/qr-code-barcode-scanner) | A workflow step reads the codes in your repository's images, and can fail the build when a payload you expect is missing. [Guide](integrations/github-action/README.md) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-obsidian-dark.png?v=43f72b4f65c1"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-obsidian-light.png?v=1e44702b653c" alt="" width="24" height="24" align="absmiddle"></picture> Obsidian community plugins | [`qrcode-barcode-scanner`](https://community.obsidian.md/plugins/qrcode-barcode-scanner) | Reads the codes in an image of your vault and writes their text into a note. [Guide](integrations/obsidian/README.md) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-comfyui-dark.png?v=96af9ee25553"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-comfyui-light.png?v=56a787fd873c" alt="" width="24" height="24" align="absmiddle"></picture> Comfy Registry | [`qrcode-barcode-scanner-nodes`](https://registry.comfy.org/nodes/qrcode-barcode-scanner-nodes) | A node reads every code in an image batch, to check that a generated code still decodes to the text you meant. [Guide](integrations/comfyui/README.md) |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-glama-dark.png?v=cd36fc162618"><img src="https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/docs/assets/brand/mark-glama-light.png?v=edbf6212f964" alt="" width="24" height="24" align="absmiddle"></picture> Glama MCP directory | [`qrcode-barcode-scanner-mcp`](https://glama.ai/mcp/servers/qrcode-ai-com/qrcode-barcode-scanner-mcp) | Lists the MCP server, whose `scan_image` tool reads the codes in image bytes, offline. [Guide](distribution/glama/README.md) |
+
+n8n, Node-RED, Activepieces, Raycast, Dify, VS Code, Apify, napari and the browser extension are built and
+tested in [`integrations/`](integrations/) and wait for their stores. The [distribution guide](distribution/README.md)
+gives the state of each package and recipe.
+
+<sub>Language, platform and host names and logos belong to their owners. They identify a runtime, a destination or a host and imply no endorsement.</sub>
 
 ### Rust
 
