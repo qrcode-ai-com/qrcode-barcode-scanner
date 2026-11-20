@@ -1,0 +1,130 @@
+{
+  "name": "qrcode-barcode-scanner",
+  "displayName": "QR Code & Barcode Scanner",
+  "description": "Read QR codes and barcodes in image files on your machine, with the open-source QR Code & Barcode Scanner engine. No network, no native binary.",
+  "version": "0.1.0",
+  "publisher": "qrcode-ai-com",
+  "license": "MIT AND AGPL-3.0-or-later",
+  "private": true,
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#18181b",
+    "theme": "dark"
+  },
+  "pricing": "Free",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/vscode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "qr code",
+    "qr",
+    "barcode",
+    "scanner",
+    "decoder",
+    "code 128",
+    "ean-13",
+    "data matrix",
+    "pdf417",
+    "wasm"
+  ],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist/**",
+    "images/icon.png",
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "qrcodeBarcodeScanner.scan",
+        "title": "Scan QR codes and barcodes",
+        "category": "QR Code & Barcode Scanner"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "qrcodeBarcodeScanner.scan",
+          "when": "!explorerResourceIsFolder && resourceExtname =~ /^\\.(png|jpe?g|webp|gif|bmp)$/i",
+          "group": "qrcodeBarcodeScanner@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "qrcodeBarcodeScanner.scan",
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|webp|gif|bmp)$/i",
+          "group": "navigation@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "qrcodeBarcodeScanner.scan",
+          "when": "resourceExtname =~ /^\\.(png|jpe?g|webp|gif|bmp)$/i",
+          "group": "qrcodeBarcodeScanner@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "QR Code & Barcode Scanner",
+      "properties": {
+        "qrcodeBarcodeScanner.profile": {
+          "type": "string",
+          "enum": [
+            "full",
+            "fast",
+            "frame"
+          ],
+          "enumDescriptions": [
+            "Every decode stage and the full QR quality score. The engine's default.",
+            "Fewer decode stages and a reduced QR quality score.",
+            "Decode only, the stages meant for camera frames. No quality score."
+          ],
+          "default": "full",
+          "description": "The engine profile used for each scan."
+        },
+        "qrcodeBarcodeScanner.budgetMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 60000,
+          "default": null,
+          "markdownDescription": "Time budget of one scan, in milliseconds. Leave it empty for the profile's own budget (4000 for `full`, 800 for `fast`, 80 for `frame`). `0` runs the scan without a budget."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test test/readme.test.mjs test/scan-core.test.mjs test/extension.test.mjs",
+    "package": "node scripts/package.mjs",
+    "test:vsix": "node --test test/vsix.test.mjs"
+  },
+  "devDependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "@vscode/vsce": "4.1.1",
+    "esbuild": "0.28.2"
+  }
+}

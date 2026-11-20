@@ -1,0 +1,9 @@
+{
+  "name": "qrcode-barcode-scanner-vscode-publish",
+  "private": true,
+  "description": "The Open VSX client of the VS Code publish lane, locked for npm ci.",
+  "license": "MIT",
+  "devDependencies": {
+    "ovsx": "1.4.0"
+  }
+}
