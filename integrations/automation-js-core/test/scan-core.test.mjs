@@ -83,8 +83,9 @@ test('a stopped worker is replaced by the next scan', async () => {
 });
 
 test('an idle worker does not keep the process alive', () => {
+	// The exit is what is judged: no budget, so a cold, slow runner still finds both codes.
 	const script = `const core = require(${JSON.stringify(corePath)});
-		core.scanImage(require('node:fs').readFileSync(process.argv[1])).then((r) => console.log(r.detections.length));`;
+		core.scanImage(require('node:fs').readFileSync(process.argv[1]), { budgetMs: 0 }).then((r) => console.log(r.detections.length));`;
 	const fixturePath = new URL('../../../fixtures/symbology/mixed-code128-qr.png', import.meta.url).pathname;
 	const output = execFileSync(process.execPath, ['-e', script, fixturePath], { encoding: 'utf8', timeout: 30_000 });
 	assert.equal(output.trim(), '2');
