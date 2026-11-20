@@ -1364,7 +1364,9 @@ bundle is not listed on Smithery.
 
 ## PHP package — its own repository
 
-The PHP package of `bindings/php` is not published yet. Packagist reads
+The PHP package of `bindings/php` is published on Packagist as
+`qrcode-ai-com/qrcode-barcode-scanner` since 20 November 2026: version 0.11.0,
+the mirror's tag `v0.11.0` at commit `7cad46f`. Packagist reads
 `composer.json` at the root of a repository and Composer downloads that whole
 repository, so the package is served from
 `qrcode-ai-com/qrcode-barcode-scanner-php`. That repository holds nothing
@@ -1387,9 +1389,10 @@ every push.
 
 To change the package, change `bindings/php` here, merge, stage the merged
 commit and replace the mirror's tree with the result in one commit. A version
-of the package is a tag `vX.Y.Z` in the mirror. Only the owner creates it, and
-Packagist reads it through its hook. The first listing needs the owner's
-sign-in on packagist.org.
+of the package is a tag `vX.Y.Z` in the mirror. Only the owner creates it.
+The package was listed from the owner's packagist.org sign-in. Packagist is
+not connected to the mirror by a GitHub hook yet: until the owner connects it,
+a new tag is read when the owner presses Update on the package page.
 
 The owner decided on 11 November 2026 that the package follows the engine it
 drives: its first version is 0.11.0, for `qrscan` 0.11.x, and its minimum PHP
