@@ -169,7 +169,7 @@ python3 scripts/stage-obsidian-satellite.py stage --out /absolute/empty/folder
 python3 scripts/stage-obsidian-satellite.py verify /absolute/empty/folder
 ```
 
-The stage reads one commit, checks the manifest against the community directory rules and writes `SOURCE.json` with the sha256 of every file. The workflows of [mirror/](mirror/test.yml) become the repository's own: its tests, and a release that a tag such as `1.0.0` starts. That release builds `main.js`, runs the tests and opens a draft with `main.js`, `manifest.json` and `styles.css`.
+The stage reads one commit, checks the manifest against the community directory rules and writes `SOURCE.json` with the sha256 of every file. The workflows of [mirror/](mirror/test.yml) become the repository's own: its tests, and a release that a tag such as `1.0.0` starts. That release builds `main.js`, runs the tests, attests the build provenance of `main.js` and `styles.css`, and opens a draft with `main.js`, `manifest.json` and `styles.css`. To check a downloaded file against its attestation: `gh attestation verify main.js --repo qrcode-ai-com/qrcode-barcode-scanner-obsidian`.
 
 ## Licenses of what you install
 
