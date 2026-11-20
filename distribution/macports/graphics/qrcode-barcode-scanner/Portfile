@@ -19,7 +19,7 @@ long_description    qrscan reads every QR code and barcode in an image file and 
                     linear barcodes, keeps the payload bytes and the position of \
                     each code, and scores QR scannability.
 
-homepage            https://qrcode-ai.com/en-US/qr-code-scanner/cli
+homepage            https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
 master_sites        https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v${version}/
 distname            qrcode-barcode-scanner-cli-${version}-source
 
