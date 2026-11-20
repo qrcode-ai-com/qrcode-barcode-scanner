@@ -1,14 +1,13 @@
 name: Integrations · Python hosts
 
 # The ComfyUI node, the Dify tool plugin, the Apify actor and the napari plugin under integrations/,
-# and the Streamlit app under examples/streamlit, all on the published engine wheel
-# qrcode-barcode-scanner 0.11.0. Each runs its own tests, which read the mixed fixture in the fast,
-# frame and full profiles through the integration's own entry point; the destination acceptance
-# driver judges those three reports, then the scanner is removed and must be gone. The ComfyUI node
-# and the Dify plugin are also staged as the tree of their own repository, which must verify and
-# pass its own tests. Nothing is built from the engine's Rust source, no host application runs
-# (ComfyUI, Dify, the Apify platform, a napari window, Streamlit Community Cloud) and nothing is
-# published.
+# and the Streamlit app under examples/streamlit, each on the published engine wheel its own files
+# pin. Each runs its own tests, which read the mixed fixture in the fast, frame and full profiles
+# through the integration's own entry point; the destination acceptance driver judges those three
+# reports, then the scanner is removed and must be gone. The ComfyUI node and the Dify plugin are
+# also staged as the tree of their own repository, which must verify and pass its own tests.
+# Nothing is built from the engine's Rust source, no host application runs (ComfyUI, Dify, the
+# Apify platform, a napari window, Streamlit Community Cloud) and nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -40,8 +39,6 @@ defaults:
     shell: bash
 
 env:
-  # The engine wheel every integration pins, and the version its reports must name.
-  ENGINE_VERSION: 0.11.0
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
@@ -56,6 +53,7 @@ jobs:
           # ComfyUI provides torch, NumPy and Pillow; the tests install the CPU build of torch.
           - name: ComfyUI node
             folder: integrations/comfyui
+            pins: integrations/comfyui/requirements.txt
             install: >-
               python -m pip install -r integrations/comfyui/requirements.txt &&
               python -m pip install -r integrations/comfyui/tests/requirements.txt
@@ -66,6 +64,7 @@ jobs:
           # The Dify plugin runtime is Python 3.12.
           - name: Dify tool plugin
             folder: integrations/dify
+            pins: integrations/dify/requirements.txt
             install: >-
               python -m pip install -r integrations/dify/requirements.txt
               -r integrations/dify/tests/requirements.txt
@@ -75,6 +74,7 @@ jobs:
           # The actor's image is apify/actor-python:3.12; its main runs here without Docker.
           - name: Apify actor
             folder: integrations/apify
+            pins: integrations/apify/requirements.txt
             install: >-
               python -m pip install -r integrations/apify/requirements.txt
               -r integrations/apify/tests/requirements.txt
@@ -84,6 +84,7 @@ jobs:
           # The wheel built in the step below is what the tests import.
           - name: napari plugin
             folder: integrations/napari
+            pins: integrations/napari/pyproject.toml
             install: >-
               python -m pip install "$(ls dist/napari_qrcode_barcode_scanner-*.whl)"
               -r integrations/napari/tests/requirements.txt
@@ -92,6 +93,7 @@ jobs:
             gone: python -c "import napari_qrcode_barcode_scanner"
           - name: Streamlit app
             folder: examples/streamlit
+            pins: examples/streamlit/requirements.txt
             install: >-
               python -m pip install -r examples/streamlit/requirements.txt
               -r examples/streamlit/tests/requirements.txt
@@ -100,6 +102,7 @@ jobs:
             gone: python -c "import qrcode_barcode_scanner"
     env:
       FOLDER: ${{ matrix.folder }}
+      PINS: ${{ matrix.pins }}
       INSTALL: ${{ matrix.install }}
       IDENTIFIER: ${{ matrix.identifier }}
       UNINSTALL: ${{ matrix.uninstall }}
@@ -112,6 +115,14 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
+      # The integration's own file says which engine wheel it runs on: one exact pin, which is also
+      # the version its reports must name. The workflow names none of its own.
+      - name: Read the engine version the integration pins
+        run: |
+          pins=$(grep -oE 'qrcode-barcode-scanner==[0-9]+\.[0-9]+\.[0-9]+' "$PINS" | sort -u)
+          test "$(printf '%s\n' "$pins" | wc -l)" -eq 1
+          echo "ENGINE_VERSION=${pins#qrcode-barcode-scanner==}" >> "$GITHUB_ENV"
+          echo "$pins"
       # The sdist and the wheel a PyPI upload would carry, checked the way PyPI reads them.
       - name: Build the napari plugin's distributions
         if: matrix.folder == 'integrations/napari'
