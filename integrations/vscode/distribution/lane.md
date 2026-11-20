@@ -8,8 +8,9 @@ engine repository, then stage again.
 `SOURCE.json` names one engine revision and the SHA-256 of the VSIX built from it. A tag
 `vscode-v<version>` runs the workflow. It checks out that revision, runs the extension tests,
 rebuilds the VSIX and refuses it unless its SHA-256 is the staged one. It then publishes that same
-file twice: to the Visual Studio Marketplace with Trusted Publishing, and to Open VSX with the
-`OVSX_PAT` secret.
+file twice, to the Visual Studio Marketplace and to Open VSX. Both jobs use Trusted Publishing:
+each registry trades the job's GitHub OIDC ID token for a short-lived token, so the repository
+stores no publishing token.
 
 ## Set up once
 
@@ -20,11 +21,15 @@ file twice: to the Visual Studio Marketplace with Trusted Publishing, and to Ope
    repository `qrcode-barcode-scanner-distribution`, workflow file `vscode-publish.yml`,
    environment `visual-studio-marketplace`.
 3. Open VSX: create an eclipse.org account with the GitHub username filled in, log in at
-   https://open-vsx.org with that GitHub account, sign the Publisher Agreement, create an access
-   token, then create the namespace once: `npx ovsx create-namespace qrcode-ai-com -p <token>`.
-4. In this repository, create the environments `visual-studio-marketplace` and `open-vsx`, both
-   limited to tags `vscode-v*` and to a required reviewer. Store the token as the `OVSX_PAT`
-   secret of `open-vsx` only.
+   https://open-vsx.org with that GitHub account, sign the Publisher Agreement and create the
+   namespace `qrcode-ai-com`. Claim its ownership with an issue at
+   https://github.com/EclipseFdn/open-vsx.org/issues (template "Claim namespace ownership").
+4. Once you own the namespace, register a trusted publisher at
+   https://open-vsx.org/user-settings/trusted-publishers: namespace `qrcode-ai-com`, repository
+   `qrcode-ai-com/qrcode-barcode-scanner-distribution`, workflow file `vscode-publish.yml`,
+   environment `open-vsx`.
+5. In this repository, create the environments `visual-studio-marketplace` and `open-vsx`, both
+   limited to tags `vscode-v*` and to a required reviewer. Neither holds a secret.
 
 ## Publish a version
 

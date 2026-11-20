@@ -48,7 +48,27 @@ To make a test image, encode a known text with the [QR code generator](https://q
 
 ## Install
 
-The extension is not published yet: neither the Visual Studio Marketplace nor Open VSX lists it. Its proposed identifier on both is `qrcode-ai-com.qrcode-barcode-scanner`, and nothing has been published under it. Until then, build the VSIX file from this folder and install it. You need Node.js 22 or later, npm and Git.
+The extension needs VS Code 1.74 or later. Its identifier is `qrcode-ai-com.qrcode-barcode-scanner` on the Visual Studio Marketplace and on Open VSX.
+
+### From the Visual Studio Marketplace
+
+In VS Code, open the Extensions view, search for QR Code & Barcode Scanner and choose Install. You can also open its [page on the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=qrcode-ai-com.qrcode-barcode-scanner), or install it from a terminal:
+
+```sh
+code --install-extension qrcode-ai-com.qrcode-barcode-scanner
+```
+
+### From Open VSX
+
+VSCodium, Cursor and other editors built on VS Code install extensions from Open VSX. Search for QR Code & Barcode Scanner in their Extensions view, or open its [page on Open VSX](https://open-vsx.org/extension/qrcode-ai-com/qrcode-barcode-scanner). From a terminal, use the editor's own command with the same identifier:
+
+```sh
+codium --install-extension qrcode-ai-com.qrcode-barcode-scanner
+```
+
+### From source
+
+You can also build the VSIX file from this folder and install it. You need Node.js 22 or later, npm and Git.
 
 ```sh
 git clone https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git
@@ -58,7 +78,7 @@ npm run package
 code --install-extension out/qrcode-barcode-scanner-0.1.0.vsix
 ```
 
-`npm run package` checks that the installed engine is version 0.11.0 and that its WebAssembly module matches the SHA-256 of its build record. It then bundles the extension and writes `out/qrcode-barcode-scanner-0.1.0.vsix`. You can also open the Command Palette in VS Code, run Extensions: Install from VSIX... and choose that file. The extension needs VS Code 1.74 or later. Editors built on VS Code, such as VSCodium or Cursor, take the same file with their own command (`codium`, `cursor`).
+`npm run package` checks that the installed engine is version 0.11.0 and that its WebAssembly module matches the SHA-256 of its build record. It then bundles the extension and writes `out/qrcode-barcode-scanner-0.1.0.vsix`. You can also open the Command Palette in VS Code, run Extensions: Install from VSIX... and choose that file. Editors built on VS Code, such as VSCodium or Cursor, take the same file with their own command (`codium`, `cursor`).
 
 ## Use
 
