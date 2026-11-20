@@ -66,6 +66,8 @@ def files():
 
 @pytest.fixture
 def in_plugin_root(monkeypatch):
-    """The plugin runtime starts in the plugin directory and reads its paths from there."""
+    """The plugin runtime runs `python -m main` in the plugin directory: it reads its paths from
+    there and imports provider/ and tools/ from there, wherever pytest was started."""
     monkeypatch.chdir(PLUGIN_ROOT)
+    monkeypatch.syspath_prepend(str(PLUGIN_ROOT))
     return PLUGIN_ROOT
