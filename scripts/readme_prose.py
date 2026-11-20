@@ -52,6 +52,7 @@ for _path in ('distribution/alpine', 'distribution/conda-forge', 'distribution/f
 GUIDES['distribution/artifacthub/README.md'] = ('docker', 'Docker')
 GUIDES['distribution/glama/README.md'] = ('mcp', 'MCP')
 GUIDES['distribution/jsr/README.md'] = ('sdk/javascript', 'JavaScript')
+GUIDES['distribution/mcpb/README.md'] = ('mcp', 'MCP')
 
 
 def canonical_links(path):

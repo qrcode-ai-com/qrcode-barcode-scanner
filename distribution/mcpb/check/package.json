@@ -1,0 +1,10 @@
+{
+  "name": "qrcode-barcode-scanner-mcpb-check",
+  "version": "0.3.1",
+  "private": true,
+  "description": "The official MCPB tool, pinned, that validates the bundle's manifest and resolves its launch command as an MCPB host does",
+  "type": "module",
+  "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2"
+  }
+}

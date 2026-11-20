@@ -131,6 +131,18 @@ mint registry tokens). Every privileged job must:
                adapter. It requires its separate protected environment,
                canonical repository, read-only preflight and the exact
                rechecking helper. No other job inherits this exception.
+  MCPB         mcpb.yml > attest records the build provenance of the MCP Bundle
+               on an mcpb-v* tag only, in the protected environment mcpb, with
+               exactly contents read, id-token write and attestations write.
+               It needs bundle and the consumers consume and offline, runs the
+               gate `build-mcpb-bundle.py gate` first, downloads mcpb-bundle
+               once with digest-mismatch error, requires its sha256 to be
+               bundle's output and a rebuild of the commit to give the same
+               bytes, then runs one pinned actions/attest-build-provenance
+               step on that file, last. Its steps use only checkout,
+               download-artifact and that action, with no `if:`. It uploads
+               nothing and creates no release; the owner attaches the file.
+               No other job inherits this exception.
   Pages        pages.yml > deploy serves the browser example examples/web-vite
                on GitHub Pages: no registry, no release. It deploys from main
                of the canonical repository, after build, in the github-pages
@@ -264,6 +276,26 @@ MCP_REGISTRY_CONTEXT = (MCP_REGISTRY_GUARD + " && github.event_name == 'workflow
                         " && github.repository_id == '1126991539'")
 MCP_REGISTRY_INSPECT_RUN = "python3 scripts/mcp-registry-publish.py inspect"
 MCP_REGISTRY_PUBLISH_RUN = "python3 scripts/mcp-registry-publish.py publish"
+# The MCP Bundle: attest records the build provenance of the bundle the consumers judged.
+MCPB_WORKFLOW = "mcpb.yml"
+MCPB_JOB = (MCPB_WORKFLOW, "attest")
+MCPB_GUARD = "startsWith(github.ref, 'refs/tags/mcpb-v')"
+MCPB_GATE_RUN = 'python3 scripts/build-mcpb-bundle.py gate --ref "$GITHUB_REF"'
+MCPB_PERMISSIONS = {"contents": "read", "id-token": "write", "attestations": "write"}
+MCPB_USES = ("actions/checkout", "actions/download-artifact", "actions/attest-build-provenance")
+MCPB_SET = "mcpb-bundle"
+MCPB_DOWNLOAD = {"name": MCPB_SET, "path": "mcpb", "digest-mismatch": "error"}
+MCPB_SHA_ENV = {"BUNDLE_SHA256": "${{ needs.bundle.outputs.sha256 }}"}
+MCPB_REINSPECT_RUN = "\n".join((
+    "set -euo pipefail",
+    "shopt -s nullglob",
+    'bundles=("$PWD"/mcpb/*.mcpb)',
+    'if [ "${#bundles[@]}" -ne 1 ]; then exit 1; fi',
+    'test "$(sha256sum "${bundles[0]}" | cut -d\' \' -f1)" = "$BUNDLE_SHA256"',
+    'python3 scripts/build-mcpb-bundle.py verify "${bundles[0]}"',
+))
+MCPB_ATTEST = {"subject-path": "mcpb/*.mcpb"}
+MCPB_OUTPUT = "${{ steps.build.outputs.sha256 }}"
 # GitHub Pages serves the browser example: deploy holds the Pages token in one pinned step.
 PAGES_WORKFLOW = "pages.yml"
 PAGES_JOB = (PAGES_WORKFLOW, "deploy")
@@ -459,6 +491,7 @@ INSPECTION = {
     MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
     PAGES_JOB: "build",
+    MCPB_JOB: "bundle",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
     ("npm-publish.yml", "publish-wasm"): "build-wasm",
@@ -472,6 +505,7 @@ INSPECTION = {
 CONSUMERS = {
     DOTNET_JOB: {"preflight", "binding", "natives", "consumer"},
     MCP_JOB: {"preflight", "consume", "operand-proof"},
+    MCPB_JOB: {"consume", "offline"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
@@ -1805,6 +1839,54 @@ def _pages_contract_problems(wf: dict) -> list:
     return out
 
 
+def _mcpb_contract_problems(wf: dict, job: dict) -> list:
+    """(code, message, step index or -1) for each way mcpb.yml › attest could attest other bytes than
+    the bundle the consumers judged, or let other code hold its tokens."""
+    out, steps = [], _steps(job)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("mcpb-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in MCPB_USES:
+            fail(f"{step.get('uses')}: attest uses only {', '.join(MCPB_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on an attest step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    if len(downloads) != 1 or set(steps[downloads[0]]) - {"name", "uses", "with"} or \
+            steps[downloads[0]].get("with") != MCPB_DOWNLOAD:
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly one, with {MCPB_DOWNLOAD} and no other key")
+    attests = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/attest-build-provenance"]
+    if len(attests) != 1 or attests[0] != len(steps) - 1 or set(steps[attests[0]]) - {"name", "uses", "with"} or \
+            steps[attests[0]].get("with") != MCPB_ATTEST:
+        fail(f"attest steps {[i + 1 for i in attests]}: exactly one, the last, with {MCPB_ATTEST} and no other key")
+    if not any(set(steps[i]) <= {"name", "env", "run"} and _block(steps[i].get("run")) == MCPB_REINSPECT_RUN and
+               _bare(steps[i].get("env")) == _bare(MCPB_SHA_ENV) and downloads[:1] and attests[:1] and
+               downloads[0] < i < attests[0] for i in range(len(steps))):
+        fail("between the download and the attestation, re-inspect exactly as MCPB_REINSPECT_RUN says, with "
+             "BUNDLE_SHA256 from needs.bundle.outputs.sha256 and no other key: the bytes attested are the build "
+             "of this commit and the file the consumers judged")
+    bundle = jobs.get("bundle", {})
+    outputs = bundle.get("outputs") if isinstance(bundle.get("outputs"), dict) else {}
+    build = next((s for s in _steps(bundle) if str(s.get("id")) == "build"), {})
+    lines = _code_lines(build.get("run"))
+    if re.sub(r"\s+", "", str(outputs.get("sha256", ""))) != re.sub(r"\s+", "", MCPB_OUTPUT) or not (
+            any(re.search(r"\bscripts/build-mcpb-bundle\.py\s+build\b", line) for line in lines)
+            and any(re.search(r"\bscripts/build-mcpb-bundle\.py\s+verify\b", line) for line in lines)):
+        fail(f"bundle's output sha256 must be {MCPB_OUTPUT}, from the step that builds and verifies the bundle")
+    uploads = [(other, i, step.get("with") if isinstance(step.get("with"), dict) else {})
+               for other, body in jobs.items() for i, step in enumerate(_steps(body))
+               if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    named = [other for other, _, given in uploads
+             if re.fullmatch(".*".join(map(re.escape, re.split(r"\$\{\{.*?\}\}", str(given.get("name", "artifact"))))),
+                             MCPB_SET)]
+    if named != ["bundle"] or any("overwrite" in given for _, _, given in uploads):
+        fail(f"{MCPB_SET} may be uploaded by {named or 'no job'}: one upload, bundle's, written once")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1820,8 +1902,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     dotnet = (workflow, job_id) == DOTNET_JOB
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     pages = (workflow, job_id) == PAGES_JOB
+    mcpb = (workflow, job_id) == MCPB_JOB
     guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
-             else OCI_GUARD if oci else GUARD)
+             else OCI_GUARD if oci else MCPB_GUARD if mcpb else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -1839,7 +1922,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
                             else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"container"} if oci
-                            else ENVIRONMENTS)
+                            else {"mcpb"} if mcpb else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1856,6 +1939,10 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif pages:
         if perms != {"pages": "write", "id-token": "write"}:
             flag("permissions", "the Pages deployment needs exactly pages write and id-token write")
+    elif mcpb:
+        if perms != MCPB_PERMISSIONS:
+            flag("permissions", "the bundle attestation needs exactly contents read, id-token write and "
+                                "attestations write")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -1939,7 +2026,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     checkout = next((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/checkout"), None)
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
-                     else OCI_GATE_RUN if oci else GATE_RUN)
+                     else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else GATE_RUN)
     # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
     if not pages and (set(gate) - {"run", "name", "working-directory"} or
                       str(gate.get("run", "")).strip() != required_gate):
@@ -1953,6 +2040,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag(code, message, index)
     if mcp:
         for code, message, index in _mcp_contract_problems(wf, job, first_publish):
+            flag(code, message, index)
+    if mcpb:
+        for code, message, index in _mcpb_contract_problems(wf, job):
             flag(code, message, index)
     if (workflow, job_id) in REINSPECT_JOBS and not any(
             re.search(r"package-inspect\.py\s+archive\b", line) and "--strict" in _words(line)
@@ -2517,6 +2607,57 @@ MUTATIONS = (
      [(PAGES_WORKFLOW, "      contents: read\n    steps:\n", "      contents: write\n    steps:\n")], {}, 1,
      "pages.yml › verify [pages-contract]"),
     ("pages.yml as reviewed", P, [], {}, 0, "pages.yml › deploy, "),
+    # == mcpb.yml › attest: the build provenance of the judged bundle, and nothing else
+    ("MCPB attest without the tag guard", P, [(MCPB_WORKFLOW, "    if: " + MCPB_GUARD + "\n", "")], {}, 1,
+     "mcpb.yml › attest [guard]"),
+    ("MCPB attest on the engine tag family", P, [(MCPB_WORKFLOW, "    if: " + MCPB_GUARD, "    if: " + GUARD)], {},
+     1, "mcpb.yml › attest [guard]"),
+    ("MCPB attest outside its environment", P, [(MCPB_WORKFLOW, "    environment: mcpb\n", "")], {}, 1,
+     "mcpb.yml › attest [environment]"),
+    ("MCPB attest in the npm environment", P, [(MCPB_WORKFLOW, "    environment: mcpb", "    environment: npm")],
+     {}, 1, "mcpb.yml › attest [environment]"),
+    ("MCPB attest writes contents", P, [(MCPB_WORKFLOW, "      contents: read\n      id-token: write",
+                                         "      contents: write\n      id-token: write")], {}, 1,
+     "mcpb.yml › attest [permissions]"),
+    ("MCPB attest without attestations write", P, [(MCPB_WORKFLOW, "      attestations: write\n", "")], {}, 1,
+     "mcpb.yml › attest [permissions]"),
+    ("MCPB attest without the offline consumer", P, [(MCPB_WORKFLOW, "    needs: [bundle, consume, offline]",
+                                                      "    needs: [bundle, consume]")], {}, 1,
+     "mcpb.yml › attest [needs]"),
+    ("MCPB gate omitted", P, [(MCPB_WORKFLOW, "      - run: " + MCPB_GATE_RUN + "\n", "")], {}, 1,
+     "mcpb.yml › attest [gate]"),
+    ("MCPB rebuild omitted", P, [(MCPB_WORKFLOW, '          python3 scripts/build-mcpb-bundle.py verify "${bundles[0]}"\n',
+                                  "")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB judged hash replaced", P, [(MCPB_WORKFLOW, "          BUNDLE_SHA256: ${{ needs.bundle.outputs.sha256 }}\n        run",
+                                       "          BUNDLE_SHA256: arbitrary\n        run")], {}, 1,
+     "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB bundle output faked", P, [(MCPB_WORKFLOW, "      sha256: ${{ steps.build.outputs.sha256 }}",
+                                      "      sha256: arbitrary")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB attests every downloaded file", P, [(MCPB_WORKFLOW, "          subject-path: mcpb/*.mcpb",
+                                                "          subject-path: mcpb/*")], {}, 1,
+     "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB attest ignores the artifact digest", P, [(MCPB_WORKFLOW, "          path: mcpb\n          digest-mismatch: error",
+                                                     "          path: mcpb\n          digest-mismatch: ignore")], {}, 1,
+     "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB attestation made conditional", P, [(MCPB_WORKFLOW, "      - uses: actions/attest-build-provenance@",
+                                               "      - if: success()\n        uses: actions/attest-build-provenance@")],
+     {}, 1, "mcpb.yml › attest [mcpb-contract] (step 5)"),
+    ("MCPB attest runs another action", P, [(MCPB_WORKFLOW, "      - uses: actions/attest-build-provenance@",
+                                             "      - uses: actions/github-script@" + "e" * 40 + " # v8\n        with:\n"
+                                             "          script: core.info('x')\n"
+                                             "      - uses: actions/attest-build-provenance@")], {}, 1,
+     "mcpb.yml › attest [mcpb-contract] (step 5) actions/github-script@"),
+    ("MCPB attest creates the release", P, [(MCPB_WORKFLOW, "      - uses: actions/attest-build-provenance@",
+                                             '      - run: gh release create "$GITHUB_REF_NAME" mcpb/*.mcpb\n'
+                                             "      - uses: actions/attest-build-provenance@")], {}, 1,
+     "mcpb.yml › attest [release-create] (step 5)"),
+    ("MCPB a consumer uploads the bundle set", P, [(MCPB_WORKFLOW, "          name: mcpb-offline-${{ matrix.libc }}",
+                                                    "          name: mcpb-bundle")], {}, 1,
+     "mcpb.yml › attest [mcpb-contract]"),
+    ("MCPB bundle set overwritten", P, [(MCPB_WORKFLOW, "          if-no-files-found: error\n          retention-days: 30",
+                                         "          if-no-files-found: error\n          overwrite: true\n"
+                                         "          retention-days: 30")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
+    ("mcpb.yml as reviewed", P, [], {}, 0, "mcpb.yml › attest, "),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),

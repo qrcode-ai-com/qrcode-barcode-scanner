@@ -144,6 +144,10 @@ paths = [
 ]
 
 [[file]]
+held = "the MCP Bundle, under its own tag mcpb-v: it carries the published server and engine it was built from"
+paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
+
+[[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"
 paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
 

@@ -337,11 +337,13 @@ pulled anonymously and ran the exact-content regression checks. The public
 ## Recipes prepared for other package managers
 
 These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
-SHA-256 of its checksum list, and its checks run in this repository. None of these destinations
-serves the scanner yet, except Glama, which lists the MCP server since 20 November 2026. Four
-destinations received pull requests that day (conda-forge two, one per recipe). Three wait for
-review by their maintainers; MSYS2 closed its pull request unmerged. The other eight are prepared. Each
-recipe README says what its registry still needs, usually an account or a review in that registry.
+SHA-256 of its checksum list, and its checks run in this repository. The Glama container and the
+MCP Bundle for Smithery hold the MCP server 0.3.1 instead, with the engine it was released on, each
+package pinned by its npm integrity. None of these destinations serves the scanner yet, except
+Glama, which lists the MCP server since 20 November 2026. Four destinations received pull requests
+that day (conda-forge two, one per recipe). Three wait for review by their maintainers; MSYS2 closed
+its pull request unmerged. The other nine are prepared. Each recipe README says what its registry
+still needs, usually an account or a review in that registry.
 
 | Destination | Recipe | State | Checked here |
 | --- | --- | --- | --- |
@@ -349,6 +351,7 @@ recipe README says what its registry still needs, usually an account or a review
 | Artifact Hub | [artifacthub](artifacthub/README.md) | prepared | index composed against the pinned GHCR digests |
 | JSR | [jsr](jsr/README.md) | prepared | `jsr publish --dry-run` and a Deno scan of the staged module |
 | Glama | [glama](glama/README.md) | [listed](https://glama.ai/mcp/servers/qrcode-ai-com/qrcode-barcode-scanner-mcp) | MCP container built and judged offline on amd64 and arm64 |
+| Smithery | [mcpb](mcpb/README.md) | prepared, not uploaded | `mcpb.yml` builds the MCP Bundle twice to the same bytes, runs `mcpb validate` and drives its server over MCP stdio on Linux, macOS and Windows runners and offline in glibc and musl containers |
 | conda-forge | [conda-forge](conda-forge/README.md) | submitted: [CLI](https://github.com/conda-forge/staged-recipes/pull/35745), [Python](https://github.com/conda-forge/staged-recipes/pull/35746) | recipe schema and the test script against the published wheel |
 | Nixpkgs | [nix](nix/README.md) | prepared | evaluated against nixos-unstable, with the crate hash recorded |
 | openSUSE Build Service | [obs](obs/README.md) | prepared | `rpmspec`, `rpmlint` and the service file |

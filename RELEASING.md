@@ -535,6 +535,9 @@ and judged, and it is never marked as the latest release. Since 11 November
 2026 the tag ruleset of distribution tags covers these three patterns and
 `demos-v*`, the tags the hosted examples open, next to `oci-v*` and
 `agents-v*`: only the owner creates, moves or deletes such a tag.
+`mcpb-vX.Y.Z` (the MCP Bundle, numbered after the MCP server it holds) follows
+the same rule; adding `mcpb-v*` to that ruleset is an owner step of
+[MCP Bundle](#mcp-bundle).
 
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
@@ -1292,6 +1295,72 @@ gh workflow run mcp-registry-publish.yml --ref main --repo qrcode-ai-com/qrcode-
 
 Review the protected deployment and verify the active public record in the
 run summary. Future adapter versions need their own reviewed pins.
+
+### MCP Bundle
+
+`distribution/mcpb` holds the MCP Bundle of the published adapter 0.3.1: one
+`.mcpb` file with the adapter, the engine 0.11.0 and its six native packages,
+taken from their npm archives by `scripts/build-mcpb-bundle.py` and pinned by
+the lockfile's sha512. It is a packaging release: it rebuilds nothing, and the
+`agents-v0.3.1` release and the npm packages stay as published. Its tag is
+`mcpb-v<adapter>`; a new bundle follows a new adapter version, with its pins,
+its lockfile and the constants of the builder changed in one commit.
+
+`.github/workflows/mcpb.yml` builds the bundle twice, once in another time
+zone without the download cache, and requires the same bytes. Its consumers
+(`distribution/mcpb/check/consumer.mjs`) install the bundle with the official
+MCPB tool 2.1.2, run `mcpb validate`, start the server from the manifest as a
+host does and drive it over MCP stdio on Linux, macOS and Windows runners and
+in glibc and musl containers with no network. On a pull request or a
+dispatch, nothing more runs. On a tag `mcpb-v*`, `attest` runs in the
+protected environment `mcpb`. It runs the gate first
+(`build-mcpb-bundle.py gate`: the tag must be `mcpb-v` and the version of the
+manifest and the builder), downloads the bundle the consumers judged,
+requires its sha256 to be the one the build job wrote, builds the tagged
+commit again and requires the same bytes, then records their build
+provenance with `actions/attest-build-provenance`. It holds `contents: read`,
+`id-token: write` and `attestations: write` only, and no job creates or edits
+a release. `scripts/check-publish-guards.py` holds that job to this contract.
+
+The bytes depend on the commit: `SOURCE.md` in the bundle names it, and every
+entry carries its date in UTC. The same commit gives the same file in any time
+zone. Python's zlib compresses the entries: builds with zlib 1.2.12 and 1.3
+gave the same bytes, and `build-receipt.json` records the versions of each
+build in case another zlib does not.
+
+**Owner steps, once.** Create the environment `mcpb`: deployment tags
+`mcpb-v*` only, `ThibautMelen` as its required reviewer, no administrator
+bypass. Add `mcpb-v*` to the tag ruleset of distribution tags.
+
+**Each bundle.**
+
+1. Merge the change to `main`, with `mcpb.yml` green on its pull request.
+2. Tag the merged commit and push the tag:
+   `git tag -a mcpb-v0.3.1 <commit> -m 'MCP Bundle 0.3.1'`, then
+   `git push origin mcpb-v0.3.1`.
+3. Approve `attest` in the environment once the consumers are green, and wait
+   for the attestation.
+4. Download the artifact `mcpb-bundle` of that run into an empty directory.
+   Check it there: `shasum -a 256 -c ./*-SHA256SUMS`, then
+   `gh attestation verify qrcode-barcode-scanner-0.3.1.mcpb --repo
+   qrcode-ai-com/qrcode-barcode-scanner-rust`, then
+   `python3 scripts/build-mcpb-bundle.py verify <file> --revision mcpb-v0.3.1`
+   from a checkout.
+5. Create the release `mcpb-v0.3.1` on that tag, not marked as the latest,
+   with the `.mcpb` file and its `SHA256SUMS` file only, and its digest in the
+   notes. A published release is immutable: a mistake is a new adapter
+   version and a new tag, never a replaced file.
+6. Download both files signed out and compare their digests.
+
+**Smithery.** Smithery lists a local server from its MCPB file, uploaded in
+the browser at `smithery.ai/new` under Local (MCPB bundle). Upload the
+attested file of the release, then check that the listing names
+`scan_image` and `scan_file`. The web form is the route because the
+manifest's tools carry a name and a description only, as the MCPB schema
+requires (`mcpb validate` refuses `inputSchema`, which the consumer checks),
+while `smithery mcp publish`, the CLI, was reported to refuse tools without
+`inputSchema` (arcadeai-labs/smithery-cli#787). No upload has been made: the
+bundle is not listed on Smithery.
 
 ## PHP package — its own repository
 

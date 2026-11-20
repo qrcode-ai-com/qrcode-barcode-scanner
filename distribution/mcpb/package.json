@@ -1,0 +1,9 @@
+{
+  "name": "qrcode-barcode-scanner-mcpb",
+  "version": "0.3.1",
+  "private": true,
+  "description": "The MCP Bundle of the published MCP server @qrcode-ai-com/qrcode-barcode-scanner-mcp 0.3.1, with the native scanner 0.11.0 of its six platforms",
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-mcp": "0.3.1"
+  }
+}
