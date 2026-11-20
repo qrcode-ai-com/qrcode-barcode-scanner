@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-dark.gif?v=74f967bc6d23">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-light.gif?v=1ab06a2a50e5" alt="QR Code &amp; Barcode Scanner for the browser: the JavaScript and TypeScript logo, the quick start in the page, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-extension-dark.gif?v=496d8e3cbdbf">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-browser-extension-light.gif?v=ea1c85992de7" alt="QR Code &amp; Barcode Scanner for Chrome, Edge and Firefox: the Chrome, Edge and Firefox logos, the Scan this image menu item and the toolbar popup, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
