@@ -97,7 +97,8 @@ def prepare(app, receipts):
         "package": PACKAGE, "version": VERSION, "archive_sha256": ARCHIVE_SHA256,
         "public_files_byte_exact": len(files), "installed_from": expected_url,
         "dependency_source": "pub.dev", "fixture_sha256": FIXTURE_SHA256,
-        "cargo_profile_dev_opt_level": os.environ.get("CARGO_PROFILE_DEV_OPT_LEVEL", "default"),
+        "cargo_profile_dev": {name: value for name, value in sorted(os.environ.items())
+                              if name.startswith("CARGO_PROFILE_DEV_")},
     }, indent=2) + "\n")
     shutil.copyfile(app / "pubspec.lock", receipts / "consumer-pubspec.lock")
 

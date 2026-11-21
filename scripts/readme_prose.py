@@ -38,6 +38,7 @@ GUIDES = {
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
+    'tests/consumers/flutter/README.md': ('sdk/flutter', 'Flutter'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }
 for _path in ('crates/qrcode-ai-scanner-cli', 'distribution/appimage', 'distribution/aur',

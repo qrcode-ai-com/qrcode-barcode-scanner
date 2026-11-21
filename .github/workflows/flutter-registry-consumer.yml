@@ -14,9 +14,19 @@ permissions:
 env:
   RUST_TOOLCHAIN: "1.99.1"
   FLUTTER_VERSION: "3.47.9"
-  # Simulators require Flutter debug mode; the decoder needs optimized native code for its budgets.
-  # Default Rust opt-level 0 exceeded all three budgets in the retained first Android run.
-  CARGO_PROFILE_DEV_OPT_LEVEL: "2"
+  # Simulators and emulators run Flutter in debug mode, so cargokit builds the Rust core with
+  # Cargo's dev profile. These values give that build the code generation of the package's own
+  # [profile.release] (rust/Cargo.toml: opt-level 3, thin LTO, one codegen unit, no debug
+  # assertions), the build a release app gets on a device. Overflow checks stay on for every
+  # crate, a superset of the release profile, which keeps them for rxing only. The retained runs
+  # say why: Rust's default opt-level 0 exceeded all three budgets on Android (43274479127), and
+  # opt-level 2 alone left the first iOS fast scan at 1250 ms against its 800 ms (43278040726).
+  CARGO_PROFILE_DEV_OPT_LEVEL: "3"
+  CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: "false"
+  CARGO_PROFILE_DEV_LTO: "thin"
+  CARGO_PROFILE_DEV_CODEGEN_UNITS: "1"
+  CARGO_PROFILE_DEV_INCREMENTAL: "false"
+  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
   native:
