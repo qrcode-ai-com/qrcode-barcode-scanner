@@ -129,7 +129,7 @@ jobs:
           flutter test
       - name: FRB bindings are in sync with rust/src/api (no drift)
         run: |
-          cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
           cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
           cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
           flutter_rust_bridge_codegen generate

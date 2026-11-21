@@ -49,6 +49,64 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # TEMPORARY, removed before review: refreshes the locks and the generated
+  # bindings for the flutter_rust_bridge 2.13.0 bump, as an artifact.
+  frb-bump:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Refresh the locks and regenerate the bindings
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/frb-bump"
+          mkdir -p "$out/bindings/flutter/example" "$out/bindings/flutter/rust/src" "$out/bindings/flutter/lib/src"
+          cargo update --manifest-path bindings/flutter/rust/Cargo.toml \
+            -p flutter_rust_bridge -p flutter_rust_bridge_macros
+          (cd bindings/flutter && flutter pub get)
+          (cd bindings/flutter/example && flutter pub get)
+          git status --short
+          git diff --stat
+          cp bindings/flutter/rust/Cargo.lock "$out/bindings/flutter/rust/"
+          cp bindings/flutter/pubspec.lock "$out/bindings/flutter/"
+          cp bindings/flutter/example/pubspec.lock "$out/bindings/flutter/example/"
+          git -c user.name=frb-bump -c user.email=frb-bump@localhost \
+            commit -q -m 'temporary: refreshed locks' -- \
+            bindings/flutter/rust/Cargo.lock bindings/flutter/pubspec.lock bindings/flutter/example/pubspec.lock
+          python3 scripts/stage-flutter-package.py --output /tmp/frb-bump/bindings/flutter
+          cd /tmp/frb-bump/bindings/flutter
+          flutter pub get --enforce-lockfile
+          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+          find . -path ./rust/vendor -prune -o -path ./.dart_tool -prune -o -type f -print | sort > "$RUNNER_TEMP/files-before"
+          cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
+          cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
+          flutter_rust_bridge_codegen generate
+          find . -path ./rust/vendor -prune -o -path ./.dart_tool -prune -o -type f -print | sort > "$RUNNER_TEMP/files-after"
+          diff "$RUNNER_TEMP/files-before" "$RUNNER_TEMP/files-after" || true
+          diff -ru "$RUNNER_TEMP/frb-dart-before" lib/src/rust || true
+          diff -u "$RUNNER_TEMP/frb-rust-before.rs" rust/src/frb_generated.rs || true
+          cp -R lib/src/rust "$out/bindings/flutter/lib/src/"
+          cp rust/src/frb_generated.rs "$out/bindings/flutter/rust/src/"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: frb-bump
+          path: ${{ runner.temp }}/frb-bump/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check the staged crate against the refreshed lock
+        working-directory: /tmp/frb-bump/bindings/flutter
+        run: cargo check --locked --manifest-path rust/Cargo.toml --lib
+
   qualify:
     name: ${{ matrix.check }}
     needs: stage
@@ -136,7 +194,7 @@ jobs:
         if: matrix.platform == 'host'
         working-directory: /tmp/flutter-validation/bindings/flutter
         run: |
-          cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
           cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
           cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
           flutter_rust_bridge_codegen generate
