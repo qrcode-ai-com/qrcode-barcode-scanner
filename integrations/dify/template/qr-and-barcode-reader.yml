@@ -1,7 +1,7 @@
-# Draft of the Dify Marketplace template "Uploaded Image QR and Barcode Reader" (destination
-# expansion-26). Prepared only: it has not been imported into a Dify instance. It uses the tool of
-# this plugin, qrcode-ai-com/qrcode-barcode-scanner, and no model. TEMPLATE.md says how it becomes
-# the submitted template once the plugin is on the Marketplace.
+# The Dify Marketplace template "Uploaded Image QR and Barcode Reader" (destination expansion-26),
+# not submitted yet. It uses the tool of this plugin, qrcode-ai-com/qrcode-barcode-scanner, and no
+# model. The integration-dify-template job imports this file unchanged into Dify 1.20.0 and runs it.
+# TEMPLATE.md says how it becomes the submitted template once the plugin is on the Marketplace.
 app:
   description: 'Upload an image and read its QR codes and barcodes with the QR Code & Barcode Scanner plugin. Three branches: codes found, no code, and a file the scanner cannot read. No model key needed.'
   icon: 🔎

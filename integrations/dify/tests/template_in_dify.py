@@ -263,10 +263,14 @@ def main(argv=None):
           f"blank.png: outputs {finished['outputs']}")
     print("fast, blank.png: No code found")
     nodes, finished = run(console, apps["fast"], ids["corrupt.png"])
+    # A failure the fail branch handles: Dify reports the run as partly succeeded.
+    check(finished["status"] == "partial-succeeded", f"corrupt.png: workflow status {finished['status']}")
     check(ends(nodes) == ["unreadable"], f"corrupt.png: End nodes reached {ends(nodes)}")
     check(nodes["scan"]["status"] == "exception", f"corrupt.png: scan node status {nodes['scan']['status']}")
     error = finished["outputs"].get("error", "")
-    check(list(finished["outputs"]) == ["error"] and "[QRS-001]" in error, f"corrupt.png: outputs {finished['outputs']}")
+    check(list(finished["outputs"]) == ["error"] and error.endswith("error type: ValueError, error details: "
+          "unsupported or corrupt image: The image format could not be determined [QRS-001]"),
+          f"corrupt.png: outputs {finished['outputs']}")
     print(f"fast, corrupt.png: File not readable ({finished['status']}): {error}")
     (args.work / "runs.json").write_text(json.dumps({"corrupt": {"status": finished["status"], "error": error}}))
     if args.reports:
