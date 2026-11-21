@@ -169,6 +169,16 @@ held = "the MCP Bundle, under its own tag mcpb-v: it carries the published serve
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
 
 [[file]]
+held = "the Swift package, under its own tag swift-v: its satellite.json pins the engine tag it is built from"
+paths = [
+  "bindings/swift/package/**",
+  "bindings/swift/LISTING.md",
+  "scripts/stage-swift-package.py",
+  ".github/workflows/swift-package.yml",
+  "tests/consumers/swift-package/**",
+]
+
+[[file]]
 held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
 paths = [
   "distribution/http/**",

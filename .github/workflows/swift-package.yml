@@ -1,0 +1,342 @@
+name: Swift package
+
+# Builds the Swift package that qrcode-ai-com/qrcode-barcode-scanner-swift serves, from the engine
+# tag that bindings/swift/package/satellite.json pins: the xcframework of the engine's library for
+# iOS devices, the iOS simulator and macOS, its zip and the Swift UniFFI generates. It stages the
+# satellite's tree (scripts/stage-swift-package.py), compares the published satellite with the
+# stage of the commit it names, and installs the staged package in a clean Swift package on macOS,
+# where it reads both codes of the mixed fixture in the fast, full and frame profiles, then builds
+# it for iOS.
+# On a tag swift-vX.Y.Z only, attach uploads the judged zip into the owner's draft release of that
+# tag and reads it back; it never creates, edits or publishes a release (RELEASING.md, Swift
+# package).
+on:
+  workflow_dispatch:
+  push:
+    tags: ["swift-v*"]
+  pull_request:
+    paths:
+      - .github/workflows/swift-package.yml
+      - bindings/swift/package/**
+      - scripts/stage-swift-package.py
+      - scripts/satellite_stage.py
+      - tests/consumers/swift-package/**
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-package-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain).
+  RUST_TOOLCHAIN: "1.99.1"
+  SATELLITE: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-swift
+  FIXTURE: fixtures/symbology/mixed-code128-qr.png
+  FIXTURE_SHA256: c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8
+
+jobs:
+  xcframework:
+    name: Engine xcframework · iOS and macOS
+    runs-on: macos-15
+    timeout-minutes: 120
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Self-test the stage program
+        run: python3 scripts/stage-swift-package.py --self-test
+      - name: Read the pinned engine
+        id: pin
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          pin = json.load(open('bindings/swift/package/satellite.json'))
+          print(f"commit={pin['engine']['commit']}")
+          PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pin.outputs.commit }}
+          path: engine
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,aarch64-apple-darwin,x86_64-apple-darwin
+      # The zip a tag attaches is built without a cache.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          workspaces: engine/crates/qrcode-ai-scanner-uniffi
+      - name: Build the static library for five targets
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "13.0"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          for target in aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo build --release --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --target "$target"
+          done
+      # A plain module map: the xcframework holds static libraries with their headers, which SwiftPM
+      # puts on the include path, where a `framework module` (--xcframework) finds no header.
+      - name: Generate the Swift, the header and the module map
+        run: |
+          lib=engine/crates/qrcode-ai-scanner-uniffi/target/aarch64-apple-ios/release/libqrcode_ai_scanner_uniffi.a
+          mkdir -p "$RUNNER_TEMP/swift" "$RUNNER_TEMP/headers"
+          cargo run --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
+            "$lib" "$RUNNER_TEMP/swift" --swift-sources
+          cargo run --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
+            "$lib" "$RUNNER_TEMP/headers" --headers --modulemap --modulemap-filename module.modulemap
+          ls -l "$RUNNER_TEMP/swift" "$RUNNER_TEMP/headers"
+      - name: Assemble the xcframework
+        run: |
+          t=engine/crates/qrcode-ai-scanner-uniffi/target
+          lib=libqrcode_ai_scanner_uniffi.a
+          mkdir -p "$RUNNER_TEMP/simulator" "$RUNNER_TEMP/macos" "$RUNNER_TEMP/framework"
+          lipo -create "$t/aarch64-apple-ios-sim/release/$lib" "$t/x86_64-apple-ios/release/$lib" \
+            -output "$RUNNER_TEMP/simulator/$lib"
+          lipo -create "$t/aarch64-apple-darwin/release/$lib" "$t/x86_64-apple-darwin/release/$lib" \
+            -output "$RUNNER_TEMP/macos/$lib"
+          xcodebuild -create-xcframework \
+            -library "$t/aarch64-apple-ios/release/$lib" -headers "$RUNNER_TEMP/headers" \
+            -library "$RUNNER_TEMP/simulator/$lib" -headers "$RUNNER_TEMP/headers" \
+            -library "$RUNNER_TEMP/macos/$lib" -headers "$RUNNER_TEMP/headers" \
+            -output "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework"
+          # The terms the library ships under travel inside the bundle SwiftPM extracts.
+          cp engine/LICENSE engine/crates/qrcode-ai-scanner/LICENSE-APACHE-2.0 \
+            engine/crates/qrcode-ai-scanner/THIRD-PARTY.md "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework/"
+          find "$RUNNER_TEMP/framework" -type f | sort
+      - name: Pack the zip
+        id: pack
+        run: |
+          python3 scripts/stage-swift-package.py pack "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework" \
+            --swift "$RUNNER_TEMP/swift/qrcode_ai_scanner_uniffi.swift" --engine engine --out swift-xcframework
+          sha=$(shasum -a 256 swift-xcframework/QrcodeAiScannerFFI.xcframework.zip | cut -d' ' -f1)
+          test "$(swift package compute-checksum swift-xcframework/QrcodeAiScannerFFI.xcframework.zip)" = "$sha"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: swift-xcframework
+          path: swift-xcframework/
+          if-no-files-found: error
+          retention-days: 90
+
+  satellite:
+    name: Stage and compare the satellite
+    needs: xcframework
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: swift-xcframework
+          path: ${{ runner.temp }}/generated
+      - name: Stage the satellite from this commit
+        run: |
+          python3 scripts/stage-swift-package.py stage --generated "$RUNNER_TEMP/generated" --out swift-satellite
+          find swift-satellite -type f | sort
+      # The published satellite must be the stage of the commit its SOURCE.json names. Before the
+      # repository exists, a pull request may only say so; a tag or a manual run requires it.
+      - name: Compare the published satellite
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if ! git ls-remote --exit-code "$SATELLITE" HEAD > /dev/null 2>&1; then
+            if [ "$EVENT" = pull_request ]; then
+              echo "::notice::$SATELLITE does not exist yet: nothing to compare."
+              exit 0
+            fi
+            echo "::error::$SATELLITE does not exist: a release needs the satellite it pins."
+            exit 1
+          fi
+          git clone --quiet --depth 1 "$SATELLITE" "$RUNNER_TEMP/published"
+          python3 scripts/stage-swift-package.py verify "$RUNNER_TEMP/published" --generated "$RUNNER_TEMP/generated"
+          python3 - <<'PY'
+          import json, os, pathlib, sys
+          published = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'published' / 'SOURCE.json').read_text())
+          staged = json.loads(pathlib.Path('swift-satellite/SOURCE.json').read_text())
+          same = published['package'] == staged['package']
+          print(f"published package: {published['package']}")
+          if not same:
+              print('::warning::the published satellite pins another package than this commit: stage it again after the merge')
+          if os.environ['EVENT'] != 'pull_request' and not same:
+              sys.exit(1)
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: swift-satellite
+          path: swift-satellite/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+
+  consumer:
+    name: Clean Swift package · macOS, then an iOS build
+    needs: [xcframework, satellite]
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: swift-satellite
+          path: ${{ runner.temp }}/work/satellite
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: swift-xcframework
+          path: ${{ runner.temp }}/xcframework
+      # SwiftPM accepts the zip only when its checksum is the one Package.swift pins. The URL is
+      # the release asset, which exists once the owner publishes the release; here the same zip
+      # stands at a local path, after that check.
+      - name: Place the zip the staged Package.swift pins
+        run: |
+          zip="$RUNNER_TEMP/xcframework/QrcodeAiScannerFFI.xcframework.zip"
+          checksum=$(swift package compute-checksum "$zip")
+          echo "zip checksum: $checksum"
+          python3 - "$RUNNER_TEMP/work/satellite/Package.swift" "$checksum" <<'PY'
+          import re, sys
+          path, checksum = sys.argv[1], sys.argv[2]
+          text = open(path).read()
+          target = re.search(r'\n( +)url: "(https://[^"]+)",\n +checksum: "([0-9a-f]{64})"\n', text)
+          if not target:
+              sys.exit('the staged Package.swift has no url and checksum binary target')
+          if target[3] != checksum:
+              sys.exit(f'the staged Package.swift pins {target[3]}, not the zip this run built ({checksum})')
+          print(f'pinned: {target[2]} {target[3]}')
+          text = text.replace(target[0], f'\n{target[1]}path: "QrcodeAiScannerFFI.xcframework"\n', 1)
+          open(path, 'w').write(text)
+          PY
+          (cd "$RUNNER_TEMP/work/satellite" && unzip -q "$zip")
+          cp -R tests/consumers/swift-package "$RUNNER_TEMP/work/consumer"
+          echo "$FIXTURE_SHA256  $FIXTURE" | shasum -a 256 -c -
+      - name: Scan on macOS
+        run: |
+          mkdir -p receipt
+          swift build -c release --package-path "$RUNNER_TEMP/work/consumer"
+          "$RUNNER_TEMP/work/consumer/.build/release/Consumer" "$FIXTURE" receipt/facts-macos.json
+      - name: Build for iOS devices and the iOS simulator
+        working-directory: ${{ runner.temp }}/work/satellite
+        run: |
+          for destination in 'generic/platform=iOS' 'generic/platform=iOS Simulator'; do
+            xcodebuild build -scheme QRCodeBarcodeScanner -destination "$destination" \
+              -derivedDataPath "$RUNNER_TEMP/derived" -quiet
+          done
+      - name: Write the receipt
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p receipt
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = pathlib.Path('receipt')
+          facts = receipt / 'facts-macos.json'
+          staged = pathlib.Path(os.environ['RUNNER_TEMP']) / 'work' / 'satellite' / 'SOURCE.json'
+          build = pathlib.Path(os.environ['RUNNER_TEMP']) / 'xcframework' / 'build.json'
+          json.dump({
+              'check': 'Swift package, clean consumer of the staged satellite',
+              'job_status': os.environ['JOB_STATUS'],
+              'package': json.loads(staged.read_text())['package'] if staged.exists() else None,
+              'build': {key: value for key, value in json.loads(build.read_text()).items() if key != 'members'} if build.exists() else None,
+              'macos_scan': json.loads(facts.read_text()) if facts.exists() else None,
+              'ios_builds': ['generic/platform=iOS', 'generic/platform=iOS Simulator'],
+              'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'commit': os.environ['GITHUB_SHA'],
+          }, open(receipt / 'receipt.json', 'w'), indent=2)
+          print(open(receipt / 'receipt.json').read())
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: swift-consumer
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # Tag-only, and its own job: the builds above never hold a write token. It never creates, edits
+  # or publishes a release: the owner creates the draft of the tag swift-vX.Y.Z first and
+  # publishes it once. This job uploads the judged zip and checksum.txt into that draft, only
+  # where no zip is, only when the zip is the archive satellite.json pins, then reads it back.
+  attach:
+    needs: [xcframework, satellite, consumer]
+    if: startsWith(github.ref, 'refs/tags/swift-v')
+    runs-on: ubuntu-24.04
+    environment: swift
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write # upload the xcframework zip and checksum.txt into the owner's draft release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/stage-swift-package.py gate --ref "$GITHUB_REF"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: swift-xcframework
+          path: swift-xcframework
+          digest-mismatch: error
+      - name: Re-inspect the zip the consumer judged
+        env:
+          BUILT_SHA256: ${{ needs.xcframework.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          pinned=$(python3 -c "import json; print(json.load(open('bindings/swift/package/satellite.json'))['checksum'])")
+          built=$(sha256sum swift-xcframework/QrcodeAiScannerFFI.xcframework.zip | cut -d' ' -f1)
+          echo "pinned: $pinned"
+          echo "built : $built"
+          test "$built" = "$BUILT_SHA256"
+          test "$built" = "$pinned"
+          printf '%s\n' "$built" > swift-xcframework/checksum.txt
+      - name: Attach the zip to the owner's draft and read it back
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          zip=swift-xcframework/QrcodeAiScannerFFI.xcframework.zip
+          pinned="$(cat swift-xcframework/checksum.txt)"
+          commit="$(git rev-parse 'HEAD^{commit}')"
+          gh release list --limit 1000 --json tagName,isDraft --jq '.[] | "\(.tagName) draft=\(.isDraft)"' > "$RUNNER_TEMP/releases.txt"
+          count="$(awk -v tag="$GITHUB_REF_NAME" '$1 == tag' "$RUNNER_TEMP/releases.txt" | awk 'END { print NR }')"
+          if [ "$count" -ne 1 ]; then
+            echo "::error::$count releases carry the tag $GITHUB_REF_NAME, where exactly the owner's draft must: nothing was uploaded."
+            exit 1
+          fi
+          gh release view "$GITHUB_REF_NAME" --json isDraft,targetCommitish,assets \
+            --jq '"draft=\(.isDraft)", "target=\(.targetCommitish)", (.assets[] | "asset=\(.name)")' > "$RUNNER_TEMP/release.txt"
+          draft="$(sed -n 's/^draft=//p' "$RUNNER_TEMP/release.txt")"
+          target="$(sed -n 's/^target=//p' "$RUNNER_TEMP/release.txt")"
+          if [ "$target" != "$commit" ]; then
+            echo "::error::the release $GITHUB_REF_NAME targets ${target:-<none>}, not the tagged commit $commit: nothing was uploaded."
+            exit 1
+          fi
+          if grep -qxF 'asset=QrcodeAiScannerFFI.xcframework.zip' "$RUNNER_TEMP/release.txt"; then
+            echo "::notice::the zip is already attached: leaving it untouched."
+          elif [ "$draft" != true ]; then
+            echo "::error::$GITHUB_REF_NAME is published without the zip: a published release is never completed in place."
+            exit 1
+          elif grep -qxF 'asset=checksum.txt' "$RUNNER_TEMP/release.txt"; then
+            echo "::error::the draft carries checksum.txt without the zip: the owner deletes it from the draft, then re-runs this job."
+            exit 1
+          else
+            gh release upload "$GITHUB_REF_NAME" "$zip" swift-xcframework/checksum.txt
+          fi
+          gh release download "$GITHUB_REF_NAME" -p QrcodeAiScannerFFI.xcframework.zip -O "$RUNNER_TEMP/attached.zip"
+          attached="$(sha256sum "$RUNNER_TEMP/attached.zip" | cut -d' ' -f1)"
+          echo "attached: $attached"
+          if [ "$attached" != "$pinned" ]; then
+            echo "::error::the attached zip is not the archive the satellite pins: SwiftPM would refuse it."
+            exit 1
+          fi
+          echo "::notice::the attached zip is the archive the satellite pins ($pinned)."

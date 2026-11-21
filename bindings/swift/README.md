@@ -77,6 +77,20 @@ a local package and link its `QrcodeAiScanner` library.
 The Swift names keep their original spelling: the `QrcodeAiScanner` library and
 module, and the `QrcodeAiScannerFFI` binary target.
 
+## The Swift package repository
+
+Not published yet. The package SwiftPM and the Swift Package Index will read lives in its own
+repository, [`qrcode-ai-com/qrcode-barcode-scanner-swift`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-swift),
+with `Package.swift` at its root, the library product and module `QRCodeBarcodeScanner`, and
+the engine compiled for iOS devices, the iOS simulator and macOS. Nothing in it is edited by
+hand: [`scripts/stage-swift-package.py`](../../scripts/stage-swift-package.py) writes it from
+[`package/`](package/) and the engine tag `package/satellite.json` pins, and the workflow
+[Swift package](../../.github/workflows/swift-package.yml) builds it, compares that repository
+with its stage and installs it in a clean Swift package on macOS, where it reads both codes of
+the mixed fixture in the fast, full and frame profiles. It has no tag yet, so no dependency line
+resolves; the release and the index submission are the owner's steps, in
+[LISTING.md](LISTING.md).
+
 ## Usage
 
 `scan(...)` throws `ScanBindingError` and returns the `ScanReport` as a **JSON

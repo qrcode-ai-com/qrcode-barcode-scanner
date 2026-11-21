@@ -15,6 +15,7 @@ bindings/kotlin/README.md
 bindings/php/README.md
 bindings/ruby/README.md
 bindings/swift/README.md
+bindings/swift/package/README.md
 crates/qrcode-ai-scanner-cli/README.md
 crates/qrcode-ai-scanner-node/README.md
 crates/qrcode-ai-scanner-py/README.md
