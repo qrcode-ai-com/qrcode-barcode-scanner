@@ -1,6 +1,6 @@
 name: Integration · agent plugin
 
-# integrations/agent-plugin is one plugin root for fourteen agent clients; its own repository,
+# integrations/agent-plugin is one plugin root for seventeen agent clients; its own repository,
 # qrcode-ai-com/qrcode-barcode-scanner-plugin, is written from a commit of this one by
 # scripts/stage-agent-plugin-satellite.py. This workflow stages that tree from this commit,
 # checks every manifest against its published JSON schema, runs Gemini CLI's extension validator

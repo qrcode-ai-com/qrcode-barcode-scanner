@@ -168,7 +168,7 @@ To remove it, run `gemini extensions uninstall qrcode-barcode-scanner`. The [Gem
 
 ### Kiro
 
-In Kiro, open Powers, choose Add Custom Power, then Import power from GitHub, and paste `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin`. Kiro reads the root `plugin.json`, `mcp.json` and `skills/`, and loads the power when your request matches its keywords. To remove it, delete the power in the same panel. The [Kiro QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/kiro) and the [Kiro barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/kiro) describe the power.
+In Kiro, open Powers, choose Add Custom Power, then Import power from GitHub, and paste `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin`. Kiro reads the root `plugin.json`, `mcp.json` and `skills/`, and loads the power when your request matches its keywords. Kiro imports the default branch, not a release tag: check the commit it shows. To remove it, delete the power in the same panel. The [Kiro QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/kiro) and the [Kiro barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/kiro) describe the power.
 
 ### Kimi Code
 
@@ -211,7 +211,7 @@ A goose plugin carries skills, so the skill and the server are added separately.
 goose plugin install https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin.git
 ```
 
-Then add the server. Copy the `qrscan` entry of [`goose/qrscan-extension.yaml`](goose/qrscan-extension.yaml) under `extensions:` in `~/.config/goose/config.yaml`, or open this link in a browser to add it from goose Desktop:
+`goose plugin install` takes no tag and clones the default branch: check the commit it records. Then add the server. Copy the `qrscan` entry of [`goose/qrscan-extension.yaml`](goose/qrscan-extension.yaml) under `extensions:` in `~/.config/goose/config.yaml`, or open this link in a browser to add it from goose Desktop:
 
 ```text
 goose://extension?cmd=npx&arg=--yes&arg=--ignore-scripts&arg=%40qrcode-ai-com%2Fqrcode-barcode-scanner-mcp%400.3.1&id=qrscan&name=QR%20Code%20%26%20Barcode%20Scanner&description=Read%20QR%20codes%20and%20barcodes%20in%20local%20images
