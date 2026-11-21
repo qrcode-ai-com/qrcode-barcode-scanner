@@ -365,6 +365,11 @@ still needs, usually an account or a review in that registry.
 
 No Rust build of these recipes ran here: each registry compiles the package in its own builders.
 
+The [Wasmer package](wasmer/README.md) is compiled here instead: `wasmer.yml` builds qrscan for
+WASI (`wasm32-wasip1`) from the source of tag v0.11.0, twice to the same module, and runs it under
+Wasmer on the shared truth set beside the native 0.11.0 command. It is prepared, not published;
+publishing it on the Wasmer registry is the owner's step ([LISTING.md](wasmer/LISTING.md)).
+
 <details>
 <summary>Historical installations: agent 0.1.0 and engine 0.10.0</summary>
 

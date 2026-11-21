@@ -149,6 +149,10 @@ held = "the MCP Bundle, under its own tag mcpb-v: it carries the published serve
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
 
 [[file]]
+held = "the Wasmer package, built from the source of tag v0.11.0 and published by the owner: moved when a later source is packaged"
+paths = ["distribution/wasmer/**", ".github/workflows/wasmer.yml"]
+
+[[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"
 paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
 
