@@ -4,7 +4,7 @@
 ci.yml builds and tests the Rust workspace, the native Node package and the
 WASM package on three systems. A pull request that only changes an
 integration, an example, the documentation, a prepared submission, the README
-counts and release pins that come with a new integration, or a workflow other
+counts, README list and release pins that come with a new integration, or a workflow other
 than ci.yml and the reusable workflows it calls, does not change any of that:
 those trees consume the published artifacts and have their own workflows. For
 such a pull request the heavy jobs are skipped; lint (publish guards, every
@@ -41,6 +41,7 @@ OUTSIDE_ENGINE = (
     'distribution/releases/pins.toml',
     'scripts/build-readme-actions.py',
     'scripts/build-readme-licensing.py',
+    'scripts/maintained-readmes.txt',
     'scripts/readme_prose.py',
     'scripts/test-licensing.py',
     'scripts/test-readme-actions.py',
@@ -106,7 +107,8 @@ def self_test():
         ('a nested workflow path', ['.github/workflows/sub/x.yml'], True),
         ('readme counts and pins', ['integrations/x/README.md', 'scripts/test-licensing.py',
                                     'scripts/test-readme-actions.py', 'scripts/readme_prose.py',
-                                    'distribution/releases/pins.toml'], False),
+                                    'distribution/releases/pins.toml',
+                                    'scripts/maintained-readmes.txt'], False),
         ('another script', ['integrations/x/a.js', 'scripts/package-inspect.py'], True),
         ('another distribution file', ['distribution/releases/other.toml'], True),
         ('the pins self-test script', ['scripts/release-fanout.py'], True),
