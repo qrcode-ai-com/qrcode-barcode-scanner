@@ -6,8 +6,9 @@ services:
   - type: web
     name: qrcode-barcode-scanner-http
     runtime: docker
-    # 0.1 CPU and 512 MB. Render spins a free web service down after 15 minutes without traffic.
-    plan: free
+    # Half a CPU and 512 MB, $7 a month prorated to the second. On the free plan's 0.1 CPU a scan
+    # takes 12 to 17 seconds and the engine cuts it short: the free plan is not this file's plan.
+    plan: 0.5c-512mb
     healthCheckPath: /healthz
     # Render advises 'off' for a Deploy to Render button: a push here then redeploys no copy.
     autoDeployTrigger: 'off'
@@ -15,3 +16,6 @@ services:
       # One scan at a time on 512 MB. Settings may lower the service's limits, never raise them.
       - key: QRSCAN_HTTP_MAX_CONCURRENT
         value: "1"
+      # Half a CPU runs every stage about twice as slowly: twice the engine's budgets.
+      - key: QRSCAN_HTTP_BUDGET_SCALE
+        value: "2"

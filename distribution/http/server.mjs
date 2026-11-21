@@ -29,6 +29,12 @@ const VARIABLES = Object.freeze({
   pixels: "QRSCAN_HTTP_MAX_PIXELS",
   concurrent: "QRSCAN_HTTP_MAX_CONCURRENT",
 });
+// The time budget of each profile in ms, as the pinned package documents its budgetMs option. A
+// host that gives the container a tenth of a CPU runs every stage about ten times slower, and the
+// engine would cut the scan short: QRSCAN_HTTP_BUDGET_SCALE multiplies these budgets.
+export const PROFILE_BUDGETS_MS = Object.freeze({ fast: 800, frame: 80, full: 4000 });
+export const MAX_BUDGET_SCALE = 20;
+const BUDGET_SCALE = "QRSCAN_HTTP_BUDGET_SCALE";
 
 /** Operator settings can lower the limits, never raise them past the published boundary. */
 export function limitsFromEnvironment(env = process.env) {
@@ -44,6 +50,21 @@ export function limitsFromEnvironment(env = process.env) {
     limits[key] = number;
   }
   return Object.freeze(limits);
+}
+
+/** The factor of the profile budgets: a whole number from 1, the engine's own budgets, to 20. */
+export function budgetScaleFromEnvironment(env = process.env) {
+  const value = env[BUDGET_SCALE];
+  if (value === undefined || value === "") return 1;
+  if (!/^[1-9]\d*$/.test(value) || Number(value) > MAX_BUDGET_SCALE) {
+    throw new Error(`${BUDGET_SCALE} must be a whole number from 1 to ${MAX_BUDGET_SCALE}`);
+  }
+  return Number(value);
+}
+
+/** The budget each profile scans with, in ms. */
+export function profileBudgets(scale) {
+  return Object.freeze(Object.fromEntries(PROFILES.map((profile) => [profile, PROFILE_BUDGETS_MS[profile] * scale])));
 }
 
 /**
@@ -152,7 +173,7 @@ async function readScanRequest(request, url, limits) {
   return { bytes, mode };
 }
 
-function describe(limits, source) {
+function describe(limits, budgets, source) {
   return {
     name: "QR Code & Barcode Scanner HTTP service",
     service: SERVICE_VERSION,
@@ -164,6 +185,7 @@ function describe(limits, source) {
     modes: PROFILES,
     defaultMode: DEFAULT_PROFILE,
     limits: { inputBytes: limits.inputBytes, dimension: limits.dimension, pixels: limits.pixels, concurrent: limits.concurrent },
+    budgetsMs: budgets,
     privacy: "Images are scanned in memory and never stored. The service makes no outbound request and never opens a decoded link.",
     license: `AGPL-3.0-or-later: this service runs the scanner engine ${ENGINE_VERSION}. Its own source is MIT.`,
     source,
@@ -221,9 +243,13 @@ function pathOf(target) {
  * A scan slot (limits.concurrent) is held only while the engine scans. Reading a body holds an
  * upload slot, twice as many, so slow uploads cannot hold the scans, and the images held in
  * memory stay bounded.
+ *
+ * BUDGET_SCALE 1 leaves each profile's budget to the engine; a larger one passes the scaled
+ * budget as budgetMs.
  */
-export function createScanServer({ engine, limits = limitsFromEnvironment(), source = sourceFromRecord(), log = () => {} }) {
+export function createScanServer({ engine, limits = limitsFromEnvironment(), budgetScale = budgetScaleFromEnvironment(), source = sourceFromRecord(), log = () => {} }) {
   if (engine?.version?.() !== ENGINE_VERSION) throw new Error(`Scanner engine ${ENGINE_VERSION} is required`);
+  const budgets = profileBudgets(budgetScale);
   const uploadSlots = 2 * limits.concurrent;
   let active = 0;
   let uploads = 0;
@@ -267,7 +293,9 @@ export function createScanServer({ engine, limits = limitsFromEnvironment(), sou
     active += 1;
     let report;
     try {
-      report = await engine.scan(read.bytes, { profile: read.mode, maxDimension: limits.dimension, maxPixels: limits.pixels });
+      const options = { profile: read.mode, maxDimension: limits.dimension, maxPixels: limits.pixels };
+      if (budgetScale > 1) options.budgetMs = budgets[read.mode];
+      report = await engine.scan(read.bytes, options);
     } catch (error) {
       const tag = error?.message?.match(/\[?(QRS-\d{3})\]?/)?.[1];
       if (INPUT_ERRORS.has(tag)) throw new Refusal(422, tag, clean(error.message));
@@ -306,7 +334,7 @@ export function createScanServer({ engine, limits = limitsFromEnvironment(), sou
           send(response, 200, page(limits, source), "text/html; charset=utf-8", {
             "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
           });
-        } else json(response, 200, describe(limits, source));
+        } else json(response, 200, describe(limits, budgets, source));
       } else {
         throw new Refusal(404, "QRSHTTP_NOT_FOUND", "Use GET /, GET /healthz or POST /scan");
       }
@@ -349,11 +377,12 @@ export function createScanServer({ engine, limits = limitsFromEnvironment(), sou
 
 async function main() {
   const limits = limitsFromEnvironment();
+  const budgetScale = budgetScaleFromEnvironment();
   const engine = await import("@qrcode-ai-com/qrcode-barcode-scanner");
   const source = sourceFromRecord();
   const port = process.env.PORT === undefined || process.env.PORT === "" ? 8080 : Number(process.env.PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be a TCP port number");
-  const server = createScanServer({ engine, limits, source, log: (line) => console.log(line) });
+  const server = createScanServer({ engine, limits, budgetScale, source, log: (line) => console.log(line) });
   const host = process.env.HOST || undefined;
   server.listen(port, host, () => {
     console.log(`QR Code & Barcode Scanner HTTP service ${SERVICE_VERSION}, engine ${ENGINE_VERSION}, listening on ${host ?? "every address"} port ${port}; source ${source.service}`);

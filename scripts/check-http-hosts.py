@@ -23,6 +23,7 @@ Exit 0 when the step passes, 1 when it fails, 2 for usage. Needs PyYAML, and jso
 """
 import argparse
 import json
+import math
 import pathlib
 import re
 import sys
@@ -32,21 +33,27 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SERVICE = ROOT / "distribution/http"
 NAME = "qrcode-barcode-scanner-http"
 HEALTH = "/healthz"
-# The variables of server.mjs and the ceilings of HARD_LIMITS: a host file may lower them only.
+# The variables server.mjs reads and their ceilings: the HARD_LIMITS a host file may only lower,
+# and MAX_BUDGET_SCALE.
+BUDGET_SCALE = "QRSCAN_HTTP_BUDGET_SCALE"
 LIMITS = {
     "QRSCAN_HTTP_MAX_INPUT_BYTES": 8 * 1024 * 1024,
     "QRSCAN_HTTP_MAX_DIMENSION": 4096,
     "QRSCAN_HTTP_MAX_PIXELS": 16_000_000,
     "QRSCAN_HTTP_MAX_CONCURRENT": 2,
+    BUDGET_SCALE: 20,
 }
 HOSTS = {
     "render": {
         "file": "render.yaml",
         "schema": "https://render.com/schema/render.yaml.json",
         # https://render.com/docs/web-services: "The default value of PORT is 10000 for all Render
-        # web services." https://render.com/docs/blueprint-spec: plan `free` is 0.1 CPU and 512 MB.
+        # web services." https://render.com/pricing: `0.5c-512mb` is "Less than 1 CPU" and 512 MB,
+        # $7/month; the Blueprint spec gives it half a CPU. Measured in a 0.1 CPU container, the
+        # free plan's, a scan of the mixed sample took 12 to 17 seconds and every profile was cut
+        # short at the engine's budgets: it is not a judged plan.
         "port": 10000,
-        "plans": {"free": {"cpus": "0.1", "memory": "512m"}},
+        "plans": {"0.5c-512mb": {"cpus": "0.5", "memory": "512m"}},
     },
 }
 
@@ -79,6 +86,15 @@ def limit_variables(pairs, name):
             raise Refused(f"{name} raises {key} above the service limit {LIMITS[key]}")
         seen[key] = value
     return seen
+
+
+def budget_scale(cpus, env, name):
+    """Refused when a plan with a fraction of a CPU keeps budgets the engine would cut short."""
+    need = math.ceil(round(1 / float(cpus), 6))
+    scale = int(env.get(BUDGET_SCALE, "1"))
+    if scale < need:
+        raise Refused(f"{name} runs the service on {cpus} CPU: set {BUDGET_SCALE} to at least {need}, "
+                      "or the engine cuts its scans short")
 
 
 def validate(data, schema, name):
@@ -123,6 +139,7 @@ def render(tree, schema=None):
     if not isinstance(variables, list) or any(not isinstance(v, dict) or set(v) != {"key", "value"} for v in variables):
         raise Refused("render.yaml envVars must be entries with a key and a value only")
     env = limit_variables(((v["key"], v["value"]) for v in variables), "render.yaml")
+    budget_scale(HOSTS["render"]["plans"][plan]["cpus"], env, "render.yaml")
     return {"plan": plan, "env": env}
 
 
@@ -156,7 +173,7 @@ def self_test():
     good = (SERVICE / "render.yaml").read_text(encoding="utf-8")
     cases = {
         "an unquoted off": (good.replace("'off'", "off"), "autoDeployTrigger"),
-        "another plan": (good.replace("plan: free", "plan: 0.5c-512mb"), "judged plans"),
+        "the free plan": (good.replace("plan: 0.5c-512mb", "plan: free"), "judged plans"),
         "another health path": (good.replace(f"healthCheckPath: {HEALTH}", "healthCheckPath: /"), "healthCheckPath"),
         "a native runtime": (good.replace("runtime: docker", "runtime: node"), "runtime"),
         "another repository": (good.replace("    runtime: docker\n",
@@ -167,6 +184,10 @@ def self_test():
         "an unknown variable": (good.replace("QRSCAN_HTTP_MAX_CONCURRENT", "QRSCAN_HTTP_MAX_THREADS"), "does not read"),
         "a number, not a string": (re.sub(r'value: "(\d+)"', r"value: \1", good, count=1), "quoted string"),
         "two services": (good + good.split("services:\n", 1)[1], "one service"),
+        "the engine's budgets on half a CPU": (re.sub(r'(?m)^ *- key: QRSCAN_HTTP_BUDGET_SCALE\n *value: "\d+"\n', "", good),
+                                               "at least 2"),
+        "a budget scale above 20": (re.sub(r'(key: QRSCAN_HTTP_BUDGET_SCALE\n *value: )"\d+"', r'\1"21"', good),
+                                    "above the service limit 20"),
     }
     failures = []
     with tempfile.TemporaryDirectory() as scratch:

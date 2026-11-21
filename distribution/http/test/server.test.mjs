@@ -12,7 +12,10 @@ import { after, before, describe, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import * as engine from "@qrcode-ai-com/qrcode-barcode-scanner";
-import { ENGINE_SOURCE, HARD_LIMITS, createScanServer, limitsFromEnvironment, sourceFromRecord } from "../server.mjs";
+import {
+  ENGINE_SOURCE, HARD_LIMITS, MAX_BUDGET_SCALE, PROFILE_BUDGETS_MS, budgetScaleFromEnvironment, createScanServer, limitsFromEnvironment,
+  sourceFromRecord,
+} from "../server.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const FIXTURE = [process.env.QRSCAN_HTTP_FIXTURE, join(here, "fixtures/mixed-code128-qr.png"), join(here, "../../../fixtures/symbology/mixed-code128-qr.png")]
@@ -143,6 +146,22 @@ describe("what the service refuses before a scan", () => {
     assert.throws(() => limitsFromEnvironment({ QRSCAN_HTTP_MAX_DIMENSION: "12px" }), /positive integer/);
   });
 
+  test("the budget scale is a whole number from 1 to 20", () => {
+    assert.equal(budgetScaleFromEnvironment({}), 1);
+    assert.equal(budgetScaleFromEnvironment({ QRSCAN_HTTP_BUDGET_SCALE: "" }), 1);
+    assert.equal(budgetScaleFromEnvironment({ QRSCAN_HTTP_BUDGET_SCALE: "10" }), 10);
+    assert.equal(budgetScaleFromEnvironment({ QRSCAN_HTTP_BUDGET_SCALE: String(MAX_BUDGET_SCALE) }), 20);
+    for (const value of ["0", "21", "1.5", "-2", "ten"]) {
+      assert.throws(() => budgetScaleFromEnvironment({ QRSCAN_HTTP_BUDGET_SCALE: value }), /whole number from 1 to 20/, value);
+    }
+  });
+
+  test("the profile budgets are the ones the pinned package documents", () => {
+    const types = readFileSync(join(here, "../node_modules/@qrcode-ai-com/qrcode-barcode-scanner/index.d.ts"), "utf8");
+    const { full, fast, frame } = PROFILE_BUDGETS_MS;
+    assert.ok(types.includes(`(full ${full} · fast ${fast} · frame ${frame} ms)`), "index.d.ts no longer lists these budgets");
+  });
+
   test("another engine version is refused at start", () => {
     assert.throws(() => createScanServer({ engine: { version: () => "0.10.0", scan: engine.scan }, source }), /0\.11\.0 is required/);
   });
@@ -205,6 +224,28 @@ describe("what the service refuses before a scan", () => {
       assert.equal(answer.status, 500);
       assert.equal(JSON.parse(answer.body).error.code, "QRSHTTP_ENGINE");
     } finally { server.close(); }
+  });
+
+  test("a budget scale above 1 scans with the scaled budget, and 1 leaves it to the engine", async () => {
+    const calls = [];
+    const recording = { version: () => "0.11.0", scan: async (bytes, options) => { calls.push(options); return engine.scan(bytes, options); } };
+    for (const scale of [1, 10]) {
+      const server = createScanServer({ engine: recording, limits: limitsFromEnvironment({}), budgetScale: scale, source });
+      const base = await listen(server);
+      try {
+        calls.length = 0;
+        for (const mode of ["fast", "frame", "full"]) {
+          const answer = await exchange(base, "POST", `/scan?mode=${mode}`, { body: fixture, headers: { "content-type": "image/png" } });
+          assert.equal(answer.status, 200, mode);
+          assert.equal(JSON.parse(answer.body).trace.budget_exhausted, false, mode);
+        }
+        const wanted = scale === 1 ? [undefined, undefined, undefined] : [8_000, 800, 40_000];
+        assert.deepEqual(calls.map((options) => options.budgetMs), wanted);
+        assert.deepEqual(calls.map((options) => Object.hasOwn(options, "budgetMs")), wanted.map((ms) => ms !== undefined));
+        const described = JSON.parse((await exchange(base, "GET", "/", { headers: { accept: "application/json" } })).body);
+        assert.deepEqual(described.budgetsMs, { fast: 800 * scale, frame: 80 * scale, full: 4000 * scale });
+      } finally { server.close(); }
+    }
   });
 
   test("scans past the concurrency limit are refused, and an engine failure is not a 200", async () => {
