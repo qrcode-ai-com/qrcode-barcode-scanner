@@ -36,7 +36,10 @@ package names the tag as its corresponding source.
 - `qrscan.wasm` sha256: `65c4436f2ac461bd94696c9daaf7fce40bf5a6c26203f1a7115a8d9201c45460`. Both
   builds of run [44883180229](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44883180229),
   in two directories, gave it; every later run of the same source and toolchain must give it too.
-- First green run: `PENDING-CI`.
+- Run that verified it under Wasmer: [44885967740](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44885967740).
+  The truth set, the native comparison, the acceptance, the notices check and the removal
+  receipt passed there; its last assertion, on the Wasmer home after the removal probe, was
+  reordered in the next commit.
 
 Take the artifact of the latest green run on `main` for the merged commit: its
 `notices/SOURCE.json` names that commit as the packaging revision. A run on a pull request

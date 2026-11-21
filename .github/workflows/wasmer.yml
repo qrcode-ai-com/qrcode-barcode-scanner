@@ -249,11 +249,14 @@ jobs:
           set -euo pipefail
           test -d "$WASMER_DIR"
           rm -r "$RUNNER_TEMP/package" "$WASMER_DIR"
+          test ! -e "$RUNNER_TEMP/package"
+          test ! -e "$WASMER_DIR"
+          # The probe starts Wasmer, which makes itself a new home: it must find no package to run.
           python3 scripts/destination-acceptance.py removed \
             --gone "wasmer run --quiet --offline $RUNNER_TEMP/package -- --version" \
             --uninstall "rm -r <package folder> \$WASMER_DIR" --receipt "$RUNNER_TEMP/receipts/acceptance.json"
           python3 scripts/destination-acceptance.py check "$RUNNER_TEMP/receipts/acceptance.json"
-          test ! -e "$WASMER_DIR"
+          if [ -e "$WASMER_DIR" ]; then (cd "$WASMER_DIR" && find . | sort); fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
