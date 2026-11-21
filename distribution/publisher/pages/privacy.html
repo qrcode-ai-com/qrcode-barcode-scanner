@@ -1,0 +1,145 @@
+<h1>Privacy</h1>
+<p class="lead">The QR Code &amp; Barcode Scanner reads images on the computer, phone or server
+that runs it. Its code sends no image, no decoded text and no usage data to QR Code AI. It has
+no analytics, no telemetry, no account and no cookies.</p>
+<p>Where an integration makes a network request, or runs inside a host that keeps its own
+records, the <a href="#integrations">integrations</a> below say so. This page describes the
+code; the source is public, so each statement can be checked in the
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">scanner's repository</a>.</p>
+
+<h2 id="engine">The engine</h2>
+<p>The engine decodes the image bytes it is given and returns a report. It opens no network
+connection and keeps no copy of the image or of the report. Every package of the scanner and its
+command-line program run this same engine.</p>
+<p>The JavaScript and WebAssembly package also contains an optional module that checks where a
+decoded web address leads. It sends a request only when an application calls it with a network
+function of its own. None of the integrations on this site calls it.</p>
+<p>Decoded codes can contain personal data, such as a contact card, a ticket or a payment code.
+The report goes back only to the program or person that asked for the scan.</p>
+
+<h2 id="integrations">Integrations</h2>
+<p>Each integration is listed here with what it reads, stores and sends.</p>
+<dl>
+<dt id="browser-extension">Browser extension</dt>
+<dd>An image you drop, paste or choose is read in the browser and never sent. For an image you
+right-click on a page, the extension fetches that one image again from the site that served it:
+first without cookies, then, if the site refuses, with that site's own cookies. It stores only the
+scanner profile you last chose, in the extension's local storage, and copies text to the clipboard
+only when you click a copy button. Its
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/listing/PRIVACY.md">privacy notice</a>
+gives the details and the permissions.</dd>
+
+<dt id="canva">Canva app</dt>
+<dd>The only network request the app makes downloads the selected image from the temporary
+address Canva gives it. The engine reads the image in the app's panel, in the browser. The app
+has no cookies and no storage, and keeps nothing after you close it.</dd>
+
+<dt id="adobe-express">Adobe Express add-on</dt>
+<dd>The add-on loads Adobe's add-on SDK from Adobe and its own files from its package, and makes
+no other request. Adobe Express renders the page inside the browser, and the engine reads that
+rendering in the add-on, in the browser. A file you choose is read the same way and is not
+uploaded. The add-on has no cookies and no storage, and keeps nothing after you close it.</dd>
+
+<dt id="photoshop">Photoshop plugin</dt>
+<dd>The plugin reads the pixels of the open document, of a selection, or of an image file you
+choose, inside its panel on your computer, and never changes the document. It asks for no network
+access and makes no network request. It has no storage and keeps nothing after you close the
+panel.</dd>
+
+<dt id="wordpress">WordPress plugin</dt>
+<dd>The scanner runs in the visitor's browser, with code served by your own site. The image never
+leaves the browser and is discarded when the page closes. The plugin makes no request to another
+server, sets no cookie, uses no local storage and stores nothing in your database.</dd>
+
+<dt id="joomla">Joomla module</dt>
+<dd>The scanner runs in the visitor's browser, with code served by your own site. The image never
+leaves the browser and is discarded when the page closes. The module makes no request to another
+server, sets no cookie, uses no local storage and stores nothing in your database. It copies text
+to the clipboard only when the visitor clicks a copy button. When an administrator looks for
+updates, Joomla reads the module's update file from the scanner's repository on GitHub.</dd>
+
+<dt id="http">HTTP service</dt>
+<dd>You run the service yourself; it scans the images sent to it. Each image stays in the
+service's memory for the time of its scan and is never written to disk or logged. The service
+logs one line per request: method, path, status and duration, with no image and no decoded
+text.</dd>
+
+<dt id="make">Make app</dt>
+<dd>The module sends the image file of an earlier module to the scan service you run, at the
+address of your connection, and returns its report; the service handles the image as described
+above. What Make records about each scenario run follows Make's own settings.</dd>
+
+<dt id="github-action">GitHub Action</dt>
+<dd>The action downloads the scanner's command-line program and its checksum file from the
+scanner's GitHub releases, on the runner of your workflow. It scans the files of your repository
+there. The decoded texts become outputs of the step and appear in the job's log and summary,
+which GitHub keeps with the workflow run.</dd>
+
+<dt id="mcp">MCP server, agent skill and agent plugin</dt>
+<dd>Scanning makes no network call: the server and the skill's helper read the image you name on
+your machine. Installing the server, or the engine the skill runs, downloads packages from npm.
+Your agent client sends its conversation, including the scan report, to the model you chose,
+under that client's own terms.</dd>
+
+<dt id="openclaw">OpenClaw plugin bundle</dt>
+<dd>Its setup installs a pinned version of the MCP server from npm into the plugin's own folder
+and writes a local record of that installation there. Scanning then works as for the MCP
+server.</dd>
+
+<dt id="editors">VS Code extension and Obsidian plugin</dt>
+<dd>Both run the engine inside the editor and make no network request. The Obsidian plugin saves
+your profile and format choices in its plugin data. Both copy text to the clipboard only when you
+choose to copy it.</dd>
+
+<dt id="raycast">Raycast extension</dt>
+<dd>It scans the image selected in Finder, or the image file on the clipboard, with the scanner's
+command-line program installed on your Mac. It makes no network request.</dd>
+
+<dt id="automation">n8n, Node-RED and Activepieces</dt>
+<dd>The node or piece runs the engine on the server of your automation platform and makes no
+network request. What the platform records about each run follows that platform's own
+settings.</dd>
+
+<dt id="zapier">Zapier integration</dt>
+<dd>The action runs on Zapier's platform, under your Zapier account. It downloads the image file
+of an earlier step, or the image address you give it, scans it inside the step and keeps nothing.
+What Zapier records about each run, such as the Zap history, follows Zapier's own settings.</dd>
+
+<dt id="apify">Apify Actor</dt>
+<dd>The Actor runs on Apify's platform, under your Apify account. It downloads each image address
+you give it. An image you upload in the input form is kept by Apify Console in a key-value store
+of your account, and the Actor reads it from there. The Actor itself stores the images nowhere and
+keeps only the result items in your dataset, under your account's storage retention. It never
+opens what a code points to.</dd>
+
+<dt id="replicate">Replicate model</dt>
+<dd>Each image you send is uploaded to Replicate and scanned on Replicate's servers, under your
+Replicate account, and Replicate keeps the prediction under its own data retention rules. The model
+never opens what a code points to.</dd>
+
+<dt id="dify">Dify plugin</dt>
+<dd>The plugin reads the file your workflow gives it inside your Dify plugin runtime and keeps
+nothing. Dify itself stores files, workflow runs and logs as your Dify installation is configured.
+Its <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/dify/PRIVACY.md">privacy notice</a>
+gives the details.</dd>
+
+<dt id="comfyui">ComfyUI nodes and napari plugin</dt>
+<dd>They scan the images of your graph or viewer on your machine and make no network
+request.</dd>
+
+<dt id="jupyterlab">JupyterLab extension</dt>
+<dd>The scan runs in the browser tab that shows JupyterLab. An image chosen from your computer
+never leaves it; a file of the file browser is read through the Jupyter server's contents API,
+which already serves that file to the tab. The extension makes no other network request and adds
+no server or kernel code.</dd>
+</dl>
+
+<h2 id="site">This site</h2>
+<p>This site has no cookies, no analytics, no scripts and no external fonts. GitHub hosts it on
+GitHub Pages. GitHub states that when a GitHub Pages site is visited, the visitor's IP address is
+logged and stored for security purposes; see
+<a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages">What is GitHub Pages?</a></p>
+
+<h2 id="contact">Questions</h2>
+<p>Ask a question about privacy in the
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues">scanner's issues</a>.</p>

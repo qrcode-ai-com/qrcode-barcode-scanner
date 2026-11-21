@@ -1,0 +1,58 @@
+name: Publisher site
+
+# The pages and the agent skill index of qrcode-ai-com/qrcode-ai-com.github.io, written from
+# distribution/publisher by scripts/stage-publisher-site.py. This workflow downloads the published
+# skill archive that distribution/publisher/site.json pins, runs the program's self-test, stages
+# this commit, verifies the staged tree and uploads it. Nothing is published: the site's
+# repository receives the tree through a reviewed pull request.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/publisher-site.yml
+      - distribution/publisher/**
+      - scripts/stage-publisher-site.py
+      - scripts/satellite_stage.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publisher-site-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  stage:
+    name: Stage and verify the publisher site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The archive's files are compared with the skill's source at the commit of its release.
+      - name: Fetch the commit the skill release was built from
+        run: |
+          skill=$(python3 -c "import json; print(json.load(open('distribution/publisher/site.json'))['skill']['revision'])")
+          git fetch --quiet --depth 1 origin "$skill"
+      - name: Download the published skill archive
+        run: |
+          url=$(python3 -c "import json; print(json.load(open('distribution/publisher/site.json'))['skill']['archive'])")
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/skill.tar.gz" "$url"
+      - name: Self-test
+        run: python3 scripts/stage-publisher-site.py --self-test --archive "$RUNNER_TEMP/skill.tar.gz"
+      - name: Stage this commit and verify the staged tree
+        run: |
+          python3 scripts/stage-publisher-site.py stage --archive "$RUNNER_TEMP/skill.tar.gz" --out "$RUNNER_TEMP/site"
+          python3 scripts/stage-publisher-site.py verify "$RUNNER_TEMP/site"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: publisher-site
+          path: ${{ runner.temp }}/site/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

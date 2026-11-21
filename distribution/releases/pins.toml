@@ -157,6 +157,10 @@ paths = [
 ]
 
 [[file]]
+held = "the publisher site: its pages state the licences of the published releases and move when the owner reviews them again"
+paths = ["distribution/publisher/**", "scripts/stage-publisher-site.py", ".github/workflows/publisher-site.yml"]
+
+[[file]]
 held = "the Python host kit: the engine the Python hosts under integrations/ and examples/ run, moved with them"
 paths = ["scripts/python_host_kit.py", "scripts/python-host-consumer.py"]
 

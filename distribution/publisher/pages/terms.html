@@ -1,0 +1,50 @@
+<h1>Software licences</h1>
+<p class="lead">QR Code AI publishes the QR Code &amp; Barcode Scanner as open-source software.
+This page lists the licence of each published part. The licence texts are the only terms; this
+page adds nothing to them and removes nothing from them.</p>
+
+<h2 id="source">The source code</h2>
+<p>The project-authored source in the
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">scanner's repository</a> is
+under the <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE">MIT License</a>:
+the engine, its bindings, the command-line program, the integrations, the agent skill and the
+documentation. The licence file carries the copyright notice. The <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md">licensing guide</a>
+explains what the MIT grant covers.</p>
+
+<h2 id="releases">Published releases</h2>
+<p>A published file keeps the licence it was packaged with. The source moved to MIT after these
+releases, and that change does not relabel them:</p>
+<ul>
+<li>The engine release 0.11.0, in all its runtime packages and command-line programs, is under
+the GNU Affero General Public License, version 3 or any later version (AGPL-3.0-or-later). So is
+every distribution that contains those engine files.</li>
+<li>The MCP server 0.3.1 on npm is under AGPL-3.0-or-later.</li>
+<li>The agent skill 0.2.0 and the OpenClaw plugin bundle 0.2.0 are under MIT-0. The engine they
+install separately keeps its own licence.</li>
+<li>The VS Code extension, the Obsidian plugin, the browser extension, the Canva app, the Adobe
+Express add-on and the WordPress plugin contain the published WebAssembly engine 0.11.0, and the
+HTTP service's container image contains its Node.js engine 0.11.0. Their own source is MIT and
+the engine inside them stays under AGPL-3.0-or-later; the licence notes of each one give the
+licence of the package as a whole.</li>
+<li>The other integrations are MIT and install or run a published engine release, which keeps its
+own licence.</li>
+</ul>
+<p>The <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/docs/guides/license-history.mdx">licence history</a>
+records each of these grants, and the repository keeps the
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/distribution/releases/historical-agpl-3.0.txt">exact AGPL-3.0 text</a>
+those releases carry.</p>
+
+<h2 id="third-party">Third-party components</h2>
+<p>Third-party code keeps its own licence and notices. The copied rxing and ZXing reader source
+stays under the Apache License 2.0, as
+<a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/crates/qrcode-ai-scanner/THIRD-PARTY.md">THIRD-PARTY.md</a>
+describes, and the dependencies keep the licences they declare.</p>
+
+<h2 id="warranty">Warranty and liability</h2>
+<p>Each of these licences provides the software as it is, without warranty of any kind, and
+contains its own limitation of liability. Read the licence of the file you use for the exact
+wording.</p>
+
+<h2 id="service">The QR Code AI service</h2>
+<p>These licences cover the scanner's software only. They do not cover the QR Code AI service at
+<a href="https://qrcode-ai.com/">qrcode-ai.com</a>, which is a separate product.</p>
