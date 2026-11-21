@@ -1767,7 +1767,11 @@ then `python3 scripts/test-readme-actions.py` and
 `python3 scripts/build-readme-actions.py --check`. Release preparation also renders
 these blocks. The generator preserves the text outside its exact marked block;
 frozen evidence and vendored documentation are excluded. Native npm package
-READMEs inherit the maintained distribution template.
+READMEs inherit the maintained distribution template. A pull request that adds or
+removes a maintained README adds or removes its path in
+`scripts/maintained-readmes.txt` (sorted); both README tests compare that list with
+what the generator finds, so two pull requests adding two READMEs change two lines
+instead of racing on one shared count.
 
 Before freezing any package or archive, review each maintained README separately.
 Its introduction must explain that directory's actual role, prerequisites and

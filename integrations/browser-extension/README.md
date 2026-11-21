@@ -40,9 +40,11 @@ Help me understand QR Code & Barcode Scanner · browser extension 0.1.0 (integra
 
 A Manifest V3 extension for Chrome, Edge and Firefox that reads the QR codes and barcodes in an image. Right-click an image on a page and choose Scan this image, or drop, paste or choose an image file in the toolbar popup. Each code is shown with its format and its exact text, with a copy button. Decoding runs in the browser with the published WebAssembly engine 0.11.0: no image is uploaded, and a decoded link is never opened for you.
 
+![QR Code & Barcode Scanner in the toolbar popup: a QR code read as https://qrc-ai.com/76xMa and a Code 128 barcode read as STOCK-4827, from an image on a shop page](listing/images/screenshot-2-popup-1280x800.png)
+
 Version 0.1.0 is built and tested in this folder, but it is not in any store yet. Until the Chrome Web Store, Microsoft Edge Add-ons and Firefox Add-ons list it, install it unpacked from a build of this folder, as shown below.
 
-The same engine runs on the web as the [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) of QR Code AI. The [QR code scanner browser extension guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension) and the [barcode scanner browser extension guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/browser-extension) explain this extension for each use. If a page is unavailable, this README and the store texts in [store/LISTING.md](store/LISTING.md) remain the reference.
+The same engine runs on the web as the [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) of QR Code AI. The [QR code scanner browser extension guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension) and the [barcode scanner browser extension guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/browser-extension) explain this extension for each use. If a page is unavailable, this README and the store texts in [listing/texts.md](listing/texts.md) remain the reference.
 
 To make a test image with a known value, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Keep the text you encoded, then compare it with what the extension shows, character for character, leading zeroes included.
 
@@ -85,28 +87,34 @@ The extension does not ask for access to all sites at install. That would let it
 
 ## Privacy
 
-Nothing leaves the browser. The only network request the extension makes is to fetch the image you right-clicked, from the address the page already loaded it from. It is sent without cookies first, and with the site's own cookies if the site refuses. The extension has no server, no account and no analytics. The full statement is [store/PRIVACY.md](store/PRIVACY.md).
+Nothing leaves the browser. The only network request the extension makes is to fetch the image you right-clicked, from the address the page already loaded it from. It is sent without cookies first, and with the site's own cookies if the site refuses. The extension has no server, no account and no analytics. The full statement is [listing/PRIVACY.md](listing/PRIVACY.md).
 
 ## Build, test and inspect
 
 ```sh
 npm ci --ignore-scripts
-npm run build              # the three store zips, the source zip and build/build-receipt.json
-npm test                   # Node unit tests, no browser
-npm run inspect            # opens each zip as a store reviewer would
-npm run lint:firefox       # Mozilla's add-on linter on build/firefox, through web-ext
+npm run build               # the three store zips, the source zip and build/build-receipt.json
+npm run check:pins          # the same build, which fails unless every archive is the pinned one
+npm test                    # Node unit tests, no browser
+npm run inspect             # opens each zip as a store reviewer would
+npm run lint:firefox        # Mozilla's add-on linter on build/firefox, through web-ext
 node node_modules/playwright/cli.js install chromium firefox
-npm run test:chromium      # the Chrome build in Playwright's Chromium
-npm run test:firefox-page  # the Firefox build's page in Playwright's Firefox
-npm run test:reproduce     # rebuild from the source zip and compare every archive
+npm run test:chromium -- --package build/qrcode-barcode-scanner-chrome-0.1.0.zip
+npm run test:firefox-addon  # the Firefox zip installed in your Firefox (FIREFOX=/path/to/firefox)
+npm run test:firefox-page   # the Firefox build's page in Playwright's Firefox
+npm run test:reproduce      # rebuild from the source zip and compare every archive
+npm run store-images        # the store screenshots and tiles, captured from build/chrome
 ```
 
 - `npm test` covers the result helpers, the manifests, the zip and PNG writers, the background's menu handler against a fake browser API, the store texts, and the files of each store package.
 - `npm run inspect` checks that each zip holds exactly the expected files, equal to the unpacked build, with the described manifest and the pinned WebAssembly module, and that no script builds code from text or loads code from the network.
 - `npm run lint:firefox` fails on any error or warning, except one it accepts on purpose: Firefox for Android reads `data_collection_permissions` from version 142, and this add-on targets desktop Firefox 140.
-- `npm run test:chromium` loads the extension in Playwright's Chromium. It reads the mixed fixture in the popup in fast, frame and full, and checks the copy buttons, the link button, the empty and error states, drop and paste. It calls the menu handler for an image its site lets others read, a `data:` image, a closed image of another site (which must ask for that site), a `blob:` image and an expired request. It checks that no request leaves the local test server, then removes the extension.
-- `npm run test:firefox-page` opens the Firefox build's page in Playwright's Firefox under the manifest's policy and reads the mixed fixture in the three profiles. A control run without `'wasm-unsafe-eval'` must fail to load, which shows the policy is enforced. Playwright cannot install a Firefox add-on, so the menu item and the popup are not covered in Firefox.
+- `npm run test:chromium` loads the extension in Playwright's Chromium, in a new profile. With `--package`, it first extracts that store zip into an empty folder, so it runs the bytes a store receives; CI runs it on the Chrome zip and on the Edge zip. With `--channel chrome` it runs in the installed Google Chrome instead, which ignores `--load-extension` and loads the folder through the DevTools protocol (`Extensions.loadUnpacked`, allowed by `--enable-unsafe-extension-debugging`); CI runs the Chrome zip that way in the runner's Chrome. It reads the mixed fixture in the popup in fast, frame and full, and checks the copy buttons, the link button, the empty and error states, drop and paste. It calls the menu handler for an image its site lets others read, a `data:` image, a closed image of another site (which must ask for that site), a `blob:` image and an expired request. It checks that no request leaves the local test server, then removes the extension.
+- `npm run test:firefox-addon` starts Firefox with a new profile and installs the Firefox zip itself through WebDriver BiDi, as a temporary add-on: release Firefox installs an unsigned add-on only that way. It checks the add-on ID, the permissions, the declaration that no data is collected and the menu item, reads the mixed fixture in the popup page in fast, frame and full through the file input (release Firefox refuses the protocol's file command on an add-on page, so the test hands the same file to the input through a DataTransfer there), checks the empty and error states, checks that no request of the add-on's tab leaves the browser (after a control request proves the listener works), then uninstalls the add-on. CI runs it in the runner's release Firefox. The menu click itself is driven in Chromium only.
+- `npm run test:firefox-page` opens the Firefox build's page in Playwright's Firefox under the manifest's policy and reads the mixed fixture in the three profiles. A control run without `'wasm-unsafe-eval'` must fail to load, which shows the policy is enforced.
 - `npm run test:reproduce` extracts the source zip into an empty folder, installs and builds there, and requires the same bytes for every archive.
+- `npm run store-images` loads `build/chrome` in Playwright's Chromium, scans the mixed fixture from a file, from the popup over a page and from the right-click menu, and captures the four 1280 × 800 screenshots and the two promotional tiles into [listing/images](listing/images). Every address shown is on example.com. CI captures them again into `build/store-images` on each run.
+- The workflow's reproduce job builds again on Linux, macOS and Windows, with Node.js 22 and 24, in UTC and in UTC+14, and requires the hashes of [SHA256SUMS](SHA256SUMS) each time.
 
 The browser tests write the reports under `build/acceptance/` in the shape of `distribution/acceptance/drivers/web-page.mjs`, so `scripts/check-demo-page.py` and `scripts/destination-acceptance.py` can judge them.
 
@@ -118,9 +126,12 @@ The browser tests write the reports under `build/acceptance/` in the shape of `d
 - `qrcode-barcode-scanner-edge-0.1.0.zip` for Microsoft Edge Add-ons;
 - `qrcode-barcode-scanner-firefox-0.1.0.zip` for Firefox Add-ons, with the add-on ID `qrcode-barcode-scanner@qrcode-ai.com`;
 - `qrcode-barcode-scanner-source-0.1.0.zip`, the source package that Firefox Add-ons reviewers rebuild from, with [SOURCE.md](SOURCE.md);
-- `amo-metadata.json`, the Firefox Add-ons listing for `web-ext sign`, and `store-assets/`, the icon and logo the store forms ask for.
+- `amo-metadata.json`, the Firefox Add-ons listing for `web-ext sign`, and `store-assets/`, the icon and logo the store forms ask for;
+- `SHA256SUMS` and `build-receipt.json`, the size and SHA-256 of each archive.
 
-The three store zips differ only in the manifest. Chrome and Edge run a service worker; Firefox runs an event page. Each zip holds the WebAssembly module and its JavaScript glue, copied unchanged from the npm package. The manifest's policy is `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`, so the module can compile and no other code can run. The store texts, the form values and the owner's steps for each store are in [store/LISTING.md](store/LISTING.md).
+Every archive entry carries the same fixed date and the files are sorted, so the same source gives the same bytes in any time zone and on any system. [SHA256SUMS](SHA256SUMS) in this folder pins the archives of this revision: check a build with `(cd build && sha256sum --check ../SHA256SUMS)`, or with `npm run check:pins`. After an intended change, `npm run pin` rewrites it.
+
+The three store zips differ only in the manifest. Chrome and Edge run a service worker; Firefox runs an event page. Each zip holds the WebAssembly module and its JavaScript glue, copied unchanged from the npm package. The manifest's policy is `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`, so the module can compile and no other code can run. The store texts shared by every store are in [listing/texts.md](listing/texts.md). The Chrome Web Store form, tab by tab, with the owner's steps and the sources read, is in [listing/chrome-web-store.md](listing/chrome-web-store.md); the Edge and Firefox steps are still in texts.md.
 
 ## Limits
 
@@ -129,7 +140,7 @@ The three store zips differ only in the manifest. Chrome and Edge run a service 
 - A `file:` image needs the browser's Allow access to file URLs setting for the extension.
 - Images larger than 32 MB are refused.
 - Firefox for Android is not targeted.
-- It has been tested in Playwright's Chromium and, for its page only, in Playwright's Firefox. It has not been run yet from a store install in Chrome, Edge or Firefox.
+- The Chrome and Edge zips are tested in Playwright's Chromium, the Chrome zip also in Google Chrome, and the Firefox zip in release Firefox as a temporary add-on. None has been installed from a store yet, since none is published.
 
 ## How it works
 

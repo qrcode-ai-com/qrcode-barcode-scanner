@@ -15,5 +15,6 @@
         "dataset": "./dataset_schema.json"
     },
     "dockerfile": "../Dockerfile",
-    "readme": "../README.md"
+    "readme": "../STORE.md",
+    "changelog": "../CHANGELOG.md"
 }
