@@ -13,6 +13,7 @@ bindings/flutter/example/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.
 bindings/go/README.md
 bindings/kotlin/README.md
 bindings/php/README.md
+bindings/ruby/README.md
 bindings/swift/README.md
 crates/qrcode-ai-scanner-cli/README.md
 crates/qrcode-ai-scanner-node/README.md
