@@ -145,6 +145,10 @@ paths = [
 ]
 
 [[file]]
+held = "the Python host kit: the engine the Python hosts under integrations/ and examples/ run, moved with them"
+paths = ["scripts/python_host_kit.py", "scripts/python-host-consumer.py"]
+
+[[file]]
 held = "the MCP Bundle, under its own tag mcpb-v: it carries the published server and engine it was built from"
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
 
