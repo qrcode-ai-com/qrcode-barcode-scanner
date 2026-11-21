@@ -20,9 +20,13 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build-for-amo": "node scripts/build.mjs",
+    "check:pins": "node scripts/build.mjs --check",
+    "pin": "node scripts/build.mjs --pin",
+    "store-images": "node scripts/store-images.mjs",
     "inspect": "node scripts/inspect.mjs build",
     "test": "node --test test/unit.test.mjs",
     "test:chromium": "node test/chromium.mjs",
+    "test:firefox-addon": "node test/firefox-addon.mjs",
     "test:firefox-page": "node test/firefox-page.mjs",
     "test:reproduce": "node test/reproduce.mjs",
     "lint:firefox": "node scripts/lint-firefox.mjs"

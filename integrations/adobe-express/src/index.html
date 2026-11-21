@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR Code &amp; Barcode Scanner</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="index.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Read the codes in your design</h1>
+    <p>Scan a page of your design, or an image file, to see which QR codes and barcodes it holds and their exact text.</p>
+
+    <fieldset id="profile" data-value="full">
+      <legend>Profile</legend>
+      <div class="segments">
+        <label><input type="radio" name="profile" value="full" checked> Full</label>
+        <label><input type="radio" name="profile" value="fast"> Fast</label>
+        <label><input type="radio" name="profile" value="frame"> Frame</label>
+      </div>
+      <p class="help">Full reads the most and also scores QR codes. Fast suits clear images. Frame is the quickest.</p>
+    </fieldset>
+
+    <label class="field" for="expected">Expected text <span class="optional">(optional)</span></label>
+    <input id="expected" type="text" autocomplete="off" spellcheck="false">
+    <p class="help">Each code is compared with it, character for character.</p>
+
+    <div class="actions">
+      <button id="scan-page" class="primary" type="button" disabled>Scan this page</button>
+      <button id="scan-document" type="button" disabled>Scan all pages</button>
+      <label id="choose-file" class="button" aria-disabled="true">
+        Scan an image file
+        <input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled>
+      </label>
+    </div>
+
+    <section id="result" data-state="loading" data-scan="0" aria-live="polite">
+      <p id="summary">Loading the scanner…</p>
+      <div id="items"></div>
+    </section>
+
+    <details id="report">
+      <summary>Full report of the first image</summary>
+      <pre id="report-json" data-scan="0" data-profile=""></pre>
+    </details>
+
+    <footer>
+      <p id="about" data-package="" data-version="" data-wasm-sha256="" data-engine-version="">Open-source QR Code &amp; Barcode Scanner by QR Code AI. It runs in this panel: your design is not uploaded anywhere.</p>
+      <p>The add-on is licensed AGPL-3.0-or-later. Source code: <span class="source">github.com/qrcode-ai-com/qrcode-barcode-scanner-rust</span></p>
+    </footer>
+  </main>
+</body>
+</html>

@@ -150,17 +150,18 @@ export class QrcodeBarcodeScanner implements INodeType {
 				returnData.push({ json, binary: items[i].binary, pairedItem: { item: i } });
 			} catch (error) {
 				const code = (error as { code?: string }).code;
-				if (this.continueOnFail()) {
-					returnData.push({
-						json: { error: (error as Error).message, code: code ?? null },
-						pairedItem: { item: i },
-					});
-					continue;
-				}
-				throw new NodeOperationError(this.getNode(), error as Error, {
+				const failure = new NodeOperationError(this.getNode(), error as Error, {
 					itemIndex: i,
 					description: code ? `Scanner error ${code}` : undefined,
 				});
+				if (this.continueOnFail()) {
+					// n8n sends an item that carries `error` to the error output ("Continue (using error
+					// output)") and sets its json to `{ error: message }`. The message ends with the
+					// engine code, such as [QRS-001].
+					returnData.push({ json: { error: failure.message }, error: failure, pairedItem: { item: i } });
+					continue;
+				}
+				throw failure;
 			}
 		}
 

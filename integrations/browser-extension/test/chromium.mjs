@@ -1,7 +1,12 @@
-// The unpacked Chrome build in Playwright's Chromium, driven as a user would drive it.
+// A Chromium store package in Playwright's Chromium, driven as a user would drive it.
 //
-//   node test/chromium.mjs [--extension build/chrome] [--out build/acceptance] [--headed]
+//   node test/chromium.mjs [--package ZIP | --extension build/chrome] [--out build/acceptance]
+//                          [--channel chromium|chrome|msedge] [--headed]
 //
+// With --package, the store zip (the Chrome or the Edge one) is extracted into an empty folder and
+// that folder is loaded, in a new profile: the test then runs the bytes a store receives.
+// --channel chooses Playwright's Chromium (the default) or the installed Google Chrome or
+// Microsoft Edge, which load the folder through the DevTools protocol.
 // It loads the extension, then checks:
 //   install   the permissions it holds, no site granted, the "Scan this image" menu item
 //   popup     the toolbar page: choose the mixed fixture, read it in fast, frame and full
@@ -19,20 +24,38 @@
 // The popup and menu reports are written as fast.json, frame.json and full.json, with page.json,
 // under OUT/popup and OUT/menu, for scripts/destination-acceptance.py and
 // scripts/check-demo-page.py to judge. Exits 1 on the first failed check.
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { encodePng } from '../scripts/bytes.mjs';
+import { encodePng, readZip } from '../scripts/bytes.mjs';
 import {
   ENGINE, EXPECTED, HERE, check, checkCount, finished, judge, option, pageFacts, readState, ready,
   same, stageFixture, threeProfiles,
 } from './page-contract.mjs';
 
-const extensionDir = resolve(option('--extension', join(HERE, 'build', 'chrome')));
+const packageZip = option('--package', null);
 const out = resolve(option('--out', join(HERE, 'build', 'acceptance')));
+
+/** The store zip, extracted into an empty folder; readZip refuses an entry leaving it. */
+function extract(zip) {
+  const directory = mkdtempSync(join(tmpdir(), 'qrscan-extension-package-'));
+  for (const [name, bytes] of readZip(readFileSync(zip))) {
+    mkdirSync(dirname(join(directory, name)), { recursive: true });
+    writeFileSync(join(directory, name), bytes);
+  }
+  return directory;
+}
+const extensionDir = packageZip ? extract(resolve(packageZip))
+  : resolve(option('--extension', join(HERE, 'build', 'chrome')));
+const packageSha256 = packageZip
+  ? createHash('sha256').update(readFileSync(resolve(packageZip))).digest('hex') : null;
 const headed = process.argv.includes('--headed');
+// chromium (Playwright's build, the default), or an installed browser: chrome or msedge.
+const channel = option('--channel', 'chromium');
+const branded = channel !== 'chromium';
 
 // ------------------------------------------------------------------ inputs
 
@@ -69,11 +92,22 @@ const otherSite = `http://localhost:${port}`;
 
 // ------------------------------------------------------------------ install
 
+// Playwright's Chromium takes the extension on the command line. Branded Chrome and Edge ignore
+// --load-extension; they load it through the DevTools protocol instead, which they allow only
+// with --enable-unsafe-extension-debugging and over the pipe Playwright talks through.
 const context = await chromium.launchPersistentContext('', {
-  channel: 'chromium',
+  channel,
   headless: !headed,
-  args: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`],
+  ignoreDefaultArgs: ['--disable-extensions'],
+  args: branded ? ['--enable-unsafe-extension-debugging']
+    : [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`],
 });
+if (branded) {
+  const session = await context.browser().newBrowserCDPSession();
+  const loaded = await session.send('Extensions.loadUnpacked', { path: extensionDir });
+  check(/^[a-p]{32}$/.test(loaded.id), `${channel} loads the extension through the DevTools `
+    + 'protocol', loaded);
+}
 const outside = [];
 await context.route(/.*/, (route) => {
   const url = new URL(route.request().url());
@@ -198,7 +232,9 @@ async function fromMenu(srcUrl) {
     { menuItemId: 'scan-image', srcUrl: src, pageUrl: page }, clicked),
   { src: srcUrl, page: `${site}/page.html`, clicked: tabInfo });
   const page = await opened;
-  await page.waitForLoadState('domcontentloaded');
+  // Branded Chrome announces the tab before its first address commits.
+  await page.waitForURL((url) => url.href !== 'about:blank' && url.href !== '',
+    { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
   check(page.url() === `${base}/scanner.html?request=${encodeURIComponent(id)}`,
     `the menu item opens the scanner page for ${srcUrl.slice(0, 32)}...`, page.url());
   return page;
@@ -276,7 +312,7 @@ check(gone && context.serviceWorkers().every((sw) => !sw.url().startsWith(base))
 await context.close();
 server.close();
 writeFileSync(join(out, 'chromium-run.json'), `${JSON.stringify({
-  checks: checkCount(), extension: extensionDir, fixture, browser: `chromium ${browserVersion}`,
-  served,
+  checks: checkCount(), extension: extensionDir, fixture, browser: `${channel} ${browserVersion}`,
+  package: packageZip ? { path: resolve(packageZip), sha256: packageSha256 } : null, served,
 }, null, 2)}\n`);
 console.log(`${checkCount()} checks passed`);
