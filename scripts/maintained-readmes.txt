@@ -48,6 +48,7 @@ distribution/snap/README.md
 distribution/termux/README.md
 examples/README.md
 examples/codepen/README.md
+examples/kaggle/README.md
 examples/notebooks/README.md
 examples/streamlit/README.md
 examples/web-vite/README.md
@@ -61,6 +62,7 @@ integrations/canva/README.md
 integrations/comfyui/README.md
 integrations/dify/README.md
 integrations/github-action/README.md
+integrations/jupyterlab/README.md
 integrations/mcp/README.md
 integrations/n8n/README.md
 integrations/n8n/template/README.md
@@ -68,6 +70,7 @@ integrations/napari/README.md
 integrations/node-red/README.md
 integrations/obsidian/README.md
 integrations/openclaw/README.md
+integrations/photoshop-uxp/README.md
 integrations/raycast/README.md
 integrations/vscode/README.md
 integrations/wasm-inline/README.md

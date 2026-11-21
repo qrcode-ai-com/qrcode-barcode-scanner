@@ -143,6 +143,7 @@ paths = [
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
   ".github/workflows/integration-n8n-template.yml",
+  ".github/workflows/integration-photoshop-uxp.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
   ".github/workflows/integration-vscode.yml",
