@@ -69,6 +69,7 @@ integrations/napari/README.md
 integrations/node-red/README.md
 integrations/obsidian/README.md
 integrations/openclaw/README.md
+integrations/photoshop-uxp/README.md
 integrations/raycast/README.md
 integrations/vscode/README.md
 integrations/wasm-inline/README.md

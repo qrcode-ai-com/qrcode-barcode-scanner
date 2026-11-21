@@ -38,6 +38,7 @@ GUIDES = {
     'integrations/jupyterlab/README.md': ('integrations/jupyterlab', 'JupyterLab'),
     'integrations/napari/README.md': ('integrations/napari', 'napari'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
+    'integrations/photoshop-uxp/README.md': ('integrations/photoshop', 'Photoshop'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
     'integrations/wordpress/README.md': ('integrations/wordpress', 'WordPress'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
