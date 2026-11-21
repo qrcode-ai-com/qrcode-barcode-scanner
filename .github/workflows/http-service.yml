@@ -18,6 +18,7 @@ on:
       - distribution/http/**
       - scripts/http-service-release.py
       - scripts/check-http-hosts.py
+      - distribution/digitalocean/**
       - scripts/stage-http-satellite.py
       - scripts/satellite_stage.py
       - fixtures/symbology/mixed-code128-qr.png
@@ -28,6 +29,7 @@ on:
       - distribution/http/**
       - scripts/http-service-release.py
       - scripts/check-http-hosts.py
+      - distribution/digitalocean/**
       - scripts/stage-http-satellite.py
       - scripts/satellite_stage.py
     tags: ["http-v*"]
@@ -182,6 +184,9 @@ jobs:
           # Railway reads no file: its settings live in its composer (distribution/railway).
           - host: railway
             schema: ""
+          # DigitalOcean App Platform: doctl 2.7.0 validates the app spec offline.
+          - host: digitalocean
+            schema: ""
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -206,6 +211,15 @@ jobs:
             sha256sum "$RUNNER_TEMP/schema.json"
             schema=(--schema "$HOST=$RUNNER_TEMP/schema.json")
           fi
+          if [ "$HOST" = digitalocean ]; then
+            curl --fail --silent --show-error --location --proto '=https' --retry 3 \
+              --output "$RUNNER_TEMP/doctl.tar.gz" \
+              https://github.com/digitalocean/doctl/releases/download/v2.7.0/doctl-2.7.0-linux-amd64.tar.gz
+            echo "1033caac941fe6238aa3b3170ac2651117ab259f2eaaa87a252164ed4df405ee  $RUNNER_TEMP/doctl.tar.gz" \
+              | sha256sum --check --strict -
+            tar -xzf "$RUNNER_TEMP/doctl.tar.gz" -C "$RUNNER_TEMP" doctl
+            schema+=(--doctl "$RUNNER_TEMP/doctl")
+          fi
           python scripts/check-http-hosts.py check --tree "$RUNNER_TEMP/staged" "${schema[@]}"
           python scripts/check-http-hosts.py profile "$HOST" --tree "$RUNNER_TEMP/staged" --out "$RUNNER_TEMP/profile.json"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -225,6 +239,61 @@ jobs:
           name: http-host-${{ matrix.host }}
           path: hosts/
           if-no-files-found: error
+
+  droplet:
+    name: DigitalOcean 1-Click Droplet · fresh Ubuntu 24.04
+    needs: [unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CHECKPOINT_DISABLE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Validate the Packer template with its pinned plugin
+        run: |
+          set -euo pipefail
+          python3 scripts/stage-http-satellite.py stage --out "$RUNNER_TEMP/http"
+          curl --fail --silent --show-error --location --proto '=https' --retry 3 \
+            --output "$RUNNER_TEMP/packer.zip" https://releases.hashicorp.com/packer/1.16.2/packer_1.16.2_linux_amd64.zip
+          echo "abbfe0cf74985084112659b53e3565f264f70a20914c3b7c4f789f54f61c2414  $RUNNER_TEMP/packer.zip" \
+            | sha256sum --check --strict -
+          unzip -q "$RUNNER_TEMP/packer.zip" packer -d "$RUNNER_TEMP"
+          template=distribution/digitalocean/droplet/template.pkr.hcl
+          export PACKER_PLUGIN_PATH="$RUNNER_TEMP/packer-plugins"
+          "$RUNNER_TEMP/packer" init "$template"
+          "$RUNNER_TEMP/packer" fmt -check "$template"
+          # validate runs the builder's own checks, which want a token value; it calls no API.
+          DIGITALOCEAN_API_TOKEN=placeholder-not-a-token "$RUNNER_TEMP/packer" validate \
+            -var "service_dir=$RUNNER_TEMP/http" "$template"
+      - name: Install on this fresh runner as the image build does, judge it from outside and remove it
+        run: |
+          set -euo pipefail
+          sudo bash distribution/digitalocean/droplet/install.sh "$RUNNER_TEMP/http"
+          firewall=$(sudo ufw status)
+          printf '%s\n' "$firewall"
+          test "$(printf '%s\n' "$firewall" | grep -c -E '^Status: active$')" -eq 1
+          test "$(printf '%s\n' "$firewall" | grep -c -E '^(22|80)/tcp +ALLOW +Anywhere$')" -eq 2
+          test "$(printf '%s\n' "$firewall" | grep -E 'ALLOW' | grep -c -v -E '^(22|80)/tcp( \(v6\))? +ALLOW ')" -eq 0
+          pid=$(systemctl show --property MainPID --value qrscan-http)
+          user=$(ps -o user= -p "$pid")
+          echo "qrscan-http runs as $user"
+          test "$user" != root
+          bash /etc/update-motd.d/99-qrcode-barcode-scanner
+          revision=$(python3 -c "import json; print(json.load(open('$RUNNER_TEMP/http/SOURCE.json'))['engine']['revision'])")
+          node "$RUNNER_TEMP/http/test/consumer.mjs" http://127.0.0.1 \
+            "$RUNNER_TEMP/http/test/fixtures/mixed-code128-qr.png" --revision "$revision"
+          sudo systemctl disable --now qrscan-http
+          sudo rm /etc/systemd/system/qrscan-http.service /etc/update-motd.d/99-qrcode-barcode-scanner
+          sudo rm -r /opt/qrscan-http
+          sudo systemctl daemon-reload
+          if curl --silent --max-time 2 http://127.0.0.1/healthz; then echo "the service still answers"; exit 1; fi
+          echo "removed: no unit, no files, nothing on port 80"
 
   publish:
     name: Publish to ghcr.io
