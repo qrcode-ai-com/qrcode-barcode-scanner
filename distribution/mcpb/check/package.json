@@ -6,5 +6,10 @@
   "type": "module",
   "devDependencies": {
     "@anthropic-ai/mcpb": "2.1.2"
+  },
+  "overrides": {
+    "external-editor": {
+      "tmp": "^0.2.7"
+    }
   }
 }
