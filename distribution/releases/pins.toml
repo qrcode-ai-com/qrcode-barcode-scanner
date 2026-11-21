@@ -143,6 +143,7 @@ paths = [
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
   ".github/workflows/integration-canva.yml",
+  ".github/workflows/integration-dify-template.yml",
   ".github/workflows/integration-github-action.yml",
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
