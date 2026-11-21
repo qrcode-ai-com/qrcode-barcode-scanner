@@ -5,9 +5,13 @@ import os
 import pathlib
 
 import pytest
+import python_host_kit as kit
 import qrcode_barcode_scanner
+import tomllib
 from PIL import Image
 from streamlit.testing.v1 import AppTest
+
+import scan_view
 
 APP = pathlib.Path(__file__).resolve().parents[1]
 QR = "https://qrc-ai.com/76xMa"
@@ -15,19 +19,10 @@ CODE128 = "STOCK-4827"
 PROFILES = ("fast", "frame", "full")
 
 
-def fixtures_root():
-    if os.environ.get("QRSCAN_FIXTURES"):
-        return pathlib.Path(os.environ["QRSCAN_FIXTURES"])
-    for parent in APP.parents:
-        if (parent / "fixtures" / "consumer-truth.json").is_file():
-            return parent / "fixtures"
-    raise RuntimeError("no scanner fixtures found: set QRSCAN_FIXTURES")
-
-
 @pytest.fixture
 def mixed_bytes():
-    staged = os.environ.get("QRSCAN_ACCEPTANCE_IMAGE")
-    return pathlib.Path(staged).read_bytes() if staged else (fixtures_root() / "symbology/mixed-code128-qr.png").read_bytes()
+    """The mixed fixture, or the copy an acceptance run staged, checked against its SHA-256."""
+    return kit.mixed_bytes(APP)
 
 
 def start():
@@ -58,6 +53,13 @@ def png(width, height, color="white"):
 def test_the_first_visit_scans_the_sample_with_the_fast_profile():
     app = start()
     assert app.title[0].value == "QR Code & Barcode Scanner"
+    # Where the scan runs, said on the page itself: on Community Cloud, a Streamlit server.
+    assert app.caption[0].value.startswith("On Streamlit Community Cloud, that machine is a Streamlit server")
+    # The three QR Code AI links every scanner destination carries.
+    links = [element.value for element in app.markdown if "qrcode-ai.com" in element.value]
+    assert links == ["From [QR Code AI](https://qrcode-ai.com/): the "
+                     "[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the "
+                     "[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) in the browser."]
     assert app.radio[0].value == "Sample image" and app.selectbox[0].value == "fast"
     assert app.number_input[0].value is None
     assert app.success[0].value == "2 code(s) found in mixed-code128-qr.png."
@@ -76,10 +78,7 @@ def test_an_uploaded_mixed_image_gives_both_codes_in_each_profile(mixed_bytes, p
     upload(app, "label.png", mixed_bytes)
     assert app.success[0].value == "2 code(s) found in label.png."
     assert [row["Text"] for row in table(app)] == [QR, CODE128]
-    report = json.loads(app.json[0].value)
-    assert report["trace"]["budget_exhausted"] is False and report["trace"]["engine_panics"] == 0
-    assert report["versions"]["scanner"] == "0.11.0"
-    assert (report["score"] is None) == (profile == "frame")
+    report = kit.assert_mixed(json.loads(app.json[0].value), profile)
     direct = qrcode_barcode_scanner.scan(mixed_bytes, profile, budget_ms=0)
     assert report["detections"] == json.loads(json.dumps(direct["detections"]))
 
@@ -121,15 +120,25 @@ def test_the_requirements_pin_the_published_engine():
     assert qrcode_barcode_scanner.__version__ == "0.11.0"
 
 
+def test_the_config_beside_the_app_matches_its_limits():
+    """Community Cloud reads .streamlit/config.toml beside the entrypoint; it must hold the app's limit."""
+    config = tomllib.loads((APP / ".streamlit" / "config.toml").read_text())
+    assert config == {"server": {"maxUploadSize": 8}, "browser": {"gatherUsageStats": False}}
+    assert config["server"]["maxUploadSize"] * 1024 * 1024 == scan_view.MAX_BYTES
+    assert not (APP.parents[1] / ".streamlit").exists(), "a root config would be read by every app"
+
+
 def test_the_acceptance_reports_are_written_through_the_app(mixed_bytes):
     """Three reports for scripts/destination-acceptance.py, when an acceptance run asks for them."""
-    out_dir = os.environ.get("QRSCAN_ACCEPTANCE_DIR")
-    if not out_dir:
-        pytest.skip("QRSCAN_ACCEPTANCE_DIR is not set")
-    pathlib.Path(out_dir).mkdir(parents=True, exist_ok=True)
-    for profile in PROFILES:
+    if not os.environ.get(kit.REPORTS_VARIABLE):
+        pytest.skip(f"{kit.REPORTS_VARIABLE} is not set")
+
+    def scan(profile):
         app = start()
         app.selectbox[0].set_value(profile)
         app.number_input[0].set_value(0)
         upload(app, "mixed.png", mixed_bytes)
-        (pathlib.Path(out_dir) / f"{profile}.json").write_text(app.json[0].value, encoding="utf-8")
+        assert app.success[0].value == "2 code(s) found in mixed.png."
+        return kit.assert_mixed(json.loads(app.json[0].value), profile)
+
+    assert len(kit.write_acceptance_reports(scan)) == 3

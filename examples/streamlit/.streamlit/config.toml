@@ -1,0 +1,13 @@
+# Streamlit reads this file when the app is started from the repository root with
+# `streamlit run examples/streamlit/streamlit_app.py`, as Streamlit Community Cloud starts it: a
+# `.streamlit/config.toml` beside the entrypoint is read after the root one and wins over it.
+# The repository has no root config, so these values are the app's own.
+
+[server]
+# The largest upload, in megabytes: scan_view.MAX_BYTES, 8 MiB. The app refuses a larger file too.
+maxUploadSize = 8
+
+[browser]
+# No usage statistics from a copy run on your machine. Community Cloud overrides this setting and
+# sends them for every app it hosts, so the hosted app's page says so.
+gatherUsageStats = false
