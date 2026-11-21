@@ -1,0 +1,226 @@
+name: Maven Central bundle
+
+# Builds the bundle Maven Central takes for the Android binding, under the group
+# io.github.qrcode-ai-com: the AAR with the native library of four ABIs, its POM, its sources
+# and javadoc jars and their checksums, in the Maven layout the Central Portal's upload reads.
+# It inspects the bundle, then a clean Android project installs the AAR from that bundle alone
+# and scans the mixed fixture on an emulator with 16 KB pages.
+# The bundle is unsigned and nothing leaves the runner: there is no Maven Central trusted
+# publishing, so signing and the upload are the owner's steps (bindings/kotlin/LISTING.md).
+# The run on an engine tag gives the bundle of that release; a branch run is a rehearsal.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/maven-central.yml
+      - bindings/kotlin/**
+      - crates/qrcode-ai-scanner-uniffi/**
+      - crates/qrcode-ai-scanner/LICENSE-APACHE-2.0
+      - crates/qrcode-ai-scanner/THIRD-PARTY.md
+      - tests/consumers/jitpack-android/**
+      - scripts/maven-central-bundle.py
+      - scripts/elf-load-alignment.py
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-central-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN; RELEASING.md § toolchain).
+  RUST_TOOLCHAIN: "1.99.1"
+  GROUP: io.github.qrcode-ai-com
+  COORDINATE: io/github/qrcode-ai-com/qrcode-barcode-scanner
+  FIXTURE: fixtures/symbology/mixed-code128-qr.png
+  FIXTURE_SHA256: c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8
+
+jobs:
+  bundle:
+    name: Bundle · four ABIs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Self-test the bundle program
+        run: python3 scripts/maven-central-bundle.py --self-test
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: crates/qrcode-ai-scanner-uniffi
+      - uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
+        with:
+          ndk-version: r27
+      - run: cargo install cargo-ndk --version 4.1.2 --locked
+      - name: Build the four ABIs and generate the Kotlin bindings
+        run: |
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -t x86 \
+            -o bindings/kotlin/qrcodeaiscanner/src/main/jniLibs \
+            build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          cargo build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml
+          cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen -- \
+            generate --library crates/qrcode-ai-scanner-uniffi/target/release/libqrcode_ai_scanner_uniffi.so \
+            --language kotlin \
+            --out-dir bindings/kotlin/qrcodeaiscanner/src/main/kotlin
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          gradle-version: "8.9"
+          cache-disabled: true
+      - name: Publish to a Maven directory on the runner
+        run: |
+          gradle -p bindings/kotlin :qrcodeaiscanner:publishReleasePublicationToMavenLocal \
+            -PscannerGroup="$GROUP" -Dmaven.repo.local="$RUNNER_TEMP/m2"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' bindings/kotlin/qrcodeaiscanner/build.gradle.kts)
+          test -n "$version"
+          test -d "$RUNNER_TEMP/m2/$COORDINATE/$version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          find "$RUNNER_TEMP/m2/$COORDINATE/$version" -maxdepth 1 -type f -printf '%f\n' | sort
+      # The bundle is written twice from the one publication: the same files give the same zip.
+      - name: Write and inspect the bundle
+        run: |
+          mkdir maven-central
+          zip="maven-central/qrcode-barcode-scanner-$VERSION-bundle.zip"
+          python3 scripts/maven-central-bundle.py bundle --repo "$RUNNER_TEMP/m2" \
+            --version "$VERSION" --commit "$GITHUB_SHA" --out "$zip"
+          python3 scripts/maven-central-bundle.py bundle --repo "$RUNNER_TEMP/m2" \
+            --version "$VERSION" --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/again.zip"
+          cmp "$zip" "$RUNNER_TEMP/again.zip"
+          python3 scripts/maven-central-bundle.py inspect "$zip" \
+            --version "$VERSION" --commit "$GITHUB_SHA" --out maven-central/bundle.json
+          # The 64-bit libraries of the AAR must be aligned for 16 KB pages.
+          python3 scripts/elf-load-alignment.py \
+            "$RUNNER_TEMP/m2/$COORDINATE/$VERSION/qrcode-barcode-scanner-$VERSION.aar" \
+            --json maven-central/alignment.json
+          sha256sum "$zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: maven-central-bundle
+          path: maven-central/
+          if-no-files-found: error
+          retention-days: 90
+
+  consumer:
+    name: Clean Android project · Android 15, 16 KB pages
+    needs: bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: maven-central-bundle
+          path: ${{ runner.temp }}/bundle
+      - name: Check the bundle against its receipt
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          folder = pathlib.Path(os.environ['RUNNER_TEMP']) / 'bundle'
+          report = json.loads((folder / 'bundle.json').read_text())
+          zips = sorted(folder.glob('*-bundle.zip'))
+          assert len(zips) == 1, zips
+          assert hashlib.sha256(zips[0].read_bytes()).hexdigest() == report['sha256'], 'the zip is not the inspected one'
+          group, artifact, version = report['coordinate'].split(':')
+          assert group == os.environ['GROUP'], group
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f"VERSION={version}\nBUNDLE={zips[0]}\n")
+          PY
+      # The project resolves the binding from this directory and from nowhere else
+      # (exclusiveContent in tests/consumers/jitpack-android/settings.gradle.kts). The step above
+      # sets BUNDLE and VERSION, which GITHUB_ENV gives to the steps after it only.
+      - name: Unpack the bundle as a Maven repository
+        run: |
+          mkdir "$RUNNER_TEMP/central"
+          unzip -q "$BUNDLE" -d "$RUNNER_TEMP/central"
+          find "$RUNNER_TEMP/central" -type f | sort
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        with:
+          gradle-version: "8.9"
+          cache-disabled: true
+      - name: Stage the shared fixture
+        run: |
+          echo "$FIXTURE_SHA256  $FIXTURE" | sha256sum -c -
+          mkdir -p tests/consumers/jitpack-android/app/src/main/assets
+          cp "$FIXTURE" tests/consumers/jitpack-android/app/src/main/assets/
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # The dependency is the one line a consumer writes, with the Maven Central coordinate:
+      # no JNA added by hand. The instrumented test reads both codes in the fast, full and
+      # frame profiles; the minified app runs the same three scans.
+      - name: Scan on the emulator, debug and minified
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis_ps16k
+          arch: x86_64
+          disable-animations: true
+          script: |
+            mkdir -p receipt
+            adb shell getconf PAGE_SIZE | tee receipt/page-size.txt
+            test "$(cat receipt/page-size.txt)" = "16384"
+            gradle -p tests/consumers/jitpack-android :app:dependencies --configuration debugRuntimeClasspath -PscannerGroup="$GROUP" -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/central" > receipt/dependencies.txt
+            grep -i -E 'qrcode-barcode-scanner|jna' receipt/dependencies.txt | tee receipt/resolved-dependencies.txt
+            grep -F "$GROUP:qrcode-barcode-scanner:$VERSION" receipt/resolved-dependencies.txt
+            gradle -p tests/consumers/jitpack-android :app:connectedDebugAndroidTest -PscannerGroup="$GROUP" -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/central"
+            gradle -p tests/consumers/jitpack-android :app:assembleRelease -PscannerGroup="$GROUP" -PscannerVersion="$VERSION" -PscannerRepo="$RUNNER_TEMP/central"
+            adb install -r tests/consumers/jitpack-android/app/build/outputs/apk/release/app-release.apk
+            adb logcat -c
+            adb shell am start -W -n com.qrcodeai.consumer.jitpack/.SelfTestActivity
+            for attempt in $(seq 1 45); do adb logcat -d -s SCANNER_SELFTEST:I > receipt/logcat.txt; grep -c 'SCANNER_SELFTEST: ' receipt/logcat.txt > /dev/null && break; sleep 2; done
+            grep 'SCANNER_SELFTEST: ' receipt/logcat.txt | tee receipt/minified-selftest.txt
+            grep -x '.*SCANNER_SELFTEST: ok' receipt/minified-selftest.txt
+      - name: Write the receipt
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = pathlib.Path('receipt')
+          receipt.mkdir(exist_ok=True)
+          read = lambda name: (receipt / name).read_text().strip() if (receipt / name).exists() else None
+          bundle = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'bundle' / 'bundle.json').read_text())
+          json.dump({
+              'check': 'Maven Central bundle, one-line dependency from the unpacked bundle',
+              'coordinate': bundle['coordinate'],
+              'bundle_sha256': bundle['sha256'],
+              'job_status': os.environ['JOB_STATUS'],
+              'resolved_dependencies': read('resolved-dependencies.txt'),
+              'device_page_size': read('page-size.txt'),
+              'profiles': ['fast', 'full', 'frame'],
+              'expected': {'qr_code': 'https://qrc-ai.com/76xMa', 'code128': 'STOCK-4827'},
+              'minified_selftest': read('minified-selftest.txt'),
+              'workflow_run': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'commit': os.environ['GITHUB_SHA'],
+          }, open(receipt / 'receipt.json', 'w'), indent=2)
+          print(open(receipt / 'receipt.json').read())
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: maven-central-consumer
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90

@@ -1779,6 +1779,21 @@ again before the push, and pushes only the gems rubygems.org does not hold; a ge
 be the same file. See [the account setup and the listing fields](bindings/ruby/LISTING.md). No
 account, trusted publisher, environment, tag or publication is created by a branch rehearsal.
 
+## Maven Central
+
+The Android binding is not on Maven Central. `.github/workflows/maven-central.yml` builds its
+bundle under the group `io.github.qrcode-ai-com` on every engine tag `vX.Y.Z`, on a manual run
+and on a pull request that touches it: the AAR with four ABIs and its license files, the POM,
+the sources and javadoc jars and their md5, sha1, sha256 and sha512, in the Maven layout of the
+Central Portal's upload. `scripts/maven-central-bundle.py inspect` judges it and a clean Android
+project installs it from the unpacked bundle alone and scans on an emulator with 16 KB pages.
+Maven Central has no trusted publishing and the workflow holds no key or token, so the bundle
+stays unsigned and no job uploads it. The bundle of a release is the artifact
+`maven-central-bundle` of the run on that tag; a branch run is a rehearsal. Signing, the
+namespace verification and the upload are the owner's, in
+[the listing kit](bindings/kotlin/LISTING.md). JitPack's `com.github.qrcode-ai-com` publication
+is unchanged.
+
 ## README actions
 
 Run `python3 scripts/build-readme-actions.py` after changing a maintained README,

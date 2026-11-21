@@ -109,6 +109,19 @@ For a minified build with 0.11.0, also add this line to your ProGuard rules:
 Use the version string `0.11.0`, without a `v`. JitPack treats `v0.11.0` as
 another build of the same tag.
 
+## Maven Central
+
+Not published yet: `io.github.qrcode-ai-com:qrcode-barcode-scanner` is not on Maven Central, and
+JitPack above is the only coordinate that resolves today. The workflow
+[Maven Central bundle](../../.github/workflows/maven-central.yml) builds the complete bundle
+Central takes: the AAR with the native library of four Android ABIs (`arm64-v8a`,
+`armeabi-v7a`, `x86_64`, `x86`) and its license files, the POM, the sources and javadoc jars,
+and their checksums. It inspects the bundle, then installs the AAR from that bundle alone in the
+clean Android project on an emulator with 16 KB pages, where it reads the QR code and the
+Code 128 of the mixed fixture in the fast, full and frame profiles. The bundle is unsigned;
+signing it and the upload are the owner's steps, written in [LISTING.md](LISTING.md). The
+license of each part of the AAR is in [LICENSE-NOTES.md](LICENSE-NOTES.md).
+
 ## Usage
 
 `scan(...)` returns the `ScanReport` as a **JSON String** (the cross-surface

@@ -54,6 +54,8 @@ app.
 | `-PscannerVersion=0.11.0` | The exact JitPack version string to consume. |
 | `-PwithScanner=false` | The removal check: the app builds without the dependency. |
 | `-PjnaAar=5.13.0` | Add JNA's Android AAR explicitly and drop the transitive JNA jar. |
+| `-PscannerRepo=<directory or URL>` | Resolve the binding from that Maven repository instead of JitPack. The binding's group resolves from that one repository only. |
+| `-PscannerGroup=io.github.qrcode-ai-com` | The group of the publication under test: the Maven Central bundle's. JitPack's `com.github.qrcode-ai-com` otherwise. |
 
 To run it by hand, copy the fixture into `app/src/main/assets/`, start an emulator and run
 `gradle :app:connectedDebugAndroidTest -PjnaAar=5.17.0` with Gradle 8.9 and JDK 17. No Gradle
@@ -71,6 +73,10 @@ against it with `-PscannerRepo=<directory>`, on Android 14 with 4 KB pages and o
 with 16 KB pages. It uses the one-line dependency, without `-PjnaAar`, so it fails if the
 publication stops naming JNA's Android AAR. It also checks that the library inside the AAR is
 aligned for 16 KB pages.
+
+[`maven-central.yml`](../../../.github/workflows/maven-central.yml) runs this same app against
+the unpacked Maven Central bundle, with `-PscannerGroup=io.github.qrcode-ai-com`, on Android 15
+with 16 KB pages: the AAR of four ABIs that a Central upload would publish.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
 
