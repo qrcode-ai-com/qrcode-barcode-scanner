@@ -34,6 +34,7 @@ GUIDES = {
     'integrations/n8n/template/README.md': ('integrations/n8n', 'n8n'),
     'integrations/node-red/README.md': ('integrations/node-red', 'Node-RED'),
     'integrations/obsidian/README.md': ('integrations/obsidian', 'Obsidian'),
+    'integrations/jupyterlab/README.md': ('integrations/jupyterlab', 'JupyterLab'),
     'integrations/napari/README.md': ('integrations/napari', 'napari'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
