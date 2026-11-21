@@ -21,7 +21,7 @@ pages below were read on 21 November 2026; read them again before relying on a p
 
 ## The values the form fills
 
-[`prefill.html`](prefill.html) holds them; [`build-codepen-prefill.py`](../../scripts/build-codepen-prefill.py)
+[`prefill.html`](prefill.html) holds them; [`build-prefill.py`](build-prefill.py)
 writes it from the three files, and the workflow fails when it differs from them.
 
 | Field | Value |

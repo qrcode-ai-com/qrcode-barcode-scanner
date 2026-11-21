@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Write or check examples/codepen/prefill.html from the three files of the Pen.
 
-  build-codepen-prefill.py           write prefill.html
-  build-codepen-prefill.py --check   exit 1 when prefill.html is not what this program writes
+  build-prefill.py           write prefill.html
+  build-prefill.py --check   exit 1 when prefill.html is not what this program writes
 
 CodePen creates a new Pen from a form POSTed to its prefill endpoint: one field, `data`, whose
 value is JSON with the Pen's title, description and code. prefill.html is that form, filled with
@@ -19,8 +19,7 @@ import json
 import pathlib
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-FOLDER = ROOT / "examples/codepen"
+FOLDER = pathlib.Path(__file__).resolve().parent
 TARGET = FOLDER / "prefill.html"
 ENDPOINTS = (
     ("https://codepen.io/cpe/pen/define/", "Create the Pen on CodePen"),
@@ -75,7 +74,7 @@ def page():
 </style>
 </head>
 <body>
-<!-- Written by scripts/build-codepen-prefill.py from index.html, style.css and script.js. -->
+<!-- Written by build-prefill.py from index.html, style.css and script.js. -->
 <h1>Create the CodePen demo</h1>
 <p>Sign in to CodePen in this browser, then press the first button. CodePen opens a new, unsaved
   Pen with the three files of this folder, its title and its description. Check the preview, then
@@ -94,7 +93,7 @@ def main():
     expected = page()
     if args.check:
         if not TARGET.exists() or TARGET.read_text(encoding="utf-8") != expected:
-            print("examples/codepen/prefill.html is stale: run python3 scripts/build-codepen-prefill.py", file=sys.stderr)
+            print("examples/codepen/prefill.html is stale: run python3 examples/codepen/build-prefill.py", file=sys.stderr)
             return 1
         print("ok    examples/codepen/prefill.html holds the three files of the Pen")
         return 0

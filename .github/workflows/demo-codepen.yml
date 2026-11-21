@@ -11,7 +11,6 @@ on:
     paths:
       - .github/workflows/demo-codepen.yml
       - examples/codepen/**
-      - scripts/build-codepen-prefill.py
       - distribution/acceptance/**
       - scripts/destination-acceptance.py
       - scripts/check-demo-page.py
@@ -45,7 +44,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: The prefill form holds the three files of the Pen
-        run: python3 scripts/build-codepen-prefill.py --check
+        run: python3 examples/codepen/build-prefill.py --check
       # The checks take Playwright from this project. They drive the Chrome of the runner image,
       # so no browser is downloaded.
       - name: Install Playwright for the page checks
