@@ -16,7 +16,7 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { launches, SERVER } from './launches.mjs';
+import { launches, readmeEntries, SERVER } from './launches.mjs';
 
 const ENGINE = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const NAME = 'qrcode-barcode-scanner';
@@ -31,6 +31,8 @@ const SCHEMAS = {
   '.antigravity-plugin/plugin.json': 'https://antigravity.google/schemas/v1/plugin.json',
 };
 const OPENCODE_SCHEMA = 'https://opencode.ai/config.json';
+// Amp publishes the schema of its settings file; the README's Amp entry is checked against it.
+const AMP_SCHEMA = 'https://ampcode.com/cli-settings.schema.json';
 
 const args = process.argv.slice(2);
 const option = (flag) => { const at = args.indexOf(flag); return at === -1 ? undefined : args.splice(at, 2)[1]; };
@@ -114,6 +116,17 @@ for (const [path, url] of Object.entries(SCHEMAS)) {
     return `schema sha256 ${sha256}`;
   });
 }
+
+// The Amp settings entry the README shows, against Amp's published settings schema. Continue's
+// schema ships only inside its editor extension and Zed publishes none, so those two entries are
+// held to their documented keys by launches.mjs.
+await check(`README.md Amp settings match ${AMP_SCHEMA}`, async () => {
+  const { ampSettings } = readmeEntries(await read('README.md'));
+  const { body, sha256 } = await schema(AMP_SCHEMA);
+  const validate = (await validator(body))();
+  expect(validate(ampSettings), errors(validate));
+  return `schema sha256 ${sha256}`;
+});
 
 // Every JSON file of the stage parses, and none is empty.
 await check('every JSON file parses', async () => {

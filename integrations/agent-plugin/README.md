@@ -42,7 +42,7 @@ Help me understand QR Code & Barcode Scanner plugin for coding agents (integrati
 
 This plugin gives a coding agent a QR code and barcode scanner that runs on your own machine. Every client gets the same two parts: the QR Code & Barcode Scanner skill 0.2.0 and the scanner's MCP server `@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1`, started over stdio at that exact version. One repository root holds the file each client reads.
 
-It serves Claude Code, Codex, Cursor, GitHub Copilot CLI, Gemini CLI, Kiro, Kimi Code, Junie, Antigravity, goose, Pi, OpenCode, Devin and Factory. Each client section below gives the install command, the files the client reads and how to remove the plugin again.
+It serves Claude Code, Codex, Cursor, GitHub Copilot CLI, Gemini CLI, Kiro, Kimi Code, Junie, Antigravity, goose, Pi, OpenCode, Devin, Factory, Amp, Continue and Zed. Each client section below gives the install command, the files the client reads and how to remove the plugin again. Amp, Continue and Zed take the server from their own settings, and Continue gets the server only.
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI's pages for reading a code in the browser. The [QR code scanner guide for agent integrations](https://qrcode-ai.com/en-US/qr-code-scanner/integrations) and the [barcode scanner guide for agent integrations](https://qrcode-ai.com/en-US/barcode-scanner/integrations) cover the clients this plugin serves, and each client section below links its own pair of guides.
 
@@ -79,6 +79,9 @@ This folder is the source of the plugin. Its own repository, [`qrcode-ai-com/qrc
 | OpenCode | `package.json` (`exports["./server"]`), `opencode/plugin.mjs` |
 | Devin | `.claude-plugin/plugin.json`, `.mcp.json`, `skills/` |
 | Factory | `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, `mcp.json`, `skills/` |
+| Amp | `skills/` copied to `~/.config/agents/skills/`, the server in `~/.config/amp/settings.json` |
+| Continue | no file of this repository, the server in `.continue/mcpServers/qrscan.yaml` |
+| Zed | `skills/` copied to `~/.agents/skills/`, the server in `~/.config/zed/settings.json` |
 
 ## Before you install
 
@@ -257,6 +260,78 @@ droid plugin install qrcode-barcode-scanner@qrcode-barcode-scanner-plugin@v0.3.0
 
 Factory reads the Claude Code files of the repository. A pinned source registers as `qrcode-barcode-scanner-plugin@v0.3.0`, so the install names that marketplace. To remove it, run `droid plugin uninstall qrcode-barcode-scanner@qrcode-barcode-scanner-plugin@v0.3.0 --scope user`, then `droid plugin marketplace remove qrcode-barcode-scanner-plugin@v0.3.0`. The [Factory QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/factory-droid) and the [Factory barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/factory-droid) cover Droid.
 
+### Amp
+
+An Amp plugin is a TypeScript file, and this repository ships none, so the skill and the server are added separately. Clone the release tag, copy the skill into Amp's skill folder for this machine, then add the server:
+
+```sh
+git clone --depth 1 --branch v0.3.0 https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin
+mkdir -p ~/.config/agents/skills
+cp -R qrcode-barcode-scanner-plugin/skills/qrcode-barcode-scanner ~/.config/agents/skills/
+amp mcp add qrscan -- npx --yes --ignore-scripts @qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1
+```
+
+`amp mcp add` writes this entry to `~/.config/amp/settings.json`. You can also add it there yourself:
+
+```json
+{
+  "amp.mcpServers": {
+    "qrscan": {
+      "command": "npx",
+      "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+    }
+  }
+}
+```
+
+To remove it, run `amp mcp remove qrscan`, then delete the folder `~/.config/agents/skills/qrcode-barcode-scanner`.
+
+### Continue
+
+Continue's documentation describes MCP servers but no skill folder, so Continue gets the server only. In your workspace, save this file as `.continue/mcpServers/qrscan.yaml`:
+
+```yaml
+name: QR Code and Barcode Scanner
+version: 0.3.1
+schema: v1
+mcpServers:
+  - name: qrscan
+    type: stdio
+    command: npx
+    args:
+      - --yes
+      - --ignore-scripts
+      - "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"
+    connectionTimeout: 60000
+```
+
+`connectionTimeout` is in milliseconds. It gives the first start, which downloads the server, one minute instead of Continue's default of 20 seconds. Continue calls MCP tools in agent mode only. To use the server in every workspace, add the same `mcpServers` item to `~/.continue/config.yaml` instead. To remove it, delete the file or the item.
+
+### Zed
+
+Zed reads skills from `~/.agents/skills/` and MCP servers from `context_servers` in its settings. Clone the release tag and copy the skill:
+
+```sh
+git clone --depth 1 --branch v0.3.0 https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin
+mkdir -p ~/.agents/skills
+cp -R qrcode-barcode-scanner-plugin/skills/qrcode-barcode-scanner ~/.agents/skills/
+```
+
+Then add the server to `~/.config/zed/settings.json`, which the `zed: open settings file` action opens, beside the settings already there. You can also add it from Settings, under AI, MCP Servers: choose Add Server, then Add Local Server. Either way, the entry is:
+
+```json
+{
+  "context_servers": {
+    "qrscan": {
+      "command": "npx",
+      "args": ["--yes", "--ignore-scripts", "@qrcode-ai-com/qrcode-barcode-scanner-mcp@0.3.1"]
+    }
+  }
+}
+```
+
+The skill serves Zed's own agent. Zed also passes the server to external agents. To remove them, delete the `qrscan` entry and the folder `~/.agents/skills/qrcode-barcode-scanner`.
+
 ## Privacy and support
 
 The plugin collects nothing. It holds no telemetry, no account and no key. The server and the helper read the image you name on your machine and return the report to your agent. The only network traffic they cause is npm downloading the pinned packages. Your agent client sends its conversation, including the report, to the model you chose, under that client's own terms.
@@ -334,7 +409,7 @@ The Rust, Node.js, browser and Python packages hold the engine. The Go and PHP p
 
 ## How this folder is checked
 
-The engine repository checks this folder on every change with [its own workflow](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/.github/workflows/integration-agent-plugin.yml). It validates each manifest against its published JSON schema where one exists, runs `gemini extensions validate` from Gemini CLI 0.70.0 on the tree, and lints the skill with vally 0.20.0, the check the awesome-copilot marketplace runs on the plugins it reviews. It then starts the pinned server from every client configuration and scans the mixed test image in the `fast`, `frame` and `full` profiles, and runs the skill's helper the same way. It also stages the plugin repository and checks that the staged tree matches the commit it names.
+The engine repository checks this folder on every change with [its own workflow](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/.github/workflows/integration-agent-plugin.yml). It validates each manifest against its published JSON schema where one exists, and the Amp entry above against Amp's settings schema, runs `gemini extensions validate` from Gemini CLI 0.70.0 on the tree, and lints the skill with vally 0.20.0, the check the awesome-copilot marketplace runs on the plugins it reviews. It then starts the pinned server from every client configuration, the Amp, Continue and Zed entries of this README included, and scans the mixed test image in the `fast`, `frame` and `full` profiles, and runs the skill's helper the same way. It also stages the plugin repository and checks that the staged tree matches the commit it names.
 
 ## License
 
