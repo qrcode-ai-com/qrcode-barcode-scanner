@@ -107,7 +107,7 @@ With the default settings, an image that holds a QR code and a Code 128 barcode 
 
 `raw` holds the exact bytes of each code in base64. With **Include Report** on, `report` holds the engine report unchanged: positions, scores, hints, trace and versions. The `frame` profile leaves `report.score` null, because it does not score. The image stays on the item, so a later step can still use it.
 
-An image without a code is a normal result: `texts` is empty and `count` is 0. A corrupt file, an unknown format or an image over the limits stops the node with an error such as `Scanner error QRS-001`. With **On Error** set to continue, the item carries `error` and `code` instead, and the next items are still scanned.
+An image without a code is a normal result: `texts` is empty and `count` is 0. A corrupt file, an unknown format or an image over the limits stops the node with an error such as `Scanner error QRS-001`. With **On Error** set to continue, the item carries `error` instead, a message that ends with the code in brackets (such as `[QRS-001]`), and the next items are still scanned.
 
 ## Limits
 

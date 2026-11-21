@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "qrcode-barcode-scanner",
   "title": "QR Code & Barcode Scanner",
-  "description": "Read the QR codes and barcodes in an image selected in Finder or copied to the clipboard, on your Mac, with qrscan.",
+  "description": "Read every QR code and barcode in an image from Finder or the clipboard, then copy each decoded text or the full scan report.",
   "icon": "icon.png",
   "author": "qrcode-ai-com",
   "categories": [
@@ -25,8 +25,7 @@
     {
       "name": "scan-image",
       "title": "Scan Image for Codes",
-      "subtitle": "QR Code & Barcode Scanner",
-      "description": "Read the QR codes and barcodes in the image selected in Finder, or in the image on the clipboard.",
+      "description": "Read the QR codes and barcodes in the image selected in Finder, or in the image file on the clipboard, and list each decoded text.",
       "mode": "view"
     }
   ],
@@ -58,6 +57,24 @@
         {
           "title": "Frame",
           "value": "frame"
+        }
+      ]
+    },
+    {
+      "name": "timeLimit",
+      "type": "dropdown",
+      "required": false,
+      "title": "Time Limit",
+      "description": "Profile Default stops the scan at the profile's own limit: 4 s for Full, 0.8 s for Fast, 0.08 s for Frame. No Limit lets it run to its end, which a large or damaged image may need.",
+      "default": "profile",
+      "data": [
+        {
+          "title": "Profile Default",
+          "value": "profile"
+        },
+        {
+          "title": "No Limit",
+          "value": "none"
         }
       ]
     }

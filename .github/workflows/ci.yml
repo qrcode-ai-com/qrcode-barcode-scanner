@@ -21,6 +21,36 @@ env:
   RUST_TOOLCHAIN: "1.99.1"
 
 jobs:
+  # Which jobs this change needs (scripts/ci-scope.py). A pull request that
+  # only touches integrations/, examples/, docs/, distribution/submissions/,
+  # the README counts, README list and release pins a new integration updates, or a
+  # workflow other than this one and wasm-browser.yml, changes nothing the
+  # gated jobs build: those trees consume the published artifacts and have
+  # their own workflows. Such a pull request skips test, msrv, wasm-shape, the
+  # Node and WASM smokes with their consumers and browser legs, corpus and
+  # deny; lint (publish guards, fmt, clippy) and packaging (README, licence,
+  # recipe and pin checks) always run. Every push to main runs everything.
+  scope:
+    runs-on: ubuntu-24.04
+    outputs:
+      engine: ${{ steps.decide.outputs.engine }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          python3 scripts/ci-scope.py --self-test
+          if [ "$EVENT" = pull_request ]; then
+            # The pull_request checkout is the merge commit: its first parent
+            # is the base branch, so this diff is exactly the change.
+            python3 scripts/ci-scope.py --git HEAD^1 HEAD
+          else
+            echo engine=true | tee -a "$GITHUB_OUTPUT"
+          fi
+
   lint:
     runs-on: ubuntu-24.04
     steps:
@@ -61,6 +91,8 @@ jobs:
             --features engine-rxing,serde --lib
 
   test:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     strategy:
       matrix:
         os: [ubuntu-24.04, macos-latest, windows-latest]
@@ -95,6 +127,8 @@ jobs:
   # (This job's first run proved the previously-declared 1.87 was fiction —
   # the code uses let-chains, stabilized in 1.88.)
   msrv:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -108,6 +142,8 @@ jobs:
       - run: cargo check -p qrcode-barcode-scanner-cli --locked
 
   wasm-shape:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -134,6 +170,8 @@ jobs:
   # the package as built (release, the publish profile) and assert exact
   # content with budget-free judgments, so machine load cannot flip them.
   node-smoke:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -248,6 +286,8 @@ jobs:
             fixtures/clean/gen_v5_q.png "$version"
 
   wasm-smoke:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -359,6 +399,8 @@ jobs:
           python3 scripts/packed-rust-consumer.py target/package fixtures/clean/gen_v5_q.png "$version"
 
   corpus:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -393,6 +435,8 @@ jobs:
           path: corpus-report.txt
 
   deny:
+    needs: scope
+    if: needs.scope.outputs.engine == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

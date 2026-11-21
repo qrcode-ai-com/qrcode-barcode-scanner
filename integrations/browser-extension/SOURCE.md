@@ -7,7 +7,8 @@ Firefox Add-ons reviewer who wants to rebuild the uploaded add-on and compare it
 ## What you need
 
 - Node.js 22.19 or later on the 22 line, or Node.js 24 or later, with the npm that comes with it.
-  The packages were built with Node.js 22.22.2 and npm 10.9.7.
+  The packages were built with Node.js 22.22.2 and npm 10.9.7, and CI gets the same bytes with
+  Node.js 22 and 24 on Linux, macOS and Windows.
 - Any operating system that runs Node.js: Linux, macOS or Windows.
 - Network access to the npm registry, for one package.
 
@@ -32,8 +33,9 @@ install script. `npm run build-for-amo` runs `node scripts/build.mjs`. It writes
 - `build/qrcode-barcode-scanner-source-0.1.0.zip`, this source package;
 - `build/build-receipt.json`, with the size and SHA-256 of every archive.
 
-Compare `build/firefox/` with the files of the uploaded add-on: they are the same files. The zip
-bytes also match when the same Node.js zlib compresses them; the files inside match either way.
+Compare `build/firefox/` with the files of the uploaded add-on: they are the same files, and the
+zip has the same bytes: every entry carries one fixed date, so neither the clock nor the time zone
+changes it. `build/build-receipt.json` and `build/SHA256SUMS` give the SHA-256 of each archive.
 A signed copy from Firefox Add-ons also holds the signature that Mozilla adds under `META-INF/`.
 `node scripts/inspect.mjs build` checks each archive: its file list, its manifest, the pinned
 WebAssembly module, and that no script builds code from text or loads it from the network.
@@ -76,12 +78,13 @@ network.
 ```sh
 npm ci --ignore-scripts
 npm run build
-npm test                   # Node unit tests, no browser
-npm run inspect            # the archive checks above
-npm run lint:firefox       # Mozilla's add-on linter, through web-ext
-npm run test:chromium      # the Chrome build in Playwright's Chromium
-npm run test:firefox-page  # the Firefox build's page in Playwright's Firefox
-npm run test:reproduce     # rebuild from the source zip and compare the archives
+npm test                    # Node unit tests, no browser
+npm run inspect             # the archive checks above
+npm run lint:firefox        # Mozilla's add-on linter, through web-ext
+npm run test:chromium       # the Chrome build in Playwright's Chromium
+npm run test:firefox-addon  # the Firefox zip installed in Firefox (FIREFOX=/path/to/firefox)
+npm run test:firefox-page   # the Firefox build's page in Playwright's Firefox
+npm run test:reproduce      # rebuild from the source zip and compare the archives
 ```
 
 The browser tests need Playwright's browsers:

@@ -46,9 +46,12 @@ To make test images with known values, use the [QR code generator](https://qrcod
 
 ## Status
 
-The Actor is built and tested in the engine repository. It is not on the Apify Store yet, and its
-image has not been built: Apify builds it from the [`Dockerfile`](Dockerfile) when the Actor is
-pushed.
+The Actor is built and tested in the engine repository. It is not on the Apify Store yet. Apify
+builds its image from the [`Dockerfile`](Dockerfile) when the Actor is pushed; the engine
+repository's CI builds the same image and runs it on the sample image. The page the Store shows is
+[STORE.md](STORE.md), and [LISTING.md](LISTING.md) holds the listing values and the steps left to
+the owner: the Apify account, the publishing terms, the Git source, the pricing model and the
+publication.
 
 ## Run it
 
@@ -115,9 +118,26 @@ python -m venv .venv
 They scan the sample by URL and from an uploaded file in the three profiles. One batch mixes a
 good image, a missing one, a file that is not an image, a refused address, two oversized files, an
 oversized image, a blank image and a second code: each gets its own item, in order. They also
-check that unusable input fails the run and that the input and dataset schemas match the code.
-The workflow `integration-python-hosts` of the engine repository runs them. The Docker image and
-a run on the Apify platform have not been tried.
+check that unusable input fails the run, that the input and dataset schemas match the code, that
+the Store page follows Apify's README guidance, and that the engine notices are the copies of
+v0.11.0. The workflow `integration-python-hosts` of the engine repository runs them.
+
+The workflow `integration-apify` builds the image from the `Dockerfile` and runs it as the platform
+starts an Actor, with a local storage holding the run's input:
+
+```sh
+docker build -t qrscan-apify integrations/apify
+python3 integrations/apify/tests/image_consumer.py --image qrscan-apify \
+  --fixture fixtures/symbology/mixed-code128-qr.png --reports /tmp/apify-reports --work /tmp/apify-runs \
+  --prefill integrations/apify/.actor/input_schema.json
+```
+
+It reads the sample, served from the runner, in the three profiles, then runs the input schema's
+prefill the way the Store's daily test does: the run must succeed with a non-empty dataset in
+under five minutes. On a Mac with Docker Desktop, add `--network bridge --url-host
+host.docker.internal`. The workflow also validates the definition files with Apify's CLI
+(`apify validate-schema`) and against the schemas Apify publishes. A run on the Apify platform
+itself has not been tried.
 
 ## How it works
 
@@ -203,7 +223,7 @@ each one starts `qrscan` and hands you its report.
 
 ## Licence
 
-Project-authored Actor source is MIT; see [LICENSE](LICENSE). The Actor's image installs the engine wheel `qrcode-barcode-scanner` 0.11.0 from PyPI. The published engine 0.11.0 keeps the license it shipped with, AGPL-3.0-or-later; read the license packaged with the version you install and the [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md).
+Project-authored Actor source is MIT; see [LICENSE](LICENSE). The Actor's image installs the engine wheel `qrcode-barcode-scanner` 0.11.0 from PyPI. The published engine 0.11.0 keeps the license it shipped with, AGPL-3.0-or-later; read the license packaged with the version you install and the [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md). Because the image runs that engine, the image as a whole is distributed under AGPL-3.0-or-later; [LICENSE-NOTES.md](LICENSE-NOTES.md) lists each part of the image, its license and its source, and the image carries the engine's third-party notices in `licenses/engine-0.11.0/`.
 
 Maintained by **Thibaut Mélen & Nicolas Cella** for **QR Code AI**, a product of **SuperNovae Studio**. The license of each component is stated in its own license files.
 
