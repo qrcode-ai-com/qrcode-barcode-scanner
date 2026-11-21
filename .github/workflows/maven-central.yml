@@ -126,9 +126,7 @@ jobs:
         with:
           name: maven-central-bundle
           path: ${{ runner.temp }}/bundle
-      # The project resolves the binding from this directory and from nowhere else
-      # (exclusiveContent in tests/consumers/jitpack-android/settings.gradle.kts).
-      - name: Unpack the bundle as a Maven repository
+      - name: Check the bundle against its receipt
         run: |
           python3 - <<'PY'
           import hashlib, json, os, pathlib
@@ -142,6 +140,11 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as env:
               env.write(f"VERSION={version}\nBUNDLE={zips[0]}\n")
           PY
+      # The project resolves the binding from this directory and from nowhere else
+      # (exclusiveContent in tests/consumers/jitpack-android/settings.gradle.kts). The step above
+      # sets BUNDLE and VERSION, which GITHUB_ENV gives to the steps after it only.
+      - name: Unpack the bundle as a Maven repository
+        run: |
           mkdir "$RUNNER_TEMP/central"
           unzip -q "$BUNDLE" -d "$RUNNER_TEMP/central"
           find "$RUNNER_TEMP/central" -type f | sort
