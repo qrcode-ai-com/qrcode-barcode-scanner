@@ -19,7 +19,9 @@ of that file, reviewed here.
 `pack` runs where the engine was built (.github/workflows/swift-package.yml, on macOS). It
 writes into DIR the zip of XCFRAMEWORK, every entry sorted with the engine commit's date and
 fixed permissions, the Swift that UniFFI generated (FILE), and `build.json`, which names the
-engine checkout and the sha256 of both. CHECKOUT must be the pinned engine commit.
+engine checkout and the sha256 of both. CHECKOUT must be the pinned engine commit. The
+xcframework's Info.plist enters the zip in one canonical form, its libraries sorted by
+identifier: `xcodebuild -create-xcframework` lists them in an order that changes between runs.
 
 `stage` reads bindings/swift/package at REV (HEAD by default) from git, never from the working
 tree, and writes into an empty OUT the whole tree of the satellite:
@@ -43,11 +45,13 @@ import hashlib
 import io
 import json
 import pathlib
+import plistlib
 import re
 import subprocess
 import sys
 import tempfile
 import time
+import xml.parsers.expat
 import zipfile
 
 from satellite_stage import REPOSITORY, ROOT, Refused, Satellite, git, tree
@@ -207,8 +211,35 @@ def zip_time(epoch):
     return (parts.tm_year, parts.tm_mon, parts.tm_mday, parts.tm_hour, parts.tm_min, parts.tm_sec - parts.tm_sec % 2)
 
 
+def canonical_info(framework):
+    """Bytes of FRAMEWORK's Info.plist in one form: libraries sorted by identifier, keys sorted.
+
+    xcodebuild -create-xcframework writes the same libraries in an order that differs from one
+    run to the next, which would change the zip's sha256 that Package.swift pins."""
+    path = pathlib.Path(framework) / "Info.plist"
+    try:
+        info = plistlib.loads(path.read_bytes())
+    except (OSError, plistlib.InvalidFileException, ValueError, xml.parsers.expat.ExpatError) as error:
+        raise Refused(f"{path} is not a property list: {error}") from error
+    libraries = info.get("AvailableLibraries") if isinstance(info, dict) else None
+    if not isinstance(libraries, list) or not libraries:
+        raise Refused(f"{path} lists no AvailableLibraries")
+    names = [library.get("LibraryIdentifier") if isinstance(library, dict) else None for library in libraries]
+    if not all(isinstance(name, str) and name for name in names) or len(set(names)) != len(names):
+        raise Refused(f"{path} does not name each library once")
+    missing = [name for name in names if not (pathlib.Path(framework) / name).is_dir()]
+    if missing:
+        raise Refused(f"{path} names {missing[0]}, which the xcframework does not hold")
+    for library in libraries:
+        if isinstance(library.get("SupportedArchitectures"), list):
+            library["SupportedArchitectures"] = sorted(library["SupportedArchitectures"])
+    info["AvailableLibraries"] = sorted(libraries, key=lambda library: library["LibraryIdentifier"])
+    return plistlib.dumps(info, fmt=plistlib.FMT_XML, sort_keys=True)
+
+
 def zip_tree(framework, epoch):
-    """Bytes of the zip of the directory FRAMEWORK, under its own name, files sorted, one date."""
+    """Bytes of the zip of the directory FRAMEWORK, under its own name, files sorted, one date,
+    its Info.plist in canonical form."""
     framework = pathlib.Path(framework)
     if framework.name != FRAMEWORK or not framework.is_dir():
         raise Refused(f"{framework} is not a directory named {FRAMEWORK}")
@@ -228,15 +259,17 @@ def zip_tree(framework, epoch):
         declaration = path.read_text(encoding="utf-8").lstrip()
         if not declaration.startswith(f"module {MODULE} "):
             raise Refused(f"{path} does not declare the plain module {MODULE}")
+    info = canonical_info(framework)
     out = io.BytesIO()
     when = zip_time(epoch)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in files:
-            info = zipfile.ZipInfo(f"{FRAMEWORK}/{path.relative_to(framework).as_posix()}", when)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o100644 << 16
-            info.create_system = 3
-            archive.writestr(info, path.read_bytes())
+            name = path.relative_to(framework).as_posix()
+            entry = zipfile.ZipInfo(f"{FRAMEWORK}/{name}", when)
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            entry.create_system = 3
+            archive.writestr(entry, info if name == "Info.plist" else path.read_bytes())
     data = out.getvalue()
     if len(data) > LIMIT:
         raise Refused("the zip exceeds its size limit")
@@ -394,7 +427,18 @@ def self_test():
 
         framework = box / "x" / FRAMEWORK
         (framework / "ios-arm64").mkdir(parents=True)
-        (framework / "Info.plist").write_text("<plist/>")
+
+        def library(identifier, *architectures, **more):
+            return {"BinaryPath": "libqrcode_ai_scanner_uniffi.a", "HeadersPath": "Headers",
+                    "LibraryIdentifier": identifier, "LibraryPath": "libqrcode_ai_scanner_uniffi.a",
+                    "SupportedArchitectures": list(architectures), **more}
+
+        def write_info(*libraries):
+            (framework / "Info.plist").write_bytes(plistlib.dumps(
+                {"AvailableLibraries": list(libraries), "CFBundlePackageType": "XFWK",
+                 "XCFrameworkFormatVersion": "1.0"}, sort_keys=False))
+
+        write_info(library("ios-arm64", "arm64", SupportedPlatform="ios"))
         (framework / "ios-arm64" / "libqrcode_ai_scanner_uniffi.a").write_bytes(b"!<arch>\n")
         refused("an xcframework without a module map", lambda: zip_tree(framework, 1793815385), "no module.modulemap")
         (framework / "ios-arm64" / "Headers").mkdir()
@@ -409,6 +453,29 @@ def self_test():
         check("the zip holds the xcframework at its root, files only",
               names == [f"{FRAMEWORK}/Info.plist", f"{FRAMEWORK}/ios-arm64/Headers/module.modulemap",
                         f"{FRAMEWORK}/ios-arm64/libqrcode_ai_scanner_uniffi.a"])
+        (framework / "macos-arm64_x86_64" / "Headers").mkdir(parents=True)
+        (framework / "macos-arm64_x86_64" / "Headers" / "module.modulemap").write_text(modulemap.read_text())
+        (framework / "macos-arm64_x86_64" / "libqrcode_ai_scanner_uniffi.a").write_bytes(b"!<arch>\n")
+        ios = library("ios-arm64", "arm64", SupportedPlatform="ios")
+        write_info(library("macos-arm64_x86_64", "x86_64", "arm64", SupportedPlatform="macos"), ios)
+        listed = zip_tree(framework, 1793815385)
+        write_info(ios, library("macos-arm64_x86_64", "arm64", "x86_64", SupportedPlatform="macos"))
+        check("the zip does not depend on the order xcodebuild lists the libraries",
+              zip_tree(framework, 1793815385) == listed)
+        info = plistlib.loads(zipfile.ZipFile(io.BytesIO(listed)).read(f"{FRAMEWORK}/Info.plist"))
+        check("the zipped Info.plist lists the libraries by identifier",
+              [entry["LibraryIdentifier"] for entry in info["AvailableLibraries"]] == ["ios-arm64", "macos-arm64_x86_64"]
+              and info["AvailableLibraries"][1]["SupportedArchitectures"] == ["arm64", "x86_64"])
+        write_info(ios, library("ios-arm64_x86_64-simulator", "arm64", SupportedPlatform="ios"))
+        refused("an Info.plist naming a library the xcframework lacks",
+                lambda: zip_tree(framework, 1793815385), "does not hold")
+        write_info(ios, ios)
+        refused("an Info.plist naming a library twice", lambda: zip_tree(framework, 1793815385), "each library once")
+        (framework / "Info.plist").write_text("<plist><dict>")
+        refused("an Info.plist that is no property list", lambda: zip_tree(framework, 1793815385), "not a property list")
+        write_info()
+        refused("an Info.plist without libraries", lambda: zip_tree(framework, 1793815385), "lists no AvailableLibraries")
+        write_info(ios, library("macos-arm64_x86_64", "arm64", "x86_64", SupportedPlatform="macos"))
         (framework / "link").symlink_to("Info.plist")
         refused("a link in the xcframework", lambda: zip_tree(framework, 1793815385), "holds links")
     print(f"self-test: {'FAILED ' + str(len(failures)) if failures else 'all passed'}")
