@@ -1,0 +1,265 @@
+name: Wasmer · WASI module
+
+# The qrscan command compiled for wasm32-wasip1 from the source of tag v0.11.0, packaged for the
+# Wasmer registry by distribution/wasmer/package.py, then run under a pinned Wasmer on a fresh
+# runner: the shared truth set against the native 0.11.0 release binary, the mixed fixture in
+# the fast, frame and full profiles, and the removal of the package and of Wasmer's cache. The
+# module is built twice, in two directories, and must come out the same. Nothing is published:
+# the owner publishes the package folder this workflow uploads (distribution/wasmer/LISTING.md).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/wasmer.yml
+      - distribution/wasmer/**
+      - scripts/cli-release.py
+      - scripts/consumer_truth.py
+      - scripts/destination-acceptance.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wasmer.yml
+      - distribution/wasmer/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasmer-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The one toolchain (ci.yml RUST_TOOLCHAIN; RELEASING.md § Toolchain).
+  RUST_TOOLCHAIN: "1.99.1"
+  # The engine source the module is built from: tag v0.11.0, never a branch.
+  ENGINE_COMMIT: 176ac96ef16ee330dbfc6ada10327d0b4e23a8b2
+  # Wasmer 7.5.0, the release of 1 October 2026: the archive's sha256 is the one GitHub records.
+  WASMER_VERSION: 7.5.0
+  WASMER_SHA256: 23f99818deaad93859f8bb8292af81f0c39f25aea19eaccfb72fc7c9e8a3fae9
+  # The native qrscan 0.11.0 of the release, for the comparison: its SHA256SUMS and its binary.
+  NATIVE_SUMS_SHA256: 1b3263cf6c29af99fbcf9cc3f82e32febc7e598638292685fcd57c0656cc911e
+  NATIVE_QRSCAN_SHA256: 77965589784699138d2b512f94067528eba552536160560daed191de824ea01c
+
+jobs:
+  checks:
+    name: Package and consumer self-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 distribution/wasmer/package.py --self-test
+      - run: python3 distribution/wasmer/consume.py --self-test
+      - run: sh -n distribution/wasmer/qrscan-in-wasmer.sh
+
+  build:
+    name: Build qrscan for wasm32-wasip1 · ${{ matrix.directory }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Two directories: the module must not depend on where it was built.
+        directory: [engine-0.11.0, rebuild/source]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v0.11.0
+          path: ${{ matrix.directory }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-wasip1
+      - name: Build the command from the 0.11.0 source, with host paths remapped
+        id: build
+        env:
+          SOURCE_DIR: ${{ matrix.directory }}
+        run: |
+          set -euo pipefail
+          test "$(git -C "$SOURCE_DIR" rev-parse 'HEAD^{commit}')" = "$ENGINE_COMMIT"
+          rustc -vV
+          cd "$SOURCE_DIR"
+          # Every crate of Cargo.lock, for all targets: package.py reads cargo metadata offline.
+          cargo fetch --locked
+          home="${CARGO_HOME:-$HOME/.cargo}"
+          export RUSTFLAGS="--remap-path-prefix=$home=/cargo --remap-path-prefix=$PWD=/source --remap-path-prefix=$PWD/target=/target"
+          cargo build --locked --release --target wasm32-wasip1 -p qrcode-barcode-scanner-cli --bin qrscan
+          module="$PWD/target/wasm32-wasip1/release/qrscan.wasm"
+          ls -l "$module"
+          sha=$(sha256sum "$module" | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "module=$module" >> "$GITHUB_OUTPUT"
+          echo "qrscan.wasm from $SOURCE_DIR: \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+          if grep -c -a -F "$PWD" "$module"; then echo "::error::the module holds the build directory path"; exit 1; fi
+          if grep -c -a -F "$home" "$module"; then echo "::error::the module holds the Cargo home path"; exit 1; fi
+      - name: Assemble and check the package folder
+        env:
+          SOURCE_DIR: ${{ matrix.directory }}
+          MODULE: ${{ steps.build.outputs.module }}
+          MODULE_SHA256: ${{ steps.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          python3 distribution/wasmer/package.py assemble --engine "$SOURCE_DIR" --module "$MODULE" --out "$RUNNER_TEMP/package"
+          python3 distribution/wasmer/package.py verify "$RUNNER_TEMP/package" --module-sha256 "$MODULE_SHA256"
+          { echo '```'; cat "$RUNNER_TEMP/package/SHA256SUMS"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: matrix.directory == 'engine-0.11.0'
+        with:
+          name: qrscan-wasmer-package
+          path: ${{ runner.temp }}/package/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: matrix.directory != 'engine-0.11.0'
+        with:
+          name: qrscan-wasmer-rebuild
+          path: ${{ runner.temp }}/package/SHA256SUMS
+          if-no-files-found: error
+
+  reproducible:
+    name: Both builds give the same module
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: qrscan-wasmer-package
+          path: package
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: qrscan-wasmer-rebuild
+          path: rebuild
+          digest-mismatch: error
+      - name: Compare the two SHA256SUMS files
+        run: |
+          set -euo pipefail
+          grep ' qrscan.wasm$' package/SHA256SUMS
+          test "$(grep ' qrscan.wasm$' package/SHA256SUMS)" = "$(grep ' qrscan.wasm$' rebuild/SHA256SUMS)"
+
+  consume:
+    name: Run the package under Wasmer on a fresh runner
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: qrscan-wasmer-package
+          path: ${{ runner.temp }}/package
+          digest-mismatch: error
+      - name: The downloaded folder is the package that was built
+        run: python3 distribution/wasmer/package.py verify "$RUNNER_TEMP/package"
+      - name: Install Wasmer from its release archive, checked by sha256
+        run: |
+          set -euo pipefail
+          curl -fsSL --proto '=https' --tlsv1.2 -o "$RUNNER_TEMP/wasmer.tar.gz" \
+            "https://github.com/wasmerio/wasmer/releases/download/v$WASMER_VERSION/wasmer-linux-amd64.tar.gz"
+          echo "$WASMER_SHA256  $RUNNER_TEMP/wasmer.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/wasmer"
+          tar -xzf "$RUNNER_TEMP/wasmer.tar.gz" -C "$RUNNER_TEMP/wasmer"
+          rm "$RUNNER_TEMP/wasmer.tar.gz"
+          echo "$RUNNER_TEMP/wasmer/bin" >> "$GITHUB_PATH"
+          # A home of its own: removing it removes every cached compilation of the module.
+          echo "WASMER_DIR=$RUNNER_TEMP/wasmer-home" >> "$GITHUB_ENV"
+          echo "WASMER_CACHE_DIR=$RUNNER_TEMP/wasmer-home/cache" >> "$GITHUB_ENV"
+      - name: Wasmer version
+        run: |
+          set -euo pipefail
+          wasmer --version
+          wasmer --version | grep -c -F "wasmer $WASMER_VERSION"
+      - name: Fetch the native qrscan 0.11.0 of the release, anonymously, for the comparison
+        run: |
+          set -euo pipefail
+          python3 scripts/packed-cli-consumer.py fetch --repository qrcode-ai-com/qrcode-barcode-scanner-rust \
+            --tag v0.11.0 --sums-sha256 "$NATIVE_SUMS_SHA256" --target x86_64-unknown-linux-gnu --out "$RUNNER_TEMP/native"
+          mkdir "$RUNNER_TEMP/native/x"
+          tar -xzf "$RUNNER_TEMP/native/qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-gnu.tar.gz" -C "$RUNNER_TEMP/native/x"
+          binary="$RUNNER_TEMP/native/x/qrcode-barcode-scanner-cli-0.11.0-x86_64-unknown-linux-gnu/qrscan"
+          echo "$NATIVE_QRSCAN_SHA256  $binary" | sha256sum -c -
+          echo "NATIVE_QRSCAN=$binary" >> "$GITHUB_ENV"
+      - name: The shared truth set, compared with the native command
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/receipts"
+          export QRSCAN_WASMER_PACKAGE="$RUNNER_TEMP/package"
+          python3 distribution/wasmer/consume.py --qrscan "$PWD/distribution/wasmer/qrscan-in-wasmer.sh" \
+            --native "$NATIVE_QRSCAN" --version 0.11.0 --receipt "$RUNNER_TEMP/receipts/truth.json"
+      - name: Destination acceptance, the mixed fixture in fast, frame and full
+        run: |
+          set -euo pipefail
+          export QRSCAN_WASMER_PACKAGE="$RUNNER_TEMP/package"
+          python3 scripts/destination-acceptance.py cli --qrscan "$PWD/distribution/wasmer/qrscan-in-wasmer.sh" \
+            --destination "Wasmer package (local folder, before publication)" \
+            --identifier qrcode-ai-com/qrcode-barcode-scanner --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/distribution/wasmer" \
+            --install "wasmer run --offline --volume DIR:/data <package folder> -- /data/IMAGE" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "$RUNNER_TEMP/receipts/acceptance.json"
+      - name: The command line a reader of the README types
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/images"
+          cp fixtures/symbology/mixed-code128-qr.png "$RUNNER_TEMP/images/label.png"
+          cd "$RUNNER_TEMP/images"
+          for profile in fast frame full; do
+            wasmer run --quiet --offline --volume "$PWD:/data" "$RUNNER_TEMP/package" -- /data/label.png --profile "$profile" > "report-$profile.json"
+            python3 -c 'import json, sys; texts = sorted(d["content"]["text"] for d in json.load(open(sys.argv[1]))["detections"]); assert texts == ["STOCK-4827", "https://qrc-ai.com/76xMa"], texts; print(sys.argv[2], texts)' "report-$profile.json" "$profile"
+          done
+          status=0
+          wasmer run --quiet --offline --volume "$PWD:/data" "$RUNNER_TEMP/package" -- /data/missing.png > /dev/null 2> missing.txt || status=$?
+          test "$status" -eq 2
+          wasmer run --quiet --offline "$RUNNER_TEMP/package" -- --version | tee version.txt
+          grep -c -x -F "qrscan 0.11.0" version.txt
+      - name: The package Wasmer builds from the folder holds every notice
+        run: |
+          set -euo pipefail
+          wasmer package build --quiet "$RUNNER_TEMP/package" -o "$RUNNER_TEMP/qrscan.webc"
+          sha256sum "$RUNNER_TEMP/qrscan.webc"
+          wasmer package unpack --quiet --format webc "$RUNNER_TEMP/qrscan.webc" -o "$RUNNER_TEMP/unpacked"
+          (cd "$RUNNER_TEMP/unpacked" && find . -type f | sort)
+          python3 distribution/wasmer/package.py packed "$RUNNER_TEMP/package" "$RUNNER_TEMP/unpacked"
+          rm -r "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/qrscan.webc"
+      - name: Publication dry run, without an account (a probe, not a gate)
+        run: |
+          set -uo pipefail
+          cp -R "$RUNNER_TEMP/package" "$RUNNER_TEMP/dry-run"
+          status=0
+          wasmer publish --dry-run --non-interactive "$RUNNER_TEMP/dry-run" > "$RUNNER_TEMP/receipts/publish-dry-run.txt" 2>&1 || status=$?
+          echo "exit $status" >> "$RUNNER_TEMP/receipts/publish-dry-run.txt"
+          cat "$RUNNER_TEMP/receipts/publish-dry-run.txt"
+          { echo "wasmer publish --dry-run without an account: exit $status"; echo '```'; tail -n 20 "$RUNNER_TEMP/receipts/publish-dry-run.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          rm -r "$RUNNER_TEMP/dry-run"
+      - name: Remove the package and Wasmer's cache, then close the receipt
+        run: |
+          set -euo pipefail
+          test -d "$WASMER_DIR"
+          rm -r "$RUNNER_TEMP/package" "$WASMER_DIR"
+          test ! -e "$RUNNER_TEMP/package"
+          test ! -e "$WASMER_DIR"
+          # The probe starts Wasmer, which makes itself a new home: it must find no package to run.
+          python3 scripts/destination-acceptance.py removed \
+            --gone "wasmer run --quiet --offline $RUNNER_TEMP/package -- --version" \
+            --uninstall "rm -r <package folder> \$WASMER_DIR" --receipt "$RUNNER_TEMP/receipts/acceptance.json"
+          python3 scripts/destination-acceptance.py check "$RUNNER_TEMP/receipts/acceptance.json"
+          if [ -e "$WASMER_DIR" ]; then (cd "$WASMER_DIR" && find . | sort); fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: qrscan-wasmer-receipts
+          path: ${{ runner.temp }}/receipts/
+          if-no-files-found: error

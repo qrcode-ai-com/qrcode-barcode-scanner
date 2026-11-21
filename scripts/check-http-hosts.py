@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the deploy-host files of the scanner HTTP service and say how each host runs it.
 
-  check-http-hosts.py check [--tree DIR] [--schema HOST=FILE ...]
+  check-http-hosts.py check [--tree DIR] [--schema HOST=FILE ...] [--doctl FILE]
   check-http-hosts.py profile HOST [--tree DIR] --out FILE
   check-http-hosts.py --self-test
 
@@ -10,7 +10,8 @@ scripts/stage-http-satellite.py writes from distribution/http, and reads one fil
 `check` holds each file to the host's documented format and to the service: the Dockerfile at the
 root, the health path the service answers, its own port variable, and limits that may only be
 lowered. `--schema HOST=FILE` also validates that host's file against the JSON Schema the host
-publishes, at the address HOSTS names.
+publishes, at the address HOSTS names. `--doctl FILE` also validates the DigitalOcean app spec with
+`doctl apps spec validate --schema-only`, which reads it offline and refuses an unknown field.
 
 `profile` writes, as JSON, what the host gives the container: the PORT it sets, the variables of
 the file, and the memory and CPU of the plan the file selects. scripts/http-service-release.py
@@ -69,6 +70,16 @@ HOSTS = {
         "env": {"QRSCAN_HTTP_MAX_CONCURRENT": "1", "QRSCAN_HTTP_BUDGET_SCALE": "2"},
     },
 }
+HOSTS["digitalocean"] = {
+    # The Deploy to DigitalOcean button reads .do/deploy.template.yaml, an app spec under `spec:`
+    # (https://docs.digitalocean.com/products/app-platform/how-to/add-deploy-do-button/). App
+    # Platform sends traffic to http_port. apps-s-1vcpu-0.5gb is the smallest service, 1 shared
+    # vCPU and 512 MiB (https://docs.digitalocean.com/products/app-platform/details/pricing/).
+    "file": ".do/deploy.template.yaml",
+    "port": 8080,
+    "plans": {"apps-s-1vcpu-0.5gb": {"cpus": "1", "memory": "512m"}},
+}
+REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http"
 # Files a host would read at the root in place of its composer: none may be staged.
 FOREIGN = ("railway.json", "railway.toml")
 
@@ -163,10 +174,56 @@ def render(tree, schema=None):
     return {"plan": plan, "env": env}
 
 
-CHECKS = {"render": render}
+def digitalocean(tree, schema=None, doctl=None):
+    """The checked .do/deploy.template.yaml as {plan, env}."""
+    name = HOSTS["digitalocean"]["file"]
+    data = load_yaml((tree / name).read_text(encoding="utf-8"), name)
+    if not isinstance(data, dict) or set(data) != {"spec"} or not isinstance(data["spec"], dict):
+        raise Refused(f"{name} must hold the app spec under spec: and nothing else (the button needs spec:)")
+    spec = data["spec"]
+    if doctl is not None:
+        import subprocess
+        import yaml
+        with tempfile.TemporaryDirectory() as scratch:
+            inner = pathlib.Path(scratch) / "spec.yaml"
+            inner.write_text(yaml.safe_dump(spec))
+            result = subprocess.run([doctl, "apps", "spec", "validate", "--schema-only", str(inner)],
+                                    capture_output=True, text=True, env={"HOME": scratch, "PATH": "/usr/bin:/bin"})
+        if result.returncode != 0:
+            raise Refused(f"doctl refuses {name}: {(result.stderr or result.stdout).strip()[:500]}")
+    if set(spec) != {"name", "services"} or spec["name"] != "qrcode-barcode-scanner":
+        raise Refused(f"{name} must name the app qrcode-barcode-scanner and declare services only")
+    services = spec["services"]
+    if not isinstance(services, list) or len(services) != 1 or not isinstance(services[0], dict):
+        raise Refused(f"{name} must declare one service")
+    service = services[0]
+    allowed = {"name", "git", "dockerfile_path", "http_port", "instance_size_slug", "instance_count",
+               "health_check", "envs"}
+    if set(service) - allowed:
+        raise Refused(f"{name} sets {sorted(set(service) - allowed)}: the service needs nothing more")
+    wanted = {"name": NAME, "git": {"branch": "main", "repo_clone_url": REPOSITORY + ".git"},
+              "dockerfile_path": "Dockerfile", "http_port": HOSTS["digitalocean"]["port"], "instance_count": 1,
+              "health_check": {"http_path": HEALTH}}
+    for key, value in wanted.items():
+        if service.get(key) != value:
+            raise Refused(f"{name} {key} is {service.get(key)!r}, want {value!r}")
+    plan = service.get("instance_size_slug")
+    if plan not in HOSTS["digitalocean"]["plans"]:
+        raise Refused(f"{name} instance_size_slug is {plan!r}: the judged sizes are "
+                      f"{sorted(HOSTS['digitalocean']['plans'])}")
+    variables = service.get("envs", [])
+    if not isinstance(variables, list) or any(
+            not isinstance(v, dict) or set(v) != {"key", "value", "scope"} or v["scope"] != "RUN_TIME" for v in variables):
+        raise Refused(f"{name} envs must be entries with a key, a value and the scope RUN_TIME only")
+    env = limit_variables(((v["key"], v["value"]) for v in variables), name)
+    budget_scale(HOSTS["digitalocean"]["plans"][plan]["cpus"], env, name)
+    return {"plan": plan, "env": env}
 
 
-def check(tree, schemas):
+CHECKS = {"render": render, "digitalocean": digitalocean}
+
+
+def check(tree, schemas, doctl=None):
     tree = pathlib.Path(tree)
     if not (tree / "Dockerfile").is_file():
         raise Refused(f"{tree} has no Dockerfile at its root")
@@ -178,7 +235,8 @@ def check(tree, schemas):
         raise Refused(f"{staged} would configure a host from a deprecated file: settings belong to its composer")
     results = {}
     for host, function in CHECKS.items():
-        results[host] = function(tree, schemas.get(host))
+        results[host] = function(tree, schemas.get(host), doctl) if host == "digitalocean" else \
+            function(tree, schemas.get(host))
         print(f"ok    {HOSTS[host]['file']}: {json.dumps(results[host], sort_keys=True)}")
     return results
 
@@ -217,17 +275,35 @@ def self_test():
         "a budget scale above 20": (re.sub(r'(key: QRSCAN_HTTP_BUDGET_SCALE\n *value: )"\d+"', r'\1"21"', good),
                                     "above the service limit 20"),
     }
+    ocean = (SERVICE / ".do/deploy.template.yaml").read_text(encoding="utf-8")
+    ocean_cases = {
+        "a spec without its spec: key": (re.sub(r"(?m)^  ", "", ocean.replace("spec:\n", "")), "under spec:"),
+        "another repository": (ocean.replace("qrcode-barcode-scanner-http.git", "other.git"), "git is"),
+        "an unknown size": (ocean.replace("apps-s-1vcpu-0.5gb", "apps-s-1vcpu-0.25gb"), "judged sizes"),
+        "another port": (ocean.replace("http_port: 8080", "http_port: 80"), "http_port"),
+        "a build-time variable": (ocean.replace("scope: RUN_TIME", "scope: BUILD_TIME"), "RUN_TIME"),
+        "a raised limit": (ocean.replace('value: "1"', 'value: "8"'), "above the service limit"),
+        "a route of its own": (ocean.replace("      dockerfile_path", "      routes: []\n      dockerfile_path"),
+                               "needs nothing more"),
+        "the engine's budgets on a shared vCPU": (
+            re.sub(r'(?m)^ *- key: QRSCAN_HTTP_BUDGET_SCALE\n *value: "\d+"\n *scope: RUN_TIME\n', "", ocean), "at least 2"),
+    }
     failures = []
     with tempfile.TemporaryDirectory() as scratch:
         tree = pathlib.Path(scratch)
         for name in ("server.mjs", "Dockerfile"):
             (tree / name).write_bytes((SERVICE / name).read_bytes())
+        (tree / ".do").mkdir()
+        (tree / ".do/deploy.template.yaml").write_text(ocean)
         (tree / "render.yaml").write_text(good)
         try:
             check(tree, {})
             got = profile("render", tree)
             if got["port"] != 10000 or got["env"].get("PORT") != "10000" or got["memory"] != "512m":
                 failures.append(f"the Render profile is {got}")
+            got = profile("digitalocean", tree)
+            if got["port"] != 8080 or got["memory"] != "512m" or got["plan"] != "apps-s-1vcpu-0.5gb":
+                failures.append(f"the DigitalOcean profile is {got}")
             got = profile("railway", tree)
             if got["port"] != 3000 or got["env"] != {"PORT": "3000", "QRSCAN_HTTP_MAX_CONCURRENT": "1", "QRSCAN_HTTP_BUDGET_SCALE": "2"} or \
                     got["file"] is not None:
@@ -253,10 +329,21 @@ def self_test():
             except Refused as error:
                 if reason not in str(error):
                     failures.append(f"{name}: refused for another reason: {error}")
+        for name, (text, reason) in ocean_cases.items():
+            if text == ocean:
+                failures.append(f"{name}: the mutation changed nothing")
+                continue
+            (tree / ".do/deploy.template.yaml").write_text(text)
+            try:
+                digitalocean(tree)
+                failures.append(f"{name}: accepted")
+            except Refused as error:
+                if reason not in str(error):
+                    failures.append(f"{name}: refused for another reason: {error}")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
     print(f"self-test: {'ok' if not failures else 'FAILED'} (the real files, a deprecated railway.json, "
-          f"{len(cases)} refused render.yaml)")
+          f"{len(cases)} refused render.yaml, {len(ocean_cases)} refused app specs)")
     return 1 if failures else 0
 
 
@@ -267,6 +354,7 @@ def main():
     one = commands.add_parser("check")
     one.add_argument("--tree", default=str(SERVICE))
     one.add_argument("--schema", action="append", default=[], metavar="HOST=FILE")
+    one.add_argument("--doctl")
     two = commands.add_parser("profile")
     two.add_argument("host", choices=sorted(HOSTS))
     two.add_argument("--tree", default=str(SERVICE))
@@ -279,7 +367,7 @@ def main():
             schemas = dict(item.split("=", 1) for item in arguments.schema if "=" in item)
             if len(schemas) != len(arguments.schema) or set(schemas) - set(HOSTS):
                 parser.error(f"--schema takes HOST=FILE with HOST one of {sorted(HOSTS)}")
-            check(arguments.tree, schemas)
+            check(arguments.tree, schemas, arguments.doctl)
         elif arguments.command == "profile":
             result = profile(arguments.host, arguments.tree)
             out = pathlib.Path(arguments.out)

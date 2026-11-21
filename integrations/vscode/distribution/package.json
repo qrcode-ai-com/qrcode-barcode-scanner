@@ -5,5 +5,10 @@
   "license": "MIT",
   "devDependencies": {
     "ovsx": "1.4.0"
+  },
+  "overrides": {
+    "@vscode/vsce": {
+      "minimatch": "^11.0.1"
+    }
   }
 }

@@ -181,6 +181,7 @@ paths = [
 [[file]]
 held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
 paths = [
+  "distribution/digitalocean/**",
   "distribution/http/**",
   "distribution/railway/**",
   "distribution/render/**",
@@ -189,6 +190,10 @@ paths = [
   "scripts/stage-http-satellite.py",
   ".github/workflows/http-service.yml",
 ]
+
+[[file]]
+held = "the Wasmer package, built from the source of tag v0.11.0 and published by the owner: moved when a later source is packaged"
+paths = ["distribution/wasmer/**", ".github/workflows/wasmer.yml"]
 
 [[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"

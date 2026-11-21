@@ -1,0 +1,24 @@
+#!/bin/sh
+# Message of the day of the QR Code & Barcode Scanner 1-Click Droplet.
+address=$(hostname -I 2>/dev/null | cut -d' ' -f1)
+cat <<MESSAGE
+
+QR Code & Barcode Scanner HTTP service
+--------------------------------------
+The service answers on port 80 of this Droplet: http://${address:-this-droplet}/
+  Health:  curl http://localhost/healthz
+  Scan:    curl --data-binary @label.png -H 'content-type: image/png' 'http://localhost/scan?mode=fast'
+
+It has no account or key: anyone who can reach port 80 can scan. The firewall (ufw) allows SSH
+and port 80 only. Put TLS and your own access control in front of it before you expose it.
+
+  Status and log:  systemctl status qrscan-http ; journalctl -u qrscan-http
+  Settings:        /etc/qrscan-http.env (QRSCAN_HTTP_MAX_* lower the limits,
+                   QRSCAN_HTTP_BUDGET_SCALE multiplies the time budgets), then
+                   systemctl restart qrscan-http
+  Updates:         apt upgrades the system; a new service version is a new Droplet image.
+
+Documentation and source (AGPL-3.0-or-later):
+  https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/distribution/http
+
+MESSAGE
