@@ -129,6 +129,7 @@ paths = [
 held = "the agent integrations: they name the engine they were released on"
 paths = [
   "integrations/**",
+  ".github/workflows/integration-apify.yml",
   "skills/**",
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
@@ -140,6 +141,7 @@ paths = [
   ".github/workflows/integration-github-action.yml",
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
+  ".github/workflows/integration-n8n-template.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
   ".github/workflows/integration-vscode.yml",
