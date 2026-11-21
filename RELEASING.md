@@ -1622,6 +1622,37 @@ administrator bypass. Add `http-v*` to the tag ruleset of distribution tags.
    and compare its index digest with the receipt. Only then may a README name
    the image as published.
 
+## Swift package — its own repository
+
+SwiftPM and the Swift Package Index read a package from the root of a
+repository at a tag, with the compiled engine as a binary target pinned by its
+sha256. The package is therefore served from
+`qrcode-ai-com/qrcode-barcode-scanner-swift`, which holds nothing written by
+hand, and its zip is an asset of this repository's release `swift-vX.Y.Z`, a
+tag family of its own that no `v*` publisher reads.
+
+`bindings/swift/package/satellite.json` pins the engine tag and commit the
+package is built from, the package version, the release tag and the zip's
+sha256. `.github/workflows/swift-package.yml` checks the pinned engine out,
+builds its static library for five Apple targets, generates the Swift with
+UniFFI, assembles the xcframework (iOS, iOS simulator, macOS) with the engine's
+license and notices inside, and packs it with
+`scripts/stage-swift-package.py pack`: sorted entries, the engine commit's
+date, fixed permissions. `stage` writes the satellite's tree from one commit of
+this repository; `verify` compares a tree with the stage of the commit its
+`SOURCE.json` names. The job `satellite` compares the published repository that
+way, and `consumer` installs the staged package in
+`tests/consumers/swift-package` on macOS and builds it for iOS.
+
+On a tag `swift-v*`, `attach` runs in the protected environment `swift` with
+`contents: write` only. It runs the gate `stage-swift-package.py gate` first,
+re-inspects the downloaded zip (the sha256 the build recorded and the one
+`satellite.json` pins), uploads it with `checksum.txt` into the owner's draft
+only where no zip is, and reads it back. It never creates, edits or publishes a
+release. `scripts/check-publish-guards.py` holds that job to this contract. The
+owner's setup, release, satellite tag and Swift Package Index submission are in
+[bindings/swift/LISTING.md](bindings/swift/LISTING.md).
+
 ## Docker publishing — historical 0.10 distribution
 
 The historical 0.10 publisher (`distribution/docker/publish.py`, retained for

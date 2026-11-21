@@ -185,6 +185,21 @@ mint registry tokens). Every privileged job must:
                Its steps use only checkout, download-artifact and upload-artifact,
                with no `if:`. Only image uploads http-image-*, only consume
                uploads http-consumed-*. No other job inherits this exception.
+  Swift        swift-package.yml > attach uploads the xcframework zip of the
+               Swift package into the owner's draft release of a swift-v* tag
+               only, in the protected environment swift, with exactly contents
+               write. It needs xcframework (which packs the zip with
+               stage-swift-package.py pack), satellite (the staged and
+               compared satellite tree) and consumer (the clean Swift
+               package); runs the gate `stage-swift-package.py gate` first;
+               downloads swift-xcframework once, with digest-mismatch error;
+               re-inspects it exactly as SWIFT_REINSPECT_RUN says (the zip is
+               xcframework's output and the sha256 satellite.json pins) before
+               the one step that holds the token, last, whose gh calls are
+               release list, view, download and the single upload
+               SWIFT_UPLOAD. Its steps use only checkout and download-artifact,
+               with no `if:`. Only xcframework uploads swift-xcframework. No
+               other job inherits this exception.
   Pages        pages.yml > deploy serves the browser example examples/web-vite
                on GitHub Pages: no registry, no release. It deploys from main
                of the canonical repository, after build, in the github-pages
@@ -416,6 +431,30 @@ HTTP_PUBLISH_RUN = "\n".join((
     '  --ref "$GITHUB_REF" --receipt "$PWD/published/registry.json"',
 ))
 HTTP_SETS = {"http-image-": "image", "http-consumed-": "consume"}
+# The Swift package: attach uploads the judged xcframework zip into the owner's draft of its tag.
+SWIFT_WORKFLOW = "swift-package.yml"
+SWIFT_JOB = (SWIFT_WORKFLOW, "attach")
+SWIFT_GUARD = "startsWith(github.ref, 'refs/tags/swift-v')"
+SWIFT_GATE_RUN = 'python3 scripts/stage-swift-package.py gate --ref "$GITHUB_REF"'
+SWIFT_PERMISSIONS = {"contents": "write"}
+SWIFT_USES = ("actions/checkout", "actions/download-artifact")
+SWIFT_SET = "swift-xcframework"
+SWIFT_DOWNLOAD = {"name": SWIFT_SET, "path": "swift-xcframework", "digest-mismatch": "error"}
+SWIFT_REINSPECT_ENV = {"BUILT_SHA256": "${{ needs.xcframework.outputs.sha256 }}"}
+SWIFT_REINSPECT_RUN = "\n".join((
+    "set -euo pipefail",
+    "pinned=$(python3 -c \"import json; print(json.load(open('bindings/swift/package/satellite.json'))['checksum'])\")",
+    "built=$(sha256sum swift-xcframework/QrcodeAiScannerFFI.xcframework.zip | cut -d' ' -f1)",
+    'echo "pinned: $pinned"',
+    'echo "built : $built"',
+    'test "$built" = "$BUILT_SHA256"',
+    'test "$built" = "$pinned"',
+    "printf '%s\\n' \"$built\" > swift-xcframework/checksum.txt",
+))
+SWIFT_ZIP = "zip=swift-xcframework/QrcodeAiScannerFFI.xcframework.zip"
+SWIFT_UPLOAD = 'gh release upload "$GITHUB_REF_NAME" "$zip" swift-xcframework/checksum.txt'
+SWIFT_TOKEN_ENV = {"GH_TOKEN": "${{ github.token }}"}
+SWIFT_GH = re.compile(r"\bgh\s+release\s+(list|view|upload|download)\b")
 # GitHub Pages serves the browser example: deploy holds the Pages token in one pinned step.
 PAGES_WORKFLOW = "pages.yml"
 PAGES_JOB = (PAGES_WORKFLOW, "deploy")
@@ -615,6 +654,7 @@ INSPECTION = {
     MCPB_JOB: "bundle",
     **{job: row["build"] for job, row in PYPI_PLUGINS.items()},
     HTTP_JOB: "image",
+    SWIFT_JOB: "xcframework",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
     ("npm-publish.yml", "publish-wasm"): "build-wasm",
@@ -631,6 +671,7 @@ CONSUMERS = {
     MCP_JOB: {"preflight", "consume", "operand-proof"},
     MCPB_JOB: {"consume", "offline"},
     HTTP_JOB: {"consume", "rehearse"},
+    SWIFT_JOB: {"satellite", "consumer"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
@@ -2190,6 +2231,61 @@ def _http_contract_problems(wf: dict, job: dict) -> list:
     return out
 
 
+def _swift_contract_problems(wf: dict, job: dict) -> list:
+    """(code, message, step index or -1) for each way swift-package.yml › attach could attach another
+    file than the zip the consumer judged, or reach a release through other calls."""
+    out, steps = [], _steps(job)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("swift-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in SWIFT_USES:
+            fail(f"{step.get('uses')}: attach uses only {', '.join(SWIFT_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on an attach step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    given = [{k: str(v) for k, v in (steps[i].get("with") or {}).items()} for i in downloads]
+    if given != [SWIFT_DOWNLOAD] or any(set(steps[i]) - {"name", "uses", "with"} for i in downloads):
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly one, {SWIFT_DOWNLOAD}")
+    holders = [i for i, step in enumerate(steps) if TOKEN.search(_text(step))]
+    reinspect = [i for i, step in enumerate(steps) if set(step) <= {"name", "env", "run"} and
+                 _block(step.get("run")) == SWIFT_REINSPECT_RUN and _bare(step.get("env")) == _bare(SWIFT_REINSPECT_ENV)]
+    if len(holders) != 1 or holders[0] != len(steps) - 1 or set(steps[holders[0]]) - {"name", "env", "run"} or \
+            _bare(steps[holders[0]].get("env")) != _bare(SWIFT_TOKEN_ENV):
+        fail(f"steps holding the token {[i + 1 for i in holders]}: exactly one, the last, with env GH_TOKEN only")
+    else:
+        lines = _code_lines(steps[holders[0]].get("run"))
+        calls = [line for line in lines if re.search(r"\bgh\b", _plain(line))]
+        strays = [line for line in calls if not SWIFT_GH.search(_plain(line))]
+        uploads = [line for line in calls if re.search(r"\bgh\s+release\s+upload\b", _plain(line))]
+        if strays:
+            fail(f"the token step calls gh beyond release list, view, upload and download: {strays[0]!r}", holders[0])
+        if [line.strip() for line in uploads] != [SWIFT_UPLOAD] or SWIFT_ZIP not in [line.strip() for line in lines]:
+            fail(f"the token step uploads exactly once, `{SWIFT_UPLOAD}`, with `{SWIFT_ZIP}`", holders[0])
+        if not any(re.search(r"\bgh\s+release\s+download\b", _plain(line)) for line in calls) or \
+                '"$attached" != "$pinned"' not in steps[holders[0]].get("run", ""):
+            fail("the token step reads the attached zip back and compares it with the pinned sha256", holders[0])
+    if not reinspect or not downloads or len(holders) != 1 or not max(downloads) < reinspect[0] < holders[0]:
+        fail("after the download and before the token, re-inspect exactly as SWIFT_REINSPECT_RUN says, with env "
+             "BUILT_SHA256: the zip attached is the one xcframework packed and satellite.json pins")
+    builder = jobs.get("xcframework", {})
+    if not any("scripts/stage-swift-package.py pack" in line for step in _steps(builder)
+               for line in _code_lines(step.get("run"))):
+        fail("xcframework must pack the zip with scripts/stage-swift-package.py pack")
+    uploads = [(other, step.get("with") if isinstance(step.get("with"), dict) else {})
+               for other, body in jobs.items() for step in _steps(body)
+               if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    named = sorted({other for other, given_with in uploads if str(given_with.get("name", "")) == SWIFT_SET})
+    if named != ["xcframework"]:
+        fail(f"{SWIFT_SET} may be uploaded by {named or 'no job'}: by xcframework only")
+    if any("overwrite" in given_with for _, given_with in uploads):
+        fail("no upload of this workflow overwrites an artifact")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -2209,9 +2305,10 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     mcpb = (workflow, job_id) == MCPB_JOB
     plugin = PYPI_PLUGINS.get((workflow, job_id))
     http = (workflow, job_id) == HTTP_JOB
+    swift = (workflow, job_id) == SWIFT_JOB
     guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
              else OCI_GUARD if oci else MCPB_GUARD if mcpb else HTTP_GUARD if http
-             else pypi_plugin(plugin)["guard"] if plugin else GUARD)
+             else pypi_plugin(plugin)["guard"] if plugin else SWIFT_GUARD if swift else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -2230,7 +2327,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
                             else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"rubygems"} if ruby else {"container"} if oci
                             else {"mcpb"} if mcpb else {"container-http"} if http
-                            else {plugin["environment"]} if plugin else ENVIRONMENTS)
+                            else {plugin["environment"]} if plugin else {"swift"} if swift else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -2257,6 +2354,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif http:
         if perms != HTTP_PERMISSIONS:
             flag("permissions", "the HTTP image publisher needs exactly contents read and packages write; no id-token")
+    elif swift:
+        if perms != SWIFT_PERMISSIONS:
+            flag("permissions", "the Swift zip attachment needs exactly contents write; no id-token")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -2341,7 +2441,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
                      else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else HTTP_GATE_RUN if http
-                     else plugin["gate"] if plugin else GATE_RUN)
+                     else plugin["gate"] if plugin else SWIFT_GATE_RUN if swift else GATE_RUN)
     # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
     if not pages and (set(gate) - {"run", "name", "working-directory"} or
                       str(gate.get("run", "")).strip() != required_gate):
@@ -2367,6 +2467,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag(code, message, index)
     if http:
         for code, message, index in _http_contract_problems(wf, job):
+            flag(code, message, index)
+    if swift:
+        for code, message, index in _swift_contract_problems(wf, job):
             flag(code, message, index)
     if (workflow, job_id) in REINSPECT_JOBS and not any(
             re.search(r"package-inspect\.py\s+archive\b", line) and "--strict" in _words(line)
@@ -3107,6 +3210,51 @@ MUTATIONS = (
      [(HTTP_WORKFLOW, "-${{ github.ref }}\n      cancel-in-progress: false\n", "-${{ github.ref }}\n      cancel-in-progress: true\n")],
      {}, 1, "http-service.yml › publish [concurrency]"),
     ("http-service.yml as reviewed", P, [], {}, 0, "http-service.yml › publish, "),
+    # == swift-package.yml › attach: the judged xcframework zip, into the owner's draft of a swift-v* tag
+    ("Swift attach without the tag guard", P, [(SWIFT_WORKFLOW, "    if: " + SWIFT_GUARD + "\n", "")], {}, 1,
+     "swift-package.yml › attach [guard]"),
+    ("Swift attach on the engine tag family", P, [(SWIFT_WORKFLOW, "    if: " + SWIFT_GUARD, "    if: " + GUARD)],
+     {}, 1, "swift-package.yml › attach [guard]"),
+    ("Swift attach in the release environment", P,
+     [(SWIFT_WORKFLOW, "    environment: swift\n", "    environment: release\n")], {}, 1,
+     "swift-package.yml › attach [environment]"),
+    ("Swift attach mints an OIDC token", P,
+     [(SWIFT_WORKFLOW, "      contents: write # upload", "      id-token: write\n      contents: write # upload")], {},
+     1, "swift-package.yml › attach [permissions]"),
+    ("Swift attach without the clean consumer", P,
+     [(SWIFT_WORKFLOW, "    needs: [xcframework, satellite, consumer]\n    if:", "    needs: [xcframework, satellite]\n    if:")],
+     {}, 1, "swift-package.yml › attach [needs]"),
+    ("Swift attach without its gate", P, [(SWIFT_WORKFLOW, "      - run: " + SWIFT_GATE_RUN + "\n",
+                                           "      - run: echo gate\n")], {}, 1, "swift-package.yml › attach [gate]"),
+    ("Swift attach without the re-inspection", P,
+     [(SWIFT_WORKFLOW, '          test "$built" = "$pinned"\n', "")], {}, 1,
+     "swift-package.yml › attach [swift-contract]"),
+    ("Swift attach downloads without the digest check", P,
+     [(SWIFT_WORKFLOW, "          path: swift-xcframework\n          digest-mismatch: error\n",
+       "          path: swift-xcframework\n")], {}, 1, "swift-package.yml › attach [swift-contract]"),
+    ("Swift attach uploads another file", P,
+     [(SWIFT_WORKFLOW, '            gh release upload "$GITHUB_REF_NAME" "$zip" swift-xcframework/checksum.txt\n',
+       '            gh release upload "$GITHUB_REF_NAME" swift-xcframework/*\n')], {}, 1,
+     "swift-package.yml › attach [swift-contract]"),
+    ("Swift attach replaces an attached zip", P,
+     [(SWIFT_WORKFLOW, '            gh release upload "$GITHUB_REF_NAME" "$zip" swift-xcframework/checksum.txt\n',
+       '            gh release upload "$GITHUB_REF_NAME" "$zip" swift-xcframework/checksum.txt --clobber\n')], {}, 1,
+     "swift-package.yml › attach [release-asset]"),
+    ("Swift attach publishes the draft", P,
+     [(SWIFT_WORKFLOW, '          echo "::notice::the attached zip is the archive the satellite pins ($pinned)."\n',
+       '          gh release edit "$GITHUB_REF_NAME" --draft=false\n')], {}, 1,
+     "swift-package.yml › attach [release-asset]"),
+    ("Swift attach lends its token to the re-inspection", P,
+     [(SWIFT_WORKFLOW, "          BUILT_SHA256: ${{ needs.xcframework.outputs.sha256 }}\n",
+       "          BUILT_SHA256: ${{ needs.xcframework.outputs.sha256 }}\n          GH_TOKEN: ${{ github.token }}\n")], {}, 1,
+     "swift-package.yml › attach [swift-contract]"),
+    ("Swift the consumer uploads the zip set", P,
+     [(SWIFT_WORKFLOW, "          name: swift-consumer\n", "          name: swift-xcframework\n")], {}, 1,
+     "swift-package.yml › attach [swift-contract]"),
+    ("Swift attach cancels in progress", P,
+     [(SWIFT_WORKFLOW, "-${{ github.ref }}\n      cancel-in-progress: false\n", "-${{ github.ref }}\n      cancel-in-progress: true\n")],
+     {}, 1, "swift-package.yml › attach [concurrency]"),
+    ("swift-package.yml as reviewed", P, [], {}, 0, "swift-package.yml › attach"),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),

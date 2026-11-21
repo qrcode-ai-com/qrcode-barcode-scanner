@@ -12,6 +12,7 @@ GUIDES = {
     'bindings/php/README.md': ('sdk/php', 'PHP'),
     'bindings/ruby/README.md': ('sdk/ruby', 'Ruby'),
     'bindings/swift/README.md': ('sdk/ios', 'iOS'),
+    'bindings/swift/package/README.md': ('sdk/ios', 'iOS'),
     'crates/qrcode-ai-scanner/README.md': ('sdk/rust', 'Rust'),
     'crates/qrcode-ai-scanner-node/README.md': ('sdk/nodejs', 'Node.js'),
     'crates/qrcode-ai-scanner-py/README.md': ('sdk/python', 'Python'),
