@@ -30,6 +30,7 @@ env:
 jobs:
   # Which jobs this change needs (scripts/ci-scope.py). A pull request that
   # only touches integrations/, examples/, docs/, distribution/submissions/,
+  # the MCP bundle (distribution/mcpb/, scripts/build-mcpb-bundle.py),
   # the README counts, README list and release pins a new integration updates, or a
   # workflow other than this one and wasm-browser.yml, changes nothing the
   # gated jobs build: those trees consume the published artifacts and have

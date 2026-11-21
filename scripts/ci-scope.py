@@ -3,9 +3,10 @@
 
 ci.yml builds and tests the Rust workspace, the native Node package and the
 WASM package on three systems. A pull request that only changes an
-integration, an example, the documentation, a prepared submission, the README
-counts, README list and release pins that come with a new integration, or a workflow other
-than ci.yml and the reusable workflows it calls, does not change any of that:
+integration, an example, the documentation, a prepared submission, the MCP
+bundle (built by mcpb.yml from the published server), the README counts,
+README list and release pins that come with a new integration, or a workflow
+other than ci.yml and the reusable workflows it calls, does not change any of that:
 those trees consume the published artifacts and have their own workflows. For
 such a pull request the heavy jobs are skipped; lint (publish guards, every
 workflow file) and packaging (README, licence, recipe and pin checks) still
@@ -38,6 +39,8 @@ OUTSIDE_ENGINE = (
     'examples/*',
     'docs/*',
     'distribution/submissions/*',
+    'distribution/mcpb/*',
+    'scripts/build-mcpb-bundle.py',
     'distribution/releases/pins.toml',
     'scripts/build-readme-actions.py',
     'scripts/build-readme-licensing.py',
@@ -99,6 +102,9 @@ def self_test():
                                                                             '.github/workflows/integration-zapier.yml'], False),
         ('example and docs', ['examples/codepen/index.html', 'docs/assets/banner.svg'], False),
         ('prepared submission', ['distribution/submissions/gemini.md'], False),
+        ('the mcp bundle and its builder', ['distribution/mcpb/check/consumer.mjs',
+                                            'distribution/mcpb/manifest.json',
+                                            'scripts/build-mcpb-bundle.py'], False),
         ('core source', ['crates/qrcode-ai-scanner/src/lib.rs'], True),
         ('integration plus core', ['integrations/canva/a.ts', 'crates/x/src/lib.rs'], True),
         ('ci.yml itself', ['.github/workflows/ci.yml'], True),

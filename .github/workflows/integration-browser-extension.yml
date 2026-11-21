@@ -178,8 +178,8 @@ jobs:
       - name: Xcode 26, whose Safari 26 reads 'wasm-unsafe-eval' in an extension policy
         run: |
           set -euo pipefail
-          ls -d /Applications/Xcode*.app
-          xcode=$(ls -d /Applications/Xcode_26*.app | sort -t. -k2,2n -k3,3n | tail -1)
+          printf '%s\n' /Applications/Xcode*.app
+          xcode=$(printf '%s\n' /Applications/Xcode_26*.app | sort -t. -k2,2n -k3,3n | tail -1)
           sudo xcode-select -s "$xcode"
           xcodebuild -version
           sw_vers
