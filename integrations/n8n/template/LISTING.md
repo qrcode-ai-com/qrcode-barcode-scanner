@@ -12,6 +12,7 @@ the submit button. Nothing here has been submitted. The rules are n8n's
 | File | What it is | sha256 |
 |---|---|---|
 | [qr-barcode-label-check.json](qr-barcode-label-check.json) | The workflow to submit, exactly as committed | `62b07e5c046347b5039883ff4b63dc6653025fb35129f7f25920bdc7a516b579` |
+| `n8n-canvas.png` in the CI artifact | The image of the workflow, 1878 × 978 pixels, from the n8n 2.48.7 editor | `2247cc66252a9a250f286745cf5d836d852af376d6cca971456a21e34b511f07` |
 
 The workflow's name is `Check QR codes and barcodes in label images against an expected value`.
 The Creator portal writes the library title and description itself, so no other text is needed.
@@ -22,7 +23,8 @@ The [n8n template job](../../../.github/workflows/integration-n8n-template.yml) 
 file into n8n 2.48.7 and runs it, as the guidelines ask before submitting (see
 [How it was checked](README.md#how-it-was-checked)). Each run uploads the artifact
 `n8n-template-in-n8n-2.48.7`: the canvas screenshot `n8n-canvas.png`, the executions, the acceptance
-receipt and a `SHA256SUMS` file covering them.
+receipt and a `SHA256SUMS` file covering them. Two runs of the job on this workflow file wrote the
+same screenshot, byte for byte, with the sha256 above.
 
 ## What the template depends on
 
@@ -50,8 +52,8 @@ receipt and a `SHA256SUMS` file covering them.
    **No code found** and the corrupt file **Unreadable image**. This repeats the CI run with the
    package from npm, which CI cannot install before it is published.
 4. Download the artifact `n8n-template-in-n8n-2.48.7` of the latest green run of the n8n template
-   job on `main`, and check `n8n-canvas.png` against its `SHA256SUMS`. That is the image of the
-   workflow n8n asks for when a template uses a community node.
+   job on `main`, and check `n8n-canvas.png` against its `SHA256SUMS` and the sha256 above. That
+   is the image of the workflow n8n asks for when a template uses a community node.
 5. Create a creator account at [creators.n8n.io/register](https://creators.n8n.io/register).
 6. Sign in to the [Creator portal](https://creators.n8n.io/login) and submit
    `qr-barcode-label-check.json`. Where the portal accepts an image, add `n8n-canvas.png`.
