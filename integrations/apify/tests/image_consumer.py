@@ -73,6 +73,11 @@ def run_image(args, name: str, actor_input: dict, network: list[str]) -> list[di
     (pathlib.Path(args.work) / f"{name}.log").write_text(run.stdout + run.stderr)
     if run.returncode != 0:
         sys.exit(f"{name}: the Actor exited with {run.returncode}\n{run.stdout}{run.stderr}")
+    # The Actor wrote the storage as the image's user, readable by that user only on Linux. The run
+    # itself keeps the image's user, as on the platform; a second container opens the files to us.
+    subprocess.run(["docker", "run", "--rm", "--network", "none", "--entrypoint", "chmod", "-v",
+                    f"{storage.resolve()}:/storage", args.image, "-R", "a+rwX", "/storage"],
+                   check=True, capture_output=True, timeout=120)
     files = sorted((storage / "datasets" / "default").glob("*.json"))
     return [json.loads(path.read_text()) for path in files if path.name != "__metadata__.json"]
 
