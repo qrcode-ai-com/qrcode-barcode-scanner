@@ -59,6 +59,10 @@ paths = ["docs/assets/actions/brands/provenance.json"]
 why = "Dated license history and the exact legacy AGPL text; these never follow a new engine version."
 paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py", "integrations/openclaw/test/runtime-license.mjs"]
 
+[[frozen]]
+why = "Dated submission records: each states the pages and versions read on its day, for the owner to send."
+paths = ["distribution/submissions/**"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]
@@ -139,12 +143,15 @@ paths = [
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
   ".github/workflows/integration-canva.yml",
+  ".github/workflows/integration-dify-template.yml",
   ".github/workflows/integration-github-action.yml",
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
   ".github/workflows/integration-n8n-template.yml",
+  ".github/workflows/integration-photoshop-uxp.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
+  ".github/workflows/integration-replicate.yml",
   ".github/workflows/integration-vscode.yml",
 ]
 
@@ -160,6 +167,8 @@ paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workfl
 held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
 paths = [
   "distribution/http/**",
+  "distribution/render/**",
+  "scripts/check-http-hosts.py",
   "scripts/http-service-release.py",
   "scripts/stage-http-satellite.py",
   ".github/workflows/http-service.yml",
@@ -167,7 +176,8 @@ paths = [
 
 [[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"
-paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
+paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml",
+         ".github/workflows/demo-codepen.yml"]
 
 [[file]]
 held = "the JitPack build of a tag, judged by its consumer"

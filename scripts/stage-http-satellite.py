@@ -10,7 +10,10 @@ they find there. The service therefore has a repository of its own,
 qrcode-ai-com/qrcode-barcode-scanner-http, whose content is never edited by hand: `stage` writes it
 from one commit of this repository (scripts/satellite_stage.py says how), with:
 
-  - every file of `distribution/http` at REV, its `mirror/` folder as `.github/workflows/`;
+  - every file of `distribution/http` at REV, its `mirror/` folder as `.github/workflows/` (the
+    repository's own check: every file comes from the engine, and the image a host builds from
+    the root passes the consumer);
+  - `render.yaml`, the Render Blueprint that a Deploy to Render button reads at the root;
   - the mixed fixture its tests scan, as `test/fixtures/mixed-code128-qr.png`;
   - `SOURCE.json`: the commit and the sha256 of every staged file. The image copies it, and the
     service names that commit as its source (AGPL section 13).
@@ -87,7 +90,8 @@ SATELLITE = Satellite(
     package=PACKAGE,
     extras={"test/fixtures/mixed-code128-qr.png": FIXTURE},
     required=("Dockerfile", ".dockerignore", "server.mjs", "package.json", "package-lock.json", "LICENSE",
-              "LICENSE-NOTES.md", "README.md", "test/consumer.mjs", "test/server.test.mjs", *NOTICES),
+              "LICENSE-NOTES.md", "README.md", "render.yaml", ".github/workflows/test.yml",
+              "test/consumer.mjs", "test/server.test.mjs", *NOTICES),
     check=check,
 )
 

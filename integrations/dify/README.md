@@ -72,7 +72,9 @@ package file** and select it. Dify then installs the plugin's two dependencies,
 [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) 0.11.0. The
 `dify` command line is a program of the
 [Dify plugin daemon](https://github.com/langgenius/dify-plugin-daemon/releases), not an npm or
-PyPI package. The package has not been built in this repository.
+PyPI package. In the engine repository, the `integration-dify-template` job builds the package with
+`dify-plugin` 0.6.15 and installs it in Dify 1.20.0 to run the template; that package is a test
+artifact, not a release.
 
 A self-hosted Dify accepts only packages signed by the Marketplace by default. To install a local
 package there, its administrator adds `FORCE_VERIFYING_SIGNATURE=false` to `docker/.env` and
@@ -115,7 +117,9 @@ Never commit that file: the key opens your Dify workspace to the plugin.
 Marketplace template, **Uploaded Image QR and Barcode Reader**: a workflow app with no model that
 sends found codes, an image with no code and an unreadable file down three branches.
 [`template/TEMPLATE.md`](template/TEMPLATE.md) holds its listing text and the steps that remain.
-It has not been imported into Dify yet, and it waits for the plugin to be on the Marketplace.
+The engine repository's `integration-dify-template` job imports it into Dify 1.20.0 and runs it on
+the mixed fixture, a blank image and a corrupt file. It waits for the plugin to be on the
+Marketplace.
 
 ## Develop
 
@@ -131,8 +135,8 @@ python -m venv .venv
 They scan the sample in the three profiles and cover the defaults, an image with no code, a file
 that is not an image, every size limit, bad options and a cut budget. They check the manifest
 against the plugin daemon's rules and the template against the tool it uses. The workflow
-`integration-python-hosts` of the engine repository runs them. They have not run inside a Dify
-instance.
+`integration-python-hosts` of the engine repository runs them. They do not start Dify; the
+`integration-dify-template` job does, and runs the template there.
 
 ## Its own repository
 

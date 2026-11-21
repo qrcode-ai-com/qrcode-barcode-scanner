@@ -1,8 +1,9 @@
-// The manifest of each store package, from one description. Chrome and Edge run the background
-// as a service worker; Firefox runs the same file as an event page and needs its add-on ID and
-// its data-collection declaration.
+// The manifest of each store package, from one description. Chrome, Edge and Safari run the
+// background as a service worker; Firefox runs the same file as an event page and needs its
+// add-on ID and its data-collection declaration. Safari's package is the one the Xcode project
+// wraps (listing/safari.md).
 
-export const TARGETS = ['chrome', 'edge', 'firefox'];
+export const TARGETS = ['chrome', 'edge', 'firefox', 'safari'];
 
 export const NAME = 'QR Code & Barcode Scanner';
 export const DESCRIPTION = 'Read QR codes and barcodes from images on web pages or on your '
@@ -49,11 +50,19 @@ export function manifestFor(target, version) {
     manifest.browser_specific_settings = {
       gecko: {
         id: GECKO_ID,
-        // 140 is the first release that reads data_collection_permissions.
-        strict_min_version: '140.0',
+        // Desktop Firefox reads data_collection_permissions from 140 and Firefox for Android
+        // from 142. 142 keeps `web-ext lint` free of warnings; the supported releases (160, and
+        // ESR 153) are above both. Without a gecko_android key the add-on is offered on desktop
+        // only.
+        strict_min_version: '142.0',
         data_collection_permissions: { required: ['none'] },
       },
     };
+  } else if (target === 'safari') {
+    manifest.background = { service_worker: 'background.js' };
+    // Safari reads 'wasm-unsafe-eval' in an extension's policy from 26.0; an older Safari would
+    // refuse to compile the module.
+    manifest.browser_specific_settings = { safari: { strict_min_version: '26.0' } };
   } else {
     manifest.background = { service_worker: 'background.js' };
     // 'wasm-unsafe-eval' in a Manifest V3 extension policy needs Chrome 103.

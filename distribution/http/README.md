@@ -57,9 +57,11 @@ The picture is the page the service shows at its root address in a browser, with
 - `Dockerfile` and `.dockerignore`: the image, from `node:22.22.2-bookworm-slim` pinned by digest. It runs `npm ci --omit=dev --ignore-scripts`, compiles nothing and runs the service as user `1000:1000`.
 - `test/consumer.mjs`: a client that judges any running copy of the service from outside, in sixteen checks. `test/server.test.mjs`: the service's tests in one process.
 - `LICENSE` (MIT, for these files), `LICENSE-NOTES.md` (what the image holds and under which license) and `licenses/engine-0.11.0/` (the engine's third-party notices at tag `v0.11.0`).
+- `render.yaml`: the Render Blueprint, described in [Deploy it on a host](#deploy-it-on-a-host).
+- `mirror/test.yml`: the workflow of the service's own repository. It checks that every file comes from the engine, builds the image from the root as a host does and judges it with the consumer.
 - `media/`: the two pictures of this page, taken from the real service.
 
-Deploy hosts read their files at the root of a repository. `scripts/stage-http-satellite.py` in the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) therefore writes this folder as the tree of a repository of its own, with the test fixture and a `SOURCE.json` that names the engine commit it comes from. That repository is generated and never edited by hand: change the service in the engine repository, in `distribution/http`.
+Deploy hosts read their files at the root of a repository. `scripts/stage-http-satellite.py` in the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) therefore writes this folder as the tree of a repository of its own, [qrcode-ai-com/qrcode-barcode-scanner-http](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http), with the test fixture and a `SOURCE.json` that names the engine commit it comes from. That repository is generated and never edited by hand: change the service in the engine repository, in `distribution/http`.
 
 ## Run it
 
@@ -81,6 +83,12 @@ cd distribution/http
 npm ci --omit=dev --ignore-scripts
 node server.mjs
 ```
+
+## Deploy it on a host
+
+A host that builds a Dockerfile from a Git repository can run the service from [its own repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http): the Dockerfile is at the root, the service listens on the `PORT` the host sets, and `GET /healthz` is its health check. It needs no database, no disk and no secret.
+
+`render.yaml` is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one web service built from that Dockerfile on Render's `0.5c-512mb` plan, half a CPU and 512 MB, with `/healthz` as its health check, automatic deploys off, one scan at a time and four times the engine's time budgets. A Blueprint created from the repository in your own Render account deploys it there; Render bills that plan $7 a month, prorated to the second. The free plan is not used: in a container limited to its 0.1 CPU, a scan of the mixed sample took 12 to 17 seconds and the engine cut every profile short at its budgets. The workflow below checks the file against the schema Render publishes and runs the image as the file asks Render to run it. No deployment on Render itself has been recorded yet.
 
 ## Scan an image
 
@@ -124,8 +132,9 @@ A refusal is a JSON body `{"error":{"code":…,"message":…}}`:
 | `QRSCAN_HTTP_MAX_DIMENSION` | `4096` | the largest width or height, in pixels |
 | `QRSCAN_HTTP_MAX_PIXELS` | `16000000` | the largest image area |
 | `QRSCAN_HTTP_MAX_CONCURRENT` | `2` | scans that run at once; twice as many uploads may be received at once. More get a 503 |
+| `QRSCAN_HTTP_BUDGET_SCALE` | `1` | a whole number from 1 to 20 that multiplies each profile's time budget, for a host that gives the container a fraction of a CPU |
 
-The limits are the ones of the [MCP server](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/mcp/README.md). A setting can lower a limit, never raise it: a larger value stops the service at start with a message. A request must arrive within 30 seconds. A scan slot is held only while the engine scans, so a slow upload does not hold one. A scan is bounded by its profile's time budget, which the engine reports in `trace.budget_exhausted`; it is not a hard timeout.
+The limits are the ones of the [MCP server](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/mcp/README.md). A setting can lower a limit, never raise it: a larger value stops the service at start with a message. A request must arrive within 30 seconds. A scan slot is held only while the engine scans, so a slow upload does not hold one. A scan is bounded by its profile's time budget, 800 ms for `fast`, 80 ms for `frame` and 4000 ms for `full`, and the report says in `trace.budget_exhausted` when the budget cut it short; it is not a hard timeout. On a whole CPU of the CI runners, a scan of the mixed sample takes 490 to 650 ms in the engine, close to `fast`'s budget, and on half a CPU about twice as long. The host files in this folder therefore set `QRSCAN_HTTP_BUDGET_SCALE` to at least twice one over their plan's share of a CPU. `GET /` gives the budgets in use as `budgetsMs`.
 
 ## Privacy and security
 
@@ -147,6 +156,7 @@ The workflow `.github/workflows/http-service.yml` of the [engine repository](htt
 - `unit` runs `test/server.test.mjs` on the published engine: the consumer below, a report compared field for field with a direct call of the engine, the limits, the source record, the busy and failure answers, and the log.
 - `image` stages the tree of the service's repository, checks it against the commit, builds the image on Linux x64 and on Linux arm64 runners, and saves it with its sha256 and its config digest.
 - `consume` loads each saved image on its own architecture and checks its user, labels and health check. It runs it with a read-only root filesystem, no Linux capability, and on a Docker network that has no route out. `test/consumer.mjs` then judges it from a second container: health, the JSON and the browser page of `GET /`, the source links, the mixed QR code and Code 128 sample in `fast`, `frame` and `full` as a raw body and as a form, with exactly `https://qrc-ai.com/76xMa` and `STOCK-4827` and engine 0.11.0, then each refusal. The job checks that the service cannot reach the network and that its log holds no query or decoded text, then removes the container, the network and the image and checks that they are gone.
+- `hosts` checks `render.yaml` in the staged tree against the schema Render publishes on the day of the run, then runs the judged Linux x64 image as Render would: `PORT=10000`, the variables of the file, half a CPU and 512 MB. It refuses a host file whose budget scale is below twice one over its plan's share of a CPU. The consumer judges it as above, and the job removes it.
 - `rehearse` pushes both judged images and their multi-architecture index to a local registry, exactly as the release does, reads the index back and pulls it.
 
 The same consumer judges a deployed copy: `node test/consumer.mjs https://example.com test/fixtures/mixed-code128-qr.png`, with your service's address in place of `https://example.com`.

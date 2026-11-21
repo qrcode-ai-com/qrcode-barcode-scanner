@@ -1,0 +1,4 @@
+# The package is built byte for byte from these files and compared with updates.xml on Linux,
+# macOS and Windows: keep LF line endings in every checkout.
+* text=auto eol=lf
+*.png binary

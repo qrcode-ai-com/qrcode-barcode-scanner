@@ -1,13 +1,14 @@
 # Dify Marketplace template: Uploaded Image QR and Barcode Reader
 
-Destination `expansion-26`. This folder prepares the template. Nothing here is published, and the
-draft workflow has not been imported into a Dify instance yet.
+Destination `expansion-26`. This folder prepares the template. Nothing here is published.
 
 The Marketplace accepts a template only when every plugin it uses is installed from the
 Marketplace. So the template waits for the plugin of this folder's parent to be listed there
-(destination `expansion-25`).
+(destination `expansion-25`, [pull request 3862](https://github.com/langgenius/dify-plugins/pull/3862)
+of `langgenius/dify-plugins`, open). [LISTING.md](LISTING.md) holds the listing fields and the
+owner's steps.
 
-## What the draft holds
+## What the workflow holds
 
 [`qr-and-barcode-reader.yml`](qr-and-barcode-reader.yml) is a workflow app with five nodes and no
 model, so it runs without a model key:
@@ -20,28 +21,44 @@ model, so it runs without a model key:
 5. **No code found** returns the summary and `complete`. **File not readable** returns the
    engine's error message, which carries its `QRS-` code.
 
-## Steps that remain, all in a signed-in Dify session
+## How it was checked
 
-1. Install the plugin from the Marketplace in a clean workspace.
-2. Studio, Import DSL file, choose `qr-and-barcode-reader.yml`. Open the tool node and check that
-   it shows the installed plugin. Rebuild the node from the tool list if Dify asks for it.
-3. Run the app with the mixed sample (`fixtures/symbology/mixed-code128-qr.png`) in the three
-   profiles in turn. Expect `https://qrc-ai.com/76xMa` and `STOCK-4827`. Run it once with an image
-   that holds no code, and once with a file that is not an image.
-4. Publish, Publish to Marketplace, or export the app with secret values off and upload it in
-   Creator Center. Fill the listing with the fields below.
+The plugin's tests (`pytest` in [integrations/dify](../README.md#develop)) check the file against
+the tool it uses. The [Dify template job](../../../.github/workflows/integration-dify-template.yml)
+then runs it in Dify itself, with [template_in_dify.py](../tests/template_in_dify.py):
 
-## Listing
+1. It starts the `docker/` folder of the Dify 1.20.0 release (tag commit
+   `7bef4e1b2dc21b2c694d3243425dd3fa6288f916`) with Docker Compose, as that folder's README says,
+   with `FORCE_VERIFYING_SIGNATURE=false` so the plugin daemon accepts a package the Marketplace
+   has not signed.
+2. It packages this plugin with the `dify-plugin` command line 0.6.15, pinned by sha256, and
+   installs the package as **Plugins**, **Install plugin**, **Local package file** does.
+3. It imports this file unchanged through the console API. Dify 1.20.0 writes DSL 0.7.0 and
+   imports this file's 0.3.1 with a version warning (`completed-with-warnings`), with no missing
+   dependency. Two copies set the scan profile to `frame` and `full`.
+4. It runs the draft workflow on the mixed fixture with each profile: the run ends in **Codes**
+   with `texts` equal to `https://qrc-ai.com/76xMa` and `STOCK-4827`, `count` 2 and the engine's
+   0.11.0 report. A blank image ends in **No code found** with `complete` true. A file that is not
+   an image ends in **File not readable** with the engine's `[QRS-001]` message, and Dify reports
+   that run as `partial-succeeded`.
+5. It exports the app as YAML and as an `.ifpkg` app package, deletes the apps, uninstalls the
+   plugin, and judges the three reports with the
+   [acceptance contract](../../../distribution/acceptance/README.md).
 
-- **Name:** Uploaded Image QR and Barcode Reader
-- **Categories:** Productivity, Utilities
-- **Overview:** Upload a photo or a screenshot and get back every QR code and barcode it holds,
-  with each format and decoded text. The open-source QR Code & Barcode Scanner engine runs inside
-  your Dify plugin runtime, so the image goes to no other service. Separate branches tell found
-  codes, an image with no code and an unreadable file apart. No model key is needed.
-- **Setup:**
-  1. Install the QR Code & Barcode Scanner plugin from the Marketplace.
-  2. Use this template to create the app.
-  3. Run it and upload an image of a QR code or a barcode.
-  4. Read `texts` for the decoded values, or `report` for the engine's full report.
-  5. To judge how well a QR code scans, set the tool's profile to `full`.
+The job's artifact `dify-template-in-dify-1.20.0` keeps the plugin package, both exports, the
+receipt and a `SHA256SUMS` file. The exports name the local package as their dependency, so they
+show what Dify writes and are not the file to submit.
+
+## When the plugin is on the Marketplace
+
+Once pull request 3862 is merged and the plugin is listed, the job can install it the way a
+Marketplace user does instead of building it:
+
+1. Replace the packaging step and the local install with
+   `POST /console/api/workspaces/current/plugin/install/marketplace`, whose body
+   `{"plugin_unique_identifiers": [...]}` names the identifier the Marketplace lists for 0.1.0.
+2. Remove `FORCE_VERIFYING_SIGNATURE=false`: a Marketplace package is signed.
+3. Expect the export's dependency to read `type: marketplace`, which is what the Creator Center
+   needs.
+
+The template file itself does not change.

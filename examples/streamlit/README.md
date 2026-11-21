@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-dark.gif?v=05df706be1b2">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-light.gif?v=c050b0a71771" alt="QR Code &amp; Barcode Scanner for Python: the Python logo, the quick start in Python, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-streamlit-dark.gif?v=37c9eb844366">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-streamlit-light.gif?v=d093d40c3693" alt="QR Code &amp; Barcode Scanner in a Streamlit app: the Streamlit logo, the app's controls, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
@@ -40,7 +40,7 @@ Help me understand Scan images in a Streamlit app (examples/streamlit/README.md)
 
 A small Streamlit app that reads every QR code and barcode in an image. Take the sample or upload a picture, and the app lists each code beside the image, outlines it where the engine measured it, and shows the full report. The image is read on the server that runs the app, in memory, and the app stores nothing.
 
-The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI's scanning pages in the browser. The app uses the Python package, which has the [QR code scanner Python guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) and the [barcode scanner Python guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python). If a page is not online yet, this README is the reference.
+The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are [QR Code AI](https://qrcode-ai.com/)'s scanning pages in the browser; the app links all three under its introduction. The app uses the Python package, which has the [QR code scanner Python guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) and the [barcode scanner Python guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python). If a page is not online yet, this README is the reference.
 
 To make a test image with a known value, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Upload the exported image and compare the text in the table with the value you encoded, leading zeroes included.
 
@@ -49,9 +49,15 @@ shows: the scan with its limits, the table and the outlined image. They use the 
 package [`qrcode-barcode-scanner`](https://pypi.org/project/qrcode-barcode-scanner/0.11.0/) 0.11.0
 and Streamlit 1.67.0, pinned in [`requirements.txt`](requirements.txt).
 
+<p align="center">
+  <img src="media/app-sample-scan.png" alt="The Streamlit app after scanning its sample image: a table lists the QR code https://qrc-ai.com/76xMa and the Code 128 STOCK-4827, and the image below shows each code outlined where the engine measured it" width="600">
+</p>
+
 ## Status
 
-The app is built and tested in the engine repository. It is not deployed anywhere yet.
+The app is built and tested in the engine repository, and it is ready to deploy on Streamlit
+Community Cloud from this repository as it is. It is not deployed yet: the public address is
+not live. The picture above is the app served on a local machine, after it scanned its sample.
 
 ## Run it on your machine
 
@@ -68,17 +74,48 @@ a Code 128 barcode. Choose **Upload an image** to scan your own.
 
 ## Deploy it on Streamlit Community Cloud
 
-Community Cloud runs an app from a GitHub repository. Create the app with this repository, the
-branch `main`, the main file `examples/streamlit/streamlit_app.py` and Python 3.12. It installs the
-`requirements.txt` that sits beside the main file, and it runs the app from the root of the
-repository, where it finds the sample image.
+Community Cloud runs an app straight from a public GitHub repository, and this folder is laid out
+the way it reads one:
 
-Streamlit collects anonymous usage statistics in the browser by default. To turn them off on
-Community Cloud, the repository root needs a `.streamlit/config.toml` with
-`gatherUsageStats = false` under `[browser]`; this repository does not have one yet.
+| Community Cloud reads | Here |
+| --- | --- |
+| The main file | `examples/streamlit/streamlit_app.py`, started with `streamlit run` from the root of the repository, which is where the sample image is found |
+| The dependencies | [`requirements.txt`](requirements.txt) beside the main file, which wins over any file at the root: Streamlit, Pillow and `qrcode-barcode-scanner==0.11.0`, each at an exact version |
+| The configuration | [`.streamlit/config.toml`](.streamlit/config.toml) beside the main file: an 8 MB upload limit, the app's own limit |
+| The Python version | No file: it is chosen in the deploy form. Pick 3.12, the version the tests run on |
+
+The steps, for the repository's owner:
+
+1. Sign in at [share.streamlit.io](https://share.streamlit.io/) with an emailed code, Google or
+   GitHub, and fill in the account form. Streamlit's
+   [terms of use](https://streamlit.io/terms-of-use) govern the hosted app, including what
+   personal data it may process.
+2. Connect GitHub from **Workspaces**. Read the scopes on GitHub's consent screen first, and do
+   not add access to private repositories: this app needs none. Deploying from a repository needs
+   admin rights on it, and an organization's repositories need that organization's grant.
+3. Click **Create app**, then **Yup, I have an app**. Repository
+   `qrcode-ai-com/qrcode-barcode-scanner-rust`, branch `main`, file path
+   `examples/streamlit/streamlit_app.py`. App URL: `qrcode-barcode-scanner`, if that subdomain is
+   free.
+4. Open **Advanced settings**, choose Python 3.12, leave the secrets empty, then **Save** and
+   **Deploy**. The Python version cannot change after deployment without deleting the app.
+5. Open the address signed out, wait for the app to wake up, and check that the sample shows
+   `https://qrc-ai.com/76xMa` and `STOCK-4827` in each profile with version 0.11.0.
+
+[`LISTING.md`](LISTING.md) holds the field values, the owner decisions to settle first and the
+checks to read back after the deploy. Once the app is live, add this badge under the title of
+this README, with the app's real address:
+
+```markdown
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://qrcode-barcode-scanner.streamlit.app)
+```
 
 ## What it does with an image
 
+- On Streamlit Community Cloud, the image is processed on Streamlit's servers, which are all in
+  the United States, and Streamlit records usage statistics of the page whatever the app's
+  configuration says. The page states both under its introduction. A copy you run on your own
+  machine sends no usage statistics: the configuration beside the app turns them off.
 - An uploaded image is sent to the server that runs the app. Streamlit holds it in memory for
   the session, the engine reads it there, and the app writes it nowhere. On a hosted app, the
   host's own terms and logs apply.
@@ -99,8 +136,23 @@ The tests drive the app with Streamlit's own test runner, widget by widget:
 ```
 
 They check the first visit on the sample, an upload in the three profiles, the upload limits, an
-image with no code, a file that is not an image, an oversized image and a cut budget. The workflow
-`integration-python-hosts` runs them. A deployed copy has not been tried.
+image with no code, a file that is not an image, an oversized image, a cut budget and the
+configuration beside the app. Each scan of the mixed image is held to the exact two codes by the
+engine repository's [Python host kit](../../scripts/python_host_kit.py).
+
+[`tests/served_smoke.py`](tests/served_smoke.py) also serves the app as Community Cloud does,
+with `streamlit run` from the root of the repository. It waits for the health endpoint, checks the
+page, runs the tests against the same checkout, and checks that the scans left no file in the
+repository:
+
+```sh
+.venv/bin/python examples/streamlit/tests/served_smoke.py --port 8501
+```
+
+The workflow `integration-python-hosts` runs the tests, then the served smoke in a new virtual
+environment through [`python-host-consumer.py`](../../scripts/python-host-consumer.py): it
+installs the two requirement files, judges the three acceptance reports, uninstalls the engine
+and checks that it no longer imports. A deployed copy has not been tried yet.
 
 ## How it works
 

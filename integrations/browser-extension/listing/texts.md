@@ -1,9 +1,10 @@
 # Store listings · QR Code & Barcode Scanner 0.1.0
 
-The texts and form values for the three stores. One build serves them all: run `npm ci` and
-`npm run build`, then upload the files named below from `build/`. This file is the one copy of
-the store texts. The build writes `build/amo-metadata.json` for Firefox Add-ons from it, and
-`npm test` checks their lengths and the six links.
+The texts every store shows. This file is the one copy of them: the build writes
+`build/amo-metadata.json` for Firefox Add-ons from it, and `npm test` checks their lengths and
+the six links. Each store's form, step by step, with its package and the owner's steps, is in its
+own kit: [chrome-web-store.md](chrome-web-store.md), [edge-add-ons.md](edge-add-ons.md),
+[firefox-add-ons.md](firefox-add-ons.md) and [safari.md](safari.md).
 
 Nothing here is submitted. Each store needs its owner's account, its own review, and a check of
 the live listing once it is public.
@@ -118,57 +119,13 @@ The account, the form values tab by tab, the images and the sources read are in
 
 ## Microsoft Edge Add-ons (map-50)
 
-- **Account.** A Microsoft Partner Center account enrolled in the Microsoft Edge program. There
-  is no fee. A company account (SuperNovae Studio) goes through a verification; an individual
-  account does not.
-- **Upload.** Partner Center, Microsoft Edge, "Create new extension", then
-  `build/qrcode-barcode-scanner-edge-0.1.0.zip`. The package has no `update_url` and does not
-  name Chrome; `npm run inspect` checks both.
-- **Availability.** Public, all markets.
-- **Properties.** Category: Productivity (pick the closest name in the list). "Does this
-  extension access, collect or transmit personal information?": No, so no privacy policy is
-  required; the PRIVACY.md address can still be given. Website and support addresses as above.
-  Mature content: No.
-- **Store listing, English.** Description: the long description (Edge asks for 250 to 10,000
-  characters). Short description: the short description above. Logo: `logo-300.png`.
-  Screenshot: as above. Search terms, at most 7:
-
-  ```text
-  QR code; barcode; scanner; QR reader; barcode reader; Data Matrix; EAN
-  ```
-
-- **Notes for certification.** The reviewer notes below.
-- **Then** "Publish". Edge states a review time of up to seven business days.
+The account, the form values page by page, the search terms and the sources read are in
+[edge-add-ons.md](edge-add-ons.md).
 
 ## Firefox Add-ons (map-51)
 
-- **Account.** A Mozilla account on addons.mozilla.org with two-factor authentication on. The
-  Firefox Add-on Distribution Agreement is accepted at the first submission. There is no fee.
-- **Distribution.** "On this site" (listed). The add-on ID is in the manifest:
-  `qrcode-barcode-scanner@qrcode-ai.com`. It cannot change after the first upload.
-- **Source code.** Answer yes: the package holds generated code (the WebAssembly module and its
-  wasm-bindgen glue). Upload `build/qrcode-barcode-scanner-source-0.1.0.zip`; its `SOURCE.md`
-  tells the reviewer how to rebuild.
-- **Listing.** Name, summary for Firefox Add-ons and long description as above. Category:
-  Photos, Music & Videos (`photos-music-videos`). Homepage and support addresses as above.
-  Privacy policy: none is required, since no data is transmitted; the manifest declares
-  `data_collection_permissions` `required: ["none"]`.
-- **License.** Firefox Add-ons offers `AGPL-3.0-only` in its list, but not
-  `AGPL-3.0-or-later`, the license of the bundled engine 0.11.0. Choosing either preset would
-  misstate the package. `build/amo-metadata.json` therefore gives a custom license that states
-  both parts: the extension under MIT, the bundled engine under AGPL-3.0-or-later.
-- **Upload from the command line**, with the owner's API key and secret from the Developer Hub
-  (never written to a file in this repository):
-
-  ```sh
-  node_modules/.bin/web-ext sign --source-dir build/firefox --channel listed \
-    --amo-metadata build/amo-metadata.json \
-    --upload-source-code build/qrcode-barcode-scanner-source-0.1.0.zip \
-    --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
-  ```
-
-  Or upload `build/qrcode-barcode-scanner-firefox-0.1.0.zip` in the Developer Hub and fill the
-  same fields by hand. Signing can take up to 24 hours; a human review can follow.
+The account, the `web-ext sign` command, the Developer Hub fields, the source package, the
+license and the sources read are in [firefox-add-ons.md](firefox-add-ons.md).
 
 ## Notes for reviewers
 

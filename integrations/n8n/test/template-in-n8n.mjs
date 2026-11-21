@@ -151,10 +151,14 @@ for (const [key, id] of Object.entries(ids)) assert.ok(id, `workflow ${key} impo
 const runs = {};
 for (const [key, id] of Object.entries(ids)) {
 	const raw = inN8n(`n8n execute --id=${id} --rawOutput`);
-	// n8n prints its start-up lines before the JSON of the execution.
-	const start = raw.split('\n').findIndex((line) => line === '{');
-	assert.ok(start >= 0, `execution ${key} printed its data:\n${raw.slice(0, 2000)}`);
-	const execution = JSON.parse(raw.split('\n').slice(start).join('\n'));
+	// n8n prints its start-up lines before the JSON of the execution, and its task runner can
+	// log a line such as `Registered runner "JS Task Runner"` after it. The JSON is indented,
+	// so it is exactly the lines from the first `{` to the first `}` that stand alone.
+	const lines = raw.split('\n');
+	const start = lines.findIndex((line) => line === '{');
+	const end = lines.findIndex((line, index) => index > start && line === '}');
+	assert.ok(start >= 0 && end > start, `execution ${key} printed its data:\n${raw.slice(0, 2000)}`);
+	const execution = JSON.parse(lines.slice(start, end + 1).join('\n'));
 	writeFileSync(join(work, `execution-${key}.json`), JSON.stringify(execution, null, 2));
 	assert.equal(execution.status, 'success', `${key}: execution status`);
 	assert.equal(execution.data.resultData.error, undefined, `${key}: no workflow error`);

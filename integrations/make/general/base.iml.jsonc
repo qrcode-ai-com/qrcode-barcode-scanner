@@ -1,0 +1,19 @@
+{
+  "baseUrl": "{{connection.baseUrl}}",
+  "headers": {
+    "accept": "application/json"
+  },
+  "response": {
+    "error": {
+      "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}",
+      "400": { "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}", "type": "DataError" },
+      "413": { "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}", "type": "DataError" },
+      "415": { "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}", "type": "DataError" },
+      "422": { "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}", "type": "DataError" },
+      "503": { "message": "[{{statusCode}}] {{body.error.code}}: {{body.error.message}}", "type": "ConnectionError" }
+    }
+  },
+  "log": {
+    "sanitize": ["request.headers.authorization"]
+  }
+}

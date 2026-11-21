@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The update server of the QR Code &amp; Barcode Scanner package for Joomla, written by
+     integrations/joomla/scripts/build.mjs. The download is the GitHub release joomla-v0.1.0. -->
+<updates>
+	<update>
+		<name>QR Code &amp; Barcode Scanner</name>
+		<description>Reads QR codes and barcodes from an image or a photo in the visitor's browser.</description>
+		<element>pkg_qrcodebarcodescanner</element>
+		<type>package</type>
+		<client>site</client>
+		<version>0.1.0</version>
+		<infourl title="QR Code &amp; Barcode Scanner 0.1.0">https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/joomla</infourl>
+		<downloads>
+			<downloadurl type="full" format="zip">https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/joomla-v0.1.0/pkg_qrcodebarcodescanner-0.1.0.zip</downloadurl>
+		</downloads>
+		<sha256>20bf81badca15bbc025201703d89b98de7df027913e0d6738acad7633a0623bf</sha256>
+		<maintainer>QR Code AI</maintainer>
+		<maintainerurl>https://qrcode-ai.com/</maintainerurl>
+		<targetplatform name="joomla" version="(5\.[4-9]|6\.[0-9])" />
+		<php_minimum>8.1</php_minimum>
+	</update>
+</updates>
