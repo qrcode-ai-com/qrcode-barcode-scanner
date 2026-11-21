@@ -29,6 +29,28 @@ only when you click a copy button. Its
 <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/listing/PRIVACY.md">privacy notice</a>
 gives the details and the permissions.</dd>
 
+<dt id="canva">Canva app</dt>
+<dd>The only network request the app makes downloads the selected image from the temporary
+address Canva gives it. The engine reads the image in the app's panel, in the browser. The app
+has no cookies and no storage, and keeps nothing after you close it.</dd>
+
+<dt id="adobe-express">Adobe Express add-on</dt>
+<dd>The add-on loads Adobe's add-on SDK from Adobe and its own files from its package, and makes
+no other request. Adobe Express renders the page inside the browser, and the engine reads that
+rendering in the add-on, in the browser. A file you choose is read the same way and is not
+uploaded. The add-on has no cookies and no storage, and keeps nothing after you close it.</dd>
+
+<dt id="wordpress">WordPress plugin</dt>
+<dd>The scanner runs in the visitor's browser, with code served by your own site. The image never
+leaves the browser and is discarded when the page closes. The plugin makes no request to another
+server, sets no cookie, uses no local storage and stores nothing in your database.</dd>
+
+<dt id="http">HTTP service</dt>
+<dd>You run the service yourself; it scans the images sent to it. Each image stays in the
+service's memory for the time of its scan and is never written to disk or logged. The service
+logs one line per request: method, path, status and duration, with no image and no decoded
+text.</dd>
+
 <dt id="github-action">GitHub Action</dt>
 <dd>The action downloads the scanner's command-line program and its checksum file from the
 scanner's GitHub releases, on the runner of your workflow. It scans the files of your repository
