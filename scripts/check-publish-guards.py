@@ -143,6 +143,19 @@ mint registry tokens). Every privileged job must:
                download-artifact and that action, with no `if:`. It uploads
                nothing and creates no release; the owner attaches the file.
                No other job inherits this exception.
+  HTTP         http-service.yml > publish pushes the scanner HTTP service image to
+               ghcr.io on an http-v* tag only, in the protected environment
+               container-http, with exactly contents read and packages write. It
+               needs image (which builds it from the staged tree), consume (the
+               clean consumers of both architectures) and rehearse (the same
+               publication to a local registry); runs the gate
+               `http-service-release.py gate` first; downloads the image archives
+               and the consumer receipts once each, with digest-mismatch error;
+               re-inspects them (http-service-release.py verify) before the one
+               step that holds the token, which runs exactly HTTP_PUBLISH_RUN.
+               Its steps use only checkout, download-artifact and upload-artifact,
+               with no `if:`. Only image uploads http-image-*, only consume
+               uploads http-consumed-*. No other job inherits this exception.
   Pages        pages.yml > deploy serves the browser example examples/web-vite
                on GitHub Pages: no registry, no release. It deploys from main
                of the canonical repository, after build, in the github-pages
@@ -296,6 +309,29 @@ MCPB_REINSPECT_RUN = "\n".join((
 ))
 MCPB_ATTEST = {"subject-path": "mcpb/*.mcpb"}
 MCPB_OUTPUT = "${{ steps.build.outputs.sha256 }}"
+# The HTTP service image: publish pushes the images the consumers judged, and reads them back.
+HTTP_WORKFLOW = "http-service.yml"
+HTTP_JOB = (HTTP_WORKFLOW, "publish")
+HTTP_GUARD = "startsWith(github.ref, 'refs/tags/http-v')"
+HTTP_GATE_RUN = 'python3 scripts/http-service-release.py gate --ref "$GITHUB_REF"'
+HTTP_PERMISSIONS = {"contents": "read", "packages": "write"}
+HTTP_USES = ("actions/checkout", "actions/download-artifact", "actions/upload-artifact")
+HTTP_DOWNLOADS = (
+    {"pattern": "http-image-*", "merge-multiple": "true", "path": "images", "digest-mismatch": "error"},
+    {"pattern": "http-consumed-*", "merge-multiple": "true", "path": "consumed", "digest-mismatch": "error"},
+)
+HTTP_VERIFY_RUN = 'python3 scripts/http-service-release.py verify --images "$PWD/images" --receipts "$PWD/consumed"'
+HTTP_TOKEN_ENV = {"GHCR_TOKEN": "${{ github.token }}", "DOCKER_CONFIG": "${{ runner.temp }}/qrscan-http-docker"}
+HTTP_PUBLISH_RUN = "\n".join((
+    "set -euo pipefail",
+    'mkdir -p "$DOCKER_CONFIG"',
+    'chmod 700 "$DOCKER_CONFIG"',
+    "trap 'docker logout ghcr.io' EXIT",
+    'printf \'%s\' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin',
+    'python3 scripts/http-service-release.py publish --images "$PWD/images" --receipts "$PWD/consumed" \\',
+    '  --ref "$GITHUB_REF" --receipt "$PWD/published/registry.json"',
+))
+HTTP_SETS = {"http-image-": "image", "http-consumed-": "consume"}
 # GitHub Pages serves the browser example: deploy holds the Pages token in one pinned step.
 PAGES_WORKFLOW = "pages.yml"
 PAGES_JOB = (PAGES_WORKFLOW, "deploy")
@@ -492,6 +528,7 @@ INSPECTION = {
     OCI_JOB: "inspect",
     PAGES_JOB: "build",
     MCPB_JOB: "bundle",
+    HTTP_JOB: "image",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
     ("npm-publish.yml", "publish-wasm"): "build-wasm",
@@ -506,6 +543,7 @@ CONSUMERS = {
     DOTNET_JOB: {"preflight", "binding", "natives", "consumer"},
     MCP_JOB: {"preflight", "consume", "operand-proof"},
     MCPB_JOB: {"consume", "offline"},
+    HTTP_JOB: {"consume", "rehearse"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
@@ -1887,6 +1925,52 @@ def _mcpb_contract_problems(wf: dict, job: dict) -> list:
     return out
 
 
+
+def _http_contract_problems(wf: dict, job: dict) -> list:
+    """(code, message, step index or -1) for each way http-service.yml › publish could push other
+    images than the ones the consumers judged, or let other code hold its token."""
+    out, steps = [], _steps(job)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("http-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in HTTP_USES:
+            fail(f"{step.get('uses')}: publish uses only {', '.join(HTTP_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on a publish step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    given = tuple({k: str(v) for k, v in (steps[i].get("with") or {}).items()} for i in downloads)
+    if given != HTTP_DOWNLOADS or any(set(steps[i]) - {"name", "uses", "with"} for i in downloads):
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly {list(HTTP_DOWNLOADS)}, in that order")
+    holders = [i for i, step in enumerate(steps) if TOKEN.search(_text(step))]
+    verify = [i for i, step in enumerate(steps) if set(step) <= {"name", "run"} and _block(step.get("run")) == HTTP_VERIFY_RUN]
+    if len(holders) != 1 or set(steps[holders[0]]) - {"name", "env", "run"} or \
+            _block(steps[holders[0]].get("run")) != HTTP_PUBLISH_RUN or \
+            _bare(steps[holders[0]].get("env")) != _bare(HTTP_TOKEN_ENV):
+        fail(f"steps holding the token {[i + 1 for i in holders]}: exactly one, running HTTP_PUBLISH_RUN with "
+             "env GHCR_TOKEN and DOCKER_CONFIG and no other key")
+    elif not verify or not downloads or not max(downloads) < verify[0] < holders[0]:
+        fail("after both downloads and before the token, re-inspect exactly as HTTP_VERIFY_RUN says: the images "
+             "pushed are the archives the consumers judged")
+    image = jobs.get("image", {})
+    if not any("scripts/stage-http-satellite.py stage" in line for step in _steps(image)
+               for line in _code_lines(step.get("run"))):
+        fail("image must build from the tree scripts/stage-http-satellite.py stages")
+    uploads = [(other, step.get("with") if isinstance(step.get("with"), dict) else {})
+               for other, body in jobs.items() for step in _steps(body)
+               if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    for prefix, owner in HTTP_SETS.items():
+        named = sorted({other for other, given_with in uploads if str(given_with.get("name", "")).startswith(prefix)})
+        if named != [owner]:
+            fail(f"{prefix}* may be uploaded by {named or 'no job'}: by {owner} only")
+    if any("overwrite" in given_with for _, given_with in uploads):
+        fail("no upload of this workflow overwrites an artifact")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1903,8 +1987,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     pages = (workflow, job_id) == PAGES_JOB
     mcpb = (workflow, job_id) == MCPB_JOB
+    http = (workflow, job_id) == HTTP_JOB
     guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
-             else OCI_GUARD if oci else MCPB_GUARD if mcpb else GUARD)
+             else OCI_GUARD if oci else MCPB_GUARD if mcpb else HTTP_GUARD if http else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -1922,7 +2007,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
                             else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"container"} if oci
-                            else {"mcpb"} if mcpb else ENVIRONMENTS)
+                            else {"mcpb"} if mcpb else {"container-http"} if http else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1943,6 +2028,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
         if perms != MCPB_PERMISSIONS:
             flag("permissions", "the bundle attestation needs exactly contents read, id-token write and "
                                 "attestations write")
+    elif http:
+        if perms != HTTP_PERMISSIONS:
+            flag("permissions", "the HTTP image publisher needs exactly contents read and packages write; no id-token")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -2026,7 +2114,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     checkout = next((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/checkout"), None)
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
-                     else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else GATE_RUN)
+                     else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else HTTP_GATE_RUN if http
+                     else GATE_RUN)
     # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
     if not pages and (set(gate) - {"run", "name", "working-directory"} or
                       str(gate.get("run", "")).strip() != required_gate):
@@ -2043,6 +2132,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag(code, message, index)
     if mcpb:
         for code, message, index in _mcpb_contract_problems(wf, job):
+            flag(code, message, index)
+    if http:
+        for code, message, index in _http_contract_problems(wf, job):
             flag(code, message, index)
     if (workflow, job_id) in REINSPECT_JOBS and not any(
             re.search(r"package-inspect\.py\s+archive\b", line) and "--strict" in _words(line)
@@ -2658,6 +2750,45 @@ MUTATIONS = (
                                          "          if-no-files-found: error\n          overwrite: true\n"
                                          "          retention-days: 30")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
     ("mcpb.yml as reviewed", P, [], {}, 0, "mcpb.yml › attest, "),
+    # == http-service.yml › publish: the judged HTTP service images, pushed to ghcr.io on http-v* only
+    ("HTTP publish without the tag guard", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD + "\n", "")], {}, 1,
+     "http-service.yml › publish [guard]"),
+    ("HTTP publish on the engine tag family", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD, "    if: " + GUARD)], {},
+     1, "http-service.yml › publish [guard]"),
+    ("HTTP publish in the OCI environment", P,
+     [(HTTP_WORKFLOW, "    environment: container-http", "    environment: container")], {}, 1,
+     "http-service.yml › publish [environment]"),
+    ("HTTP publish mints an OIDC token", P,
+     [(HTTP_WORKFLOW, "      packages: write\n", "      packages: write\n      id-token: write\n")], {}, 1,
+     "http-service.yml › publish [permissions]"),
+    ("HTTP publish without the clean consumers", P,
+     [(HTTP_WORKFLOW, "    needs: [image, consume, rehearse]", "    needs: [image, rehearse]")], {}, 1,
+     "http-service.yml › publish [needs]"),
+    ("HTTP publish without its gate", P, [(HTTP_WORKFLOW, "        run: " + HTTP_GATE_RUN + "\n",
+                                           "        run: echo gate\n")], {}, 1, "http-service.yml › publish [gate]"),
+    ("HTTP publish without the re-inspection", P,
+     [(HTTP_WORKFLOW, "        run: " + HTTP_VERIFY_RUN + "\n", "        run: echo verified\n")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP publish downloads without the digest check", P,
+     [(HTTP_WORKFLOW, "          path: consumed\n          digest-mismatch: error\n      - name: Re-inspect",
+       "          path: consumed\n      - name: Re-inspect")], {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP publish lends its token to a second step", P,
+     [(HTTP_WORKFLOW, "        run: " + HTTP_VERIFY_RUN + "\n",
+       "        env:\n          GH_TOKEN: ${{ github.token }}\n        run: " + HTTP_VERIFY_RUN + "\n")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP publish skips a failing step", P,
+     [(HTTP_WORKFLOW, "      - name: Push the judged images", "      - continue-on-error: true\n        name: Push the judged images")],
+     {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP image no longer built from the staged tree", P,
+     [(HTTP_WORKFLOW, "python3 scripts/stage-http-satellite.py stage --out", "mkdir -p")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP a consumer uploads an image set", P,
+     [(HTTP_WORKFLOW, "          name: http-consumed-${{ matrix.architecture }}", "          name: http-image-${{ matrix.architecture }}")],
+     {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP publish cancels in progress", P,
+     [(HTTP_WORKFLOW, "-${{ github.ref }}\n      cancel-in-progress: false\n", "-${{ github.ref }}\n      cancel-in-progress: true\n")],
+     {}, 1, "http-service.yml › publish [concurrency]"),
+    ("http-service.yml as reviewed", P, [], {}, 0, "http-service.yml › publish, "),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),
