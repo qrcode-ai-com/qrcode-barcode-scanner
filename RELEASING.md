@@ -1537,6 +1537,63 @@ is claimed. Retain those receipts separately from producer and inspector results
 Producer artifacts have 14-day retention: complete this activation while those
 exact artifacts are available; expiry is not authority to substitute a rebuild.
 
+## HTTP service image
+
+`distribution/http` is a small HTTP service around the published npm package
+`@qrcode-ai-com/qrcode-barcode-scanner@0.11.0`: `POST /scan` answers with the
+engine's report, unchanged. Its image runs Node.js 22 from a base pinned by
+digest and installs the engine and its six native packages from the lockfile's
+sha512, so it compiles nothing. It is a packaging release with its own version
+(`SERVICE_VERSION` in `server.mjs`, the same in `package.json` and the
+`Dockerfile` label) and its own tag `http-v<version>`. The engine tag `v0.11.0`
+and its packages stay as published. A new engine needs its pins, its lockfile,
+its notices and the constants of `scripts/stage-http-satellite.py` changed in
+one commit.
+
+`scripts/stage-http-satellite.py` writes the folder as the tree of its own
+repository, `qrcode-ai-com/qrcode-barcode-scanner-http`, with the test fixture
+and a `SOURCE.json` that names the engine commit. Deploy hosts build that tree.
+`.github/workflows/http-service.yml` builds the image from the same staged
+tree, on Linux x64 and arm64 runners, and saves it with its sha256 and config
+digest. Its consumers (`scripts/http-service-release.py consume`) run each
+image fresh with a read-only root filesystem, no capability and no route out,
+judge it from a second container with `distribution/http/test/consumer.mjs`
+(the mixed QR code and Code 128 sample in fast, frame and full, raw and
+multipart, exact payloads, every refusal), check that it cannot reach the
+network, then remove it. `rehearse` pushes both judged images and their index
+to a local registry and pulls them back, as the release does.
+
+On a pull request or a dispatch, nothing more runs. On a tag `http-v*`,
+`publish` runs in the protected environment `container-http`. It runs the gate
+first (`http-service-release.py gate`: the tag must be `http-v` and the service
+version, and the engine pin 0.11.0), downloads the images the consumers judged,
+requires their sha256 and config digest to be the ones the consumers recorded,
+then pushes them as `0.1.0-amd64` and `0.1.0-arm64` and their index as `0.1.0`
+to `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner-http` with the job's own
+`github.token`, and reads each back. It never rebuilds, never moves `latest`
+and holds `contents: read` and `packages: write` only.
+`scripts/check-publish-guards.py` holds that job to this contract.
+
+**Owner steps, once.** Create the environment `container-http`: deployment tags
+`http-v*` only, no branch rule, `ThibautMelen` as its required reviewer, no
+administrator bypass. Add `http-v*` to the tag ruleset of distribution tags.
+
+**Each image.**
+
+1. Merge the change to `main`, with `http-service.yml` green on its pull
+   request.
+2. Tag the merged commit and push the tag:
+   `git tag -a http-v0.1.0 <commit> -m 'HTTP service 0.1.0'`, then
+   `git push origin http-v0.1.0`.
+3. Approve `publish` in the environment once the consumers are green. Its
+   artifact `http-published` records the digests it pushed.
+4. A new GitHub package starts private: in the package settings of
+   `qrcode-barcode-scanner-http`, link it to this repository and make it
+   public.
+5. Signed out, pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner-http:0.1.0`
+   and compare its index digest with the receipt. Only then may a README name
+   the image as published.
+
 ## Docker publishing — historical 0.10 distribution
 
 The historical 0.10 publisher (`distribution/docker/publish.py`, retained for
