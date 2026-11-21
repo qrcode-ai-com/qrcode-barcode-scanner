@@ -138,6 +138,7 @@ paths = [
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
   ".github/workflows/ecosystem-checks.yml",
+  ".github/workflows/integration-adobe-express.yml",
   ".github/workflows/integration-agent-plugin.yml",
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
