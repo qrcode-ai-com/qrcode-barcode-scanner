@@ -1,0 +1,28 @@
+# DigitalOcean App Platform template of the QR Code & Barcode Scanner HTTP service, read by the
+# Deploy to DigitalOcean button: an app spec under a `spec:` key
+# (https://docs.digitalocean.com/products/app-platform/how-to/add-deploy-do-button/).
+# scripts/check-http-hosts.py in the engine repository holds it to App Platform's spec and to the
+# service, and its workflow runs the image as this file asks App Platform to run it.
+spec:
+  name: qrcode-barcode-scanner
+  services:
+    - name: qrcode-barcode-scanner-http
+      git:
+        branch: main
+        repo_clone_url: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http.git
+      dockerfile_path: Dockerfile
+      http_port: 8080
+      # 1 shared vCPU and 512 MiB, the smallest App Platform service.
+      instance_size_slug: apps-s-1vcpu-0.5gb
+      instance_count: 1
+      health_check:
+        http_path: /healthz
+      envs:
+        # One scan at a time on 512 MiB. Settings may lower the service's limits, never raise them.
+        - key: QRSCAN_HTTP_MAX_CONCURRENT
+          value: "1"
+          scope: RUN_TIME
+        # A shared vCPU: twice the engine's time budgets (fast 1.6 s, frame 160 ms, full 8 s).
+        - key: QRSCAN_HTTP_BUDGET_SCALE
+          value: "2"
+          scope: RUN_TIME
