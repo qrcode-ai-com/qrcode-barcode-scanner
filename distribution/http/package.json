@@ -1,0 +1,28 @@
+{
+  "name": "qrcode-barcode-scanner-http",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A small HTTP service that scans QR codes and barcodes with the published QR Code & Barcode Scanner engine 0.11.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "server.mjs",
+  "homepage": "https://qrcode-ai.com/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "distribution/http"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/server.test.mjs"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner": "0.11.0"
+  }
+}
