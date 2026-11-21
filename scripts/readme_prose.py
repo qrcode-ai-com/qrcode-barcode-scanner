@@ -29,6 +29,7 @@ GUIDES = {
     'integrations/comfyui/README.md': ('integrations/comfyui', 'ComfyUI'),
     'integrations/dify/README.md': ('integrations/dify', 'Dify'),
     'integrations/mcp/README.md': ('mcp', 'MCP'),
+    'integrations/make/README.md': ('integrations/make', 'Make'),
     'integrations/n8n/README.md': ('integrations/n8n', 'n8n'),
     'integrations/n8n/template/README.md': ('integrations/n8n', 'n8n'),
     'integrations/node-red/README.md': ('integrations/node-red', 'Node-RED'),
