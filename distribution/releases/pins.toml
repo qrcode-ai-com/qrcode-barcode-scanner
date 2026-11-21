@@ -59,6 +59,10 @@ paths = ["docs/assets/actions/brands/provenance.json"]
 why = "Dated license history and the exact legacy AGPL text; these never follow a new engine version."
 paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py", "integrations/openclaw/test/runtime-license.mjs"]
 
+[[frozen]]
+why = "Dated submission records: each states the pages and versions read on its day, for the owner to send."
+paths = ["distribution/submissions/**"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]
