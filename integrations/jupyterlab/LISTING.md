@@ -101,8 +101,9 @@ yet.
    | Workflow name | `python-plugins-publish.yml` |
    | Environment name | `pypi-jupyterlab` |
 
-   The jobs `jupyterlab-build` and `jupyterlab-publish` join that workflow beside the napari
-   plugin's: until they are on `main`, a tag has nothing to run.
+   In that workflow, `jupyterlab-build` builds and judges the two files on every run, and
+   `jupyterlab-publish` uploads them on a `jupyterlab-v*` tag only, in that environment
+   (RELEASING.md § Python plugin packages).
 
    Press **Add**. The first upload from that workflow and environment creates the project.
 

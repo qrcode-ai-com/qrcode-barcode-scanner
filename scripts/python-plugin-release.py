@@ -7,19 +7,27 @@
   python-plugin-release.py pypi-live DIR --folder FOLDER
   python-plugin-release.py --self-test
 
-A plugin package is a Python project under integrations/ that installs the published engine wheel
-`qrcode-barcode-scanner` and is not the engine itself: the napari plugin today. PLUGINS names each
-one: its folder, its PyPI project, its tag family and what its distributions must state. The
-workflow python-plugins-publish.yml runs these steps, and scripts/check-publish-guards.py holds its
-publishing jobs to them (PYPI_PLUGINS there).
+A plugin package is a Python project under integrations/ that is not the engine itself and ships
+the published engine one of two ways. A Python plugin (kind `python`: the napari plugin) installs
+the published engine wheel `qrcode-barcode-scanner`. A prebuilt JupyterLab extension (kind
+`labextension`: the JupyterLab extension) is a wheel that holds the built frontend, which bundles
+the published WebAssembly engine `@qrcode-ai-com/qrcode-barcode-scanner-wasm`; it installs no
+engine wheel. PLUGINS names each one: its folder, its kind, its PyPI project, its tag family and
+what its distributions must state. The workflow python-plugins-publish.yml runs these steps, and
+scripts/check-publish-guards.py holds its publishing jobs to them (PYPI_PLUGINS there).
 
-`gate` reads the folder's pyproject.toml: the project name is the one PLUGINS states, the version
-is X.Y.Z and equals the package's own `__version__`, the engine is pinned exactly once
-(`qrcode-barcode-scanner==X.Y.Z`) and the listing classifier is present. A tag REF must be exactly
+`gate` reads the folder's pyproject.toml: the project name is the one PLUGINS states and the
+listing classifier is present. For a Python plugin the version is X.Y.Z and equals the package's
+own `__version__`, and the engine is pinned exactly once (`qrcode-barcode-scanner==X.Y.Z`). For a
+labextension the version and the engine come from package.json: the pyproject takes its version
+from there (hatch-nodejs-version), package.json states X.Y.Z and pins the WebAssembly engine to an
+exact X.Y.Z, and the pyproject depends on no engine wheel. A tag REF must be exactly
 `refs/tags/<tag family><version>`. Any other REF fails, unless --dry-run (a dispatch that builds
 and judges without publishing).
 
-`build` builds the sdist and the wheel with `python -m build` (SOURCE_DATE_EPOCH from the commit,
+`build` builds the sdist and the wheel with `python -m build`. A labextension must be built first
+(`npm ci`, then `npm run build:prod` in its folder): the build backend only checks that it is
+there, and `build` refuses a folder without it. `build` (SOURCE_DATE_EPOCH from the commit,
 TZ=UTC: each build of a commit puts the same entries with the same dates in its wheel, though the
 compressed bytes follow the zlib that wrote them, and the sdist's archive dates change with each
 build; so the publishing job uploads the files this build recorded, never a rebuild), then
@@ -29,6 +37,11 @@ inspects them and prints `sha256  name` for each. Under GitHub Actions it writes
 `inspect` holds a folder of distributions to the release set: exactly the sdist and the wheel of
 this version, regular files, whose metadata names the project, the version, the engine pin and the
 classifier, and whose listing has the SHA-256 the build job recorded. A swapped or added file fails.
+A labextension wheel must also hold, under share/jupyter/labextensions/<package>, its package.json
+at this version, the install.json that names the project, one WebAssembly module and the
+licenses/ENGINE.json record of it: the engine package and version package.json pins, and that
+module's file and SHA-256. The wheel's license files carry the same record, its metadata names no
+engine wheel and its License-Expression includes AGPL-3.0-or-later, the engine's license.
 
 `pypi-live` reads PyPI's public JSON for the project at this version, with no credential. A 404
 means nothing is live. Otherwise every file PyPI serves there must be in DIR with the same SHA-256,
@@ -58,16 +71,31 @@ ENGINE = "qrcode-barcode-scanner"
 PYPI_JSON = "https://pypi.org/pypi/{project}/{version}/json"
 VERSION = re.compile(r"\d+\.\d+\.\d+")
 PIN = re.compile(rf"^{re.escape(ENGINE)}==(\d+\.\d+\.\d+)$")
+NAMES_ENGINE = re.compile(rf"^{re.escape(ENGINE)}\b(?!-)")
+WASM_ENGINE = "@qrcode-ai-com/qrcode-barcode-scanner-wasm"
+ENGINE_LICENSE = "AGPL-3.0-or-later"
+LABEXTENSIONS = "share/jupyter/labextensions"
 
-# One row per plugin package. `version_file` holds the package's own `__version__`; `classifier`
-# is the one its listing reads; `entry_point` is a group its wheel must declare.
+# One row per plugin package. `classifier` is the one its listing reads. A `python` row names the
+# file that holds the package's own `__version__` and an entry-point group its wheel must declare.
+# A `labextension` row names the frontend package (package.json `name`, the folder JupyterLab
+# serves it from) and the folder the build writes the prebuilt extension to.
 PLUGINS = {
     "integrations/napari": {
+        "kind": "python",
         "project": "napari-qrcode-barcode-scanner",
         "tag": "napari-v",
         "version_file": "src/napari_qrcode_barcode_scanner/__init__.py",
         "classifier": "Framework :: napari",
         "entry_point": "napari.manifest",
+    },
+    "integrations/jupyterlab": {
+        "kind": "labextension",
+        "project": "jupyterlab-qrcode-barcode-scanner",
+        "tag": "jupyterlab-v",
+        "package": "@qrcode-ai-com/jupyterlab-qrcode-barcode-scanner",
+        "classifier": "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
+        "prebuilt": "jupyterlab_qrcode_barcode_scanner/labextension",
     },
 }
 
@@ -91,10 +119,13 @@ def project_of(folder, root=ROOT):
     """(name, version, engine version) the folder's pyproject.toml states, held to its PLUGINS row."""
     key, row = plugin(folder)
     base = pathlib.Path(root) / key
-    project = tomllib.loads((base / "pyproject.toml").read_text(encoding="utf-8")).get("project", {})
+    pyproject = tomllib.loads((base / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject.get("project", {})
     name, version = project.get("name"), str(project.get("version", ""))
     if name != row["project"]:
         raise Refused(f"{key}/pyproject.toml names {name!r}, PLUGINS says {row['project']!r}")
+    if row["kind"] == "labextension":
+        return (name, *labextension_versions(key, row, base, pyproject))
     if not VERSION.fullmatch(version):
         raise Refused(f"{key}/pyproject.toml version {version!r} is not X.Y.Z")
     pins = [match[1] for dep in project.get("dependencies", []) if (match := PIN.match(dep.replace(" ", "")))]
@@ -109,6 +140,31 @@ def project_of(folder, root=ROOT):
     if stated != [version]:
         raise Refused(f"{key}/{row['version_file']} states __version__ {stated}, the project is {version}")
     return name, version, pins[0]
+
+
+def labextension_versions(key, row, base, pyproject):
+    """(version, engine version) of a labextension: both from its package.json."""
+    project = pyproject.get("project", {})
+    source = pyproject.get("tool", {}).get("hatch", {}).get("version", {}).get("source")
+    if "version" in project or "version" not in project.get("dynamic", []) or source != "nodejs":
+        raise Refused(f"{key}/pyproject.toml must take its version from package.json "
+                      "(dynamic version, [tool.hatch.version] source nodejs)")
+    engines = [dep for dep in project.get("dependencies", []) if NAMES_ENGINE.match(dep.replace(" ", ""))]
+    if engines:
+        raise Refused(f"{key}/pyproject.toml depends on {engines}: a labextension bundles the WebAssembly "
+                      "engine and installs no engine wheel")
+    if row["classifier"] not in project.get("classifiers", []):
+        raise Refused(f"{key}/pyproject.toml lacks the classifier {row['classifier']!r}")
+    package = json.loads((base / "package.json").read_text(encoding="utf-8"))
+    version = str(package.get("version", ""))
+    if package.get("name") != row["package"]:
+        raise Refused(f"{key}/package.json names {package.get('name')!r}, PLUGINS says {row['package']!r}")
+    if not VERSION.fullmatch(version):
+        raise Refused(f"{key}/package.json version {version!r} is not X.Y.Z")
+    engine = str((package.get("dependencies") or {}).get(WASM_ENGINE, ""))
+    if not VERSION.fullmatch(engine):
+        raise Refused(f"{key}/package.json must pin {WASM_ENGINE} to an exact X.Y.Z, got {engine!r}")
+    return version, engine
 
 
 def expected_files(name, version):
@@ -128,12 +184,70 @@ def metadata_problems(fields, name, version, engine, row, where):
     if fields.get("Name") != name or fields.get("Version") != version:
         out.append(f"{where}: Name/Version {fields.get('Name')!r} {fields.get('Version')!r}, want {name} {version}")
     requires = [value.replace(" ", "") for value in fields.get_all("Requires-Dist") or []]
-    if f"{ENGINE}=={engine}" not in requires:
+    if row["kind"] == "labextension":
+        engines = [value for value in requires if NAMES_ENGINE.match(value)]
+        if engines:
+            out.append(f"{where}: Requires-Dist {engines}: the labextension bundles the engine, it installs none")
+        if ENGINE_LICENSE not in re.split(r"[\s()]+", fields.get("License-Expression") or ""):
+            out.append(f"{where}: License-Expression {fields.get('License-Expression')!r} lacks {ENGINE_LICENSE}, "
+                       "the license of the engine it bundles")
+    elif f"{ENGINE}=={engine}" not in requires:
         out.append(f"{where}: no Requires-Dist {ENGINE}=={engine}")
     if row["classifier"] not in (fields.get_all("Classifier") or []):
         out.append(f"{where}: no Classifier {row['classifier']!r}")
     if not fields.get("License-Expression"):
         out.append(f"{where}: no License-Expression")
+    return out
+
+
+def labextension_problems(archive, name, version, engine, row, where):
+    """What a labextension wheel lacks: its served package at this version, the install record, one
+    WebAssembly module and the record of it, the engine package.json pins, in its license files too."""
+    out, norm = [], normalized(name)
+    served = f"{norm}-{version}.data/data/{LABEXTENSIONS}/{row['package']}/"
+    record_name = f"{norm}-{version}.dist-info/licenses/licenses/ENGINE.json"
+
+    def read(member):
+        try:
+            return archive.read(member)
+        except KeyError:
+            out.append(f"{where}: no {member}")
+            return None
+
+    def read_json(member):
+        data = read(member)
+        try:
+            return None if data is None else json.loads(data)
+        except ValueError:
+            out.append(f"{where}: {member} is not JSON")
+            return None
+
+    package = read_json(served + "package.json")
+    if package is not None and (package.get("name"), package.get("version")) != (row["package"], version):
+        out.append(f"{where}: the served package.json names {package.get('name')!r} {package.get('version')!r}, "
+                   f"want {row['package']} {version}")
+    install = read_json(served + "install.json")
+    if install is not None and (install.get("packageManager"), install.get("packageName")) != ("python", name):
+        out.append(f"{where}: install.json names {install.get('packageManager')!r} {install.get('packageName')!r}, "
+                   f"want python {name}")
+    modules = sorted(member for member in archive.namelist()
+                     if member.startswith(served + "static/") and member.endswith(".wasm"))
+    if len(modules) != 1:
+        out.append(f"{where}: {len(modules)} WebAssembly modules under {served}static, the engine is one")
+    served_record, record = read(served + "licenses/ENGINE.json"), read(record_name)
+    if served_record is not None and record is not None and served_record != record:
+        out.append(f"{where}: {record_name} is not the served licenses/ENGINE.json")
+    entry = read_json(served + "licenses/ENGINE.json") if served_record is not None else None
+    if entry is not None:
+        wasm = entry.get("wasm") if isinstance(entry.get("wasm"), dict) else {}
+        if (entry.get("package"), entry.get("version"), entry.get("license")) != (WASM_ENGINE, engine, ENGINE_LICENSE):
+            out.append(f"{where}: ENGINE.json records {entry.get('package')!r} {entry.get('version')!r} "
+                       f"{entry.get('license')!r}, want {WASM_ENGINE} {engine} {ENGINE_LICENSE}")
+        if len(modules) == 1 and served + str(wasm.get("file")) != modules[0]:
+            out.append(f"{where}: ENGINE.json records {wasm.get('file')!r}, the module is {modules[0][len(served):]}")
+        elif len(modules) == 1 and hashlib.sha256(archive.read(modules[0])).hexdigest() != wasm.get("sha256"):
+            out.append(f"{where}: {modules[0][len(served):]} is not the module ENGINE.json records "
+                       f"({wasm.get('sha256')!r})")
     return out
 
 
@@ -161,9 +275,12 @@ def judge(directory, folder, root=ROOT):
                 with zipfile.ZipFile(path) as archive:
                     info = f"{normalized(name)}-{version}.dist-info"
                     fields = parser.parsebytes(archive.read(f"{info}/METADATA"))
-                    entry_points = archive.read(f"{info}/entry_points.txt").decode()
-                if f"[{row['entry_point']}]" not in entry_points:
-                    problems.append(f"{path.name}: entry_points.txt declares no [{row['entry_point']}]")
+                    if row["kind"] == "labextension":
+                        problems += labextension_problems(archive, name, version, engine, row, path.name)
+                    else:
+                        entry_points = archive.read(f"{info}/entry_points.txt").decode()
+                        if f"[{row['entry_point']}]" not in entry_points:
+                            problems.append(f"{path.name}: entry_points.txt declares no [{row['entry_point']}]")
             else:
                 with tarfile.open(path, "r:gz") as archive:
                     member = archive.extractfile(f"{normalized(name)}-{version}/PKG-INFO")
@@ -189,11 +306,16 @@ def gate(args):
 
 
 def build(args):
-    key, _ = plugin(args.folder)
+    key, row = plugin(args.folder)
     _, _, engine = project_of(key)
     out = pathlib.Path(args.out)
     if out.exists() and any(out.iterdir()):
         raise Refused(f"{out} is not empty: build into a new folder")
+    prebuilt = ROOT / key / row.get("prebuilt", "")
+    if row["kind"] == "labextension" and not ((prebuilt / "package.json").is_file() and
+                                             (prebuilt / "licenses" / "ENGINE.json").is_file()):
+        raise Refused(f"{key}/{row['prebuilt']} holds no built extension: run `npm ci` and `npm run build:prod` "
+                      f"in {key} first")
     # A wheel stores its entries' dates: from the commit, in UTC, whatever the machine's zone.
     env = dict(os.environ, TZ="UTC")
     commit_time = subprocess.run(["git", "log", "-1", "--format=%ct"], cwd=ROOT, capture_output=True, text=True)
@@ -278,6 +400,43 @@ def _fake_release(root, folder, name, version, engine, row, *, wheel_name=None, 
         archive.writestr(f"{norm}-{version}.dist-info/METADATA", meta)
         archive.writestr(f"{norm}-{version}.dist-info/entry_points.txt",
                          "" if broken == "entry" else f"[{row['entry_point']}]\nx = y:z\n")
+    data = meta.encode()
+    with tarfile.open(out / f"{norm}-{version}.tar.gz", "w:gz") as archive:
+        info = tarfile.TarInfo(f"{norm}-{version}/PKG-INFO")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    return out
+
+
+LAB_WASM = b"\0asm engine module"
+
+
+def _fake_labextension(root, name, version, engine, row, *, broken=None):
+    """A labextension release set the way hatchling writes it, with one defect at a time."""
+    out = pathlib.Path(root) / "dist"
+    out.mkdir()
+    norm = normalized(name)
+    license_expression = "MIT" if broken == "license" else f"MIT AND {ENGINE_LICENSE}"
+    requires = f"Requires-Dist: {ENGINE}=={engine}\n" if broken == "requires" else ""
+    meta = (f"Metadata-Version: 2.5\nName: {name}\nVersion: {version}\nLicense-Expression: {license_expression}\n"
+            f"Classifier: {row['classifier']}\n{requires}\n")
+    served = f"{norm}-{version}.data/data/{LABEXTENSIONS}/{row['package']}/"
+    module = "static/0123456789abcdef.wasm"
+    record = {"package": WASM_ENGINE, "version": "0.0.1" if broken == "engine" else engine, "license": ENGINE_LICENSE,
+              "wasm": {"file": module, "sha256": hashlib.sha256(LAB_WASM).hexdigest()}}
+    record_text = json.dumps(record, indent=2) + "\n"
+    with zipfile.ZipFile(out / f"{norm}-{version}-py3-none-any.whl", "w") as archive:
+        archive.writestr(f"{norm}-{version}.dist-info/METADATA", meta)
+        archive.writestr(f"{norm}-{version}.dist-info/licenses/licenses/ENGINE.json",
+                         record_text.replace("sha256", "sha-256") if broken == "license-record" else record_text)
+        archive.writestr(served + "package.json", json.dumps(
+            {"name": row["package"], "version": "9.9.9" if broken == "served-version" else version}))
+        if broken != "install":
+            archive.writestr(served + "install.json", json.dumps({"packageManager": "python", "packageName": name}))
+        archive.writestr(served + module, LAB_WASM + (b"!" if broken == "module" else b""))
+        if broken == "two-modules":
+            archive.writestr(served + "static/fedcba9876543210.wasm", LAB_WASM)
+        archive.writestr(served + "licenses/ENGINE.json", record_text)
     data = meta.encode()
     with tarfile.open(out / f"{norm}-{version}.tar.gz", "w:gz") as archive:
         info = tarfile.TarInfo(f"{norm}-{version}/PKG-INFO")
@@ -381,6 +540,56 @@ def self_test():
         expect("pypi-live with another file live", lambda: pypi_live(
             live_args, answer(200, dict(local, **{"extra-0.1.0.tar.gz": "1" * 64}))), False)
         expect("pypi-live when PyPI fails", lambda: pypi_live(live_args, answer(503)), False)
+
+    # The JupyterLab extension: a labextension row, its version and engine from package.json.
+    lab_key = "integrations/jupyterlab"
+    lab_name, lab_version, lab_engine = project_of(lab_key)
+    lab_row = PLUGINS[lab_key]
+    lab_tag = f"refs/tags/{lab_row['tag']}{lab_version}"
+    expect("labextension gate on its tag", lambda: gate(ns(ref=lab_tag, folder=lab_key, dry_run=False)), True)
+    expect("labextension gate on the napari tag", lambda: gate(ns(ref=f"refs/tags/{row['tag']}{lab_version}",
+                                                                  folder=lab_key, dry_run=False)), False)
+    expect("napari gate on the labextension tag", lambda: gate(ns(ref=f"refs/tags/{lab_row['tag']}{version}",
+                                                                  folder=real_key, dry_run=False)), False)
+    with tempfile.TemporaryDirectory(prefix="qrscan-plugin-release-lab-") as box:
+        box = pathlib.Path(box)
+        pyproject = (ROOT / lab_key / "pyproject.toml").read_text()
+        package = (ROOT / lab_key / "package.json").read_text()
+        pin = f'"{WASM_ENGINE}": "{lab_engine}"'
+        for defect, (target, old, new) in (
+                ("package name", ("package.json", f'"name": "{lab_row["package"]}"', '"name": "@other/extension"')),
+                ("package version", ("package.json", f'"version": "{lab_version}"', '"version": "0.1"')),
+                ("engine range", ("package.json", pin, pin.replace(f'"{lab_engine}"', f'"^{lab_engine}"'))),
+                ("engine wheel", ("pyproject.toml", "dependencies = []", f'dependencies = ["{ENGINE}=={lab_engine}"]')),
+                ("static version", ("pyproject.toml", 'dynamic = ["version", "description"]',
+                                    f'version = "{lab_version}"\ndynamic = ["description"]')),
+                ("classifier", ("pyproject.toml", f'"{lab_row["classifier"]}",', ""))):
+            copy = box / defect.replace(" ", "-") / lab_key
+            copy.mkdir(parents=True)
+            texts = {"pyproject.toml": pyproject, "package.json": package}
+            assert old in texts[target], (defect, old)
+            texts[target] = texts[target].replace(old, new, 1)
+            for file, text in texts.items():
+                (copy / file).write_text(text)
+            expect(f"labextension with a wrong {defect}", lambda c=copy.parents[1]: project_of(lab_key, c), False)
+
+        def lab_release(case, broken=None):
+            where = box / f"release-{case}"
+            where.mkdir()
+            return _fake_labextension(where, lab_name, lab_version, lab_engine, lab_row, broken=broken)
+
+        lab_good = lab_release("good")
+        _, lab_digest = listing(sorted(lab_good.iterdir()))
+        expect("inspect the recorded labextension set",
+               lambda: inspect(ns(directory=lab_good, folder=lab_key, sha256=lab_digest)), True)
+        expect("inspect the labextension set as the napari plugin",
+               lambda: inspect(ns(directory=lab_good, folder=real_key, sha256=lab_digest)), False)
+        for broken in ("module", "two-modules", "engine", "install", "served-version", "requires", "license",
+                       "license-record"):
+            bad = lab_release(broken, broken)
+            _, bad_digest = listing(sorted(bad.iterdir()))
+            expect(f"inspect a labextension wheel with a wrong {broken}",
+                   lambda b=bad, d=bad_digest: inspect(ns(directory=b, folder=lab_key, sha256=d)), False)
 
     for failure in failures:
         print(f"FAIL  {failure}")

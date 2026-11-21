@@ -154,7 +154,8 @@ mint registry tokens). Every privileged job must:
                nothing and creates no release; the owner attaches the file.
                No other job inherits this exception.
   PyPI plugins python-plugins-publish.yml holds one publishing job per row of
-               PYPI_PLUGINS (napari-publish today), keyed by (workflow, job):
+               PYPI_PLUGINS (napari-publish, jupyterlab-publish), keyed by
+               (workflow, job):
                the row names the plugin's tag family, its protected
                environment, its build job, the artifact and the folder, and
                the gate its first step runs. The job runs on that tag family
@@ -351,8 +352,8 @@ MCPB_OUTPUT = "${{ steps.build.outputs.sha256 }}"
 # Python plugin packages under integrations/ that install the published engine wheel: one row per
 # (workflow, publishing job). A row names the plugin's tag family, its protected environment, the
 # build job and the artifact it uploads, the plugin folder and the gate the job runs first; the
-# guard, the download, the re-inspection and the PyPI comparison follow from it. A new plugin
-# (the JupyterLab extension next) is one more row and its two jobs in PYPI_PLUGIN_WORKFLOW.
+# guard, the download, the re-inspection and the PyPI comparison follow from it. A new plugin is
+# one more row and its two jobs in PYPI_PLUGIN_WORKFLOW.
 PYPI_PLUGIN_WORKFLOW = "python-plugins-publish.yml"
 PYPI_PLUGIN_RELEASE = "scripts/python-plugin-release.py"
 PYPI_PLUGINS = {
@@ -363,6 +364,14 @@ PYPI_PLUGINS = {
         "artifact": "napari-dist",
         "folder": "integrations/napari",
         "gate": f'python3 {PYPI_PLUGIN_RELEASE} gate --ref "$GITHUB_REF" --folder integrations/napari',
+    },
+    (PYPI_PLUGIN_WORKFLOW, "jupyterlab-publish"): {
+        "tag": "jupyterlab-v",
+        "environment": "pypi-jupyterlab",
+        "build": "jupyterlab-build",
+        "artifact": "jupyterlab-dist",
+        "folder": "integrations/jupyterlab",
+        "gate": f'python3 {PYPI_PLUGIN_RELEASE} gate --ref "$GITHUB_REF" --folder integrations/jupyterlab',
     },
 }
 PYPI_PLUGIN_PERMISSIONS = {"contents": "read", "id-token": "write"}
@@ -2796,6 +2805,8 @@ P, T = "publish", "toolchains"
 PL_JOB = (PYPI_PLUGIN_WORKFLOW, "napari-publish")
 PL_WF, PL_ROW, PL = PYPI_PLUGIN_WORKFLOW, PYPI_PLUGINS[PL_JOB], " › ".join(PL_JOB)
 PL_GUARD, PL_GATE = pypi_plugin(PL_ROW)["guard"], PL_ROW["gate"]
+JL_JOB = (PYPI_PLUGIN_WORKFLOW, "jupyterlab-publish")
+JL_ROW, JL = PYPI_PLUGINS[JL_JOB], " › ".join(JL_JOB)
 MUTATIONS = (
     # The independently versioned MCP publisher gets one exact exception only.
     ("MCP uses an engine tag", P, [(MCP_JOB[0], MCP_GUARD, "startsWith(github.ref, 'refs/tags/v')")], {}, 1,
@@ -3039,6 +3050,23 @@ MUTATIONS = (
                                               "          overwrite: true\n")], {}, 1, PL + " [pypi-plugin-contract]"),
     ("plugin upload cancels a run in progress", P, [(PL_WF, "      cancel-in-progress: false",
                                                      "      cancel-in-progress: true")], {}, 1, PL + " [concurrency]"),
+    # The JupyterLab extension's row: its own tag family, environment, folder and artifact.
+    ("JupyterLab upload on the napari tag family", P, [(PL_WF, "    if: " + pypi_plugin(JL_ROW)["guard"],
+                                                       "    if: " + PL_GUARD)], {}, 1, JL + " [guard]"),
+    ("JupyterLab upload in the napari environment", P, [(PL_WF, "    environment: pypi-jupyterlab",
+                                                         "    environment: pypi-napari")], {}, 1,
+     JL + " [environment]"),
+    ("JupyterLab gate of the napari folder", P, [(PL_WF, "      - run: " + JL_ROW["gate"] + "\n",
+                                                  "      - run: " + PL_GATE + "\n")], {}, 1, JL + " [gate]"),
+    ("JupyterLab upload of the napari distributions", P, [(PL_WF, "          name: jupyterlab-dist\n          path: dist\n",
+                                                           "          name: napari-dist\n          path: dist\n")],
+     {}, 1, JL + " [pypi-plugin-contract]"),
+    ("JupyterLab re-inspection of the napari folder", P, [(PL_WF, "        run: " + pypi_plugin(JL_ROW)["inspect"],
+                                                           "        run: " + pypi_plugin(PL_ROW)["inspect"])], {}, 1,
+     JL + " [pypi-plugin-contract]"),
+    ("JupyterLab clean consumer omitted", P, [(PL_WF, "python scripts/python-host-consumer.py run --kind page \\",
+                                               "echo python-host-consumer skipped \\")], {}, 1,
+     JL + " [pypi-plugin-contract]"),
     ("python-plugins-publish.yml as reviewed", P, [], {}, 0, PL + ", "),
     # == http-service.yml › publish: the judged HTTP service images, pushed to ghcr.io on http-v* only
     ("HTTP publish without the tag guard", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD + "\n", "")], {}, 1,
