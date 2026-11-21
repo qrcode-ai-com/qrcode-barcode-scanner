@@ -17,8 +17,8 @@ One version of the gem `qrcode-barcode-scanner`, as five platform gems built by
 | Authors | QR Code AI |
 | License | MIT (the gem also ships `LICENSE-NOTES.md`, `LICENSE-APACHE-2.0` and `THIRD-PARTY.md`) |
 | Homepage | `https://qrcode-ai.com/en-US/qr-code-scanner/sdk/ruby` |
-| Source code | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner` |
-| Bug tracker | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues` |
+| Source code | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust` |
+| Bug tracker | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues` |
 | Ruby | `>= 3.3`, RubyGems `>= 3.3.22` |
 | Dependency | `ffi ~> 1.17` |
 | MFA | `rubygems_mfa_required: true` |
