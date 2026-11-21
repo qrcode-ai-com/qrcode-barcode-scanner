@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-zapier-dark.gif?v=4bef86e80d62">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-zapier-light.gif?v=1fa10d7840bd" alt="QR Code &amp; Barcode Scanner for Zapier: the Zapier logo, the Scan Image action in a Zap step with its output fields, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-zapier-dark.gif?v=db47fbf05f37">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-zapier-light.gif?v=554916c2f436" alt="QR Code &amp; Barcode Scanner for Zapier: the Zapier logo, the Scan Image action in a Zap step with its output fields, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
