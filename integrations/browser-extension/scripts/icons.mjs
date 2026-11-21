@@ -34,11 +34,16 @@ function insideRoundedSquare(x, y, radius) {
   return (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2;
 }
 
-/** The icon at `size` pixels as PNG bytes, antialiased by 8 x 8 supersampling. */
-export function drawIcon(size) {
+/**
+ * The icon at `size` pixels as PNG bytes, antialiased by 8 x 8 supersampling. With `margin`, the
+ * art fills the square of `size - 2 * margin` pixels in the middle and the margin stays
+ * transparent: the Chrome Web Store asks for a 128 px store icon with 96 px of art.
+ */
+export function drawIcon(size, margin = 0) {
   const samples = 8;
   const pad = 0.17;
   const module = (1 - 2 * pad) / 17;
+  const art = size - 2 * margin;
   const rgba = new Uint8Array(size * size * 4);
   for (let py = 0; py < size; py += 1) {
     for (let px = 0; px < size; px += 1) {
@@ -48,9 +53,9 @@ export function drawIcon(size) {
       let covered = 0;
       for (let sy = 0; sy < samples; sy += 1) {
         for (let sx = 0; sx < samples; sx += 1) {
-          const x = (px + (sx + 0.5) / samples) / size;
-          const y = (py + (sy + 0.5) / samples) / size;
-          if (!insideRoundedSquare(x, y, 0.22)) continue;
+          const x = (px - margin + (sx + 0.5) / samples) / art;
+          const y = (py - margin + (sy + 0.5) / samples) / art;
+          if (x < 0 || y < 0 || x > 1 || y > 1 || !insideRoundedSquare(x, y, 0.22)) continue;
           const colour = colourAt((x - pad) / module, (y - pad) / module) ?? BACKGROUND;
           r += colour[0];
           g += colour[1];

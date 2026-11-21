@@ -1,0 +1,22 @@
+{
+  "testId": "qrcode-barcode-scanner",
+  "name": "QR Code & Barcode Scanner",
+  "version": "0.1.0",
+  "manifestVersion": 2,
+  "requirements": {
+    "apps": [
+      {
+        "name": "Express",
+        "apiVersion": 1
+      }
+    ],
+    "renditionPreview": true
+  },
+  "entryPoints": [
+    {
+      "type": "panel",
+      "id": "panel1",
+      "main": "index.html"
+    }
+  ]
+}
