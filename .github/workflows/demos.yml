@@ -160,8 +160,8 @@ jobs:
           python-version: "3.13"
       - name: The committed folder is what kaggle kernels push reads
         run: |
-          python scripts/check-demo-notebook.py --self-test
-          python scripts/check-demo-notebook.py kaggle examples/kaggle --requirements binder/requirements.txt
+          python examples/kaggle/tools/check_folder.py --self-test
+          python examples/kaggle/tools/check_folder.py examples/kaggle --requirements binder/requirements.txt
       - name: Run the notebook in a new environment and judge its reports
         run: |
           mkdir -p kaggle-run
@@ -170,7 +170,7 @@ jobs:
             --identifier qrcode-barcode-scanner --version 0.11.0 \
             --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/examples/kaggle" \
             --install "nbclient==0.11.0 ipykernel==7.4.0" \
-            --scan "{python} distribution/acceptance/drivers/notebook-run.py examples/kaggle/qrcode-barcode-scanner-demo.ipynb {out} --executed $GITHUB_WORKSPACE/kaggle-run/executed.ipynb" \
+            --scan "{python} examples/kaggle/tools/run_notebook.py examples/kaggle/qrcode-barcode-scanner-demo.ipynb {out} --executed $GITHUB_WORKSPACE/kaggle-run/executed.ipynb" \
             --uninstall qrcode-barcode-scanner --gone-import qrcode_barcode_scanner \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --receipt kaggle-run/acceptance-kaggle.json

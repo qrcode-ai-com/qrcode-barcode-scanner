@@ -15,8 +15,8 @@ the same sample, and judges its three reports.
      tutorial. The notebook links only the source repository and the PyPI page, as committed; the
      QR Code AI product links stay in this repository's README.
    - (b) Add the QR Code AI product links to the notebook and accept the terms risk. The checker
-     (`scripts/check-demo-notebook.py kaggle`) refuses a product link today, so this needs a
-     change to the checker first.
+     (`tools/check_folder.py`) refuses a product link today, so this needs a change to the
+     checker first.
    - (c) Skip Kaggle. The only option with no terms risk.
 2. **Licence notice.** Kaggle shows a public notebook as released under Apache 2.0. The notebook's
    own cells are project-authored MIT source in this repository; the engine 0.11.0 it installs

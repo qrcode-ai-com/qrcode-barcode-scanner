@@ -1,8 +1,7 @@
-"""Destination acceptance, notebook: run a notebook from top to bottom in a fresh folder, as a
-notebook host's Run All does, then copy the three JSON reports it wrote, for
-`scripts/destination-acceptance.py reports` to judge.
+"""Run a notebook from top to bottom in a fresh folder, as a notebook host's Run All does, then
+copy the three JSON reports it wrote, for `scripts/destination-acceptance.py reports` to judge.
 
-    python notebook-run.py NOTEBOOK OUT_DIR [--reports DIR] [--executed FILE] [--timeout SECONDS]
+    python run_notebook.py NOTEBOOK OUT_DIR [--reports DIR] [--executed FILE] [--timeout SECONDS]
 
 The notebook is copied into a new empty folder and run there with nbclient, on the `python3`
 kernel of this interpreter's environment: run it with the interpreter of the environment the host
@@ -10,7 +9,8 @@ prepared (nbclient and ipykernel installed, the scanner left to the notebook's o
 when that is how the host works). The notebook writes fast.json, frame.json and full.json into
 DIR of its working folder (default `scan-reports`); they are copied to OUT_DIR. The executed
 notebook is saved to FILE when given, outputs included, for `scripts/check-demo-notebook.py
-executed`. A cell that raises stops the run: exit 1. It judges nothing else.
+executed`. A cell that raises stops the run: exit 1. It judges nothing else. demos.yml gives it
+as the `--scan` command of scripts/python-host-consumer.py for examples/kaggle.
 """
 import argparse
 import pathlib

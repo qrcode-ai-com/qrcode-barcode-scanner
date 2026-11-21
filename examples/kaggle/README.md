@@ -110,12 +110,15 @@ outputs. The owner then pushes it again from a shell that holds the Kaggle token
 ## Checked on every change
 
 The workflow [`demos.yml`](../../.github/workflows/demos.yml) checks the committed folder with
-`scripts/check-demo-notebook.py kaggle`: the metadata fields and values, the slug against the
-title, a notebook without stored output, the install pin equal to `binder/requirements.txt`, the
-sample read from the matching release tag and the links of the first cell. It then runs the
-notebook from top to bottom on Python 3.13, the Python of Kaggle's image, in a new virtual
-environment with [`scripts/python-host-consumer.py`](../../scripts/python-host-consumer.py). The
-notebook installs the package itself, as on Kaggle; the three reports it saves are judged by the
+[`tools/check_folder.py`](tools/check_folder.py): the metadata fields and values, the slug
+against the title, a notebook without stored output, the install pin equal to
+`binder/requirements.txt`, the sample read from the matching release tag and the links of the
+first cell. It then runs the notebook from top to bottom on Python 3.13, the Python of Kaggle's
+image, in a new virtual environment with
+[`scripts/python-host-consumer.py`](../../scripts/python-host-consumer.py), which gives
+[`tools/run_notebook.py`](tools/run_notebook.py) as the scan command. The `tools/` folder is not
+pushed to Kaggle. The notebook installs the package itself, as on Kaggle; the three reports it
+saves are judged by the
 [destination acceptance](../../distribution/acceptance/README.md) contract, and after its last
 cell the package must no longer import in that environment. A run on Kaggle itself has not been
 made.

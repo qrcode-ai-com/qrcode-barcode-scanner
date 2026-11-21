@@ -421,23 +421,12 @@ codes, an uncut scan, no panic, the engine version and a score in every profile 
 The workflow [`integration-python-hosts.yml`](../../.github/workflows/integration-python-hosts.yml)
 runs the harness's self-test and the harness itself on the public wheel, on Linux and macOS.
 
-A notebook that installs the package in its own first cell, as a Kaggle notebook does, runs
-through the same command with [`drivers/notebook-run.py`](drivers/notebook-run.py) as its
-`--scan`. The environment receives only what executes a notebook, `nbclient` and `ipykernel`;
-the driver copies the notebook into a new folder, runs it from top to bottom on that
-environment's kernel, saves the executed notebook when `--executed` names a file, and copies the
-three reports the notebook wrote under `scan-reports/`. The notebook's last cell uninstalls the
-package, so the kit's own `pip uninstall` finds nothing left and its import must fail.
-[`examples/kaggle/`](../../examples/kaggle/README.md) is run this way by
-[`demos.yml`](../../.github/workflows/demos.yml).
-
 ## What is covered today
 
 Four kinds of surface: an installed `qrscan` command, a container image, a language package, with
 programs for Node.js and Python, and a web page that follows the page contract. A notebook
 session is judged as a language package, through `binder-session.mjs`, and a Python host in a new
-virtual environment, through `python-host-consumer.py`, with `notebook-run.py` when the host is
-a notebook that installs the package itself. Other bindings, host
+virtual environment, through `python-host-consumer.py`. Other bindings, host
 integrations and agent clients keep their own consumers, listed in
 [`RELEASING.md`](../../RELEASING.md), until a program of this contract exists for each.
 
