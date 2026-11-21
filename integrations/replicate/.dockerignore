@@ -1,0 +1,6 @@
+# The image holds cog.yaml, requirements.txt, run.py and the two licence files; not the tests or
+# the listing texts.
+tests/
+__pycache__/
+README.md
+LISTING.md
