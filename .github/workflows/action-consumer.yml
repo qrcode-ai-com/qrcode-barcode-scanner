@@ -1,0 +1,178 @@
+name: GitHub Marketplace consumer
+
+# The published GitHub Action used the way a Marketplace user adds it: one `uses:` line that
+# names the action's own repository at its release tag. integration-github-action.yml runs the
+# action from its folder here; this workflow never does. Each job first checks that the release
+# tag still names the release commit, then runs the action from that tag on the mixed fixture in
+# the three profiles and on two cases that must fail, judges the qrscan the action installed with
+# the shared acceptance driver (distribution/acceptance/README.md), removes it and uploads the
+# receipt. Nothing is built from this repository's source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/action-consumer.yml
+      - integrations/github-action/test/judge-ci.mjs
+      - scripts/destination-acceptance.py
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-consumer-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ACTION_REPOSITORY: qrcode-ai-com/qrcode-barcode-scanner-action
+  ACTION_TAG: v1.0.0
+  # The commit the release v1.0.0 and the tags v1.0.0 and v1 name, read on 21 November 2026.
+  ACTION_COMMIT: 564a6d64ef807423d07d2318b4d939ab453ebf09
+  LISTING: https://github.com/marketplace/actions/qr-code-barcode-scanner
+  # The qrscan release the action installs by default.
+  QRSCAN_VERSION: 0.11.0
+
+jobs:
+  scan:
+    name: Marketplace action · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A tag can move. The receipt is only about the commit the release names.
+      - name: The release tags still name the release commit
+        run: |
+          refs=$(git ls-remote "https://github.com/$ACTION_REPOSITORY" "refs/tags/$ACTION_TAG" refs/tags/v1)
+          echo "$refs"
+          release=$(awk -v ref="refs/tags/$ACTION_TAG" '$2 == ref {print $1}' <<< "$refs")
+          major=$(awk '$2 == "refs/tags/v1" {print $1}' <<< "$refs")
+          test "$release" = "$ACTION_COMMIT"
+          test "$major" = "$ACTION_COMMIT"
+      - name: Scan the mixed fixture · fast
+        id: fast
+        uses: qrcode-ai-com/qrcode-barcode-scanner-action@v1.0.0
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: |
+            https://qrc-ai.com/76xMa
+            STOCK-4827
+          profile: fast
+      - name: Scan the mixed fixture · frame
+        id: frame
+        uses: qrcode-ai-com/qrcode-barcode-scanner-action@v1.0.0
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: |
+            https://qrc-ai.com/76xMa
+            STOCK-4827
+          profile: frame
+      - name: Scan the mixed fixture · full
+        id: full
+        uses: qrcode-ai-com/qrcode-barcode-scanner-action@v1.0.0
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: |
+            https://qrc-ai.com/76xMa
+            STOCK-4827
+          profile: full
+      - name: A payload that is not in the image
+        id: mismatch
+        continue-on-error: true
+        uses: qrcode-ai-com/qrcode-barcode-scanner-action@v1.0.0
+        with:
+          files: fixtures/symbology/mixed-code128-qr.png
+          expected: STOCK-0000
+      - name: A file that is not an image
+        id: unreadable
+        continue-on-error: true
+        uses: qrcode-ai-com/qrcode-barcode-scanner-action@v1.0.0
+        with:
+          files: LICENSE
+      # The action's own judge, once per profile: both payloads, nothing cut, and the two failing
+      # cases each failing with their own result.
+      - name: Judge the action's results
+        env:
+          FAST_RESULT: ${{ steps.fast.outputs.result }}
+          FAST_REPORT: ${{ steps.fast.outputs.report }}
+          FRAME_RESULT: ${{ steps.frame.outputs.result }}
+          FRAME_REPORT: ${{ steps.frame.outputs.report }}
+          FULL_RESULT: ${{ steps.full.outputs.result }}
+          FULL_REPORT: ${{ steps.full.outputs.report }}
+          MISMATCH_OUTCOME: ${{ steps.mismatch.outcome }}
+          MISMATCH_RESULT: ${{ steps.mismatch.outputs.result }}
+          UNREADABLE_OUTCOME: ${{ steps.unreadable.outcome }}
+          UNREADABLE_RESULT: ${{ steps.unreadable.outputs.result }}
+        run: |
+          MIXED_RESULT="$FAST_RESULT" MIXED_REPORT="$FAST_REPORT" node integrations/github-action/test/judge-ci.mjs
+          MIXED_RESULT="$FRAME_RESULT" MIXED_REPORT="$FRAME_REPORT" node integrations/github-action/test/judge-ci.mjs
+          MIXED_RESULT="$FULL_RESULT" MIXED_REPORT="$FULL_REPORT" node integrations/github-action/test/judge-ci.mjs
+          # The program is JavaScript in single quotes: its ${} belongs to node, not to bash.
+          # shellcheck disable=SC2016
+          node -e '
+            for (const profile of ["fast", "frame", "full"]) {
+              const report = JSON.parse(process.env[`${profile.toUpperCase()}_REPORT`]);
+              if (report.profile !== profile) throw new Error(`the ${profile} step scanned with ${report.profile}`);
+              if (report.qrscan.version !== process.env.QRSCAN_VERSION) throw new Error(`qrscan ${report.qrscan.version}`);
+            }'
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - name: Judge the installed qrscan with the acceptance contract
+        env:
+          QRSCAN_PATH: ${{ steps.fast.outputs.qrscan-path }}
+          RUNNER: ${{ matrix.runner }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, sys
+          path = pathlib.Path(os.environ["QRSCAN_PATH"]).resolve()
+          if pathlib.Path(os.environ["RUNNER_TEMP"]).resolve() not in path.parents:
+              sys.exit(f"qrscan was installed outside RUNNER_TEMP: {path}")
+          PY
+          mkdir receipt
+          python scripts/destination-acceptance.py cli \
+            --qrscan "$QRSCAN_PATH" \
+            --destination "GitHub Marketplace" \
+            --identifier "$ACTION_REPOSITORY@$ACTION_TAG ($ACTION_COMMIT)" \
+            --version "$QRSCAN_VERSION" \
+            --url "$LISTING" \
+            --install "uses: $ACTION_REPOSITORY@$ACTION_TAG" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-$RUNNER.json"
+      # An action has no uninstall: what it writes sits in RUNNER_TEMP/qrcode-barcode-scanner-action,
+      # which the runner deletes with the job. Deleting that folder here is the same removal, early.
+      - name: Nothing outside RUNNER_TEMP, then remove what the action wrote
+        env:
+          QRSCAN_PATH: ${{ steps.fast.outputs.qrscan-path }}
+          RUNNER: ${{ matrix.runner }}
+        run: |
+          test -z "$(git status --porcelain --untracked-files=all -- . ':!receipt')"
+          python - <<'PY'
+          import os, pathlib, shutil, sys
+          folder = pathlib.Path(os.environ["RUNNER_TEMP"]).resolve() / "qrcode-barcode-scanner-action"
+          if folder not in pathlib.Path(os.environ["QRSCAN_PATH"]).resolve().parents:
+              sys.exit(f"qrscan is not inside {folder}")
+          shutil.rmtree(folder)
+          PY
+          python scripts/destination-acceptance.py removed \
+            --qrscan "$QRSCAN_PATH" \
+            --uninstall "delete RUNNER_TEMP/qrcode-barcode-scanner-action (the runner deletes RUNNER_TEMP after each job)" \
+            --receipt "receipt/acceptance-$RUNNER.json"
+          python scripts/destination-acceptance.py check "receipt/acceptance-$RUNNER.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: marketplace-consumer-${{ matrix.runner }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
