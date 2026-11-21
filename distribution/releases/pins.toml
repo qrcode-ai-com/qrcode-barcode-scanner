@@ -154,6 +154,15 @@ held = "the MCP Bundle, under its own tag mcpb-v: it carries the published serve
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
 
 [[file]]
+held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
+paths = [
+  "distribution/http/**",
+  "scripts/http-service-release.py",
+  "scripts/stage-http-satellite.py",
+  ".github/workflows/http-service.yml",
+]
+
+[[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"
 paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
 
