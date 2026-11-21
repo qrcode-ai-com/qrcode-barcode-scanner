@@ -1,0 +1,128 @@
+/* The scanner takes the theme's fonts and colors; only spacing and borders are its own. */
+.qrbs {
+  display: grid;
+  gap: 1em;
+  padding: 1.25em;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 0.75em;
+}
+
+.qrbs__drop {
+  padding: 1em;
+  border: 2px dashed color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 0.5em;
+  text-align: center;
+}
+
+.qrbs__drop--over {
+  border-color: currentColor;
+}
+
+.qrbs__lead,
+.qrbs__actions,
+.qrbs__controls,
+.qrbs__summary,
+.qrbs__meta,
+.qrbs__note,
+.qrbs__item-actions,
+.qrbs__credit {
+  margin: 0;
+}
+
+.qrbs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5em;
+  margin-top: 0.75em;
+}
+
+.qrbs__button {
+  position: relative;
+  display: inline-block;
+  padding: 0.5em 1em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.qrbs__button--quiet {
+  font-weight: 400;
+}
+
+.qrbs__button:focus-within {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* The real input stays in the page for keyboards and screen readers, over its label. */
+.qrbs__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.qrbs__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.qrbs__result[data-state="error"] .qrbs__summary {
+  font-weight: 600;
+}
+
+.qrbs__detections {
+  display: grid;
+  gap: 0.75em;
+  margin: 0.75em 0 0;
+  padding-left: 1.25em;
+}
+
+.qrbs__detection {
+  display: grid;
+  gap: 0.35em;
+}
+
+.qrbs__meta {
+  font-size: 0.875em;
+  opacity: 0.8;
+}
+
+.qrbs__text {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.qrbs__note {
+  font-size: 0.875em;
+}
+
+.qrbs__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75em;
+}
+
+.qrbs__copy {
+  cursor: pointer;
+}
+
+.qrbs__report pre {
+  max-height: 24em;
+  overflow: auto;
+  font-size: 0.8em;
+  white-space: pre-wrap;
+}
+
+.qrbs__credit {
+  font-size: 0.875em;
+  opacity: 0.85;
+}
