@@ -2,6 +2,15 @@ name: Flutter candidate qualification
 
 # Qualification on a candidate branch only. The release workflow owns the
 # tagged build and first-upload procedure.
+#
+# The Android and iOS jobs build the staged example, then run its
+# integration tests on an Android emulator and an iPhone simulator. Both run
+# Flutter in debug mode, so cargokit builds the Rust core with the package's
+# own [profile.dev] (rust/Cargo.toml): no CARGO_PROFILE_* or RUSTFLAGS
+# variable may change it here, and a step checks that none is set. Each scan
+# of the mixed QR/Code 128 fixture logs a QRSCAN_TIMING line; the job summary
+# collects them. A simulator or an emulator on a shared hosted runner is not
+# a device: these timings are CI observations, not device performance.
 on:
   push:
     branches: [codex/flutter-public-identity, "claude/flutter-*"]
@@ -43,7 +52,7 @@ jobs:
   qualify:
     name: ${{ matrix.check }}
     needs: stage
-    timeout-minutes: 35
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
@@ -52,19 +61,41 @@ jobs:
             platform: host
             runner: ubuntu-24.04
             targets: ""
-          - check: Android APK build
+            timeout: 35
+          - check: Android APK build and emulator tests
             platform: android
             runner: ubuntu-24.04
             targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-          - check: Unsigned iOS build
+            timeout: 75
+          - check: Unsigned iOS build and simulator tests
             platform: ios
             runner: macos-15
             targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+            timeout: 75
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A freshly booted simulator runs its first-boot work for minutes; boot
+      # it before the long native build so that work is not timed with the scans.
+      - name: Boot an iPhone simulator
+        if: matrix.platform == 'ios'
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))
+          candidates = [device for runtime in sorted(data['devices'], reverse=True) if '.iOS-' in runtime
+                        for device in data['devices'][runtime] if device['name'].startswith('iPhone')]
+          if not candidates:
+              raise SystemExit('No available iPhone simulator')
+          device = candidates[0]
+          if device['state'] != 'Booted':
+              subprocess.run(['xcrun', 'simctl', 'boot', device['udid']], check=True, timeout=120)
+          print(f"Booting {device['name']} {device['udid']}")
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f"SIMULATOR_UDID={device['udid']}\n")
+          PY
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
@@ -118,18 +149,178 @@ jobs:
           path: ${{ runner.temp }}/flutter-pub-qualification.sha256
           if-no-files-found: error
           retention-days: 14
+      # The debug builds below must use the candidate's [profile.dev] as a
+      # consuming app would: refuse any variable that would override it.
+      - name: Check that the build uses the package's own dev profile
+        if: matrix.platform != 'host'
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, sys, tomllib
+          overrides = sorted(name for name in os.environ
+                             if name.startswith('CARGO_PROFILE_') or name.endswith('RUSTFLAGS'))
+          if overrides:
+              sys.exit(f"build settings overridden by the environment: {', '.join(overrides)}")
+          config = pathlib.Path.home() / '.cargo' / 'config.toml'
+          if config.is_file() and re.search(r'^\s*\[profile', config.read_text(), re.M):
+              sys.exit(f'{config} sets a [profile]')
+          with open('/tmp/flutter-validation/bindings/flutter/rust/Cargo.toml', 'rb') as manifest:
+              profile = tomllib.load(manifest)['profile']['dev']
+          line = (f'staged rust/Cargo.toml [profile.dev]: {profile}; no CARGO_PROFILE_* or *RUSTFLAGS '
+                  f"variable; CARGO_INCREMENTAL={os.environ.get('CARGO_INCREMENTAL', 'unset')}")
+          print(line)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f'{line}\n\n')
+          PY
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         if: matrix.platform == 'android'
         with:
           distribution: temurin
           java-version: "17"
+      # The verbose build log is kept as an artifact; the line Cargo prints for
+      # the core's debug build ("`dev` profile [optimized + debuginfo]") is
+      # copied to the job summary.
       - name: Build the Android example
         if: matrix.platform == 'android'
         working-directory: /tmp/flutter-validation/bindings/flutter/example
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
-          flutter build apk --debug
+          mkdir -p "$RUNNER_TEMP/flutter-device"
+          flutter build apk --debug -v > "$RUNNER_TEMP/flutter-device/build.log" 2>&1 \
+            || { tail -n 200 "$RUNNER_TEMP/flutter-device/build.log"; exit 1; }
+          grep -E 'Finished .dev. profile' "$RUNNER_TEMP/flutter-device/build.log" \
+            | sed 's/^/    /' | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Check the Android native library alignment
+        if: matrix.platform == 'android'
+        run: |
+          python3 scripts/elf-load-alignment.py \
+            /tmp/flutter-validation/bindings/flutter/example/build/app/outputs/flutter-apk/app-debug.apk \
+            --json "$RUNNER_TEMP/flutter-device/apk-alignment.json"
       - name: Build the iOS example without signing
         if: matrix.platform == 'ios'
         working-directory: /tmp/flutter-validation/bindings/flutter/example
-        run: flutter build ios --debug --no-codesign
+        run: |
+          mkdir -p "$RUNNER_TEMP/flutter-device"
+          flutter build ios --debug --no-codesign -v > "$RUNNER_TEMP/flutter-device/build.log" 2>&1 \
+            || { tail -n 200 "$RUNNER_TEMP/flutter-device/build.log"; exit 1; }
+          grep -E 'Finished .dev. profile' "$RUNNER_TEMP/flutter-device/build.log" \
+            | sed 's/^/    /' | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Write the device test command
+        if: matrix.platform != 'host'
+        run: |
+          mkdir -p "$RUNNER_TEMP/flutter-device"
+          cat > "$RUNNER_TEMP/flutter-device/run-tests.sh" <<'SH'
+          #!/usr/bin/env bash
+          # Usage: run-tests.sh DEVICE. Runs the example's integration tests
+          # on DEVICE and keeps their complete output.
+          set -euo pipefail
+          cd /tmp/flutter-validation/bindings/flutter/example
+          flutter test integration_test -d "$1" --reporter expanded 2>&1 \
+            | tee "$RUNNER_TEMP/flutter-device/integration.log"
+          SH
+          chmod +x "$RUNNER_TEMP/flutter-device/run-tests.sh"
+      - name: Enable KVM for the emulator
+        if: matrix.platform == 'android'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run the integration tests on the Android emulator
+        if: matrix.platform == 'android'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: bash "$RUNNER_TEMP/flutter-device/run-tests.sh" emulator-5554
+      - name: Run the integration tests on the iPhone simulator
+        if: matrix.platform == 'ios'
+        timeout-minutes: 40
+        run: |
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+          bash "$RUNNER_TEMP/flutter-device/run-tests.sh" "$SIMULATOR_UDID"
+      - name: Summarize the scan timings
+        if: always() && matrix.platform != 'host'
+        env:
+          CHECK: ${{ matrix.check }}
+        run: |
+          python3 - "$RUNNER_TEMP/flutter-device/integration.log" "$CHECK" <<'PY'
+          import os, re, sys
+          log, title = sys.argv[1], sys.argv[2]
+          try:
+              text = open(log, encoding='utf-8', errors='replace').read()
+          except FileNotFoundError:
+              text = ''
+          rows = []
+          for line in text.splitlines():
+              found = re.search(r'QRSCAN_TIMING (.*)$', line)
+              if found:
+                  rows.append(dict(part.split('=', 1) for part in found.group(1).split() if '=' in part))
+          columns = ('case', 'profile', 'budget_ms', 'total_ms', 'wall_ms', 'budget_exhausted', 'contents')
+          lines = [f'### {title}: scans of the mixed QR/Code 128 fixture', '']
+          if rows:
+              lines += ['| ' + ' | '.join(columns) + ' |', '|' + '---|' * len(columns)]
+              lines += ['| ' + ' | '.join(row.get(c, '').replace('|', ', ') for c in columns) + ' |' for row in rows]
+          else:
+              lines.append('No QRSCAN_TIMING line was logged.')
+          verdicts = [line.strip() for line in text.splitlines() if re.search(r'All tests passed|Some tests failed', line)]
+          lines += ['', *verdicts[-1:]]
+          output = '\n'.join(lines) + '\n'
+          print(output)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(output + '\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always() && matrix.platform != 'host'
+        with:
+          name: flutter-device-${{ matrix.platform }}
+          path: ${{ runner.temp }}/flutter-device/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # TEMPORARY, removed before review: regenerate the flutter_rust_bridge
+  # files from rust/src/api in the staged candidate and upload them, so the
+  # committed files are exactly what the pinned codegen produced.
+  frb-regenerate:
+    needs: stage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flutter-stage
+          path: flutter-artifact
+      - name: Regenerate the bindings
+        run: |
+          (cd flutter-artifact && shasum -a 256 -c flutter-stage.sha256)
+          python3 scripts/stage-flutter-package.py \
+            --extract flutter-artifact/flutter-stage.tar.gz \
+            --output /tmp/flutter-validation/bindings/flutter
+          cd /tmp/flutter-validation/bindings/flutter
+          flutter pub get --enforce-lockfile
+          cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+          cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
+          cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
+          flutter_rust_bridge_codegen generate
+          mkdir -p "$RUNNER_TEMP/frb-generated/lib/src" "$RUNNER_TEMP/frb-generated/rust/src"
+          cp -R lib/src/rust "$RUNNER_TEMP/frb-generated/lib/src/"
+          cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-generated/rust/src/"
+          diff -ru "$RUNNER_TEMP/frb-dart-before" lib/src/rust || true
+          diff -u "$RUNNER_TEMP/frb-rust-before.rs" rust/src/frb_generated.rs || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: frb-generated
+          path: ${{ runner.temp }}/frb-generated/
+          if-no-files-found: error
+          retention-days: 7

@@ -43,7 +43,8 @@ reading "NO" on valid product output is the documented trap.
 - Override per call: Rust `ScanProfile::Custom(config)` ·
   CLI `--budget-ms` · Node `budgetMs` ·
   WASM `budget_ms` (positional arg #5 of `scan_image`, #5 of `scan_frame`) ·
-  Python `budget_ms` kwarg · Kotlin/Swift (UniFFI) `budget_ms`.
+  Python `budget_ms` kwarg · Kotlin/Swift (UniFFI) `budget_ms` · Flutter
+  `budgetMs` (named argument of `scan` and `scanFrame`).
 - CLI and bindings: `0` = **unbounded** — NOT a zero-millisecond budget —
   and an unset `budget_ms` keeps the profile default (`full` 4000 · `fast`
   800 · `frame` 80 ms), so reproducible reports need `0`. Rust
@@ -130,11 +131,12 @@ deadline the clock cannot represent is `QRS-006`, never a panic and never
 an unbounded scan (every admitted budget is representable on the supported
 clocks).
 
-Integer surfaces (Rust, the CLI, Python, Kotlin/Swift) carry these options
-as unsigned integers. A value the type cannot hold — a negative, a larger
-integer, a Python float — is refused by that language's conversion
+Integer surfaces (Rust, the CLI, Python, Kotlin/Swift, Flutter) carry these
+options as unsigned integers. A value the type cannot hold — a negative, a
+larger integer, a Python float — is refused by that language's conversion
 (Python `OverflowError`/`TypeError`, CLI usage error) before the scanner
-sees it.
+sees it. Flutter's `budgetMs` is a Dart `int`: the facade refuses a negative
+with a `RangeError` before the native call.
 
 JavaScript numbers (Node, WASM) are read as doubles and mapped once, the
 same way on both — never through an integer conversion that wraps modulo

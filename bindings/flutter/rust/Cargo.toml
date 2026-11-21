@@ -17,7 +17,7 @@ version = "0.11.0"
 edition = "2021"
 rust-version = "1.88"
 license = "MIT"
-repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
 description = "Flutter/Dart bindings for qrcode-ai-scanner — QR decoding + scannability scoring for artistic / AI-generated QR codes."
 publish = false
 
@@ -46,6 +46,29 @@ strip = true
 # builds this crate as its own root inside the consuming app's build, so this
 # manifest is the only place the setting can live.
 [profile.release.package.rxing]
+overflow-checks = true
+
+# Debug builds. Simulators and emulators run Flutter only in debug mode, and in
+# debug mode cargokit builds this crate with Cargo's dev profile. As its own
+# root, the crate does not inherit the engine workspace's [profile.dev] either:
+# without this table every crate here builds at opt-level 0, and on the iOS
+# simulator a scan of the mixed QR/Code 128 fixture took 7336 ms in `fast`
+# (budget 800 ms) and 6438 ms in `full` (budget 4000 ms), both cut by their
+# budgets (consumer runs of 21 November 2026, bindings/flutter/README.md).
+#
+# opt-level 3 is the release profile's optimization, and debug-assertions off
+# drops the standard library's and the dependencies' debug checks from the
+# pixel loops, as release does. Overflow checks stay on, the dev default, for
+# every crate; rxing is pinned below like in release. Debug info, incremental
+# builds and codegen units keep Cargo's dev defaults: no LTO and no single
+# codegen unit here, because a debug build with thin LTO and one codegen unit
+# built but its iOS simulator test app never connected to the test runner.
+[profile.dev]
+opt-level = 3
+debug-assertions = false
+overflow-checks = true
+
+[profile.dev.package.rxing]
 overflow-checks = true
 
 [lints.rust]

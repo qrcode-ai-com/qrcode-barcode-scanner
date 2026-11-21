@@ -77,6 +77,9 @@ final report = await QrcodeAiScanner.scan(pngBytes); // profile: 'full' (default
 
 // raw RGBA camera frame (width*height*4 bytes), no scoring
 final frame = await QrcodeAiScanner.scanFrame(rgba, w, h); // profile: 'frame'
+
+// next release: a wall-clock budget in milliseconds (0 = unbounded)
+final slow = await QrcodeAiScanner.scan(pngBytes, budgetMs: 10000);
 ```
 
 This release does not expose `capabilities()` (spec/01 § Capabilities); the
@@ -84,11 +87,29 @@ package builds the core with its default engines.
 
 Scans run on flutter_rust_bridge's Rust worker pool, so `await` never blocks the
 UI isolate. Profiles: `'full'` · `'fast'` · `'frame'`, each under its default
-wall-clock budget (4000 · 800 · 80 ms — this release cannot override it),
-which starts once the image is decoded and normalized. A
+wall-clock budget (4000 · 800 · 80 ms), which starts once the image is decoded
+and normalized. A
 report the budget cut says so: `report.trace.budgetExhausted == true`; a null
 `score` beside a detection then means "not judged", never 0. A null
 `budgetExhausted` is an older report: unknown, never final.
+
+## Scan budget
+
+Published 0.11.0 cannot change the budget. The working source adds an optional
+`budgetMs` argument to `scan` and `scanFrame` for the next release, with the
+semantics of `budget_ms` in the other bindings
+([spec/02 § Budget semantics](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/spec/02-profiles.md#budget-semantics)):
+
+| `budgetMs` | Budget |
+|---|---|
+| `null` (omitted) | the profile's default |
+| `0` | unbounded: the scan runs its whole ladder, the reproducible mode (not a zero-millisecond budget) |
+| 1 to 4294967295 | that many milliseconds |
+| above 4294967295 | refused before the image is read: the call throws a `String` ending with `[QRS-006]` |
+| negative | refused before the native call: `RangeError`, without a code |
+
+Calls written for 0.11.0 keep their meaning: without `budgetMs`, each profile
+keeps its default budget.
 
 Unlike the Kotlin/Swift bindings (which return a JSON string), Flutter ships a
 **typed** [`ScanReport`](/api/report) — sealed `Payload`/`Hint`, `Score` with the
@@ -114,7 +135,8 @@ if (report.detections.isEmpty) {
 ## Errors + license
 
 A scan fault throws a `String` ending with the `[QRS-xxx]` wire code
-([catalog](/api/errors)); an unknown profile name throws without a code.
+([catalog](/api/errors)); an unknown profile name throws without a code, and
+a negative `budgetMs` throws a `RangeError`.
 The report shape is the [one contract](/api/report).
 
 Current project-authored scanner source uses the [MIT License](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE), including use in proprietary and commercial applications with the required copyright and permission notice. Published `qr_barcode_scanner` 0.11.0 retains the license included in its archive; changing this source does not replace that release. Read the [licensing guide](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSING.md) for third-party notices and the source/archive distinction.

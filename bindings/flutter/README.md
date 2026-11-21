@@ -122,12 +122,33 @@ if (report.detections.isEmpty) {
 
 // Decode a raw RGBA camera frame (width*height*4 bytes), no scoring:
 final frame = await QrcodeAiScanner.scanFrame(rgba, w, h); // profile: 'frame'
+
+// Set the wall-clock budget in milliseconds (0 = unbounded):
+final slow = await QrcodeAiScanner.scan(pngBytes, budgetMs: 10000);
 ```
 
 Scans run on flutter_rust_bridge's Rust worker pool, so `await` never blocks the
 UI isolate. Profiles: `'full'` (full ladder + score), `'fast'` (reduced),
 `'frame'` (per-frame camera decode, no scoring). Errors throw with the
 `[QRS-xxx]` wire code in the message.
+
+Each profile has a default wall-clock budget: `full` 4000 ms, `fast` 800 ms,
+`frame` 80 ms. The clock starts once the image is decoded. The optional
+`budgetMs` argument of `scan` and `scanFrame` replaces it:
+
+| `budgetMs` | Budget |
+|---|---|
+| `null` (omitted) | the profile's default |
+| `0` | unbounded, the reproducible mode (not a zero-millisecond budget) |
+| 1 to 4294967295 | that many milliseconds |
+| above 4294967295 | refused: the scan throws a `String` ending with `[QRS-006]` before the image is read |
+| negative | refused: `RangeError`, before the native call |
+
+These are the semantics of `budget_ms` in the other bindings. Published 0.11.0
+has no `budgetMs`; it comes with the next release. When the budget cuts a scan,
+the report says so: `report.trace.budgetExhausted == true`. Empty detections
+are then not a final "no QR", and a null `score` beside a detection means "not
+judged", never 0.
 
 The return type [`ScanReport`](lib/report.dart) is fully typed (detections, a
 typed `Payload` sealed class, `Score` with ISO 15415 / UEC grade cards, hints,

@@ -152,8 +152,9 @@ build; see the [native mobile API page](/api/mobile).
 For APIs that expose a budget override (`budget_ms` / `budgetMs` /
 `--budget-ms`), `0` is unbounded and the only strictly reproducible mode.
 `trace.budget_exhausted` tells a final report (`false`) from one the budget
-cut (`true`). The published Flutter facade exposes the three profiles but no
-budget override; its [API guide](/api/flutter) documents that restriction.
+cut (`true`). The published Flutter 0.11.0 facade exposes the three profiles
+but no budget override; the working source adds `budgetMs` for the next
+release, as its [API guide](/api/flutter) describes.
 
 <Tip>
 The report's `trace.stages` tells you exactly which stage decoded (or how

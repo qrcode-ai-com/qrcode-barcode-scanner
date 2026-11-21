@@ -12,6 +12,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   static executables checked natively and inside Alpine on both
   architectures. The allocator configuration is unchanged; these targets do not add
   platform support to the separate language packages.
+- Flutter: `scan` and `scanFrame` take an optional `budgetMs`, with the
+  semantics of `budget_ms` in the other bindings (`0` is unbounded, a value
+  above 4294967295 is `QRS-006`). A negative value throws a `RangeError`.
 
 ### Changed
 
@@ -38,6 +41,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
 - Flutter: the package is named `qr_barcode_scanner`, as its own changelog
   records, and its README states NDK r28 as the floor. Built with NDK r27 the
   Android libraries are aligned to 4 KB memory pages, not 16 KB.
+- Flutter: the pubspec `repository`, the podspec `homepage` and the Rust
+  crate's `repository` name `qrcode-ai-com/qrcode-barcode-scanner-rust`, the
+  repository's current address.
 
 ### Fixed
 
@@ -52,6 +58,12 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   `-dontwarn java.awt.*`.
 - Kotlin on Android: JNA moves from 5.13.0 to 5.17.0, the first version whose
   x86_64 library is aligned for 16 KB memory pages.
+- Flutter: debug builds of the Rust core are optimized. The package's crate is
+  built as its own Cargo root and did not inherit the workspace's development
+  settings, so simulators and emulators, which run Flutter only in debug mode,
+  scanned with an unoptimized core and overran the default budgets on the iOS
+  simulator. `bindings/flutter/rust/Cargo.toml` gives Cargo's dev profile
+  opt-level 3 without debug assertions; overflow checks stay on.
 
 ### CI
 
@@ -60,6 +72,9 @@ Kotlin/Android · Swift/iOS · Flutter bindings.
   and as a minified one, with 4 KB and with 16 KB memory pages.
 - The Flutter publish job names its Flutter and Dart versions and installs
   from a tracked `pubspec.lock`.
+- `flutter-qualification.yml` runs the example's integration tests on an
+  Android emulator and an iPhone simulator, with no Cargo profile variable,
+  and reports the time of each scan of the mixed QR/Code 128 fixture.
 - `distribution/releases/` records each public release in one manifest: its
   tag, its commit and the hash of every public file, read from the public
   addresses. `scripts/release-fanout.py` keeps every mention of a release

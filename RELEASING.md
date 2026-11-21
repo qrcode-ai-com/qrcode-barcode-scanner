@@ -801,8 +801,10 @@ performs them):
    its `flutter pub get` enforces the tracked pubspec.lock, and
    scripts/check-publish-guards.py excepts no job. Then Admin › Automated
    publishing › enable GitHub Actions: repository
-   `qrcode-ai-com/qrcode-barcode-scanner`, tag pattern `v{{version}}`,
-   require environment `pub`.
+   `qrcode-ai-com/qrcode-barcode-scanner-rust`, tag pattern `v{{version}}`,
+   require environment `pub`. GitHub's OIDC token names the repository by its
+   current name, so check before the next tag that the setting no longer
+   names the former `qrcode-ai-com/qrcode-barcode-scanner`.
    The `flutter-stage` artifact is the archive `scripts/stage-flutter-package.py`
    builds from the tagged commit; never publish `bindings/flutter` directly.
    The stage vendors that candidate's normalized Cargo archive, verifies its

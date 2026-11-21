@@ -3,7 +3,7 @@ description: >-
   Scan QR codes and barcodes locally from images or camera frames, with
   versioned reports and QR scannability diagnostics from the native Rust engine.
 version: 0.11.0
-repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner
+repository: https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
 homepage: https://qrcode-ai.com/en-US/qr-code-scanner/sdk/flutter
 topics:
   - qr

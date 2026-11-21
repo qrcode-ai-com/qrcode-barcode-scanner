@@ -69,6 +69,9 @@ flutter:
 
   assets:
     - assets/sample_qr.png
+    # A byte copy of fixtures/symbology/mixed-code128-qr.png (a Code 128 and a
+    # QR code in one image), scanned by integration_test/scan_test.dart.
+    - assets/mixed-code128-qr.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -33,7 +33,8 @@ an unknown name (a profile, stress axis, score check, alpha background,
 palette color or preset), a palette list above 32 colors, or a value its
 integer type cannot hold. That is Node's and WASM's thrown error, Python's
 `ValueError` (`OverflowError`/`TypeError` for a conversion), Flutter's thrown
-`String`, and Kotlin/Swift's own case (`UnknownProfile`, `PaletteTooLarge`, …).
+`String` (a `RangeError` for a negative `budgetMs`), and Kotlin/Swift's own
+case (`UnknownProfile`, `PaletteTooLarge`, …).
 Match it by its type or case, never by a code it does not have.
 
 `QRS-005` comes only from Rust's `scan_cancellable`. Node's `AbortSignal`
