@@ -74,6 +74,7 @@ integrations/raycast/README.md
 integrations/vscode/README.md
 integrations/wasm-inline/README.md
 integrations/wordpress/README.md
+integrations/zapier/README.md
 playground/README.md
 skills/qrcode-barcode-scanner/README.md
 spec/README.md
