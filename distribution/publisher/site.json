@@ -47,6 +47,36 @@
     "revision": "610879c31302337a2b409b21bd18324e2fece178",
     "path": "skills/qrcode-barcode-scanner"
   },
+  "integrations": {
+    "activepieces": "automation",
+    "adobe-express": "adobe-express",
+    "agent-plugin": "mcp",
+    "apify": "apify",
+    "browser-extension": "browser-extension",
+    "canva": "canva",
+    "comfyui": "comfyui",
+    "dify": "dify",
+    "github-action": "github-action",
+    "joomla": "joomla",
+    "jupyterlab": "jupyterlab",
+    "make": "make",
+    "mcp": "mcp",
+    "n8n": "automation",
+    "napari": "comfyui",
+    "node-red": "automation",
+    "obsidian": "editors",
+    "openclaw": "openclaw",
+    "photoshop-uxp": "photoshop",
+    "raycast": "raycast",
+    "replicate": "replicate",
+    "vscode": "editors",
+    "wordpress": "wordpress",
+    "zapier": "zapier"
+  },
+  "integration_parts": {
+    "automation-js-core": "the shared code of the n8n, Node-RED and Activepieces packages",
+    "wasm-inline": "the build step that inlines the WebAssembly engine into one JavaScript file"
+  },
   "links_read_outside_the_engine": {
     "https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages": "GitHub's statement that a visit to a GitHub Pages site logs the visitor's IP address, read on 21 November 2026"
   }

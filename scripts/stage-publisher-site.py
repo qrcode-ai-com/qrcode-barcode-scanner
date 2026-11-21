@@ -288,6 +288,26 @@ def exists(commit, path, root):
     return True
 
 
+def check_integrations(parsed, config, commit, root):
+    """Every folder under integrations/ is linked from the index and has a privacy note, or is a part."""
+    covered, parts = config.get("integrations", {}), config.get("integration_parts", {})
+    listing = git("ls-tree", "-d", "--name-only", commit, "integrations/", root=root).decode()
+    folders = {line.split("/", 1)[1] for line in listing.splitlines() if line.startswith("integrations/")}
+    for folder in sorted(set(covered) & set(parts)):
+        raise Refused(f"site.json names integrations/{folder} both as an integration and as a part")
+    for folder in sorted(folders - set(covered) - set(parts)):
+        raise Refused(f"integrations/{folder} is neither an integration of site.json nor one of its parts")
+    for folder in sorted((set(covered) | set(parts)) - folders):
+        raise Refused(f"site.json names integrations/{folder}, which is not in this repository at {commit}")
+    links = set(parsed["index.html"].links)
+    notes = parsed["privacy/index.html"].ids
+    for folder, anchor in sorted(covered.items()):
+        if f"{REPOSITORY}/tree/main/integrations/{folder}" not in links:
+            raise Refused(f"index.html does not link integrations/{folder}")
+        if anchor not in notes:
+            raise Refused(f"privacy/index.html has no note {anchor} for integrations/{folder}")
+
+
 def check_pages(files, config, commit, root):
     """Every rule of the site's pages, over the staged FILES."""
     pages = {page["path"]: page for page in config["pages"]}
@@ -329,6 +349,7 @@ def check_pages(files, config, commit, root):
                 problems.append(f"the link {link} is neither a path of this site nor an https address")
         if problems:
             raise Refused(f"{where}: {'; '.join(problems)}")
+    check_integrations(parsed, config, commit, root)
     allowed = config.get("links_read_outside_the_engine", {})
     for url in sorted(set(allowed) - external):
         raise Refused(f"site.json lists {url} as read outside the engine, but no page links it")
@@ -580,6 +601,24 @@ def self_test(archive):
                     "neither a path of this site nor an https address")
             refused("no color-scheme", with_index(index.replace('<meta name="color-scheme" content="light dark">', "")),
                     "no color-scheme declaration")
+            folder = "zapier"
+            link = f'href="{REPOSITORY}/tree/main/integrations/{folder}"'
+
+            def with_config(**changes):
+                return lambda: check_pages(files, dict(config, **changes), commit, ROOT)
+
+            unnamed = {name: anchor for name, anchor in config["integrations"].items() if name != folder}
+            refused("an integration folder site.json does not name", with_config(integrations=unnamed),
+                    f"integrations/{folder} is neither an integration")
+            refused("a folder site.json names that does not exist",
+                    with_config(integration_parts=dict(config["integration_parts"], **{"no-such-folder": "x"})),
+                    "integrations/no-such-folder, which is not in this repository")
+            refused("an integration the index does not link",
+                    with_index(index.replace(link, f'href="{REPOSITORY}/tree/main/integrations"')),
+                    f"index.html does not link integrations/{folder}")
+            refused("an integration with no privacy note",
+                    with_config(integrations=dict(config["integrations"], **{folder: "nowhere"})),
+                    f"privacy/index.html has no note nowhere for integrations/{folder}")
             refused("a stylesheet that loads a font", lambda: check_css("@font-face { font-family: x; }"), "@font-face")
             refused("a stylesheet that imports", lambda: check_css('@import "https://example.com/a.css";'), "@import")
 
@@ -609,8 +648,8 @@ def self_test(archive):
                 lambda: stage("0000000000000000000000000000000000000000", archive, box / "none"), "is not a commit")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'FAILED' if failures else 'ok'} (the stage of HEAD, 7 refused trees, 12 refused pages "
-          "or stylesheets, 2 refused archives, 1 refused revision)")
+    print(f"self-test: {'FAILED' if failures else 'ok'} (the stage of HEAD, 7 refused trees, 16 refused pages, "
+          "configurations or stylesheets, 2 refused archives, 1 refused revision)")
     return 1 if failures else 0
 
 

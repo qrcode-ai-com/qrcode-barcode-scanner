@@ -40,16 +40,34 @@ no other request. Adobe Express renders the page inside the browser, and the eng
 rendering in the add-on, in the browser. A file you choose is read the same way and is not
 uploaded. The add-on has no cookies and no storage, and keeps nothing after you close it.</dd>
 
+<dt id="photoshop">Photoshop plugin</dt>
+<dd>The plugin reads the pixels of the open document, of a selection, or of an image file you
+choose, inside its panel on your computer, and never changes the document. It asks for no network
+access and makes no network request. It has no storage and keeps nothing after you close the
+panel.</dd>
+
 <dt id="wordpress">WordPress plugin</dt>
 <dd>The scanner runs in the visitor's browser, with code served by your own site. The image never
 leaves the browser and is discarded when the page closes. The plugin makes no request to another
 server, sets no cookie, uses no local storage and stores nothing in your database.</dd>
+
+<dt id="joomla">Joomla module</dt>
+<dd>The scanner runs in the visitor's browser, with code served by your own site. The image never
+leaves the browser and is discarded when the page closes. The module makes no request to another
+server, sets no cookie, uses no local storage and stores nothing in your database. It copies text
+to the clipboard only when the visitor clicks a copy button. When an administrator looks for
+updates, Joomla reads the module's update file from the scanner's repository on GitHub.</dd>
 
 <dt id="http">HTTP service</dt>
 <dd>You run the service yourself; it scans the images sent to it. Each image stays in the
 service's memory for the time of its scan and is never written to disk or logged. The service
 logs one line per request: method, path, status and duration, with no image and no decoded
 text.</dd>
+
+<dt id="make">Make app</dt>
+<dd>The module sends the image file of an earlier module to the scan service you run, at the
+address of your connection, and returns its report; the service handles the image as described
+above. What Make records about each scenario run follows Make's own settings.</dd>
 
 <dt id="github-action">GitHub Action</dt>
 <dd>The action downloads the scanner's command-line program and its checksum file from the
@@ -82,10 +100,20 @@ command-line program installed on your Mac. It makes no network request.</dd>
 network request. What the platform records about each run follows that platform's own
 settings.</dd>
 
+<dt id="zapier">Zapier integration</dt>
+<dd>The action runs on Zapier's platform, under your Zapier account. It downloads the image file
+of an earlier step, or the image address you give it, scans it inside the step and keeps nothing.
+What Zapier records about each run, such as the Zap history, follows Zapier's own settings.</dd>
+
 <dt id="apify">Apify Actor</dt>
 <dd>The Actor runs on Apify's platform, under your Apify account. It downloads each image address
 you give it, stores the images nowhere and keeps only the result items in your dataset, under your
 account's storage retention. It never opens what a code points to.</dd>
+
+<dt id="replicate">Replicate model</dt>
+<dd>Each image you send is uploaded to Replicate and scanned on Replicate's servers, under your
+Replicate account, and Replicate keeps the prediction under its own data retention rules. The model
+never opens what a code points to.</dd>
 
 <dt id="dify">Dify plugin</dt>
 <dd>The plugin reads the file your workflow gives it inside your Dify plugin runtime and keeps
@@ -96,6 +124,12 @@ gives the details.</dd>
 <dt id="comfyui">ComfyUI nodes and napari plugin</dt>
 <dd>They scan the images of your graph or viewer on your machine and make no network
 request.</dd>
+
+<dt id="jupyterlab">JupyterLab extension</dt>
+<dd>The scan runs in the browser tab that shows JupyterLab. An image chosen from your computer
+never leaves it; a file of the file browser is read through the Jupyter server's contents API,
+which already serves that file to the tab. The extension makes no other network request and adds
+no server or kernel code.</dd>
 </dl>
 
 <h2 id="site">This site</h2>
