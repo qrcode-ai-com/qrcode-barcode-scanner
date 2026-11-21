@@ -37,6 +37,7 @@ GUIDES = {
     'integrations/napari/README.md': ('integrations/napari', 'napari'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
+    'integrations/wordpress/README.md': ('integrations/wordpress', 'WordPress'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'integrations/wasm-inline/README.md': ('sdk/javascript', 'JavaScript'),
     'integrations/canva/README.md': ('integrations/canva', 'Canva'),
