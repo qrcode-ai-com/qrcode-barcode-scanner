@@ -179,6 +179,9 @@ jobs:
         include:
           - host: render
             schema: https://render.com/schema/render.yaml.json
+          # Railway reads no file: its settings live in its composer (distribution/railway).
+          - host: railway
+            schema: ""
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -196,10 +199,14 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/stage-http-satellite.py stage --out "$RUNNER_TEMP/staged"
-          curl --fail --silent --show-error --location --proto '=https' --retry 3 \
-            --output "$RUNNER_TEMP/schema.json" "$SCHEMA"
-          sha256sum "$RUNNER_TEMP/schema.json"
-          python scripts/check-http-hosts.py check --tree "$RUNNER_TEMP/staged" --schema "$HOST=$RUNNER_TEMP/schema.json"
+          schema=()
+          if [ -n "$SCHEMA" ]; then
+            curl --fail --silent --show-error --location --proto '=https' --retry 3 \
+              --output "$RUNNER_TEMP/schema.json" "$SCHEMA"
+            sha256sum "$RUNNER_TEMP/schema.json"
+            schema=(--schema "$HOST=$RUNNER_TEMP/schema.json")
+          fi
+          python scripts/check-http-hosts.py check --tree "$RUNNER_TEMP/staged" "${schema[@]}"
           python scripts/check-http-hosts.py profile "$HOST" --tree "$RUNNER_TEMP/staged" --out "$RUNNER_TEMP/profile.json"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
