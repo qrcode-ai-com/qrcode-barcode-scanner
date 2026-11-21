@@ -13,7 +13,8 @@ It has no account or key: anyone who can reach port 80 can scan. The firewall (u
 and port 80 only. Put TLS and your own access control in front of it before you expose it.
 
   Status and log:  systemctl status qrscan-http ; journalctl -u qrscan-http
-  Settings:        /etc/qrscan-http.env (QRSCAN_HTTP_MAX_* lower the limits), then
+  Settings:        /etc/qrscan-http.env (QRSCAN_HTTP_MAX_* lower the limits,
+                   QRSCAN_HTTP_BUDGET_SCALE multiplies the time budgets), then
                    systemctl restart qrscan-http
   Updates:         apt upgrades the system; a new service version is a new Droplet image.
 

@@ -275,7 +275,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo bash distribution/digitalocean/droplet/install.sh "$RUNNER_TEMP/http"
-          firewall=$(sudo ufw status)
+          # ufw pads its columns with trailing spaces.
+          firewall=$(sudo ufw status | sed 's/[[:space:]]*$//')
           printf '%s\n' "$firewall"
           test "$(printf '%s\n' "$firewall" | grep -c -E '^Status: active$')" -eq 1
           test "$(printf '%s\n' "$firewall" | grep -c -E '^(22|80)/tcp +ALLOW +Anywhere$')" -eq 2
