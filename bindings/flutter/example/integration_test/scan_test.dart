@@ -68,12 +68,16 @@ void main() {
       testWidgets(profile, (tester) async {
         final bytes = await asset('mixed-code128-qr.png');
         final report = await timedScan('mixed-default', bytes, profile: profile);
-        expect(report.trace.budgetExhausted, isFalse,
-            reason: 'the $profile budget cut the scan');
         expect(report.trace.enginePanics, 0);
         expect(contents(report), mixedContents);
         expect(report.versions.pipeline, 5);
         expect(report.versions.scoreContract, 5);
+        // Last, so that a failure here means only that the budget cut the
+        // scan: the reads above already held. A cut report may leave the
+        // score unjudged, so the score is checked only on a final report.
+        expect(report.trace.budgetExhausted, isFalse,
+            reason: 'the default $profile budget cut the scan after '
+                '${report.trace.totalMs.toStringAsFixed(1)} ms of ladder');
         if (profile == 'frame') {
           expect(report.score, isNull); // frame profile skips scoring
         } else {
