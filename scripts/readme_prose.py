@@ -17,6 +17,7 @@ GUIDES = {
     'crates/qrcode-ai-scanner-wasm/README.md': ('sdk/javascript', 'JavaScript'),
     'crates/qrcode-ai-scanner-wasm/examples/README.md': ('sdk/javascript', 'JavaScript'),
     'distribution/npm/README.md': ('sdk/nodejs', 'Node.js'),
+    'examples/codepen/README.md': ('sdk/javascript', 'JavaScript'),
     'examples/kaggle/README.md': ('sdk/python', 'Python'),
     'examples/notebooks/README.md': ('sdk/python', 'Python'),
     'examples/streamlit/README.md': ('sdk/python', 'Python'),

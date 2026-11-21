@@ -175,7 +175,8 @@ paths = [
 
 [[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"
-paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml"]
+paths = ["examples/**", "binder/requirements.txt", ".github/workflows/demos.yml",
+         ".github/workflows/demo-codepen.yml"]
 
 [[file]]
 held = "the JitPack build of a tag, judged by its consumer"

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Scan QR codes and barcodes in the browser with the open-source QR Code &amp; Barcode Scanner, loaded from jsDelivr. The image stays on your device.">
+<title>QR Code &amp; Barcode Scanner: browser image demo</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main>
+  <h1>QR Code &amp; Barcode Scanner</h1>
+  <p>Scan the QR codes and barcodes in an image, in your browser. The open-source scanner engine
+    is a WebAssembly module loaded from jsDelivr at an exact version; your image is decoded on
+    this device and never uploaded. A decoded link is shown as text and never opened.</p>
+
+  <nav class="links" aria-label="QR Code AI">
+    <p><strong>Try the scanner live</strong>
+      <a href="https://qrcode-ai.com/en-US/qr-code-scanner" rel="noopener" target="_blank">QR code scanner</a> ·
+      <a href="https://qrcode-ai.com/en-US/barcode-scanner" rel="noopener" target="_blank">Barcode scanner</a></p>
+    <p><strong>JavaScript guide</strong>
+      <a href="https://qrcode-ai.com/en-US/qr-code-scanner/sdk/javascript" rel="noopener" target="_blank">for QR codes</a> ·
+      <a href="https://qrcode-ai.com/en-US/barcode-scanner/sdk/javascript" rel="noopener" target="_blank">for barcodes</a></p>
+    <p><strong>Create a code</strong>
+      <a href="https://qrcode-ai.com/en-US/qr-code-generator" rel="noopener" target="_blank">QR code generator</a> ·
+      <a href="https://qrcode-ai.com/en-US/barcode-generator" rel="noopener" target="_blank">Barcode generator</a></p>
+  </nav>
+
+  <section aria-labelledby="sample-title">
+    <h2 id="sample-title">The sample, in the three profiles</h2>
+    <p id="sample-status" class="muted" data-state="waiting">The sample is scanned once the scanner has loaded.</p>
+    <div class="table-wrap">
+      <table id="sample-table">
+        <thead><tr><th scope="col">Profile</th><th scope="col">Codes read</th><th scope="col">Time</th><th scope="col">Complete</th></tr></thead>
+        <tbody>
+          <tr data-profile="fast"><th scope="row">fast</th><td class="codes">waiting</td><td class="ms"></td><td class="complete"></td></tr>
+          <tr data-profile="frame"><th scope="row">frame</th><td class="codes">waiting</td><td class="ms"></td><td class="complete"></td></tr>
+          <tr data-profile="full"><th scope="row">full</th><td class="codes">waiting</td><td class="ms"></td><td class="complete"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure id="sample-figure" hidden>
+      <img id="sample-image" alt="The sample: a Code 128 barcode on the left and a QR code on the right">
+      <figcaption class="muted">The sample holds a QR code and a Code 128 barcode. It is the tagged
+        test image of the scanner repository, checked by its SHA-256 before it is scanned.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="input-title">
+    <h2 id="input-title">Scan your own image</h2>
+    <div id="drop-zone" class="drop-zone">
+      <label for="file">Choose an image (PNG, JPEG, WebP or GIF)</label>
+      <input id="file" type="file" accept="image/*" aria-describedby="drop-hint">
+      <p id="drop-hint" class="muted">Or drop an image file on this box.</p>
+    </div>
+    <figure id="preview" hidden>
+      <img id="preview-image" alt="">
+      <figcaption id="preview-caption" class="muted"></figcaption>
+    </figure>
+    <div class="field">
+      <label for="profile">Profile</label>
+      <select id="profile" aria-describedby="profile-hint">
+        <option value="full" selected>full</option>
+        <option value="fast">fast</option>
+        <option value="frame">frame</option>
+      </select>
+      <p id="profile-hint" class="muted">full runs every stage and scores how well a QR code
+        scans; fast skips the deep QR stages; frame only decodes, as for camera frames. Every
+        scan here runs to its end, without a time budget.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="result-title">
+    <h2 id="result-title">Result</h2>
+    <div id="result" data-state="loading" data-scan="0">
+      <p id="summary" role="status" aria-live="polite">Loading the scanner…</p>
+      <ol id="detections"></ol>
+    </div>
+    <details id="report-details">
+      <summary>Full report (JSON)</summary>
+      <pre id="report-json" data-scan="0"></pre>
+    </details>
+  </section>
+
+  <section aria-labelledby="package-title">
+    <h2 id="package-title">What runs here</h2>
+    <dl class="facts">
+      <div><dt>npm package</dt><dd id="package-name" class="mono">reading</dd></div>
+      <div><dt>Package version</dt><dd id="package-version" class="mono">reading</dd></div>
+      <div><dt>WASM SHA-256</dt><dd id="wasm-sha256" class="mono">reading</dd></div>
+      <div><dt>Engine version</dt><dd id="engine-version" class="mono">not loaded yet</dd></div>
+      <div><dt>Runs in</dt><dd id="runtime" class="mono">not loaded yet</dd></div>
+    </dl>
+    <p class="muted">The package name and version come from its package.json on jsDelivr. The
+      WebAssembly module is checked against its pinned SHA-256 before it runs. The engine version
+      is the one the loaded module reports.</p>
+  </section>
+</main>
+<footer>
+  <p>The QR Code &amp; Barcode Scanner is open source, built for QR Code AI by Thibaut Mélen
+    and Nicolas Cella, SuperNovae Studio.</p>
+  <p class="muted">This page's own code:
+    <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/examples/codepen" rel="noopener" target="_blank">examples/codepen</a>.
+    The engine it loads, version 0.11.0, is licensed AGPL-3.0-or-later; its source is the tag
+    <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/v0.11.0" rel="noopener" target="_blank">v0.11.0</a>
+    of the scanner repository.</p>
+</footer>
+<script src="./script.js"></script>
+</body>
+</html>

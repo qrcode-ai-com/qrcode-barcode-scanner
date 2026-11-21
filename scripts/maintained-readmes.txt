@@ -47,6 +47,7 @@ distribution/rpm/README.md
 distribution/snap/README.md
 distribution/termux/README.md
 examples/README.md
+examples/codepen/README.md
 examples/kaggle/README.md
 examples/notebooks/README.md
 examples/streamlit/README.md
