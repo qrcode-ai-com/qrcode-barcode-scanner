@@ -15,7 +15,7 @@ before(async () => {
 });
 beforeEach(() => host.reset());
 
-const result = (codes, extra = {}) => ({ file: '/d/mixed.png', codes, budgetExhausted: false, profile: 'full', engine: '0.11.0', ...extra });
+const result = (codes, extra = {}) => ({ file: '/d/mixed.png', codes, budgetExhausted: false, profile: 'full', engine: '0.11.0', score: null, report: { detections: [] }, ...extra });
 const code = (text, symbology = 'qr_code', label = 'QR Code', complete = true) => ({ symbology, label, text, complete });
 const view = (state) => command.ScanView({ state });
 
@@ -32,8 +32,8 @@ test('the manifest is a Raycast extension under MIT with one view command', () =
 });
 
 test('two codes become two items, each copied or pasted as its exact text', () => {
-  const tree = view({ kind: 'result', name: 'mixed.png', result: result([code(QR), code(CODE128, 'code128', 'Code 128')]) });
-  assert.equal(tree.props.navigationTitle, 'Codes in mixed.png');
+  const report = { detections: [{ symbology: 'qr_code' }, { symbology: 'code128' }], score: { value: 100, grade: 'excellent' } };
+  const tree = view({ kind: 'result', name: 'mixed.png', result: result([code(QR), code(CODE128, 'code128', 'Code 128')], { score: { value: 100, grade: 'excellent' }, report }) });
   const [section] = named(tree, 'List.Section');
   assert.deepEqual([section.props.title, section.props.subtitle], ['mixed.png', '2 codes']);
   const items = named(tree, 'List.Item');
@@ -43,10 +43,36 @@ test('two codes become two items, each copied or pasted as its exact text', () =
   ]);
   for (const [index, text] of [QR, CODE128].entries()) {
     const actions = named(items[index], 'Action.CopyToClipboard').map((action) => [action.props.title, action.props.content]);
-    assert.deepEqual(actions, [['Copy Text', text], ['Copy All Texts', `${QR}\n${CODE128}`]]);
+    assert.deepEqual(actions, [['Copy Text', text], ['Copy All Texts', `${QR}\n${CODE128}`], ['Copy Scan Report', JSON.stringify(report, null, 2)]]);
     assert.deepEqual(named(items[index], 'Action.Paste').map((action) => action.props.content), [text]);
   }
+  // The report judges its first code only: the score is shown on that item and no other.
+  assert.deepEqual(items.map((item) => item.props.accessories), [[{ tag: { value: 'Score 100 · excellent', color: 'color:Green' } }], []]);
   assert.deepEqual(named(tree, 'Action.OpenInBrowser'), [], 'a decoded link is never opened');
+});
+
+test('the root command keeps its own title and every list has a search placeholder', () => {
+  const states = [
+    { kind: 'loading' },
+    { kind: 'result', name: 'mixed.png', result: result([code(QR)]) },
+    { kind: 'result', name: 'blank.png', result: result([]) },
+    { kind: 'none', reason: 'Select an image.' },
+    { kind: 'missing', looked: ['/opt/homebrew/bin/qrscan'] },
+    { kind: 'unreadable', name: 'x.png', message: 'corrupt [QRS-001]' },
+    { kind: 'failed', message: 'crash' },
+  ];
+  for (const state of states) {
+    const tree = view(state);
+    assert.equal(tree.type.displayName, 'List', state.kind);
+    assert.equal(tree.props.navigationTitle, undefined, `${state.kind}: Raycast sets the root title from the command`);
+    assert.equal(tree.props.searchBarPlaceholder, 'Filter the codes', state.kind);
+  }
+});
+
+test('the score tag follows the grade', () => {
+  const colors = ['excellent', 'good', 'acceptable', 'fair', 'poor'].map((grade) => command.scoreTag({ value: 50, grade }).color);
+  assert.deepEqual(colors, ['color:Green', 'color:Green', 'color:Yellow', 'color:Red', 'color:Red']);
+  assert.equal(command.scoreTag({ value: 72, grade: 'good' }).value, 'Score 72 · good');
 });
 
 test('text on several lines is shown on one line and copied whole; incomplete text is tagged', () => {
@@ -102,7 +128,14 @@ describe('with the published qrscan', { skip: live.skip }, () => {
       assert.equal(state.name, 'mixed-code128-qr.png');
       assert.equal(state.result.profile, profile);
       const items = named(view(state), 'List.Item');
-      assert.deepEqual(new Set(items.map((item) => item.props.title)), new Set([QR, CODE128]));
+      // The engine's order: the QR code first, then the Code 128.
+      assert.deepEqual(items.map((item) => [item.props.title, item.props.subtitle]), [[QR, 'QR Code'], [CODE128, 'Code 128']]);
+      assert.equal(state.result.engine, '0.11.0');
+      assert.equal(state.result.budgetExhausted, false);
+      // frame never scores; fast and full judge the QR code, which this fixture prints cleanly.
+      if (profile === 'frame') assert.equal(state.result.score, null);
+      else assert.ok(state.result.score.value > 0 && ['excellent', 'good'].includes(state.result.score.grade), JSON.stringify(state.result.score));
+      assert.deepEqual(state.result.report.detections.map((entry) => entry.content.text), [QR, CODE128]);
     });
   }
 
@@ -112,7 +145,7 @@ describe('with the published qrscan', { skip: live.skip }, () => {
     host.preferences = { qrscanPath: live.path };
     const state = await command.loadScan();
     assert.equal(state.kind, 'result', JSON.stringify(state));
-    assert.deepEqual(new Set(state.result.codes.map((entry) => entry.text)), new Set([QR, CODE128]));
+    assert.deepEqual(state.result.codes.map((entry) => entry.text), [QR, CODE128]);
   });
 
   test('a file that is not an image gives the unreadable view', async () => {

@@ -12,15 +12,17 @@ before(async () => {
   q = await bundleSource('src/qrscan.ts');
 });
 
-const REPORT = JSON.stringify({
+const REPORT_OBJECT = {
   versions: { scanner: '0.11.0' },
   detections: [
     { symbology: 'qr_code', content: { text: QR, charset: 'utf8' } },
     { symbology: 'code128', content: { text: CODE128, charset: 'iso8859_1' } },
     { symbology: 'future_format', content: { text: 'caf?', charset: 'unknown' } },
   ],
+  score: { value: 93, grade: 'excellent', weights_run: 100 },
   trace: { budget_exhausted: false },
-});
+};
+const REPORT = JSON.stringify(REPORT_OBJECT);
 
 /** A stand-in for execFile that records the call and answers with EXIT. */
 function fakeRun(exit) {
@@ -80,6 +82,18 @@ test('a report becomes codes; the file and the profile are the only arguments', 
   assert.equal(result.engine, '0.11.0');
   assert.equal(result.budgetExhausted, false);
   assert.equal(q.allTexts(result.codes), `${QR}\n${CODE128}\ncaf?`);
+  assert.deepEqual(result.score, { value: 93, grade: 'excellent' });
+  // The report is kept as qrscan printed it, and copied indented.
+  assert.deepEqual(result.report, REPORT_OBJECT);
+  assert.equal(q.reportText(result), JSON.stringify(REPORT_OBJECT, null, 2));
+});
+
+test('a report without a judgment, or with a malformed one, has no score', async () => {
+  for (const score of [null, undefined, { value: '93', grade: 'excellent' }, { value: 93 }]) {
+    const stdout = JSON.stringify({ ...REPORT_OBJECT, score });
+    const result = await q.scanFile('/q', '/a.png', 'frame', fakeRun({ code: 0, stdout }).run);
+    assert.equal(result.score, null, JSON.stringify(score));
+  }
 });
 
 test('every way qrscan can end is told apart', async () => {
