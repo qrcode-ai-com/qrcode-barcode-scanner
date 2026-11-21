@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="package" method="upgrade">
+	<name>QR Code &amp; Barcode Scanner</name>
+	<packagename>qrcodebarcodescanner</packagename>
+	<author>QR Code AI</author>
+	<authorUrl>https://qrcode-ai.com/</authorUrl>
+	<packager>QR Code AI</packager>
+	<packagerurl>https://qrcode-ai.com/</packagerurl>
+	<creationDate>2026-11</creationDate>
+	<copyright>(C) 2026 SuperNovae Studio, QR Code AI</copyright>
+	<license>GNU General Public License version 3 or later; the bundled scanner engine files in media/mod_qrcodebarcodescanner/vendor are AGPL-3.0-or-later, see LICENSE-ENGINE.txt</license>
+	<version>0.1.0</version>
+	<description>A site module that reads the QR codes and barcodes in an image or a photo, in the visitor's browser. The image is never uploaded and no other server is called. Open source.</description>
+	<blockChildUninstall>true</blockChildUninstall>
+	<files folder="packages">
+		<file type="module" id="mod_qrcodebarcodescanner" client="site">mod_qrcodebarcodescanner.zip</file>
+	</files>
+	<updateservers>
+		<server type="extension" name="QR Code &amp; Barcode Scanner">https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/main/integrations/joomla/updates.xml</server>
+	</updateservers>
+</extension>
