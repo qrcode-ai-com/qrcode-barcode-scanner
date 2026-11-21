@@ -171,7 +171,8 @@ try {
     browser: `firefox ${browserVersion}`, binary, file_route: page.fileRoute,
     requests: requests.map((row) => row.url),
   }, null, 2)}\n`);
-  await bidi.send('session.end', {}).catch(() => {});
+  // Release Firefox may close the connection instead of answering; either way the run is over.
+  await bidi.send('session.end', {}, { timeout: 5000 }).catch(() => {});
   finishedCleanly = true;
   console.log(`${checkCount()} checks passed`);
 } finally {

@@ -80,6 +80,7 @@ jobs:
               --out "build/acceptance/$target"
           done
       - name: The Firefox zip installed in the runner's Firefox
+        timeout-minutes: 5
         run: |
           set -euo pipefail
           FIREFOX=$(command -v firefox)

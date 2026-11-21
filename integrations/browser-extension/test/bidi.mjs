@@ -67,6 +67,13 @@ export class Bidi {
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = [];
+    // A closed connection answers nothing more: every command still waiting fails.
+    socket.addEventListener('close', () => {
+      for (const waiting of this.pending.values()) {
+        waiting.reject(new Error(`${waiting.method}: the connection closed`));
+      }
+      this.pending.clear();
+    });
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.type === 'event') {
@@ -81,12 +88,20 @@ export class Bidi {
     });
   }
 
-  /** One command; resolves with its result, rejects with the BiDi error. */
-  send(method, params = {}) {
+  /**
+   * One command; resolves with its result, rejects with the BiDi error, or after `timeout` ms
+   * without an answer.
+   */
+  send(method, params = {}, { timeout = 60000 } = {}) {
     const id = this.nextId;
     this.nextId += 1;
     const reply = new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, method });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method}: no answer in ${timeout} ms`));
+      }, timeout);
+      const settle = (fn) => (value) => { clearTimeout(timer); fn(value); };
+      this.pending.set(id, { resolve: settle(resolve), reject: settle(reject), method });
     });
     this.socket.send(JSON.stringify({ id, method, params }));
     return reply;
