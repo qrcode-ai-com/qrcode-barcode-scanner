@@ -1,0 +1,146 @@
+name: Integrations · Zapier
+
+# The Zapier integration in integrations/zapier on the published WebAssembly engine its
+# package.json pins. Its copy of the shared scan core must be current; its definition is checked
+# against Zapier's schema offline, then by Zapier's integration checks (Zapier's public check
+# endpoint, no account and no key); its app tester suite runs. The bundle `zapier-platform build`
+# writes is then unpacked outside the checkout and called the way Zapier calls it, in a fresh Node
+# process and in the AWS Lambda Node.js 22 base image through its runtime interface emulator, at
+# 256 MB, read-only and as a non-root user. The destination acceptance driver judges the bundle's
+# three reports. Nothing is pushed to Zapier and no secret is used.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-zapier.yml
+      - integrations/zapier/**
+      - integrations/automation-js-core/**
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-zapier.yml
+      - integrations/zapier/**
+      - integrations/automation-js-core/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-zapier-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The CLI otherwise reports each command to Zapier.
+  DISABLE_ZAPIER_ANALYTICS: "1"
+  # public.ecr.aws/lambda/nodejs:22, the runtime zapier-platform-core 19 deploys to (both platforms).
+  LAMBDA_IMAGE: public.ecr.aws/lambda/nodejs@sha256:42246b73ef598cf22bdb44e136cf21ff72f283426ba1b2da695f19293cf744d6
+  DESTINATION: Zapier integration from this checkout (not pushed to Zapier)
+
+jobs:
+  zapier:
+    name: Zapier integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      # The integration's own file says which engine it runs on: one exact pin, which is also the
+      # version its reports must name.
+      - name: Read the engine version and the identifier the integration pins
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./integrations/zapier/package.json').dependencies['@qrcode-ai-com/qrcode-barcode-scanner-wasm']")
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "IDENTIFIER=$(node -p "const p = require('./integrations/zapier/package.json'); p.name + '@' + p.version")" >> "$GITHUB_ENV"
+          echo "engine $version"
+      - name: Shared scan core copy
+        working-directory: integrations/automation-js-core
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          node sync.mjs --check
+      - name: Install the integration
+        working-directory: integrations/zapier
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm ci --ignore-scripts --no-audit --no-fund
+          test "$(node -p "require('@qrcode-ai-com/qrcode-barcode-scanner-wasm/package.json').version")" = "$ENGINE_VERSION"
+      - name: Validate the definition against Zapier's schema (offline)
+        working-directory: integrations/zapier
+        run: npx --no-install zapier-platform validate --without-style
+      # The same checks `zapier-platform push` runs; this reads the result, not only the exit code.
+      - name: Run Zapier's integration checks (public endpoint, no account)
+        working-directory: integrations/zapier
+        run: |
+          set -euo pipefail
+          output=$(npx --no-install zapier-platform validate --fail-for-publishing 2>&1)
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" | grep -F 'Integration checks passed, no issues found.' > /dev/null
+      - name: Run the app tester suite
+        working-directory: integrations/zapier
+        run: npm test
+      - name: Build the bundle Zapier runs
+        working-directory: integrations/zapier
+        run: |
+          set -euo pipefail
+          TZ=UTC npx --no-install zapier-platform build
+          sha256sum build/build.zip build/source.zip
+      - name: Run the bundle outside the checkout, in Node and in the Lambda image
+        run: |
+          set -euo pipefail
+          docker pull --quiet "$LAMBDA_IMAGE"
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          mkdir -p receipt
+          node integrations/zapier/test/packed-consumer.mjs integrations/zapier/build/build.zip \
+            --image "$image" --reports "$RUNNER_TEMP/reports" --lambda "$LAMBDA_IMAGE" > receipt/bundle-zapier.json
+          cat receipt/bundle-zapier.json
+          echo "UNPACKED=$(node -p "require('./receipt/bundle-zapier.json').unpacked")" >> "$GITHUB_ENV"
+      - name: Judge the three reports
+        run: |
+          set -euo pipefail
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "node integrations/zapier/test/packed-consumer.mjs integrations/zapier/build/build.zip" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "$DESTINATION" \
+            --identifier "$IDENTIFIER" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/zapier" \
+            --install "npm ci && zapier-platform build, then build/build.zip unpacked" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-zapier.json
+      - name: Remove the unpacked bundle and close the receipt
+        run: |
+          set -euo pipefail
+          rm -r "$UNPACKED"
+          python scripts/destination-acceptance.py removed --gone "test -e $UNPACKED/zapierwrapper.js" \
+            --uninstall "rm -r $UNPACKED" --receipt receipt/acceptance-zapier.json
+          python scripts/destination-acceptance.py check receipt/acceptance-zapier.json
+          cp integrations/zapier/build/build.zip receipt/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: acceptance-zapier
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 14

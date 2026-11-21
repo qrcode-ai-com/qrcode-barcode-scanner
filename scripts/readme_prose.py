@@ -38,6 +38,7 @@ GUIDES = {
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'integrations/wasm-inline/README.md': ('sdk/javascript', 'JavaScript'),
+    'integrations/zapier/README.md': ('integrations/zapier', 'Zapier'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }
