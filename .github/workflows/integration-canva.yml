@@ -1,0 +1,101 @@
+name: integration-canva
+
+# The Canva app of integrations/canva, checked the way its README describes: installed from its own
+# lockfile, bundled into the one file Canva takes (engine inlined by integrations/wasm-inline),
+# rebuilt to compare the bytes, unit tested, run in Playwright's Chromium under Canva's published
+# content security policy, judged by the repository's acceptance judge, and given its listing
+# images. It uses the published WASM package: nothing is built from this repository's Rust source,
+# and nothing is uploaded to Canva.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-canva.yml
+      - integrations/canva/**
+      - integrations/wasm-inline/inline.mjs
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-canva.yml
+      - integrations/canva/**
+      - integrations/wasm-inline/inline.mjs
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-canva-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canva:
+    name: Canva app · build, test under Canva's policy
+    runs-on: ubuntu-24.04
+    # On an Apple Silicon laptop the build, the unit tests and the browser test took under a
+    # minute on 21 November 2026; the browser download with its system packages takes longer here.
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/canva
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Install Playwright's Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Build dist/app.js and the strings
+        run: npm run build
+      - name: Rebuild and compare the bytes
+        run: |
+          set -euo pipefail
+          first=$(sha256sum dist/app.js dist/messages_en.json)
+          npm run build
+          second=$(sha256sum dist/app.js dist/messages_en.json)
+          echo "$second"
+          [ "$first" = "$second" ]
+      - name: Unit tests
+        run: npm test
+      - name: dist/app.js under Canva's policy in Playwright's Chromium
+        run: npm run test:canva-csp
+      - name: Judge the reports
+        working-directory: .
+        run: |
+          set -euo pipefail
+          here=integrations/canva
+          reports="$here/build/acceptance"
+          mkdir -p "$RUNNER_TEMP/receipts"
+          python3 scripts/destination-acceptance.py reports --kind page \
+            --produced-by "node test/canva-csp.mjs" \
+            --fast "$reports/fast.json" --frame "$reports/frame.json" --full "$reports/full.json" \
+            --destination "$here, dist/app.js under Canva's policy, on the runner" \
+            --identifier "@qrcode-ai-com/qrcode-barcode-scanner-wasm" --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/$here" \
+            --install "npm ci --ignore-scripts && npm run build" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "$RUNNER_TEMP/receipts/canva.json"
+      - name: Listing images
+        run: npm run listing
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: canva-app
+          path: |
+            integrations/canva/dist
+            integrations/canva/build
+            ${{ runner.temp }}/receipts
+          if-no-files-found: error
