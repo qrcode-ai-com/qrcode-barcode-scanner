@@ -35,6 +35,7 @@ GUIDES = {
     'integrations/obsidian/README.md': ('integrations/obsidian', 'Obsidian'),
     'integrations/napari/README.md': ('integrations/napari', 'napari'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
+    'integrations/photoshop-uxp/README.md': ('integrations/photoshop', 'Photoshop'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'integrations/wasm-inline/README.md': ('sdk/javascript', 'JavaScript'),

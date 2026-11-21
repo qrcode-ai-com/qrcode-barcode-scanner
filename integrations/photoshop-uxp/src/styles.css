@@ -1,0 +1,168 @@
+/* SPDX-License-Identifier: MIT */
+/* Photoshop sets the --uxp-host-* variables to its theme; the fallbacks are its dark theme. */
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--uxp-host-background-color, #323232);
+  color: var(--uxp-host-text-color, #e8e8e8);
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: var(--uxp-host-font-size, 12px);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+}
+
+.help {
+  margin: 2px 0 10px;
+  color: var(--uxp-host-text-color-secondary, #a8a8a8);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.field {
+  margin: 4px 0 4px;
+  font-weight: 700;
+}
+
+select, input {
+  margin: 0 0 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--uxp-host-border-color, #5a5a5a);
+  border-radius: 4px;
+  background-color: var(--uxp-host-widget-hover-background-color, #262626);
+  color: var(--uxp-host-text-color, #e8e8e8);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 10px;
+}
+
+button {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--uxp-host-border-color, #5a5a5a);
+  border-radius: 14px;
+  background-color: transparent;
+  color: var(--uxp-host-text-color, #e8e8e8);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+button.primary {
+  border-color: #3b63fb;
+  background-color: #3b63fb;
+  color: #ffffff;
+}
+
+button.quiet {
+  align-self: flex-start;
+  border: none;
+  padding: 4px 0;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+button:disabled {
+  opacity: 0.45;
+}
+
+#summary {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+#result[data-state="error"] #summary {
+  color: #ff7b72;
+}
+
+.item {
+  margin: 6px 0 0;
+}
+
+.item h2 {
+  color: var(--uxp-host-text-color-secondary, #a8a8a8);
+}
+
+.detection {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 8px;
+}
+
+.format {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.text {
+  font-size: 12px;
+  line-height: 16px;
+  word-break: break-all;
+}
+
+.badge {
+  align-self: flex-start;
+  margin: 2px 0 0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.badge.match {
+  background-color: #12805c;
+}
+
+.badge.differ {
+  background-color: #d31510;
+}
+
+.error {
+  color: #ff7b72;
+}
+
+.report {
+  margin: 0 0 10px;
+  padding: 6px;
+  border: 1px solid var(--uxp-host-border-color, #5a5a5a);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--uxp-host-border-color, #5a5a5a);
+  color: var(--uxp-host-text-color-secondary, #a8a8a8);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.footer p {
+  margin: 0 0 6px;
+}
