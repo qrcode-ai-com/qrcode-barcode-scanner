@@ -14,39 +14,42 @@ permissions:
 env:
   RUST_TOOLCHAIN: "1.99.1"
   FLUTTER_VERSION: "3.47.9"
-  # Simulators and emulators run Flutter in debug mode, so cargokit builds the Rust core with
-  # Cargo's dev profile. These values give that build the code generation of the package's own
-  # [profile.release] (rust/Cargo.toml: opt-level 3, thin LTO, one codegen unit, no debug
-  # assertions), the build a release app gets on a device. Overflow checks stay on for every
-  # crate, a superset of the release profile, which keeps them for rxing only. The retained runs
-  # say why: Rust's default opt-level 0 exceeded all three budgets on Android (43274479127), and
-  # opt-level 2 alone left the first iOS fast scan at 1250 ms against its 800 ms (43278040726).
-  CARGO_PROFILE_DEV_OPT_LEVEL: "3"
-  CARGO_PROFILE_DEV_DEBUG_ASSERTIONS: "false"
-  CARGO_PROFILE_DEV_LTO: "thin"
-  CARGO_PROFILE_DEV_CODEGEN_UNITS: "1"
-  CARGO_PROFILE_DEV_INCREMENTAL: "false"
-  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
   native:
-    name: pub.dev · ${{ matrix.platform }}
+    name: pub.dev · ${{ matrix.platform }} · ${{ matrix.codegen }} codegen
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
+        # One diagnostic run: iOS with Cargo's default dev profile, on today's macos-15 image. With
+        # release code generation the test never connected in three runs (44882430387 twice,
+        # 44887343863); this run says whether the profile or the image causes that.
         include:
-          - platform: Android
-            runner: ubuntu-24.04
-            targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
           - platform: iOS
             runner: macos-15
             targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+            codegen: default
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Simulators and emulators run Flutter in debug mode, so cargokit builds the Rust core with
+      # Cargo's dev profile. `release` gives that build the code generation of the package's own
+      # [profile.release] (rust/Cargo.toml: opt-level 3, thin LTO, one codegen unit, no debug
+      # assertions); `default` leaves Cargo's dev profile as it is. The receipt records which.
+      - name: Give the Rust core the release code generation
+        if: matrix.codegen == 'release'
+        run: |
+          {
+            echo "CARGO_PROFILE_DEV_OPT_LEVEL=3"
+            echo "CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false"
+            echo "CARGO_PROFILE_DEV_LTO=thin"
+            echo "CARGO_PROFILE_DEV_CODEGEN_UNITS=1"
+            echo "CARGO_PROFILE_DEV_INCREMENTAL=false"
+            echo "CARGO_PROFILE_DEV_DEBUG=0"
+          } >> "$GITHUB_ENV"
       - name: Set isolated consumer paths
         run: |
           python3 - <<'PY'
@@ -111,10 +114,18 @@ jobs:
         run: python3 scripts/elf-load-alignment.py "$APP/build/app/outputs/flutter-apk/app-debug.apk" --json "$RECEIPTS/apk-alignment.json"
       - name: Judge all three profiles and remove the dependency
         run: python3 tests/consumers/flutter/consumer.py finish "$APP" "$RECEIPTS"
+      # A test app that crashes before the test connects leaves only a crash report.
+      - name: Keep the simulator crash reports of this job
+        if: always() && matrix.platform == 'iOS'
+        run: |
+          mkdir -p "$RECEIPTS/crash-reports"
+          find "$HOME/Library/Logs/DiagnosticReports" -type f -newer "$RUNNER_TEMP/public-pub-cache" \
+            -exec cp {} "$RECEIPTS/crash-reports/" \; 2>/dev/null || true
+          ls -la "$RECEIPTS/crash-reports"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         if: always()
         with:
-          name: flutter-public-${{ matrix.platform }}
+          name: flutter-public-${{ matrix.platform }}-${{ matrix.codegen }}
           path: ${{ runner.temp }}/flutter-public-receipts/
           if-no-files-found: error
           retention-days: 30
