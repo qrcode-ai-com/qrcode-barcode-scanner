@@ -23,14 +23,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # One diagnostic run: iOS with Cargo's default dev profile, on today's macos-15 image. With
-        # release code generation the test never connected in three runs (44882430387 twice,
-        # 44887343863); this run says whether the profile or the image causes that.
+        # One diagnostic run: iOS with opt-level 3 and nothing else. With the full release code
+        # generation the test never connected (44882430387 twice, 44887343863); with Cargo's default
+        # dev profile it connected and every scan exceeded its budget (44900149034).
         include:
           - platform: iOS
             runner: macos-15
             targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
-            codegen: default
+            codegen: opt3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,7 +38,14 @@ jobs:
       # Simulators and emulators run Flutter in debug mode, so cargokit builds the Rust core with
       # Cargo's dev profile. `release` gives that build the code generation of the package's own
       # [profile.release] (rust/Cargo.toml: opt-level 3, thin LTO, one codegen unit, no debug
-      # assertions); `default` leaves Cargo's dev profile as it is. The receipt records which.
+      # assertions); `opt3` sets opt-level 3 alone; `default` leaves Cargo's dev profile as it is. The receipt records which.
+      - name: Give the Rust core opt-level 3 only
+        if: matrix.codegen == 'opt3'
+        run: |
+          {
+            echo "CARGO_PROFILE_DEV_OPT_LEVEL=3"
+            echo "CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false"
+          } >> "$GITHUB_ENV"
       - name: Give the Rust core the release code generation
         if: matrix.codegen == 'release'
         run: |
