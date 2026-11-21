@@ -72,9 +72,11 @@ jobs:
             integrations/apify/tests/test_actor.py -k "published_schemas or definition_is_consistent or store_page or engine_notices"
       - name: Build the image from the Actor's Dockerfile
         run: |
+          mkdir -p kit
+          docker pull -q apify/actor-python:3.12
+          docker image inspect apify/actor-python:3.12 --format '{{index .RepoDigests 0}}' | tee kit/base-image.txt
           docker build --pull -t "$IMAGE" integrations/apify
           docker image inspect "$IMAGE" --format 'image {{.Id}} · {{.Size}} bytes · {{.Architecture}}'
-          docker image inspect apify/actor-python:3.12 --format 'base {{index .RepoDigests 0}}'
           docker image inspect "$IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}' |
             grep -Fx AGPL-3.0-or-later
           docker run --rm --entrypoint python "$IMAGE" -c \
@@ -89,7 +91,6 @@ jobs:
             --prefill integrations/apify/.actor/input_schema.json
       - name: Judge the three reports
         run: |
-          mkdir -p kit
           cp "$RUNNER_TEMP"/runs/*.log kit/
           python scripts/destination-acceptance.py reports --kind package \
             --produced-by "python integrations/apify/tests/image_consumer.py (docker run of the Actor image)" \

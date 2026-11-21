@@ -96,4 +96,4 @@ The artifact `apify-image-acceptance` keeps the receipt and the run logs.
   Actor fetches the record's address over HTTP instead, which works only for a public record.
 - **A run on the platform** has not been tried: the image was built and run with Docker only.
 - **The base image tag.** `apify/actor-python:3.12` is resolved when Apify builds; the workflow
-  prints the digest it used.
+  keeps the digest it used in `base-image.txt` of its artifact.
