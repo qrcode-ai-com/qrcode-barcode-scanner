@@ -86,14 +86,20 @@ No remote code. The scanner engine is a WebAssembly module packaged inside the e
 
 ### Privacy
 
-The privacy statement is [PRIVACY.md](PRIVACY.md). Where a form asks for a privacy policy
-address, use its public address once this folder is on `main`:
-`https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/store/PRIVACY.md`.
+The extension's own privacy statement is [PRIVACY.md](PRIVACY.md). Where a form asks for a
+privacy policy address, use the publisher's privacy page, `https://qrcode-ai-com.github.io/privacy/`.
+That page and the terms and support pages below are planned on the organisation's GitHub Pages
+site and are live only after the owner's review: open each one before pasting it into a form.
+Until then, the public copy of PRIVACY.md is
+`https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/listing/PRIVACY.md`.
 
 ### Addresses
 
 - Website: `https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension`
-- Support: `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues`
+- Privacy policy: `https://qrcode-ai-com.github.io/privacy/` (live after the owner's review)
+- Terms: `https://qrcode-ai-com.github.io/terms/` (live after the owner's review)
+- Support: `https://qrcode-ai-com.github.io/support/` (live after the owner's review); issues
+  also reach the maintainers at `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues`
 - Source: `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/browser-extension`
 
 ### Images

@@ -1,6 +1,6 @@
-// The store texts, read from store/LISTING.md, and the Firefox Add-ons metadata built from them.
+// The store texts, read from listing/texts.md, and the Firefox Add-ons metadata built from them.
 //
-// LISTING.md is the one copy of every store text: each field is the first ```text block after
+// texts.md is the one copy of every store text: each field is the first ```text block after
 // its ### heading. build.mjs writes build/amo-metadata.json from it for `web-ext sign
 // --amo-metadata`, so the Firefox listing cannot drift from the text the other stores get.
 import { readFileSync } from 'node:fs';
@@ -31,15 +31,15 @@ const FIELDS = {
 function field(markdown, title) {
   const heading = markdown.split('\n').findIndex((line) => /^#{2,3} /.test(line)
     && line.replace(/^#+ /, '') === title);
-  if (heading < 0) throw new Error(`LISTING.md has no heading "${title}"`);
+  if (heading < 0) throw new Error(`listing/texts.md has no heading "${title}"`);
   const after = markdown.split('\n').slice(heading + 1).join('\n');
   const block = /^```text\n([\s\S]*?)\n```$/m.exec(after);
-  if (!block) throw new Error(`LISTING.md has no text block under "${title}"`);
+  if (!block) throw new Error(`listing/texts.md has no text block under "${title}"`);
   return block[1];
 }
 
 export function listingTexts(root = HERE) {
-  const markdown = readFileSync(join(root, 'store', 'LISTING.md'), 'utf8');
+  const markdown = readFileSync(join(root, 'listing', 'texts.md'), 'utf8');
   return Object.fromEntries(Object.entries(FIELDS)
     .map(([key, title]) => [key, field(markdown, title)]));
 }
