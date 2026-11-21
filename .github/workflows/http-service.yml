@@ -1,0 +1,213 @@
+name: HTTP service
+
+# The scanner HTTP service of distribution/http, on GitHub-hosted runners. unit runs its tests on
+# the published engine 0.11.0 and the stagers' self-tests. image stages the tree that the
+# service's own repository holds (scripts/stage-http-satellite.py), builds the image from it on
+# each architecture and saves it. consume runs each saved image fresh, read-only, with no route
+# out of an internal network, judges it from a second container (fast, frame and full, raw and
+# multipart, exact payloads, every refusal) and removes it. rehearse publishes both images to a
+# local registry exactly as the tag does and pulls them back. On an http-v* tag only, publish
+# pushes the judged images to ghcr.io in the protected environment container-http.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/http-service.yml
+      - distribution/http/**
+      - scripts/http-service-release.py
+      - scripts/stage-http-satellite.py
+      - scripts/satellite_stage.py
+      - fixtures/symbology/mixed-code128-qr.png
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/http-service.yml
+      - distribution/http/**
+      - scripts/http-service-release.py
+      - scripts/stage-http-satellite.py
+      - scripts/satellite_stage.py
+    tags: ["http-v*"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit:
+    name: Service tests and stagers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Service tests on the published engine
+        working-directory: distribution/http
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+      - run: python3 scripts/stage-http-satellite.py --self-test
+      - run: python3 scripts/http-service-release.py --self-test
+
+  image:
+    name: Image · ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Stage the tree of the service's repository and build the image from it
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          python3 scripts/stage-http-satellite.py stage --out "$RUNNER_TEMP/staged"
+          python3 scripts/stage-http-satellite.py verify "$RUNNER_TEMP/staged"
+          revision="$(git rev-parse 'HEAD^{commit}')"
+          docker version --format 'docker {{.Server.Version}}'
+          docker build --provenance=false --sbom=false --platform "linux/$ARCHITECTURE" \
+            --build-arg SOURCE_REVISION="$revision" --tag "qrscan-http:candidate-$ARCHITECTURE" "$RUNNER_TEMP/staged"
+          python3 scripts/http-service-release.py save --tag "qrscan-http:candidate-$ARCHITECTURE" \
+            --architecture "$ARCHITECTURE" --revision "$revision" --out "$RUNNER_TEMP/image"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: http-image-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/image/
+          if-no-files-found: error
+
+  consume:
+    name: Clean consumer · ${{ matrix.architecture }}
+    needs: [image]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: amd64
+          - runner: ubuntu-24.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: http-image-${{ matrix.architecture }}
+          path: images
+          digest-mismatch: error
+      - name: Run the image fresh, isolated, judge it from outside and remove it
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          python3 scripts/http-service-release.py consume --images "$PWD/images" --architecture "$ARCHITECTURE" \
+            --fixture fixtures/symbology/mixed-code128-qr.png --receipt "$PWD/consumed/$ARCHITECTURE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: http-consumed-${{ matrix.architecture }}
+          path: consumed/
+          if-no-files-found: error
+
+  rehearse:
+    name: Publication rehearsal on a local registry
+    needs: [consume]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: http-image-*
+          merge-multiple: true
+          path: images
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: http-consumed-*
+          merge-multiple: true
+          path: consumed
+          digest-mismatch: error
+      - name: Publish both images and their index to a local registry, then pull it back
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/qrscan-rehearsal-docker
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
+          python3 scripts/http-service-release.py rehearse --images "$PWD/images" --receipts "$PWD/consumed" \
+            --receipt "$PWD/rehearsal/registry.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: http-rehearsal
+          path: rehearsal/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to ghcr.io
+    if: startsWith(github.ref, 'refs/tags/http-v')
+    needs: [image, consume, rehearse]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: container-http
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Gate the tag against the service version and the engine pin
+        run: python3 scripts/http-service-release.py gate --ref "$GITHUB_REF"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: http-image-*
+          merge-multiple: true
+          path: images
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: http-consumed-*
+          merge-multiple: true
+          path: consumed
+          digest-mismatch: error
+      - name: Re-inspect the downloaded images against what the consumers judged
+        run: python3 scripts/http-service-release.py verify --images "$PWD/images" --receipts "$PWD/consumed"
+      - name: Push the judged images and their index, then read them back
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          DOCKER_CONFIG: ${{ runner.temp }}/qrscan-http-docker
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          chmod 700 "$DOCKER_CONFIG"
+          trap 'docker logout ghcr.io' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          python3 scripts/http-service-release.py publish --images "$PWD/images" --receipts "$PWD/consumed" \
+            --ref "$GITHUB_REF" --receipt "$PWD/published/registry.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: http-published
+          path: published/
+          if-no-files-found: error

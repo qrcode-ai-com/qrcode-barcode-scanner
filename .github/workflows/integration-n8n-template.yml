@@ -1,0 +1,131 @@
+name: integration-n8n-template
+
+# The n8n workflow template run in the open-source n8n server, the way a self-hosted user runs it:
+# the official n8n image pinned by digest, the node built and packed from this checkout and
+# installed with the steps of n8n's own community package installer, the template imported with
+# `n8n import:workflow` and executed with `n8n execute` on the mixed fixture (fast, frame, full),
+# an image without a code and a corrupt file, every branch compared with exact values, the editor
+# canvas captured, the workflows deleted and the node removed. The acceptance receipt judges the
+# three reports. No secrets, nothing published. Untrusted event fields never reach a shell script.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "integrations/automation-js-core/**"
+      - "integrations/n8n/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - "scripts/destination-acceptance.py"
+      - ".github/workflows/integration-n8n-template.yml"
+  push:
+    branches: [main]
+    paths:
+      - "integrations/automation-js-core/**"
+      - "integrations/n8n/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - "scripts/destination-acceptance.py"
+      - ".github/workflows/integration-n8n-template.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-n8n-template-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # n8n 2.48.7, the npm `stable` and `latest` release on 21 November 2026: the multi-architecture
+  # index digest of n8nio/n8n:2.48.7 on Docker Hub.
+  N8N_IMAGE: n8nio/n8n@sha256:fabce3e9678a07d2dde83bd8f5124017f3ec457d0a3fc6b63bb4cec465d63861
+  N8N_VERSION: 2.48.7
+  PLAYWRIGHT_VERSION: 1.65.1
+  PACKAGE: "@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner"
+  NODE_VERSION: 0.1.0
+  ENGINE_VERSION: 0.11.0
+
+jobs:
+  template:
+    name: Template in n8n 2.48.7
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Build, test and pack the node
+        working-directory: integrations/n8n
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          npm test
+          mkdir -p "$RUNNER_TEMP/packs"
+          npm pack --pack-destination "$RUNNER_TEMP/packs"
+      - name: Pull the pinned n8n image
+        run: |
+          set -euo pipefail
+          docker pull "$N8N_IMAGE"
+          version="$(docker run --rm --entrypoint n8n "$N8N_IMAGE" --version)"
+          test "$version" = "$N8N_VERSION"
+      - name: Install Playwright and Chromium for the canvas screenshot
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/playwright"
+          cd "$RUNNER_TEMP/playwright"
+          npm init -y > /dev/null
+          npm install --ignore-scripts --no-audit --no-fund --save-exact "playwright@$PLAYWRIGHT_VERSION"
+          npx playwright install --with-deps chromium
+      - name: Import, run and delete the template in n8n
+        run: |
+          set -euo pipefail
+          image="$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")"
+          mkdir -p evidence
+          cd "$RUNNER_TEMP/playwright"
+          node "$GITHUB_WORKSPACE/integrations/n8n/test/template-in-n8n.mjs" \
+            --image "$N8N_IMAGE" \
+            --tarball "$RUNNER_TEMP/packs/qrcode-ai-com-n8n-nodes-qrcode-barcode-scanner-$NODE_VERSION.tgz" \
+            --work "$RUNNER_TEMP/n8n" \
+            --mixed "$image" \
+            --reports "$RUNNER_TEMP/reports" \
+            --screenshot "$GITHUB_WORKSPACE/evidence/n8n-canvas.png"
+      - name: Judge the three reports and close the receipt
+        run: |
+          set -euo pipefail
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "n8n execute --id=ID --rawOutput (a copy of the template per profile, no budget)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "n8n workflow template in n8n $N8N_VERSION, node packed from this checkout (not published)" \
+            --identifier "qr-barcode-label-check.json with $PACKAGE@$NODE_VERSION" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/n8n/template" \
+            --install "the steps of n8n's community package installer on the packed tarball" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt evidence/acceptance-n8n-template.json
+          # The file n8n loads, resolved from ~/.n8n/nodes: the driver saw it before removing it.
+          node_file="$PACKAGE/dist/nodes/QrcodeBarcodeScanner/QrcodeBarcodeScanner.node.js"
+          python3 scripts/destination-acceptance.py removed \
+            --gone "docker run --rm -v $RUNNER_TEMP/n8n/n8n-home:/home/node/.n8n --entrypoint node $N8N_IMAGE -e \"require.resolve('$node_file', { paths: ['/home/node/.n8n/nodes'] })\"" \
+            --uninstall "n8n's package removal: the package folder and its entry in ~/.n8n/nodes/package.json" \
+            --receipt evidence/acceptance-n8n-template.json
+          python3 scripts/destination-acceptance.py check evidence/acceptance-n8n-template.json
+      - name: Record the files and their sha256
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cp "$RUNNER_TEMP"/n8n/execution-*.json evidence/ 2>/dev/null || true
+          cp integrations/n8n/template/qr-barcode-label-check.json evidence/
+          cp "$RUNNER_TEMP/packs/qrcode-ai-com-n8n-nodes-qrcode-barcode-scanner-$NODE_VERSION.tgz" evidence/ 2>/dev/null || true
+          (cd evidence && sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS" && mv "$RUNNER_TEMP/SHA256SUMS" . && cat SHA256SUMS)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: n8n-template-in-n8n-2.48.7
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
