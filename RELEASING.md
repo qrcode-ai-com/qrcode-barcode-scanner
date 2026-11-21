@@ -1352,15 +1352,14 @@ bypass. Add `mcpb-v*` to the tag ruleset of distribution tags.
    version and a new tag, never a replaced file.
 6. Download both files signed out and compare their digests.
 
-**Smithery.** Smithery lists a local server from its MCPB file, uploaded in
-the browser at `smithery.ai/new` under Local (MCPB bundle). Upload the
-attested file of the release, then check that the listing names
-`scan_image` and `scan_file`. The web form is the route because the
-manifest's tools carry a name and a description only, as the MCPB schema
-requires (`mcpb validate` refuses `inputSchema`, which the consumer checks),
-while `smithery mcp publish`, the CLI, was reported to refuse tools without
-`inputSchema` (arcadeai-labs/smithery-cli#787). No upload has been made: the
-bundle is not listed on Smithery.
+**Smithery.** Smithery takes no new server. It shut down its accounts, API,
+CLI and connection services on 31 October 2026 and stays a public directory
+of servers it verifies itself ([smithery.ai/future](https://www.smithery.ai/future)),
+with no submission form: `smithery.ai/new` answered 404 on 21 November 2026.
+The bundle is not listed there. Users install it from the release file in
+Claude for macOS and Windows or another MCPB host. The manifest's tools carry
+a name and a description only, as the MCPB schema requires (`mcpb validate`
+refuses `inputSchema`, which the consumer checks).
 
 ## PHP package — its own repository
 

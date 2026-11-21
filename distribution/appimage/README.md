@@ -51,8 +51,10 @@ licences, the notices and the pointer to the corresponding source.
 
 **Published on GitHub.** The two files and their SHA-256 list are attached to the release
 [`appimage-v0.11.0`](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/appimage-v0.11.0).
-The engine release `v0.11.0` and its files did not change. The
-[AppImage catalogue](https://appimage.github.io/) does not list the application yet.
+The engine release `v0.11.0` and its files did not change. The AppImage catalogue lists the
+application as [qrcode-barcode-scanner](https://appimage.github.io/qrcode-barcode-scanner/)
+since 20 November 2026, from the entry added by
+[AppImage/appimage.github.io#12218](https://github.com/AppImage/appimage.github.io/pull/12218).
 
 ## Build
 
@@ -163,8 +165,9 @@ gh workflow run appimage.yml -f release_tag=appimage-v0.11.0
   program stays under AGPL-3.0-or-later.
 - The files are released under their own tag, `appimage-vX.Y.Z`, so that the engine release
   stays as it was published.
-- The entry in the [AppImage catalogue](https://appimage.github.io/) is the owner's step: one
-  file under `data/` of its repository, holding this repository's address. The catalogue takes
+- The entry in the [AppImage catalogue](https://appimage.github.io/) is one file under `data/`
+  of its repository, `data/qrcode-barcode-scanner`, holding this repository's address. The
+  catalogue rebuilds its site once a night, so a merged entry appears the next day. It takes
   the AppImage from the newest release of the repository, so a later release without an
   AppImage may make its test fail.
 

@@ -324,8 +324,9 @@ one file that runs `qrscan` with nothing to install. Check it against the accomp
 list, make it executable and run it. The [AppImage recipe](appimage/README.md) documents the
 build and the route for hosts without FUSE. The [public files](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/42953422833),
 downloaded signed out, passed the mixed scan on an Ubuntu 22.04 runner and, with no network, on
-AlmaLinux 8, Ubuntu 22.04 and Fedora containers, for both architectures. The AppImage catalogue
-does not list it yet.
+AlmaLinux 8, Ubuntu 22.04 and Fedora containers, for both architectures. The
+[AppImage catalogue](https://appimage.github.io/qrcode-barcode-scanner/) lists it since
+20 November 2026.
 
 For containers, use the [public GHCR image 0.11.0](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/pkgs/container/qrcode-barcode-scanner)
 on Linux AMD64 or ARM64. The [container guide](docker/v0.11/README.md#run-the-public-image)
@@ -338,7 +339,7 @@ pulled anonymously and ran the exact-content regression checks. The public
 
 These recipes package the 0.11.0 CLI for other systems. Each one pins the v0.11.0 release by the
 SHA-256 of its checksum list, and its checks run in this repository. The Glama container and the
-MCP Bundle for Smithery hold the MCP server 0.3.1 instead, with the engine it was released on, each
+MCP Bundle hold the MCP server 0.3.1 instead, with the engine it was released on, each
 package pinned by its npm integrity. None of these destinations serves the scanner yet, except
 Glama, which lists the MCP server since 20 November 2026. Four destinations received pull requests
 that day (conda-forge two, one per recipe). Three wait for review by their maintainers; MSYS2 closed
@@ -351,7 +352,7 @@ still needs, usually an account or a review in that registry.
 | Artifact Hub | [artifacthub](artifacthub/README.md) | prepared | index composed against the pinned GHCR digests |
 | JSR | [jsr](jsr/README.md) | prepared | `jsr publish --dry-run` and a Deno scan of the staged module |
 | Glama | [glama](glama/README.md) | [listed](https://glama.ai/mcp/servers/qrcode-ai-com/qrcode-barcode-scanner-mcp) | MCP container built and judged offline on amd64 and arm64 |
-| Smithery | [mcpb](mcpb/README.md) | prepared, not uploaded | `mcpb.yml` builds the MCP Bundle twice to the same bytes, runs `mcpb validate` and drives its server over MCP stdio on Linux, macOS and Windows runners and offline in glibc and musl containers |
+| MCP Bundle for Claude for macOS and Windows | [mcpb](mcpb/README.md) | prepared, not released | `mcpb.yml` builds the MCP Bundle twice to the same bytes, runs `mcpb validate` and drives its server over MCP stdio on Linux, macOS and Windows runners and offline in glibc and musl containers |
 | conda-forge | [conda-forge](conda-forge/README.md) | submitted: [CLI](https://github.com/conda-forge/staged-recipes/pull/35745), [Python](https://github.com/conda-forge/staged-recipes/pull/35746) | recipe schema and the test script against the published wheel |
 | Nixpkgs | [nix](nix/README.md) | prepared | evaluated against nixos-unstable, with the crate hash recorded |
 | openSUSE Build Service | [obs](obs/README.md) | prepared | `rpmspec`, `rpmlint` and the service file |

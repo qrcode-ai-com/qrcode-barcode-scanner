@@ -113,7 +113,7 @@ gh attestation verify qrcode-barcode-scanner-0.3.1.mcpb --repo qrcode-ai-com/qrc
 
 ## Smithery
 
-Smithery lists a local MCP server from its MCPB file, uploaded on [smithery.ai/new](https://smithery.ai/new). This bundle is prepared for that upload. It has not been uploaded, and Smithery does not list it.
+Smithery does not list this bundle and takes no new server. It shut down its accounts, API and CLI on 31 October 2026 and stays a public directory of servers it verifies itself ([smithery.ai/future](https://www.smithery.ai/future)). Install the bundle from its release file instead.
 
 ## How it works
 
