@@ -26,6 +26,7 @@ GUIDES = {
     'integrations/adobe-express/README.md': ('integrations/adobe-express', 'Adobe Express'),
     'integrations/agent-plugin/README.md': ('integrations', 'agent integrations'),
     'integrations/github-action/README.md': ('integrations/github-actions', 'GitHub Actions'),
+    'integrations/joomla/README.md': ('integrations/joomla', 'Joomla'),
     'integrations/browser-extension/README.md': ('integrations/browser-extension', 'browser extension'),
     'integrations/apify/README.md': ('integrations/apify', 'Apify'),
     'integrations/comfyui/README.md': ('integrations/comfyui', 'ComfyUI'),

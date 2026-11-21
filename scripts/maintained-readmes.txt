@@ -61,6 +61,7 @@ integrations/canva/README.md
 integrations/comfyui/README.md
 integrations/dify/README.md
 integrations/github-action/README.md
+integrations/joomla/README.md
 integrations/jupyterlab/README.md
 integrations/mcp/README.md
 integrations/n8n/README.md
