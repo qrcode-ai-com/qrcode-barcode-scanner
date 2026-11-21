@@ -28,7 +28,7 @@
     <PackageProjectUrl>https://qrcode-ai.com/en-US/qr-code-scanner/sdk/dotnet</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner</RepositoryUrl>
+    <RepositoryUrl>https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust</RepositoryUrl>
     <!-- The commit comes from the caller, with -p:RepositoryCommit: never from the build host. -->
     <PublishRepositoryUrl>false</PublishRepositoryUrl>
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>

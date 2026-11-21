@@ -17,10 +17,10 @@ engine tag's commit. Its version is the engine's.
 | Name | QR Code & Barcode Scanner for Android |
 | Description | Read QR codes and barcodes from an image in Kotlin on Android, in process, with the open-source engine's native library inside the AAR. |
 | URL | `https://qrcode-ai.com/en-US/qr-code-scanner/sdk/android` |
-| License | MIT, `https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE` (the AAR also carries `LICENSE-NOTES.md`, `LICENSE-APACHE-2.0` and `THIRD-PARTY.md`) |
+| License | MIT, `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE` (the AAR also carries `LICENSE-NOTES.md`, `LICENSE-APACHE-2.0` and `THIRD-PARTY.md`) |
 | Developer | `qrcode-ai-com`, QR Code AI |
-| SCM | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner` |
-| Issues | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues` |
+| SCM | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust` |
+| Issues | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues` |
 | Dependency | `net.java.dev.jna:jna:5.17.0`, type `aar`, runtime |
 | Native library | `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`; minimum SDK 21 |
 | Files | the AAR, the POM, `-sources.jar` (the generated Kotlin), `-javadoc.jar` (a README that points to the binding's documentation, which Central accepts for generated code), each with its `.md5`, `.sha1`, `.sha256` and `.sha512` |
