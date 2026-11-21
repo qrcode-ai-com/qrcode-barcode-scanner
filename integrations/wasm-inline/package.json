@@ -1,0 +1,23 @@
+{
+  "name": "@qrcode-ai-com/wasm-inline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build step that inlines the published WebAssembly engine in one JavaScript module; never published",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "config": {
+    "wasmSha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68"
+  },
+  "scripts": {
+    "inline": "node inline.mjs --out build/qrcode-barcode-scanner.inline.js --receipt build/inline-receipt.json",
+    "test": "node --test test/inline.test.mjs test/bundlers.test.mjs"
+  },
+  "devDependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "esbuild": "0.28.2",
+    "webpack": "5.113.0"
+  }
+}
