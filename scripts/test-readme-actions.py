@@ -96,7 +96,7 @@ class ReadmeActions(unittest.TestCase):
 
     def test_frozen_and_vendored_readmes_are_not_targets(self):
         paths = builder.maintained_readmes()
-        self.assertEqual(len(paths), 67)
+        self.assertEqual(len(paths), 68)
         self.assertNotIn('distribution/docker/v0.11/README.md', paths)
         self.assertNotIn('docs/assets/readme/README.md', paths)
         self.assertFalse(any('/cargokit/' in path for path in paths))
