@@ -46,7 +46,7 @@ The workflow fits a print or packaging check: make the codes with the [QR code g
 
 ## Requirements
 
-You need a self-hosted n8n with the community node `@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner` 0.1.0 installed, as its [README](../README.md#install) explains. n8n Cloud cannot install that node, so the template runs on self-hosted n8n only. The other nodes are n8n core nodes: Manual Trigger, Edit Fields (Set) 3.4, Read/Write Files from Disk 1.1 and Switch 3.2.
+You need a self-hosted n8n with the community node `@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner` 0.1.0 installed, as its [README](../README.md#install) explains. n8n Cloud cannot install that node, so the template runs on self-hosted n8n only. The other nodes are n8n core nodes: Manual Trigger, Edit Fields (Set) 3.4, Read/Write Files from Disk 1.1 and Switch 3.2. The workflow was tested on n8n 2.48.7.
 
 ## Set up and run
 
@@ -59,18 +59,26 @@ The template holds no credential, no webhook and no pinned data. It only reads t
 
 ## What each branch returns
 
-**Scan QR codes and barcodes** reads the binary field `data` of each file with the `Frame` profile, which decodes without scoring. Choose `Full` there to also score how well each QR code scans. **Compare with the expected value** then sends each image to one branch, and every branch writes one item with a `status`:
+**Scan QR codes and barcodes** reads the binary field `data` of each file with the `Frame` profile, which decodes without scoring, and with no time budget, so a busy machine cannot cut a scan short and report a good label as a wrong value. Choose `Full` there to also score how well each QR code scans. **Compare with the expected value** then sends each image to one branch, and every branch writes one item with a `status`:
 
 - **Expected value found**: one of the decoded texts equals `expectedText`. The item holds the `file` name and the texts `found`.
 - **Wrong value**: codes were read, but none equals `expectedText`. The item holds the `file` name, the texts `found` and the `expected` value, so you can see the wrong label.
 - **No code found**: the image holds no code the engine can read. The item holds the `file` name. This is a normal result, not an error.
-- **Unreadable image**: the file is corrupt, is not an image, or is over the node's limits. The scan step sends it to its error output, the item holds the `error` and its `code` (such as `QRS-001`), and the run goes on with the next file.
+- **Unreadable image**: the file is corrupt, is not an image, or is over the node's limits. The scan step sends it to its error output, the item holds the `file` name, the `error` message and its `code` (such as `QRS-001`), and the run goes on with the next file.
 
 Connect a spreadsheet, a chat message or a ticket after the branches you care about.
 
 ## How it was checked
 
-The node's test suite, `npm test` in [integrations/n8n](../README.md#build-and-test-from-source), checks this file: every scan parameter is a real node parameter, every connection points to an existing node, the file holds no credential, pinned data, webhook id or local path, and n8n's own filter sends a scan to the branch its result calls for. The workflow has not yet been imported into a running n8n. Before submission, import it into a clean self-hosted n8n with the published node, run it with the mixed fixture in the three profiles, an image without a code and a corrupt file, and take the canvas screenshot that the library asks for when a template uses a community node.
+The node's test suite, `npm test` in [integrations/n8n](../README.md#build-and-test-from-source), checks this file: every scan parameter is a real node parameter, every connection points to an existing node, the file holds no credential, pinned data, webhook id or local path, and n8n's own filter sends a scan to the branch its result calls for.
+
+The [n8n template job](../../../.github/workflows/integration-n8n-template.yml) then runs the file in the n8n server itself, with [template-in-n8n.mjs](../test/template-in-n8n.mjs). It starts the official `n8nio/n8n` 2.48.7 image, pinned by digest, and installs the node packed from this checkout with the steps n8n's own installer takes under **Settings**, **Community nodes**; only the download differs, because the package comes from the packed file instead of npm. It imports the file unchanged with `n8n import:workflow` and runs it with `n8n execute` on a folder that holds the mixed fixture (a QR code and a Code 128), an image without a code and a file that is not an image:
+
+- the mixed image takes **Expected value found** with `https://qrc-ai.com/76xMa` and `STOCK-4827`;
+- the image without a code takes **No code found**;
+- the corrupt file takes **Unreadable image** with the code `QRS-001`.
+
+Copies of the file run the fast, frame and full profiles with the full report kept, and one copy that expects `STOCK-0001` sends the mixed image to **Wrong value**. Each branch's items are compared with exact values. The job then captures the editor canvas, deletes the workflows through n8n's REST API, removes the node, and judges the three reports with the [acceptance contract](../../../distribution/acceptance/README.md). [LISTING.md](LISTING.md) holds what the template library submission needs.
 
 ## How it works
 
