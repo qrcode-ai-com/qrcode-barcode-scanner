@@ -31,7 +31,8 @@ class LicensingTests(unittest.TestCase):
         paths = ['crates/qrcode-ai-scanner', 'crates/qrcode-ai-scanner-cli',
                  'crates/qrcode-ai-scanner-node', 'crates/qrcode-ai-scanner-wasm',
                  'crates/qrcode-ai-scanner-py', 'bindings/flutter', 'integrations/mcp',
-                 'integrations/openclaw', 'skills/qrcode-barcode-scanner', 'distribution/aur']
+                 'integrations/openclaw', 'skills/qrcode-barcode-scanner', 'distribution/aur',
+                 'bindings/kotlin']
         for path in paths:
             with self.subTest(path=path):
                 self.assertEqual((ROOT / path / 'LICENSE').read_bytes(), license_text.encode())

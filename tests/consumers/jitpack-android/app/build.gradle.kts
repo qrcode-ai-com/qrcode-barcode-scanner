@@ -6,6 +6,8 @@ plugins {
 // -PscannerVersion=<version>   the exact JitPack version string under test
 // -PwithScanner=false          the removal check: the app must still build without the binding
 val scannerVersion = providers.gradleProperty("scannerVersion").orElse("0.11.0")
+// -PscannerGroup=<group>       the group of the publication under test (settings.gradle.kts)
+val scannerGroup = providers.gradleProperty("scannerGroup").orElse("com.github.qrcode-ai-com")
 val withScanner = providers.gradleProperty("withScanner").map { it.toBoolean() }.orElse(true)
 // -PjnaAar=<version>           add JNA's Android AAR explicitly and drop the transitive JNA jar
 val jnaAar = providers.gradleProperty("jnaAar").orNull
@@ -47,7 +49,7 @@ android {
 
 dependencies {
     if (withScanner.get()) {
-        implementation("com.github.qrcode-ai-com:qrcode-barcode-scanner:${scannerVersion.get()}") {
+        implementation("${scannerGroup.get()}:qrcode-barcode-scanner:${scannerVersion.get()}") {
             // The published module metadata of 0.11.0 names JNA without its AAR, so Gradle
             // resolves the plain jar, which carries no Android native dispatcher.
             if (jnaAar != null) exclude(group = "net.java.dev.jna", module = "jna")

@@ -18,7 +18,11 @@ plugins {
 // This field is the drift point the architecture plan §3 closes with
 // `xtask sync-version` (regex/line edit of `version = "..."` below).
 version = "0.11.0"
-group = "com.github.qrcode-ai-com"
+// The group of the publication: JitPack serves it as `com.github.qrcode-ai-com`, the default;
+// the Maven Central bundle is written as `io.github.qrcode-ai-com`, with
+// `-PscannerGroup=io.github.qrcode-ai-com` (.github/workflows/maven-central.yml).
+val publicationGroup = providers.gradleProperty("scannerGroup").orElse("com.github.qrcode-ai-com").get()
+group = publicationGroup
 
 android {
     namespace = "studio.supernovae.qrcodeaiscanner"
@@ -50,6 +54,14 @@ android {
     // 16 KB page size (Android 15+): the NDK r26+ in CI links .so's
     // 16 KB-aligned by default (uniffi plan §7 gotcha #8). No extra flag needed
     // here; this comment documents the requirement on the CI NDK pin (r27).
+
+    // The sources jar Maven Central requires, with the generated Kotlin in it. Its javadoc jar
+    // is written by scripts/maven-central-bundle.py.
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 dependencies {
@@ -75,10 +87,22 @@ dependencies {
 // .github/workflows/kotlin-publication.yml proves it on an emulator.
 tasks.withType<GenerateModuleMetadata>().configureEach { enabled = false }
 
+// Every copy of the AAR carries its license files at its root: the MIT license of the binding
+// and the notices of the native library inside it (bindings/kotlin/LICENSE-NOTES.md).
+// scripts/maven-central-bundle.py refuses an AAR without them.
+tasks.withType<Zip>().matching { it.name == "bundleReleaseAar" }.configureEach {
+    from(
+        rootDir.resolve("LICENSE"),
+        rootDir.resolve("LICENSE-NOTES.md"),
+        rootDir.resolve("../../crates/qrcode-ai-scanner/LICENSE-APACHE-2.0"),
+        rootDir.resolve("../../crates/qrcode-ai-scanner/THIRD-PARTY.md"),
+    )
+}
+
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.github.qrcode-ai-com"
+            groupId = publicationGroup
             artifactId = "qrcode-barcode-scanner"
             version = project.version.toString()
 
@@ -87,15 +111,34 @@ publishing {
             }
 
             pom {
-                name.set("qrcode-barcode-scanner (Kotlin/Android)")
-                description.set("Kotlin/Android bindings for qrcode-barcode-scanner via UniFFI.")
-                url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
+                name.set("QR Code & Barcode Scanner for Android")
+                description.set(
+                    "Read QR codes and barcodes from an image in Kotlin on Android, in process, with the " +
+                        "open-source engine's native library inside the AAR."
+                )
+                url.set("https://qrcode-ai.com/en-US/qr-code-scanner/sdk/android")
                 licenses {
                     // Project-authored source is MIT; dependencies retain their own notices.
                     license {
                         name.set("MIT")
                         url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE")
                     }
+                }
+                developers {
+                    developer {
+                        id.set("qrcode-ai-com")
+                        name.set("QR Code AI")
+                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
+                    connection.set("scm:git:https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/qrcode-ai-com/qrcode-barcode-scanner.git")
+                }
+                issueManagement {
+                    system.set("GitHub")
+                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues")
                 }
             }
         }
