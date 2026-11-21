@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Thibaut Mélen" }, { name = "Nicolas Cella" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # The napari plugin convention: napari and a Qt backend are the user's, not dependencies.
 dependencies = [
     "numpy>=1.24",

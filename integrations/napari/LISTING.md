@@ -48,7 +48,7 @@ are the ones PyPI must serve.
 | Contributions | the widget "Scan QR codes and barcodes" and its command | `napari.yaml` `contributions` |
 | Authors | Thibaut Mélen, Nicolas Cella | `pyproject.toml` `authors` |
 | Licence | MIT | `pyproject.toml` `license` |
-| Python | >= 3.10 | `pyproject.toml` `requires-python` |
+| Python | >= 3.11 (napari 0.10 needs 3.11) | `pyproject.toml` `requires-python` |
 | Operating systems | macOS, Windows, Linux | classifiers |
 | Requirements | numpy >= 1.24, magicgui >= 0.8, qrcode-barcode-scanner == 0.11.0; napari and Qt are the user's | `pyproject.toml` `dependencies` |
 | Homepage | <https://qrcode-ai.com/en-US/qr-code-scanner/integrations/napari> | `[project.urls]` |
