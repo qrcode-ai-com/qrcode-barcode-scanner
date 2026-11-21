@@ -1,0 +1,83 @@
+/* The scanner panel. JupyterLab's own variables give it the active theme, light or dark. */
+.jp-qrscan-panel {
+  overflow: auto;
+  padding: 16px 24px;
+  color: var(--jp-ui-font-color1);
+  background: var(--jp-layout-color0);
+  font-family: var(--jp-ui-font-family);
+  font-size: var(--jp-ui-font-size1);
+  line-height: 1.5;
+}
+
+.jp-qrscan-panel section {
+  max-width: 760px;
+  margin-bottom: 16px;
+}
+
+.jp-qrscan-panel h2,
+.jp-qrscan-panel h3 {
+  margin: 8px 0;
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-qrscan-panel label {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.jp-qrscan-panel select,
+.jp-qrscan-panel input[type='file'] {
+  margin-top: 4px;
+}
+
+.jp-qrscan-muted,
+.jp-qrscan-links {
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-qrscan-panel a {
+  color: var(--jp-content-link-color);
+}
+
+.jp-qrscan-mono,
+.jp-qrscan-value {
+  font-family: var(--jp-code-font-family);
+  font-size: var(--jp-code-font-size);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.jp-qrscan-detections li {
+  margin: 6px 0;
+}
+
+.jp-qrscan-format {
+  font-weight: 600;
+}
+
+.jp-qrscan-value {
+  margin: 2px 0 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--jp-layout-color2);
+}
+
+.jp-qrscan-panel #report-json {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.jp-qrscan-about dl div {
+  display: flex;
+  gap: 8px;
+}
+
+.jp-qrscan-about dt {
+  min-width: 140px;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-qrscan-about dd {
+  margin: 0;
+}
