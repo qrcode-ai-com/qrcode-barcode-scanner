@@ -17,7 +17,12 @@ validated with `agy plugin validate`.
 - The plugin repository has `.antigravity-plugin/plugin.json` and `mcp_config.json`, at tag
   `v0.3.0` and on `main` (`f37ab720795a7a15f27d5a00c302afdb321b9b3d`). The engine CI checks that
   manifest against `https://antigravity.google/schemas/v1/plugin.json`.
-- Not done here: `agy plugin validate`, which needs the Antigravity CLI.
+- On 2026-11-21, Antigravity CLI 1.1.8 validated a clone of tag `v0.3.0`
+  (`dbfb75f0c7c45b2018edd613afcf24c629ac0a69`) with `agy plugin validate`: one skill and one MCP
+  server processed. In a scratch home without sign-in, `agy plugin install` of that folder installed
+  `qrcode-barcode-scanner` with the `qrscan` server pinned to the npm adapter 0.3.1, and
+  `agy plugin uninstall qrcode-barcode-scanner` removed it. No scan ran: a scan needs a signed-in
+  Antigravity session.
 
 ## Submission: the form, field by field
 
@@ -34,6 +39,6 @@ validated with `agy plugin validate`.
 
 ## The owner's next action
 
-1. Optionally run `agy plugin validate` on a clone of the plugin repository.
+1. Optionally sign in to Antigravity and ask it to read a QR code image, to see a scan end to end.
 2. Open https://forms.gle/2EX5RFYPoJe1UgxR9, fill in the company and contact fields (Google uses
    them to verify the organization), paste the plugin values above, and submit.
