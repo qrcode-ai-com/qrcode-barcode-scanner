@@ -1,0 +1,12 @@
+{
+  "id": "KAGGLE_USERNAME/qr-code-barcode-scanner-demo",
+  "title": "QR Code & Barcode Scanner demo",
+  "code_file": "qrcode-barcode-scanner-demo.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "docker_image_pinning_type": "original",
+  "keywords": ["computer vision", "image", "python", "beginner"]
+}

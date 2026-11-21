@@ -3,6 +3,7 @@
 
   check-demo-notebook.py source NOTEBOOK --requirements FILE --page-key KEY
   check-demo-notebook.py executed NOTEBOOK
+  check-demo-notebook.py kaggle FOLDER --requirements FILE
   check-demo-notebook.py --self-test
 
 `source` judges the notebook as committed:
@@ -14,6 +15,17 @@
   version   the version its install cell pins is the one FILE pins (binder/requirements.txt, which
             a notebook host installs before the notebook opens)
   hashes    FILE pins that one requirement with --hash values, so pip refuses any other file
+
+`kaggle` judges a folder `kaggle kernels push -p FOLDER` publishes (examples/kaggle/):
+
+  metadata  kernel-metadata.json holds only fields the Kaggle CLI reads; a Python notebook, public,
+            no GPU, Internet on (the install and the sample need it), the original environment
+            pinned, distinct tags; its id is <username>/<slug>, the slug Kaggle derives from the
+            title, and code_file is a notebook beside it
+  notebook  clean, version and hashes as for `source`; its first cell links the PyPI page of
+            the pinned version and the source repository, and no cell links a QR Code AI product
+            page (the owner's Kaggle terms decision, examples/kaggle/LISTING.md); a code cell
+            reads the sample from the release tag of that version and one writes scan-reports/
 
 `executed` judges a copy a host ran from top to bottom (Run All, `jupyter execute` or
 `jupyter nbconvert --execute`): every code cell ran, in order, and none ended in an error. The
@@ -65,7 +77,7 @@ def judge_source(notebook, requirements, page_key):
     cells = notebook.get("cells", [])
     first = text(cells[0]) if cells and cells[0].get("cell_type") == "markdown" else ""
     shown = MARKDOWN_LINK.findall(first)
-    for address in links_of(page_key):
+    for address in links_of(page_key) if page_key else ():
         if address not in shown:
             problems.append(f"links: the first cell has no link to {address}")
     pinned = sorted({version for cell in code_cells(notebook) for version in PIN.findall(text(cell))
@@ -102,6 +114,87 @@ def judge_executed(notebook):
     if ran != sorted(ran) or len(set(ran)) != len(ran):
         problems.append(f"executed: the cells did not run once each, in order (counts {counts})")
     return problems
+
+
+# ------------------------------------------------------------------------------------------ kaggle
+
+KAGGLE_FIELDS = {"id", "id_no", "title", "code_file", "language", "kernel_type", "is_private",
+                 "enable_gpu", "enable_tpu", "enable_internet", "machine_shape", "dataset_sources",
+                 "competition_sources", "kernel_sources", "model_sources", "keywords",
+                 "docker_image_pinning_type", "docker_image"}
+KAGGLE_WANT = {"language": "python", "kernel_type": "notebook", "is_private": False, "enable_gpu": False,
+               "enable_internet": True, "docker_image_pinning_type": "original"}
+KAGGLE_ID = re.compile(r"^([A-Za-z0-9_-]+)/([a-z0-9-]+)$")
+PYPI_PAGE = "https://pypi.org/project/{package}/{version}/"
+SOURCE = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
+SAMPLE_PATH = "/fixtures/symbology/mixed-code128-qr.png"
+
+
+def kaggle_slug(title):
+    """The slug Kaggle derives from a title (python-slugify on ASCII text): lower case, every run
+    of other characters one dash."""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def judge_kaggle(metadata, notebook, requirements, code_file_present=True):
+    """The problems of the Kaggle folder as committed (kernel-metadata.json and its notebook)."""
+    problems = []
+    if not isinstance(metadata, dict):
+        return ["metadata: kernel-metadata.json does not hold one JSON object"]
+    for key in sorted(set(metadata) - KAGGLE_FIELDS):
+        problems.append(f"metadata: {key} is not a field kaggle kernels push reads")
+    for key, value in KAGGLE_WANT.items():
+        if type(metadata.get(key)) is not type(value) or metadata.get(key) != value:
+            problems.append(f"metadata: {key} is {metadata.get(key)!r}, want {value!r}")
+    title = metadata.get("title")
+    match = KAGGLE_ID.match(str(metadata.get("id", "")))
+    if not isinstance(title, str) or len(title) < 5:
+        problems.append("metadata: the title must be a text of five characters or more")
+    elif not match:
+        problems.append(f"metadata: id {metadata.get('id')!r} is not <username>/<slug>")
+    elif match[2] != kaggle_slug(title):
+        problems.append(f"metadata: the id's slug {match[2]!r} is not the title's slug {kaggle_slug(title)!r}")
+    if "id_no" in metadata:
+        problems.append("metadata: id_no would override id; the first push creates the notebook from id")
+    if not code_file_present:
+        problems.append(f"metadata: code_file {metadata.get('code_file')!r} is not a notebook beside it")
+    keywords = metadata.get("keywords")
+    if not isinstance(keywords, list) or not keywords or not all(isinstance(word, str) and word for word in keywords) \
+            or len(set(keywords)) != len(keywords):
+        problems.append("metadata: keywords must be a list of distinct tags")
+    problems += judge_source(notebook, requirements, None)
+    pinned = sorted({version for cell in code_cells(notebook) for version in PIN.findall(text(cell))
+                     if "pip install" in text(cell)})
+    cells = notebook.get("cells", [])
+    first = text(cells[0]) if cells and cells[0].get("cell_type") == "markdown" else ""
+    shown = MARKDOWN_LINK.findall(first)
+    if len(pinned) == 1:
+        if PYPI_PAGE.format(package=PACKAGE, version=pinned[0]) not in shown:
+            problems.append(f"links: the first cell has no link to the PyPI page of {pinned[0]}")
+        sample = f"{SOURCE.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/v{pinned[0]}"
+        # Adjacent string literals are one string: "…/rust/"\n"v1.2.3/…" reads as …/rust/v1.2.3/….
+        joined = [re.sub(r'"\s*\n?\s*"', "", text(cell)) for cell in code_cells(notebook)]
+        if not any(sample + SAMPLE_PATH in code for code in joined):
+            problems.append(f"sample: no code cell reads the sample from tag v{pinned[0]}")
+    if not any(address == SOURCE or address.startswith(SOURCE + "/") for address in shown):
+        problems.append(f"links: the first cell has no link to the source repository {SOURCE}")
+    every = [address for cell in cells for address in MARKDOWN_LINK.findall(text(cell))]
+    if any("qrcode-ai.com" in address for address in every):
+        problems.append("links: a QR Code AI product link is shown; the Kaggle notebook links the source and PyPI "
+                        "only until the owner settles the terms decision (examples/kaggle/LISTING.md)")
+    if not any("scan-reports" in text(cell) for cell in code_cells(notebook)):
+        problems.append("reports: no code cell writes the three reports to scan-reports/")
+    return problems
+
+
+def load_kaggle(folder):
+    """(metadata, notebook, code file present) of a Kaggle folder; OSError or ValueError when unreadable."""
+    folder = pathlib.Path(folder)
+    metadata = json.loads((folder / "kernel-metadata.json").read_text(encoding="utf-8"))
+    code = folder / str(metadata.get("code_file", "")) if isinstance(metadata, dict) else None
+    present = bool(code) and code.suffix == ".ipynb" and code.is_file() and code.parent == folder
+    notebook = json.loads(code.read_text(encoding="utf-8")) if present else {"cells": []}
+    return metadata, notebook, present
 
 
 def self_test():
@@ -155,9 +248,54 @@ def self_test():
         outputs=[{"output_type": "error", "ename": "AssertionError", "evalue": "fast"}]), "ended in AssertionError: fast")
     executed("out-of-order", lambda nb: nb["cells"][1].update(execution_count=5), "did not run once each, in order")
     executed("no-code", lambda nb: nb.update(cells=[nb["cells"][0]]), "has no code cell")
+    sample_url = SOURCE.replace("https://github.com/", "https://raw.githubusercontent.com/") + "/v9.9.9" + SAMPLE_PATH
+    kaggle_intro = (f"# Demo\n\n[`{PACKAGE}`]({PYPI_PAGE.format(package=PACKAGE, version='9.9.9')}) "
+                    f"from [the source]({SOURCE}/tree/main/examples/kaggle).")
+    kaggle_good = {"cells": [
+        {"cell_type": "markdown", "source": kaggle_intro},
+        {"cell_type": "code", "source": f"%pip install --quiet {PACKAGE}==9.9.9", "outputs": [], "execution_count": None},
+        {"cell_type": "code", "source": f'URL = "{sample_url}"\nout = "scan-reports"', "outputs": [],
+         "execution_count": None},
+    ]}
+    meta_good = {"id": "someone/qr-code-barcode-scanner-demo", "title": "QR Code & Barcode Scanner demo",
+                 "code_file": "demo.ipynb", "language": "python", "kernel_type": "notebook", "is_private": False,
+                 "enable_gpu": False, "enable_internet": True, "docker_image_pinning_type": "original",
+                 "keywords": ["image", "python"]}
+
+    def kaggle(name, change, needle, present=True):
+        metadata, notebook = json.loads(json.dumps(meta_good)), json.loads(json.dumps(kaggle_good))
+        change(metadata, notebook)
+        expect(name, judge_kaggle(metadata, notebook, requirements, present), needle)
+
+    kaggle("kaggle-good", lambda m, nb: None, None)
+    kaggle("kaggle-private", lambda m, nb: m.update(is_private=True), "is_private is True")
+    kaggle("kaggle-internet-off", lambda m, nb: m.update(enable_internet=False), "enable_internet is False")
+    kaggle("kaggle-string-bool", lambda m, nb: m.update(enable_gpu="false"), "enable_gpu is 'false'")
+    kaggle("kaggle-latest-image", lambda m, nb: m.update(docker_image_pinning_type="latest"), "docker_image_pinning_type")
+    kaggle("kaggle-unknown-field", lambda m, nb: m.update(colour="blue"), "colour is not a field")
+    kaggle("kaggle-slug", lambda m, nb: m.update(id="someone/qrcode-barcode-scanner-demo"), "is not the title's slug")
+    kaggle("kaggle-id", lambda m, nb: m.update(id="qr-code-barcode-scanner-demo"), "is not <username>/<slug>")
+    kaggle("kaggle-id-no", lambda m, nb: m.update(id_no=12), "id_no would override id")
+    kaggle("kaggle-tags", lambda m, nb: m.update(keywords=["image", "image"]), "distinct tags")
+    kaggle("kaggle-code-file", lambda m, nb: None, "is not a notebook beside it", present=False)
+    kaggle("kaggle-output", lambda m, nb: nb["cells"][1].update(execution_count=1), "clean: code cell 1")
+    kaggle("kaggle-other-version", lambda m, nb: nb["cells"][1].update(source=f"%pip install {PACKAGE}==9.9.8"),
+           "the notebook installs 9.9.8")
+    kaggle("kaggle-no-pypi", lambda m, nb: nb["cells"][0].update(source=kaggle_intro.replace("pypi.org", "example.com")),
+           "no link to the PyPI page")
+    kaggle("kaggle-no-source", lambda m, nb: nb["cells"][0].update(source=kaggle_intro.replace(f"({SOURCE}/", "(https://example.com/")),
+           "no link to the source repository")
+    kaggle("kaggle-product-link", lambda m, nb: nb["cells"].append(
+        {"cell_type": "markdown", "source": "[scanner](https://qrcode-ai.com/en-US/qr-code-scanner)"}), "product link")
+    kaggle("kaggle-other-tag", lambda m, nb: nb["cells"][2].update(source=nb["cells"][2]["source"].replace("v9.9.9", "v9.9.8")),
+           "reads the sample from tag v9.9.9")
+    kaggle("kaggle-split-url", lambda m, nb: nb["cells"][2].update(
+        source=nb["cells"][2]["source"].replace("/v9.9.9/", '/"\n    "v9.9.9/')), None)
+    kaggle("kaggle-no-reports", lambda m, nb: nb["cells"][2].update(source=f'URL = "{sample_url}"'), "scan-reports")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'FAILED' if failures else 'ok'} (11 committed notebooks, 5 executed notebooks)")
+    print(f"self-test: {'FAILED' if failures else 'ok'} (11 committed notebooks, 5 executed notebooks, "
+          "19 Kaggle folders)")
     return 1 if failures else 0
 
 
@@ -171,12 +309,27 @@ def main(argv=None):
     one.add_argument("--page-key", required=True, help="the notebook's guide on the site, such as sdk/python")
     two = commands.add_parser("executed", help="judge a copy a host ran from top to bottom")
     two.add_argument("notebook")
+    three = commands.add_parser("kaggle", help="judge a folder kaggle kernels push publishes")
+    three.add_argument("folder")
+    three.add_argument("--requirements", required=True, help="the requirements file that pins the same version")
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test()
     if not args.command:
         parser.print_usage(sys.stderr)
         return 2
+    if args.command == "kaggle":
+        try:
+            metadata, notebook, present = load_kaggle(args.folder)
+            requirements = pathlib.Path(args.requirements).read_text(encoding="utf-8")
+        except (OSError, ValueError) as error:
+            print(f"check-demo-notebook: {error}", file=sys.stderr)
+            return 2
+        problems = judge_kaggle(metadata, notebook, requirements, present)
+        for problem in problems:
+            print(f"FAILED · {problem}", file=sys.stderr)
+        print(f"{'FAILED' if problems else 'ok'}    {args.folder} · kaggle")
+        return 1 if problems else 0
     try:
         notebook = json.loads(pathlib.Path(args.notebook).read_text(encoding="utf-8"))
         requirements = pathlib.Path(args.requirements).read_text(encoding="utf-8") if args.command == "source" else ""
