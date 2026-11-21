@@ -60,7 +60,7 @@ for _path in ('crates/qrcode-ai-scanner-cli', 'distribution/appimage', 'distribu
 # The packaging recipes, one folder per channel.
 for _path in ('distribution/alpine', 'distribution/conda-forge', 'distribution/freebsd',
               'distribution/macports', 'distribution/msys2', 'distribution/nix', 'distribution/obs',
-              'distribution/ppa', 'distribution/snap', 'distribution/termux'):
+              'distribution/ppa', 'distribution/snap', 'distribution/termux', 'distribution/wasmer'):
     GUIDES[f'{_path}/README.md'] = ('cli', 'command line')
 GUIDES['distribution/artifacthub/README.md'] = ('docker', 'Docker')
 GUIDES['distribution/glama/README.md'] = ('mcp', 'MCP')

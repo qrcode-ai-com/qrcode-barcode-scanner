@@ -1,0 +1,27 @@
+# The Wasmer package of the qrscan command, built for wasm32-wasip1 from the source of tag v0.11.0.
+# package.py assembles it beside qrscan.wasm and its license files; nothing here is published.
+# Wasmer packs the module, the readme, the license file and the [fs] directories only: the
+# notices directory carries the other license texts and the source record into the package.
+[package]
+name = "qrcode-ai-com/qrcode-barcode-scanner"
+version = "0.11.0"
+description = "Open-source QR code and barcode scanner: the qrscan command as a WASI module. It reads an image file and prints the JSON report, locally."
+license = "AGPL-3.0-or-later"
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
+homepage = "https://qrcode-ai.com/"
+entrypoint = "qrscan"
+
+[fs]
+"/notices" = "notices"
+
+[[module]]
+name = "qrscan"
+source = "qrscan.wasm"
+abi = "wasi"
+
+[[command]]
+name = "qrscan"
+module = "qrscan"
+runner = "wasi"
