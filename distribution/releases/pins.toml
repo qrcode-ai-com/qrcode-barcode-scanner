@@ -166,6 +166,8 @@ paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workfl
 held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
 paths = [
   "distribution/http/**",
+  "distribution/render/**",
+  "scripts/check-http-hosts.py",
   "scripts/http-service-release.py",
   "scripts/stage-http-satellite.py",
   ".github/workflows/http-service.yml",

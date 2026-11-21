@@ -1,0 +1,22 @@
+# Render Blueprint of the QR Code & Barcode Scanner HTTP service: one web service built from the
+# Dockerfile at the root of this repository (https://render.com/docs/blueprint-spec).
+# scripts/check-http-hosts.py in the engine repository holds this file to Render's schema and to
+# the service, and its workflow runs the image as this file asks Render to run it.
+services:
+  - type: web
+    name: qrcode-barcode-scanner-http
+    runtime: docker
+    # Half a CPU and 512 MB, $7 a month prorated to the second. On the free plan's 0.1 CPU a scan
+    # takes 12 to 17 seconds and the engine cuts it short: the free plan is not this file's plan.
+    plan: 0.5c-512mb
+    healthCheckPath: /healthz
+    # Render advises 'off' for a Deploy to Render button: a push here then redeploys no copy.
+    autoDeployTrigger: 'off'
+    envVars:
+      # One scan at a time on 512 MB. Settings may lower the service's limits, never raise them.
+      - key: QRSCAN_HTTP_MAX_CONCURRENT
+        value: "1"
+      # Half a CPU runs every stage about twice as slowly, and the CPU is shared: four times the
+      # engine's budgets (fast 3.2 s, frame 320 ms, full 16 s).
+      - key: QRSCAN_HTTP_BUDGET_SCALE
+        value: "4"
