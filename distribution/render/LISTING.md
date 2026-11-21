@@ -10,7 +10,7 @@ kit holds what the owner needs to deploy it once for acceptance and then add the
 | Item | Value |
 | --- | --- |
 | Repository | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http`, generated from `distribution/http` by `scripts/stage-http-satellite.py`; `SOURCE.json` names the engine commit |
-| Blueprint | `render.yaml` at its root: one `web` service named `qrcode-barcode-scanner-http`, `runtime: docker`, `plan: 0.5c-512mb`, `healthCheckPath: /healthz`, `autoDeployTrigger: 'off'`, `QRSCAN_HTTP_MAX_CONCURRENT=1`, `QRSCAN_HTTP_BUDGET_SCALE=2` |
+| Blueprint | `render.yaml` at its root: one `web` service named `qrcode-barcode-scanner-http`, `runtime: docker`, `plan: 0.5c-512mb`, `healthCheckPath: /healthz`, `autoDeployTrigger: 'off'`, `QRSCAN_HTTP_MAX_CONCURRENT=1`, `QRSCAN_HTTP_BUDGET_SCALE=4` |
 | Image | built by Render from the `Dockerfile` at the root: Node.js 22 on `node:22.22.2-bookworm-slim` pinned by digest, the engine `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` from the lockfile's sha512, user `1000:1000` |
 | Port | the service reads `PORT`, which Render sets to `10000` for every web service |
 | Checked in the engine | `http-service.yml`, job `hosts`: `render.yaml` against `https://render.com/schema/render.yaml.json`, then the judged image run with `PORT=10000`, the file's variables, half a CPU and 512 MB, judged by `test/consumer.mjs` (mixed QR code and Code 128 in fast, frame and full, exact payloads, every refusal) |
@@ -27,8 +27,9 @@ kit holds what the owner needs to deploy it once for acceptance and then add the
   container limited to 0.1 CPU and 512 MB, on 21 November 2026, a scan of the mixed sample took 12
   to 17 seconds, and with the engine's budgets every profile came back with
   `trace.budget_exhausted: true` (`frame` found only the QR code). The engine CI job `hosts`
-  failed the same way on the free plan's profile (run 44892618394). At 0.5 CPU the same scans took
-  under a second, within the budgets.
+  failed the same way on the free plan's profile (run 44892618394). In the same job on the
+  `0.5c-512mb` profile, each scan took 0.9 to 1.3 seconds in the engine (run 44896488776), which
+  is why the Blueprint sets four times the engine's budgets.
 - The Hobby workspace is 0 USD a month plus compute. Outbound bandwidth beyond the workspace's
   included amount is 0.15 USD per GB. Check both pages again before choosing a plan.
 

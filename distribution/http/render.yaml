@@ -16,6 +16,7 @@ services:
       # One scan at a time on 512 MB. Settings may lower the service's limits, never raise them.
       - key: QRSCAN_HTTP_MAX_CONCURRENT
         value: "1"
-      # Half a CPU runs every stage about twice as slowly: twice the engine's budgets.
+      # Half a CPU runs every stage about twice as slowly, and the CPU is shared: four times the
+      # engine's budgets (fast 3.2 s, frame 320 ms, full 16 s).
       - key: QRSCAN_HTTP_BUDGET_SCALE
-        value: "2"
+        value: "4"

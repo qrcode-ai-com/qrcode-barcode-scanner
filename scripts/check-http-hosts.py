@@ -89,12 +89,17 @@ def limit_variables(pairs, name):
 
 
 def budget_scale(cpus, env, name):
-    """Refused when a plan with a fraction of a CPU keeps budgets the engine would cut short."""
-    need = math.ceil(round(1 / float(cpus), 6))
+    """Refused when a plan keeps budgets the engine would cut short on its share of a CPU.
+
+    On a whole CPU of the CI runners a scan of the mixed sample takes 490 to 650 ms in the engine,
+    against fast's 800 ms, and half a CPU doubles it. A host's CPU is shared with other tenants:
+    a host file sets the scale to at least twice one over its plan's share of a CPU.
+    """
+    need = math.ceil(round(2 / float(cpus), 6))
     scale = int(env.get(BUDGET_SCALE, "1"))
     if scale < need:
         raise Refused(f"{name} runs the service on {cpus} CPU: set {BUDGET_SCALE} to at least {need}, "
-                      "or the engine cuts its scans short")
+                      "or the engine may cut its scans short")
 
 
 def validate(data, schema, name):
@@ -185,7 +190,7 @@ def self_test():
         "a number, not a string": (re.sub(r'value: "(\d+)"', r"value: \1", good, count=1), "quoted string"),
         "two services": (good + good.split("services:\n", 1)[1], "one service"),
         "the engine's budgets on half a CPU": (re.sub(r'(?m)^ *- key: QRSCAN_HTTP_BUDGET_SCALE\n *value: "\d+"\n', "", good),
-                                               "at least 2"),
+                                               "at least 4"),
         "a budget scale above 20": (re.sub(r'(key: QRSCAN_HTTP_BUDGET_SCALE\n *value: )"\d+"', r'\1"21"', good),
                                     "above the service limit 20"),
     }

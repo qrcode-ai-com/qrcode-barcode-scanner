@@ -57,11 +57,15 @@ function exchange(base, method, path, { body, headers = {}, chunked = false } = 
 }
 
 describe("the service on the installed engine", () => {
+  const SCALE = 4;
   let server;
   let base;
   const lines = [];
   before(async () => {
-    server = createScanServer({ engine, limits: limitsFromEnvironment({}), source, log: (line) => lines.push(line) });
+    // The speed of the test machine is not under test: on a CI runner a scan of the sample takes
+    // 490 to 650 ms in the engine, close to fast's 800 ms, so these scans run with four times the
+    // budgets. The image jobs judge the engine's own budgets.
+    server = createScanServer({ engine, limits: limitsFromEnvironment({}), budgetScale: SCALE, source, log: (line) => lines.push(line) });
     base = await listen(server);
   });
   after(() => server.close());
@@ -75,7 +79,9 @@ describe("the service on the installed engine", () => {
   test("the report is the engine's own, field for field", async () => {
     const answer = await exchange(base, "POST", "/scan?mode=full", { body: fixture, headers: { "content-type": "image/png" } });
     assert.equal(answer.status, 200);
-    const direct = await engine.scan(fixture, { profile: "full", maxDimension: HARD_LIMITS.dimension, maxPixels: HARD_LIMITS.pixels });
+    const direct = await engine.scan(fixture, {
+      profile: "full", maxDimension: HARD_LIMITS.dimension, maxPixels: HARD_LIMITS.pixels, budgetMs: PROFILE_BUDGETS_MS.full * SCALE,
+    });
     // Only the measured durations differ from one scan to the next.
     const timeless = (value) => JSON.parse(JSON.stringify(value, (key, item) => (key === "ms" || key === "total_ms" ? 0 : item)));
     assert.deepEqual(timeless(JSON.parse(answer.body)), timeless(direct));
@@ -237,7 +243,8 @@ describe("what the service refuses before a scan", () => {
         for (const mode of ["fast", "frame", "full"]) {
           const answer = await exchange(base, "POST", `/scan?mode=${mode}`, { body: fixture, headers: { "content-type": "image/png" } });
           assert.equal(answer.status, 200, mode);
-          assert.equal(JSON.parse(answer.body).trace.budget_exhausted, false, mode);
+          // With the engine's own budgets, whether a scan is cut depends on the machine.
+          if (scale > 1) assert.equal(JSON.parse(answer.body).trace.budget_exhausted, false, mode);
         }
         const wanted = scale === 1 ? [undefined, undefined, undefined] : [8_000, 800, 40_000];
         assert.deepEqual(calls.map((options) => options.budgetMs), wanted);
