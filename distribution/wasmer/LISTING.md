@@ -33,8 +33,9 @@ package names the tag as its corresponding source.
 - Workflow: **Wasmer · WASI module** (`.github/workflows/wasmer.yml`).
 - Artifact: `qrscan-wasmer-package`, a folder with `wasmer.toml`, `README.md`, `LICENSE`,
   `qrscan.wasm`, `notices/` and `SHA256SUMS`.
-- `qrscan.wasm` sha256: `PENDING-CI` (recorded by the first green run; the workflow builds the
-  module twice, in two directories, and requires the same sha256).
+- `qrscan.wasm` sha256: `65c4436f2ac461bd94696c9daaf7fce40bf5a6c26203f1a7115a8d9201c45460`. Both
+  builds of run [44883180229](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44883180229),
+  in two directories, gave it; every later run of the same source and toolchain must give it too.
 - First green run: `PENDING-CI`.
 
 Take the artifact of the latest green run on `main` for the merged commit: its

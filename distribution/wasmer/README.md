@@ -67,7 +67,7 @@ wasmer run --offline --volume /tmp/images:/data ./qrscan-wasmer-package -- /data
 
 The module sees only the directories you map: `--volume HOST:GUEST` maps a host directory to a path inside the module, and the image path you pass is that inside path. The options after `--` go to qrscan, for example `--profile frame` or `--budget-ms 0`. qrscan prints the JSON report on stdout. It exits with 0 when it found at least one code, 1 when it found none and 2 when the image could not be read. `--offline` keeps Wasmer from asking the registry about a local folder.
 
-`qrscan-in-wasmer.sh` does the mapping for you. Set `QRSCAN_WASMER_PACKAGE` to the package folder, then call it as you would call qrscan:
+`qrscan-in-wasmer.sh` does the mapping and the colour choice for you. Set `QRSCAN_WASMER_PACKAGE` to the package folder, then call it as you would call qrscan:
 
 ```sh
 QRSCAN_WASMER_PACKAGE=./qrscan-wasmer-package distribution/wasmer/qrscan-in-wasmer.sh /tmp/images/label.png --profile full
@@ -77,6 +77,7 @@ QRSCAN_WASMER_PACKAGE=./qrscan-wasmer-package distribution/wasmer/qrscan-in-wasm
 
 - One thread. The `wasm32-wasip1` target has no threads, so the engine runs the stages it spreads over several threads in a native build one after another. A profile's wall-clock budget is the same, and one thread does less work within it: pass `--budget-ms 0` when every code of the image matters.
 - A panic stops the module. The native command catches a panic of a reader, counts it in `trace.engine_panics` and still prints a report. WebAssembly code built for this target aborts on a panic, so the module ends with a trap and prints no report. The tests below require `trace.engine_panics` to be 0 on every image of the truth set.
+- Colour. Wasmer presents the standard streams to the module as a terminal, so a plain `wasmer run` colours the messages qrscan writes on stderr even into a pipe or a file. Add `--env NO_COLOR=1` for plain text. `qrscan-in-wasmer.sh` decides as qrscan does on the host: `NO_COLOR`, then `CLICOLOR_FORCE`, then colour only when its output is a terminal. The JSON report is never coloured.
 - Files only. The module reads an image from a mapped directory; it reads no standard input, opens no network connection and sees no other host file.
 - Memory. A `wasm32` module addresses at most 4 GiB. The engine's own pixel and size limits apply as in the native command.
 

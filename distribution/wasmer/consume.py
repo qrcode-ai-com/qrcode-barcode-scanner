@@ -175,7 +175,7 @@ def self_test():
             failures.append("a conforming stand-in failed")
         if not consume(str(box / "qrscan-dropping"), None, "0.11.0", box / "bad.json", lib):
             failures.append("a stand-in that drops a code passed")
-        if not consume(str(box / "qrscan-good"), None, "0.12.0", box / "version.json", lib):
+        if not consume(str(box / "qrscan-good"), None, "9.9.9", box / "version.json", lib):
             failures.append("another engine version passed")
         if not consume(str(box / "qrscan-good"), str(box / "qrscan-dropping"), "0.11.0", box / "native.json", lib):
             failures.append("a native binary with other detections passed")
