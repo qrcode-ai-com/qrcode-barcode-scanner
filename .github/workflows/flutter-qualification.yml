@@ -7,7 +7,9 @@ name: Flutter candidate qualification
 # integration tests on an Android emulator and an iPhone simulator. Both run
 # Flutter in debug mode, so cargokit builds the Rust core with the package's
 # own [profile.dev] (rust/Cargo.toml): no CARGO_PROFILE_* or RUSTFLAGS
-# variable may change it here, and a step checks that none is set. Each scan
+# variable may change it here, and a step checks that none is set. The
+# toolchain action sets CARGO_INCREMENTAL=0, which a consuming app's build
+# does not have, so the build and test steps unset it. Each scan
 # of the mixed QR/Code 128 fixture logs a QRSCAN_TIMING line; the job summary
 # collects them. A simulator or an emulator on a shared hosted runner is not
 # a device: these timings are CI observations, not device performance.
@@ -48,64 +50,6 @@ jobs:
           path: flutter-artifact/
           if-no-files-found: error
           retention-days: 14
-
-  # TEMPORARY, removed before review: refreshes the locks and the generated
-  # bindings for the flutter_rust_bridge 2.13.0 bump, as an artifact.
-  frb-bump:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
-        with:
-          toolchain: ${{ env.RUST_TOOLCHAIN }}
-          components: rustfmt
-      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-      - name: Refresh the locks and regenerate the bindings
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/frb-bump"
-          mkdir -p "$out/bindings/flutter/example" "$out/bindings/flutter/rust/src" "$out/bindings/flutter/lib/src"
-          cargo update --manifest-path bindings/flutter/rust/Cargo.toml \
-            -p flutter_rust_bridge -p flutter_rust_bridge_macros
-          (cd bindings/flutter && flutter pub get)
-          (cd bindings/flutter/example && flutter pub get)
-          git status --short
-          git diff --stat
-          cp bindings/flutter/rust/Cargo.lock "$out/bindings/flutter/rust/"
-          cp bindings/flutter/pubspec.lock "$out/bindings/flutter/"
-          cp bindings/flutter/example/pubspec.lock "$out/bindings/flutter/example/"
-          git -c user.name=frb-bump -c user.email=frb-bump@localhost \
-            commit -q -m 'temporary: refreshed locks' -- \
-            bindings/flutter/rust/Cargo.lock bindings/flutter/pubspec.lock bindings/flutter/example/pubspec.lock
-          python3 scripts/stage-flutter-package.py --output /tmp/frb-bump/bindings/flutter
-          cd /tmp/frb-bump/bindings/flutter
-          flutter pub get --enforce-lockfile
-          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
-          find . -path ./rust/vendor -prune -o -path ./.dart_tool -prune -o -type f -print | sort > "$RUNNER_TEMP/files-before"
-          cp -R lib/src/rust "$RUNNER_TEMP/frb-dart-before"
-          cp rust/src/frb_generated.rs "$RUNNER_TEMP/frb-rust-before.rs"
-          flutter_rust_bridge_codegen generate
-          find . -path ./rust/vendor -prune -o -path ./.dart_tool -prune -o -type f -print | sort > "$RUNNER_TEMP/files-after"
-          diff "$RUNNER_TEMP/files-before" "$RUNNER_TEMP/files-after" || true
-          diff -ru "$RUNNER_TEMP/frb-dart-before" lib/src/rust || true
-          diff -u "$RUNNER_TEMP/frb-rust-before.rs" rust/src/frb_generated.rs || true
-          cp -R lib/src/rust "$out/bindings/flutter/lib/src/"
-          cp rust/src/frb_generated.rs "$out/bindings/flutter/rust/src/"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
-        with:
-          name: frb-bump
-          path: ${{ runner.temp }}/frb-bump/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Check the staged crate against the refreshed lock
-        working-directory: /tmp/frb-bump/bindings/flutter
-        run: cargo check --locked --manifest-path rust/Cargo.toml --lib
 
   qualify:
     name: ${{ matrix.check }}
@@ -209,6 +153,8 @@ jobs:
           retention-days: 14
       # The debug builds below must use the candidate's [profile.dev] as a
       # consuming app would: refuse any variable that would override it.
+      # CARGO_INCREMENTAL, set by the toolchain action, is unset by the steps
+      # that build.
       - name: Check that the build uses the package's own dev profile
         if: matrix.platform != 'host'
         run: |
@@ -224,7 +170,8 @@ jobs:
           with open('/tmp/flutter-validation/bindings/flutter/rust/Cargo.toml', 'rb') as manifest:
               profile = tomllib.load(manifest)['profile']['dev']
           line = (f'staged rust/Cargo.toml [profile.dev]: {profile}; no CARGO_PROFILE_* or *RUSTFLAGS '
-                  f"variable; CARGO_INCREMENTAL={os.environ.get('CARGO_INCREMENTAL', 'unset')}")
+                  f"variable; CARGO_INCREMENTAL={os.environ.get('CARGO_INCREMENTAL', 'unset')} in the job "
+                  'environment, unset by the build and test steps')
           print(line)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write(f'{line}\n\n')
@@ -234,19 +181,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # The verbose build log is kept as an artifact; the line Cargo prints for
-      # the core's debug build ("`dev` profile [optimized + debuginfo]") is
-      # copied to the job summary.
+      # The verbose build log is kept as an artifact. cargokit keeps Cargo's
+      # own output to itself, so the log shows which targets it built, not
+      # the profile line.
       - name: Build the Android example
         if: matrix.platform == 'android'
         working-directory: /tmp/flutter-validation/bindings/flutter/example
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
           mkdir -p "$RUNNER_TEMP/flutter-device"
+          unset CARGO_INCREMENTAL
           flutter build apk --debug -v > "$RUNNER_TEMP/flutter-device/build.log" 2>&1 \
             || { tail -n 200 "$RUNNER_TEMP/flutter-device/build.log"; exit 1; }
-          grep -E 'Finished .dev. profile' "$RUNNER_TEMP/flutter-device/build.log" \
-            | sed 's/^/    /' | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Check the Android native library alignment
         if: matrix.platform == 'android'
         run: |
@@ -258,10 +204,9 @@ jobs:
         working-directory: /tmp/flutter-validation/bindings/flutter/example
         run: |
           mkdir -p "$RUNNER_TEMP/flutter-device"
+          unset CARGO_INCREMENTAL
           flutter build ios --debug --no-codesign -v > "$RUNNER_TEMP/flutter-device/build.log" 2>&1 \
             || { tail -n 200 "$RUNNER_TEMP/flutter-device/build.log"; exit 1; }
-          grep -E 'Finished .dev. profile' "$RUNNER_TEMP/flutter-device/build.log" \
-            | sed 's/^/    /' | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Write the device test command
         if: matrix.platform != 'host'
         run: |
@@ -269,8 +214,10 @@ jobs:
           cat > "$RUNNER_TEMP/flutter-device/run-tests.sh" <<'SH'
           #!/usr/bin/env bash
           # Usage: run-tests.sh DEVICE. Runs the example's integration tests
-          # on DEVICE and keeps their complete output.
+          # on DEVICE and keeps their complete output. The test run rebuilds
+          # the app, so it unsets CARGO_INCREMENTAL like the build step.
           set -euo pipefail
+          unset CARGO_INCREMENTAL
           cd /tmp/flutter-validation/bindings/flutter/example
           flutter test integration_test -d "$1" --reporter expanded 2>&1 \
             | tee "$RUNNER_TEMP/flutter-device/integration.log"
