@@ -93,8 +93,9 @@ the model's example.
 }
 ```
 
-The report must hold two detections: a QR code with the text `https://qrc-ai.com/76xMa` and a
-Code 128 with the text `STOCK-4827`, and its `versions.scanner` must be `0.11.0`.
+The report must hold two detections: `symbology` `qr_code` with `content.text`
+`https://qrc-ai.com/76xMa`, and `symbology` `code128` with `content.text` `STOCK-4827`. Its
+`versions.scanner` must be `0.11.0`.
 
 A prediction made on the website is kept until it is deleted, so the example stays on the page.
 The example image is the scanner's own test fixture, which holds no personal data.

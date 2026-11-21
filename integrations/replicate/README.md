@@ -42,7 +42,7 @@ A Replicate model that reads every QR code and barcode in an image and returns t
 
 The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) are QR Code AI's scanning pages in the browser. The model uses the Python package, which has the [QR code scanner Python guide](https://qrcode-ai.com/en-US/qr-code-scanner/sdk/python) and the [barcode scanner Python guide](https://qrcode-ai.com/en-US/barcode-scanner/sdk/python). If a page is not online yet, this README is the reference.
 
-To make a test image with a known value, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Send the exported image to the model and compare each `text` in the report with the value you encoded, leading zeroes included.
+To make a test image with a known value, use the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator). Send the exported image to the model and compare each detection's `content.text` in the report with the value you encoded, leading zeroes included.
 
 [`run.py`](run.py) is the model: one `Runner` whose `run` takes an image and returns the report.
 [`cog.yaml`](cog.yaml) tells Cog to build it on Python 3.13 without a GPU, with the published
@@ -138,6 +138,52 @@ the inputs Cog publishes. The workflow `integration-replicate` of the engine rep
 in a new environment through the scanner's Python host kit. Its second job builds the image,
 checks that the engine inside it is the published 0.11.0 wheel, runs the three predictions with
 `cog run`, checks that a text file fails its prediction, and removes the image.
+
+## A recorded CI run
+
+This is an excerpt of the log of the image job, from
+[run 44888060012](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44888060012)
+on 21 November 2026. The commands are the ones the workflow ran, with the runner's folders cut
+from the paths, and the lines that start with `#` and a number are Docker's build output. The
+image was built on the CI machine, scanned the sample image and was then removed. It was never
+pushed.
+
+```text
+$ cog --version
+cog version 0.23.1 (built 2026-10-20T14:50:45Z)
+$ cog build --progress plain -t qrcode-barcode-scanner-cog
+#14 1.317 Downloading qrcode_barcode_scanner-0.11.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+#14 1.383 Successfully installed qrcode-barcode-scanner-0.11.0
+#15 0.119 Using Python 3.13.5 environment at: /usr/local
+#15 0.237  + cog==0.23.1
+#15 0.237  + coglet==0.23.1
+#8 writing image sha256:f3f3e5a29640abd2670787ca4ef30cfccbc91e6eaa2d753e4d0a767b4b4e72ec done
+Image built as qrcode-barcode-scanner-cog
+$ # the workflow's checks of the image label and of the engine inside the image
+Schema: inputs image, profile (fast, frame, full) and budget_ms (0 to 60000); output ['object']
+Python 3.13.5, qrcode-barcode-scanner 0.11.0, native module SHA-256 de30ac77aee57c90ec4552af10e075fbd83aa1f775b53031cf5acf84fc117e34
+$ cog run qrcode-barcode-scanner-cog -i image=@mixed-code128-qr.png -i profile=full -i budget_ms=0 -o full.json
+Starting Docker image and running setup()...
+Running prediction...
+Written output to: full.json
+$ cog run qrcode-barcode-scanner-cog -i image=@notes.png -o invalid.json
+Prediction failed with status "failed": Prediction failed: Prediction failed: ValueError: unsupported or corrupt image: The image format could not be determined [QRS-001]
+$ python3 scripts/destination-acceptance.py check receipt/acceptance-replicate-image.json
+ok    Replicate model image, built by cog build (not pushed) · 0.11.0 · PASS
+```
+
+The native module's SHA-256 is the one of the manylinux x86_64 wheel published on PyPI. In the
+three reports, the two detections are the same:
+
+```json
+[
+  {"symbology": "qr_code", "content": {"text": "https://qrc-ai.com/76xMa"}},
+  {"symbology": "code128", "content": {"text": "STOCK-4827"}}
+]
+```
+
+The JSON keeps only these two fields of each detection; the full reports also hold the raw bytes,
+the payload, the corners and the score.
 
 ## How it works
 
