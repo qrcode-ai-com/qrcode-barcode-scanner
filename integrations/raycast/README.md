@@ -44,7 +44,7 @@ The [QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the [barc
 
 To make a test image, encode a known text with the [QR code generator](https://qrcode-ai.com/en-US/qr-code-generator) or the [barcode generator](https://qrcode-ai.com/en-US/barcode-generator), save the picture, select it in Finder and run the command. The list should give back exactly the text you encoded, leading zeros included.
 
-The extension is not in the Raycast Store yet. Until it is, run it from this folder, as written below.
+The extension is not in the Raycast Store yet. Until it is, run it from this folder, as written below. The submission is prepared: see [Raycast Store](#raycast-store).
 
 ## How it works
 
@@ -61,7 +61,7 @@ The picture shows the three steps of the package route. In Raycast they are:
 
 1. Install `qrscan` once, then the extension. The extension finds `qrscan` by itself.
 2. Select an image in Finder, or copy an image file, and run **Scan Image for Codes**.
-3. Read the list. Press Enter to copy a code's text, or choose **Paste Text** or **Copy All Texts** in the actions.
+3. Read the list. Press Enter to copy a code's text, or choose **Paste Text**, **Copy All Texts** or **Copy Scan Report** in the actions.
 
 ## Install
 
@@ -91,10 +91,13 @@ Each code is one item of the list: its text, its format, and a tag when some of 
 - **Copy Text**, the default: the exact text of the code.
 - **Paste Text**: the same text, into the app in front.
 - **Copy All Texts**: every text of the image, one per line.
+- **Copy Scan Report**: the JSON report of `qrscan`, with the formats, the exact bytes, the positions and the quality score.
+
+With the Full and Fast profiles, the first item also carries a score tag, from 0 to 100 with its grade, that says how well that code scans; it is the code the report judges, QR codes first. Frame decodes only and gives no score.
 
 Decoded text comes from an image anyone can make. The extension only shows, copies and pastes it: it never opens a link it reads.
 
-**Scan Profile** in the preferences sets how long `qrscan` searches. Full, the default, searches longest and reads the most damaged codes. Fast and Frame stop sooner; when they run out of time, the list says so, because an empty result is then not final.
+**Scan Profile** in the preferences sets how long `qrscan` searches. Full, the default, searches longest and reads the most damaged codes. Fast and Frame stop sooner; when they run out of time, the list says so, because an empty result is then not final. **Time Limit** keeps each profile's own limit (4 seconds for Full, 0.8 for Fast, 0.08 for Frame) or, set to No Limit, lets the scan run to its end.
 
 When `qrscan` is missing, the extension says where it looked, and offers to copy the install command or open the install guide. A file that is not an image gives the reason `qrscan` reports.
 
@@ -150,6 +153,12 @@ Codes of different formats in one image come back in one report.
 
 The extension runs the `qrscan` command line. The Rust, Node.js, browser and Python packages hold the same engine, for a scan inside your own program. Every route is listed in the [scanner repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust).
 
+## Raycast Store
+
+The Store takes an extension through a pull request to [raycast/extensions](https://github.com/raycast/extensions). [`scripts/stage-store.py`](scripts/stage-store.py) writes the folder that pull request carries from a commit of this repository, with [STORE.md](STORE.md) as its README, and checks it against the Store rules. It can also commit that folder on a new branch of a clone of the fork; it never pushes.
+
+[LISTING.md](LISTING.md) holds the listing values, the pull request text and the steps left to the owner: a Raycast account whose username becomes the author, the screenshots, the fork and the pull request.
+
 ## Tests
 
 In this folder:
@@ -165,7 +174,15 @@ QRSCAN=/opt/homebrew/bin/qrscan npm test
 
 `npm test` drives the command against a stand-in for the Raycast API. It checks how the extension finds `qrscan`, the arguments it passes, every way `qrscan` can end (codes, no code, an unreadable file, a missing program, a crash, a timeout, output that is not a report) and the list shown for each. With `QRSCAN` set, it also scans the mixed fixture in the fast, frame and full profiles, from a Finder selection and from the clipboard. CI downloads the published `qrscan` with the checked installer of the GitHub Action and sets `QRSCAN_RAYCAST_LIVE=required`, so a missing `qrscan` fails instead of skipping.
 
-`ray build` needs no Raycast account. `ray lint` is not part of the tests, because it asks the Raycast store about the author.
+`ray build` needs no Raycast account. `ray lint` is not part of these tests, because it asks the Raycast store about the author.
+
+A second CI job checks the Store folder the way raycast/extensions does. It stages the folder twice in two time zones and compares the archives, runs `npm ci`, `ray validate` against the Store schema and `ray build -e dist`, and runs Raycast's own screenshot checker at a pinned commit. `ray validate` reports one expected error until the owner's Raycast username is the author, and the job refuses any other. The built extension is then copied into a new folder, scans the mixed fixture with the published `qrscan` in the three profiles, and the destination acceptance driver judges the reports, removes the folder and closes the receipt. Locally, after `npx ray build --environment dist --output <folder>`:
+
+```sh
+python3 scripts/stage-store.py --self-test
+node test/dist-consumer.mjs --build <folder> --qrscan /opt/homebrew/bin/qrscan \
+  --image ../../fixtures/symbology/mixed-code128-qr.png --reports /absolute/reports/folder
+```
 
 ## Licenses of what you install
 

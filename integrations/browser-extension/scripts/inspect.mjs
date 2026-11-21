@@ -96,14 +96,20 @@ function inspectSource(files) {
   const names = [...files.keys()];
   const top = `qrcode-barcode-scanner-browser-extension-${own.version}/`;
   for (const need of ['package.json', 'package-lock.json', 'SOURCE.md', 'LICENSE',
-    'scripts/build.mjs', 'scripts/bytes.mjs', 'scripts/icons.mjs', 'scripts/manifest.mjs',
-    'src/background.js', 'src/scanner.js']) {
+    'listing/texts.md', 'scripts/build.mjs', 'scripts/bytes.mjs', 'scripts/icons.mjs',
+    'scripts/listing.mjs', 'scripts/manifest.mjs', 'src/background.js', 'src/scanner.js']) {
     if (!files.has(top + need)) problem(`source: ${need} is missing`);
   }
   for (const name of names) {
     if (!name.startsWith(top)) problem(`source: ${name} is outside ${top}`);
-    if (/\/(node_modules|build)\//.test(name.slice(top.length - 1))) {
+    const inside = name.slice(top.length);
+    if (/(^|\/)(node_modules|build)\//.test(inside)) {
       problem(`source: ${name} is a dependency or a build output`);
+    }
+    // A file that quotes the archives' hashes would make the source package depend on itself.
+    if (inside === 'SHA256SUMS' || (inside.startsWith('listing/')
+        && !['listing/texts.md', 'listing/PRIVACY.md'].includes(inside))) {
+      problem(`source: ${name} quotes archive hashes and stays out of the source package`);
     }
   }
 }
