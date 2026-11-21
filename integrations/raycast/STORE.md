@@ -30,6 +30,7 @@ Decoded text comes from an image anyone can make. The extension only shows, copi
 ## Preferences
 
 - **Scan Profile**: Full, the default, searches longest, reads the most damaged codes and gives the full score. Fast stops sooner and gives a reduced score. Frame decodes only and gives no score. When Fast or Frame runs out of time, the list says so, because an empty result is then not final.
+- **Time Limit**: Profile Default stops the scan at the profile's own limit, 4 seconds for Full, 0.8 for Fast and 0.08 for Frame. No Limit lets the scan run to its end, which a large or damaged image may need.
 - **qrscan Path**: the full path of `qrscan`, when it is not in one of the usual places.
 
 ## Formats

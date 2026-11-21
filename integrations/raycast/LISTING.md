@@ -33,7 +33,8 @@ does:
   of raycast/extensions at commit `1aef446889476810eebd08301d03f2ff8ae74c0b`, verified by sha256).
   It passes with no screenshot and checks every screenshot added to `metadata/`.
 - The built extension, copied into a new folder, scans the mixed QR and Code 128 fixture with
-  the published `qrscan` 0.11.0 in the fast, frame and full profiles. The destination acceptance
+  the published `qrscan` 0.11.0 in the fast, frame and full profiles, with Time Limit at No Limit
+  as the acceptance contract asks (an unbounded scan never depends on the machine). The acceptance
   receipt records the exact texts, then the folder is removed and the receipt closed.
 
 The job keeps `kit/` as the artifact `raycast-store-kit`: the staged folder as
@@ -56,7 +57,8 @@ All of them come from `package.json`; the Store reads them from there.
 - Categories: `Developer Tools`, `Productivity`
 - Keywords: `qr code`, `barcode`, `scanner`, `ean`, `code 128`, `data matrix`
 - Command: **Scan Image for Codes** (`scan-image`, view), no subtitle
-- Preferences: **qrscan Path** (optional text field), **Scan Profile** (Full, Fast, Frame)
+- Preferences: **qrscan Path** (optional text field), **Scan Profile** (Full, Fast, Frame),
+  **Time Limit** (Profile Default, No Limit)
 - License: `MIT`. Platforms: `macOS`. Icon: `assets/icon.png`, 512 × 512 PNG.
 - Author: the owner's Raycast username. No `owner` field: raycast/extensions refuses
   organisation extensions unless Raycast allows them.

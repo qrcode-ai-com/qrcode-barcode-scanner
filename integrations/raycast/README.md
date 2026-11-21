@@ -97,7 +97,7 @@ With the Full and Fast profiles, the first item also carries a score tag, from 0
 
 Decoded text comes from an image anyone can make. The extension only shows, copies and pastes it: it never opens a link it reads.
 
-**Scan Profile** in the preferences sets how long `qrscan` searches. Full, the default, searches longest and reads the most damaged codes. Fast and Frame stop sooner; when they run out of time, the list says so, because an empty result is then not final.
+**Scan Profile** in the preferences sets how long `qrscan` searches. Full, the default, searches longest and reads the most damaged codes. Fast and Frame stop sooner; when they run out of time, the list says so, because an empty result is then not final. **Time Limit** keeps each profile's own limit (4 seconds for Full, 0.8 for Fast, 0.08 for Frame) or, set to No Limit, lets the scan run to its end.
 
 When `qrscan` is missing, the extension says where it looked, and offers to copy the install command or open the install guide. A file that is not an image gives the reason `qrscan` reports.
 

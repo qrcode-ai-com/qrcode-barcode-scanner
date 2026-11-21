@@ -25,10 +25,12 @@ import {
   QrscanMissingError,
   reportText,
   scanFile,
+  TIME_LIMITS,
   UnreadableImageError,
   type Profile,
   type ScanResult,
   type Score,
+  type TimeLimit,
 } from "./qrscan";
 
 /** The two-dimensional formats, shown with a grid icon; the others are barcodes. */
@@ -46,6 +48,7 @@ const MATRIX = new Set([
 export interface ScanPreferences {
   qrscanPath?: string;
   profile?: string;
+  timeLimit?: string;
 }
 
 export type ScanState =
@@ -62,11 +65,14 @@ export async function loadScan(): Promise<ScanState> {
   const profile: Profile = PROFILES.includes(preferences.profile as Profile)
     ? (preferences.profile as Profile)
     : "full";
+  const limit: TimeLimit = TIME_LIMITS.includes(preferences.timeLimit as TimeLimit)
+    ? (preferences.timeLimit as TimeLimit)
+    : "profile";
   const picked = await pickImage({ finder: getSelectedFinderItems, clipboard: () => Clipboard.read() });
   if (picked.kind === "none") return { kind: "none", reason: picked.reason };
   try {
     const qrscan = await findQrscan(preferences.qrscanPath);
-    return { kind: "result", result: await scanFile(qrscan, picked.path, profile), name: picked.name };
+    return { kind: "result", result: await scanFile(qrscan, picked.path, profile, { limit }), name: picked.name };
   } catch (error) {
     if (error instanceof QrscanMissingError) return { kind: "missing", looked: error.looked };
     if (error instanceof UnreadableImageError) return { kind: "unreadable", name: picked.name, message: error.message };
@@ -80,7 +86,7 @@ export function oneLine(text: string): string {
 }
 
 function budgetNote(result: ScanResult): string {
-  return `The ${result.profile} profile ran out of time before the scan ended. Choose the full profile in the preferences to search longer.`;
+  return `The ${result.profile} profile ran out of time before the scan ended. Choose the full profile, or no time limit, in the preferences to search longer.`;
 }
 
 const PLACEHOLDER = "Filter the codes";

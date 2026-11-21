@@ -7,8 +7,8 @@
 //   node test/dist-consumer.mjs --build <ray build output> --qrscan <path> --image <png> --reports <dir>
 //     [--home <new folder>] [--packages <folder>]
 //
-// Each profile must list the QR code and the Code 128, in the engine's order, with their exact
-// texts and formats, uncut, from qrscan 0.11.0. Its report is written to <dir>/<profile>.json for
+// Each profile, with the Time Limit preference at No Limit, must list the QR code and the Code 128,
+// in the engine's order, with their exact texts and formats, uncut, from qrscan 0.11.0. Its report is written to <dir>/<profile>.json for
 // scripts/destination-acceptance.py. The clipboard route, a missing qrscan and a file that is not
 // an image are checked through the same build. The copy goes to --home, a folder that must not
 // exist yet, so that a workflow can remove it and prove the command gone; by default it is a new
@@ -78,7 +78,8 @@ mkdirSync(values.reports, { recursive: true });
 for (const profile of ['fast', 'frame', 'full']) {
   host.reset();
   host.finder = [{ path: resolve(values.image) }];
-  host.preferences = { qrscanPath: values.qrscan, profile };
+  // The acceptance scans are unbounded: the Time Limit preference set to No Limit.
+  host.preferences = { qrscanPath: values.qrscan, profile, timeLimit: 'none' };
   const state = await command.loadScan();
   assert.equal(state.kind, 'result', `${profile}: ${JSON.stringify(state).slice(0, 400)}`);
   const { result } = state;

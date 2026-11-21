@@ -25,9 +25,11 @@ test('the manifest is a Raycast extension under MIT with one view command', () =
   assert.equal(manifest.title, 'QR Code & Barcode Scanner');
   assert.deepEqual(manifest.platforms, ['macOS']);
   assert.deepEqual(manifest.commands.map((entry) => [entry.name, entry.mode]), [['scan-image', 'view']]);
-  assert.deepEqual(manifest.preferences.map((entry) => [entry.name, entry.type, entry.required]), [['qrscanPath', 'textfield', false], ['profile', 'dropdown', false]]);
+  assert.deepEqual(manifest.preferences.map((entry) => [entry.name, entry.type, entry.required]), [['qrscanPath', 'textfield', false], ['profile', 'dropdown', false], ['timeLimit', 'dropdown', false]]);
   assert.deepEqual(manifest.preferences[1].data.map((entry) => entry.value), ['full', 'fast', 'frame']);
   assert.equal(manifest.preferences[1].default, 'full');
+  assert.deepEqual(manifest.preferences[2].data.map((entry) => entry.value), ['profile', 'none']);
+  assert.equal(manifest.preferences[2].default, 'profile');
   assert.deepEqual(Object.keys(manifest.dependencies), ['@raycast/api'], 'the extension carries no engine package');
 });
 
@@ -89,7 +91,7 @@ test('no code, a cut scan, a missing qrscan and a bad file each say what happene
   assert.deepEqual([empty.title, empty.description], ['No QR code or barcode found', 'qrscan found no code in blank.png.']);
 
   const cut = named(view({ kind: 'result', name: 'blank.png', result: result([], { budgetExhausted: true, profile: 'fast' }) }), 'List.EmptyView')[0].props;
-  assert.equal(cut.description, 'The fast profile ran out of time before the scan ended. Choose the full profile in the preferences to search longer.');
+  assert.equal(cut.description, 'The fast profile ran out of time before the scan ended. Choose the full profile, or no time limit, in the preferences to search longer.');
 
   const missing = view({ kind: 'missing', looked: ['/opt/homebrew/bin/qrscan'] });
   const missingView = named(missing, 'List.EmptyView')[0].props;
@@ -122,7 +124,8 @@ describe('with the published qrscan', { skip: live.skip }, () => {
   for (const profile of ['fast', 'frame', 'full']) {
     test(`profile ${profile}: the image selected in Finder gives both codes`, async () => {
       host.finder = [{ path: mixedFixture() }];
-      host.preferences = { qrscanPath: live.path, profile };
+      // No time limit: within the profile's budget, a slow machine may cut the scan.
+      host.preferences = { qrscanPath: live.path, profile, timeLimit: 'none' };
       const state = await command.loadScan();
       assert.equal(state.kind, 'result', JSON.stringify(state));
       assert.equal(state.name, 'mixed-code128-qr.png');

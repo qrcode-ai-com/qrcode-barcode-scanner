@@ -12,6 +12,10 @@ import { fileURLToPath } from "node:url";
 export type Profile = "full" | "fast" | "frame";
 export const PROFILES: Profile[] = ["full", "fast", "frame"];
 
+/** "profile" keeps the profile's own time budget; "none" lets the scan run to its end. */
+export type TimeLimit = "profile" | "none";
+export const TIME_LIMITS: TimeLimit[] = ["profile", "none"];
+
 /** The image files qrscan reads. */
 export const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -195,17 +199,25 @@ function reason(stderr: string): string {
   return line.replace(/^\s*✖\s*/, "").trim() || "qrscan could not read this file";
 }
 
-/** Scans FILE with QRSCAN and the PROFILE's own time budget. */
+export interface ScanOptions {
+  /** The profile's own time budget (the default), or none: the scan runs to its end. */
+  limit?: TimeLimit;
+  run?: Run;
+  /** When qrscan is stopped without a report: 30 s within the profile's budget, 120 s without. */
+  timeoutMs?: number;
+}
+
+/** Scans FILE with QRSCAN and the PROFILE, within the profile's time budget unless LIMIT is none. */
 export function scanFile(
   qrscan: string,
   file: string,
   profile: Profile,
-  run: Run = defaultRun,
-  timeoutMs = 30000,
+  { limit = "profile", run = defaultRun, timeoutMs = limit === "none" ? 120000 : 30000 }: ScanOptions = {},
 ): Promise<ScanResult> {
   if (!PROFILES.includes(profile)) return Promise.reject(new ScanFailedError(`unknown profile ${String(profile)}`));
+  if (!TIME_LIMITS.includes(limit)) return Promise.reject(new ScanFailedError(`unknown time limit ${String(limit)}`));
   // The path is absolute, so qrscan never reads it as an option.
-  const args = [file, "--profile", profile];
+  const args = [file, "--profile", profile, ...(limit === "none" ? ["--budget-ms", "0"] : [])];
   return new Promise((resolve, reject) => {
     run(
       qrscan,
