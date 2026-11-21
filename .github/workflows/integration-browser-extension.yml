@@ -4,8 +4,9 @@ name: integration-browser-extension
 # installed from its own lockfile, built into the three store zips and the source zip, held to the
 # hashes its SHA256SUMS pins, inspected and linted for Firefox. Each store zip is then extracted or
 # installed as a store receives it and driven in a new profile: the Chrome and the Edge zips in
-# Playwright's Chromium, the Firefox zip in the runner's own Firefox through WebDriver BiDi, and
-# the Firefox build's page in Playwright's Firefox. The reports are judged by the repository's page
+# Playwright's Chromium, the Chrome zip again in the runner's Google Chrome, the Firefox zip in the runner's own Firefox through WebDriver BiDi, and
+# the Firefox build's page in Playwright's Firefox. The store screenshots and promotional tiles
+# are captured again from the Chrome build. The reports are judged by the repository's page
 # and acceptance judges, the packages are rebuilt from the source zip, and the reproduce job
 # rebuilds them on Linux, macOS and Windows with Node.js 22 and 24 in two time zones, each time to
 # the pinned bytes. It uses the published WASM package: nothing is built from this repository's
@@ -79,6 +80,16 @@ jobs:
             node test/chromium.mjs --package "build/qrcode-barcode-scanner-$target-$version.zip" \
               --out "build/acceptance/$target"
           done
+      - name: The Chrome zip in the runner's Google Chrome
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          google-chrome --version
+          node test/chromium.mjs --channel chrome \
+            --package "build/qrcode-barcode-scanner-chrome-$version.zip" \
+            --out build/acceptance/chrome-stable
+      - name: The store images, captured from the Chrome build
+        run: node scripts/store-images.mjs --extension build/chrome --out build/store-images
       - name: The Firefox zip installed in the runner's Firefox
         timeout-minutes: 5
         run: |
@@ -95,7 +106,8 @@ jobs:
           here=integrations/browser-extension
           version=$(node -p "require('./$here/build/build-receipt.json').scanner.version")
           mkdir -p "$RUNNER_TEMP/receipts"
-          for record in chrome/popup chrome/menu edge/popup edge/menu firefox-addon firefox-page; do
+          for record in chrome/popup chrome/menu chrome-stable/popup chrome-stable/menu \
+            edge/popup edge/menu firefox-addon firefox-page; do
             reports="$here/build/acceptance/$record"
             python3 scripts/check-demo-page.py "$reports/page.json" \
               --example "$here" --page-key integrations/browser-extension
@@ -126,6 +138,7 @@ jobs:
             integrations/browser-extension/build/*.json
             integrations/browser-extension/build/SHA256SUMS
             integrations/browser-extension/build/store-assets
+            integrations/browser-extension/build/store-images
             integrations/browser-extension/build/acceptance
             ${{ runner.temp }}/receipts
           if-no-files-found: error
