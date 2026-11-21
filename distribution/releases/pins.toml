@@ -129,16 +129,20 @@ paths = [
 held = "the agent integrations: they name the engine they were released on"
 paths = [
   "integrations/**",
+  ".github/workflows/integration-apify.yml",
   "skills/**",
   "scripts/mcp-release.py",
   "scripts/test-mcp-release.py",
   ".github/workflows/ecosystem-checks.yml",
+  ".github/workflows/integration-adobe-express.yml",
   ".github/workflows/integration-agent-plugin.yml",
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
+  ".github/workflows/integration-canva.yml",
   ".github/workflows/integration-github-action.yml",
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
+  ".github/workflows/integration-n8n-template.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
   ".github/workflows/integration-vscode.yml",
@@ -151,6 +155,15 @@ paths = ["scripts/python_host_kit.py", "scripts/python-host-consumer.py"]
 [[file]]
 held = "the MCP Bundle, under its own tag mcpb-v: it carries the published server and engine it was built from"
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
+
+[[file]]
+held = "the HTTP service image, under its own tag http-v: it runs the published engine it pins"
+paths = [
+  "distribution/http/**",
+  "scripts/http-service-release.py",
+  "scripts/stage-http-satellite.py",
+  ".github/workflows/http-service.yml",
+]
 
 [[file]]
 held = "the hosted examples: examples/README.md says how to update them for a release"

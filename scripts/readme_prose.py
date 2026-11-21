@@ -22,6 +22,7 @@ GUIDES = {
     'examples/web-vite/README.md': ('sdk/javascript', 'JavaScript'),
     'playground/README.md': ('sdk/javascript', 'JavaScript'),
     'integrations/activepieces/README.md': ('integrations/activepieces', 'Activepieces'),
+    'integrations/adobe-express/README.md': ('integrations/adobe-express', 'Adobe Express'),
     'integrations/agent-plugin/README.md': ('integrations', 'agent integrations'),
     'integrations/github-action/README.md': ('integrations/github-actions', 'GitHub Actions'),
     'integrations/browser-extension/README.md': ('integrations/browser-extension', 'browser extension'),
@@ -36,8 +37,10 @@ GUIDES = {
     'integrations/napari/README.md': ('integrations/napari', 'napari'),
     'integrations/openclaw/README.md': ('integrations/openclaw', 'OpenClaw'),
     'integrations/vscode/README.md': ('integrations/vscode', 'VS Code'),
+    'integrations/wordpress/README.md': ('integrations/wordpress', 'WordPress'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'integrations/wasm-inline/README.md': ('sdk/javascript', 'JavaScript'),
+    'integrations/canva/README.md': ('integrations/canva', 'Canva'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }
@@ -52,6 +55,7 @@ for _path in ('distribution/alpine', 'distribution/conda-forge', 'distribution/f
     GUIDES[f'{_path}/README.md'] = ('cli', 'command line')
 GUIDES['distribution/artifacthub/README.md'] = ('docker', 'Docker')
 GUIDES['distribution/glama/README.md'] = ('mcp', 'MCP')
+GUIDES['distribution/http/README.md'] = ('docker', 'Docker')
 GUIDES['distribution/jsr/README.md'] = ('sdk/javascript', 'JavaScript')
 GUIDES['distribution/mcpb/README.md'] = ('mcp', 'MCP')
 

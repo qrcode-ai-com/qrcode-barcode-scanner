@@ -1,0 +1,161 @@
+name: integration-wordpress
+
+# The WordPress plugin of integrations/wordpress, checked the way its README describes: installed
+# from its own lockfile, built into the plugin zip, inspected, unit-tested, checked by the
+# WordPress.org Plugin Check, installed from the zip on a new WordPress Playground site (the
+# current WordPress, and the oldest one the plugin supports on its oldest PHP), used there in
+# Playwright's Chromium as a visitor (block, shortcode, credit line), deleted, and judged by the
+# repository's page and acceptance judges; then rebuilt to the committed SHA256SUMS on Linux and
+# macOS with Node.js 22 and 24. It uses the published WASM package: nothing is built from this
+# repository's Rust source, and nothing is uploaded to the plugin directory.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-wordpress.yml
+      - integrations/wordpress/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-wordpress.yml
+      - integrations/wordpress/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-wordpress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin:
+    name: WordPress plugin · build, inspect and test on Playground
+    runs-on: ubuntu-24.04
+    # On an Apple Silicon laptop the build took 20 s and one Playground run 2 to 3 minutes on
+    # 21 November 2026; no timing from this job exists yet.
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/wordpress
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Install Playwright's Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Build the plugin zip
+        run: npm run build -- --check
+      - name: Inspect the zip
+        run: npm run inspect
+      - name: Unit tests
+        run: npm test
+      - name: The zip on Playground, the current WordPress on PHP 8.3
+        run: >-
+          node test/playground.mjs --wp latest --php 8.3 --port 9400
+          --out build/acceptance/latest --screenshots build/screenshots
+      - name: The zip on Playground, WordPress 6.6 on PHP 7.4, the oldest the plugin supports
+        run: node test/playground.mjs --wp 6.6 --php 7.4 --port 9401 --out build/acceptance/oldest
+      - name: Check the receipts
+        working-directory: .
+        run: |
+          set -euo pipefail
+          for receipt in integrations/wordpress/build/acceptance/*/receipts/*.json; do
+            python3 scripts/destination-acceptance.py check "$receipt"
+          done
+      - name: Rebuild in two time zones and compare
+        run: npm run test:reproduce
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: wordpress-plugin
+          path: |
+            integrations/wordpress/build/*.zip
+            integrations/wordpress/build/*.json
+            integrations/wordpress/build/SHA256SUMS
+            integrations/wordpress/build/qrcode-barcode-scanner
+            integrations/wordpress/build/acceptance
+            integrations/wordpress/build/screenshots
+          if-no-files-found: error
+
+  plugin-check:
+    name: WordPress plugin · Plugin Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile and build the plugin
+        working-directory: integrations/wordpress
+        run: |
+          npm ci --ignore-scripts
+          npm run build -- --check
+      # The WordPress.org Plugin Check on the unpacked plugin, every category, warnings included:
+      # strict makes a warning fail the job, as the directory's reviewers read them.
+      - uses: WordPress/plugin-check-action@10857da14b6c2246d15402b3e69f777edcf8c12e # v1.1.9
+        with:
+          build-dir: integrations/wordpress/build/qrcode-barcode-scanner
+          include-experimental: 'true'
+          strict: 'true'
+
+  reproduce:
+    name: Reproduce the zip · ${{ matrix.os }} · Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+        node: ["22", "24"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/wordpress
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+          node -p 'process.platform + "-" + process.arch + " zlib " + process.versions.zlib'
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Build in UTC, then in UTC+14, each to the committed SHA256SUMS
+        run: |
+          set -euo pipefail
+          TZ=UTC node scripts/build.mjs --out "$RUNNER_TEMP/utc" --check
+          TZ=Pacific/Kiritimati node scripts/build.mjs --out "$RUNNER_TEMP/kiritimati" --check
+          cmp "$RUNNER_TEMP/utc/SHA256SUMS" SHA256SUMS
+          cmp "$RUNNER_TEMP/kiritimati/SHA256SUMS" SHA256SUMS
+          cat SHA256SUMS

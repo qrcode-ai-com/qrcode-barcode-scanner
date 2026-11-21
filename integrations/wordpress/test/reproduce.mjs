@@ -1,0 +1,36 @@
+// Rebuild the plugin zip twice, in two time zones, and compare it byte for byte with the zip in
+// build/ and with the committed SHA256SUMS.
+//
+//   node test/reproduce.mjs [--build build]
+//
+// Zip dates are local time in the zip format: the two time zones are UTC and UTC+14, so that a
+// date that leaked into the archive changes its bytes. Exits 1 on the first difference.
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const own = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8'));
+const index = process.argv.indexOf('--build');
+const build = resolve(index >= 0 ? process.argv[index + 1] : join(HERE, 'build'));
+const name = `qrcode-barcode-scanner-${own.version}.zip`;
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+const original = readFileSync(join(build, name));
+const committed = readFileSync(join(HERE, 'SHA256SUMS'), 'utf8');
+let failed = false;
+for (const zone of ['UTC', 'Pacific/Kiritimati']) {
+  const out = mkdtempSync(join(tmpdir(), 'qrbs-wordpress-reproduce-'));
+  execFileSync(process.execPath, [join(HERE, 'scripts', 'build.mjs'), '--out', out, '--check'],
+    { cwd: HERE, env: { ...process.env, TZ: zone }, stdio: ['ignore', 'ignore', 'inherit'] });
+  const again = readFileSync(join(out, name));
+  const same = again.equals(original);
+  const sums = readFileSync(join(out, 'SHA256SUMS'), 'utf8') === committed;
+  console.log(`${same && sums ? 'same' : 'DIFFERENT'}  TZ=${zone}  ${again.length} bytes  sha256 ${sha256(again)}`);
+  if (!same || !sums) failed = true;
+}
+console.log(`build/${name}  ${original.length} bytes  sha256 ${sha256(original)}  (SHA256SUMS: ${committed.trim()})`);
+process.exit(failed ? 1 : 0);
