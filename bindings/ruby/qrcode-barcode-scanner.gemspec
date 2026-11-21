@@ -29,8 +29,8 @@ Gem::Specification.new do |spec|
   spec.homepage = 'https://qrcode-ai.com/en-US/qr-code-scanner/sdk/ruby'
   spec.metadata = {
     'homepage_uri' => 'https://qrcode-ai.com/en-US/qr-code-scanner/sdk/ruby',
-    'source_code_uri' => 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner',
-    'bug_tracker_uri' => 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues',
+    'source_code_uri' => 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust',
+    'bug_tracker_uri' => 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues',
     'rubygems_mfa_required' => 'true'
   }
   # The oldest Ruby line its maintainers still support, 3.3, up to the last line the ffi gem
