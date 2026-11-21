@@ -10,12 +10,21 @@ import { spawn } from 'node:child_process';
 /**
  * Start `binary` with a new profile and WebDriver BiDi on a free port. Resolves once Firefox
  * prints the address it listens on.
+ *
+ * An add-on's own pages run in Firefox's extension process, which WebDriver BiDi treats as
+ * privileged: release Firefox refuses to navigate to a moz-extension: page or to run a script in
+ * it ("is not allowed in this context") unless MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 is set
+ * (remote/components/RemoteAgent.sys.mjs). It is set for this test browser only; it changes what
+ * the automation may reach, not what the add-on may do.
  */
 export function launchFirefox(binary, { profile, headless }) {
   const args = ['--remote-debugging-port', '0', '--profile', profile, '--no-remote',
     '--new-instance'];
   if (headless) args.push('--headless');
-  const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(binary, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: '1' },
+  });
   return new Promise((resolve, reject) => {
     let log = '';
     const timer = setTimeout(() => {
