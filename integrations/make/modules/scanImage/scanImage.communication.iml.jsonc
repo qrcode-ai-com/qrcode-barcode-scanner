@@ -1,0 +1,26 @@
+{
+  "url": "/scan",
+  "method": "POST",
+  "qs": {
+    "mode": "{{parameters.mode}}"
+  },
+  "type": "multipart/form-data",
+  "body": {
+    "image": {
+      "value": "{{parameters.data}}",
+      "options": {
+        "filename": "{{parameters.fileName}}"
+      }
+    }
+  },
+  "response": {
+    "output": {
+      "count": "{{length(body.detections)}}",
+      "detections": "{{body.detections}}",
+      "score": "{{body.score}}",
+      "hints": "{{body.hints}}",
+      "trace": "{{body.trace}}",
+      "versions": "{{body.versions}}"
+    }
+  }
+}

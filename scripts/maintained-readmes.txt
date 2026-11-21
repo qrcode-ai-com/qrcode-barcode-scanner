@@ -63,6 +63,7 @@ integrations/dify/README.md
 integrations/github-action/README.md
 integrations/joomla/README.md
 integrations/jupyterlab/README.md
+integrations/make/README.md
 integrations/mcp/README.md
 integrations/n8n/README.md
 integrations/n8n/template/README.md
