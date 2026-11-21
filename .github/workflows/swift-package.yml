@@ -90,7 +90,9 @@ jobs:
             cargo build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --target "$target"
           done
       # A plain module map: the xcframework holds static libraries with their headers, which SwiftPM
-      # puts on the include path, where a `framework module` (--xcframework) finds no header.
+      # puts on the include path, where a `framework module` (--xcframework) finds no header. Its
+      # module is the one the generated Swift imports; uniffi would otherwise name it after the library.
+      # It links CoreFoundation, which the library calls through iana-time-zone.
       - name: Generate the Swift, the header and the module map
         working-directory: engine
         run: |
@@ -99,8 +101,10 @@ jobs:
           cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
             "$lib" "$RUNNER_TEMP/swift" --swift-sources
           cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
-            "$lib" "$RUNNER_TEMP/headers" --headers --modulemap --modulemap-filename module.modulemap
+            "$lib" "$RUNNER_TEMP/headers" --headers --modulemap --module-name qrcode_ai_scanner_uniffiFFI \
+            --modulemap-filename module.modulemap --link-frameworks CoreFoundation
           ls -l "$RUNNER_TEMP/swift" "$RUNNER_TEMP/headers"
+          cat "$RUNNER_TEMP/headers/module.modulemap"
       - name: Assemble the xcframework
         working-directory: engine
         run: |
