@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // The MCP launch each client configuration of a staged plugin tree carries, read in that client's
-// own shape: JSON server maps, the goose YAML entry, the OpenCode 1 and 2 hooks, the Pi extension
-// and the install links of the README. Shared by check-manifests.mjs and check-launch.mjs.
+// own shape: JSON server maps, the goose YAML entry, the OpenCode 1 and 2 hooks, the Pi extension,
+// and the install links and the Amp, Continue and Zed entries of the README. Shared by
+// check-manifests.mjs and check-launch.mjs.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -37,6 +38,48 @@ export function gooseEntry(text) {
     entry[match[1]] = bare ? match[2] : JSON.parse(match[2]);
   }
   return entry;
+}
+
+// A scalar of the Continue entry: a quoted string, a whole number or a plain word.
+const scalar = (text) => (text.startsWith('"') ? JSON.parse(text) : /^\d+$/.test(text) ? Number(text) : text);
+
+// The Continue block is a fixed, small YAML shape too: one stdio server under mcpServers.
+export function continueEntry(text) {
+  const lines = text.split('\n').filter((line) => line.trim() && !line.trimStart().startsWith('#'));
+  if (!/^name: \S/.test(lines[0]) || !/^version: \d+\.\d+\.\d+$/.test(lines[1]) || lines[2] !== 'schema: v1'
+    || lines[3] !== 'mcpServers:' || lines[4] !== `  - name: ${SERVER}`) {
+    throw new Error('Continue: the block is not one mcpServers item named qrscan with name, version and schema v1');
+  }
+  const entry = { name: SERVER };
+  let list;
+  for (const line of lines.slice(5)) {
+    const item = /^ {6}- (.+)$/.exec(line);
+    if (item && list) { list.push(scalar(item[1])); continue; }
+    const match = /^ {4}([A-Za-z]+):(?: (.+))?$/.exec(line);
+    if (!match || match[1] in entry) throw new Error(`Continue: unexpected line ${JSON.stringify(line)}`);
+    list = match[2] === undefined ? [] : undefined;
+    entry[match[1]] = list ?? scalar(match[2]);
+  }
+  return entry;
+}
+
+// The client entries the README gives as text: the Amp command and settings, the Continue block
+// and the Zed settings. Each one must appear exactly once.
+export function readmeEntries(readme) {
+  const fences = [...readme.matchAll(/^```(\w*)\n([\s\S]*?)^```$/gm)].map((match) => ({ lang: match[1], body: match[2] }));
+  const one = (where, pick) => {
+    const blocks = fences.filter(pick);
+    if (blocks.length !== 1) throw new Error(`README.md holds ${blocks.length} ${where} blocks, expected one`);
+    return blocks[0].body;
+  };
+  const amp = [...readme.matchAll(/^amp mcp add (\S+) -- (.+)$/gm)];
+  if (amp.length !== 1 || amp[0][1] !== SERVER) throw new Error(`README.md holds ${amp.length} amp mcp add lines (${amp.map((line) => line[1]).join(', ')}), expected one for ${SERVER}`);
+  return {
+    ampCommand: amp[0][2].split(' '),
+    ampSettings: JSON.parse(one('Amp settings', (block) => block.lang === 'json' && block.body.includes('"amp.mcpServers"'))),
+    continueEntry: continueEntry(one('Continue', (block) => block.lang === 'yaml' && block.body.includes('mcpServers:'))),
+    zedSettings: JSON.parse(one('Zed settings', (block) => block.lang === 'json' && block.body.includes('"context_servers"'))),
+  };
 }
 
 function fromLink(url, where) {
@@ -105,5 +148,18 @@ export async function launches(stage) {
   const flag = readme.match(/--with-extension "([^"]+)"/);
   if (!flag) throw new Error('README.md has no goose --with-extension command');
   found['README.md · goose --with-extension'] = flag[1].split(' ');
+
+  const entries = readmeEntries(readme);
+  found['README.md · amp mcp add'] = entries.ampCommand;
+  const ampKeys = Object.keys(entries.ampSettings);
+  if (ampKeys.length !== 1 || ampKeys[0] !== 'amp.mcpServers') throw new Error(`README.md · Amp settings set ${ampKeys.join(', ')}`);
+  found['README.md · Amp settings'] = argv(only(entries.ampSettings['amp.mcpServers'], 'README.md · Amp settings'), 'README.md · Amp settings', ['command', 'args']);
+  const { name, type, connectionTimeout, ...launch } = entries.continueEntry;
+  if (type !== 'stdio') throw new Error(`README.md · Continue: the server type is ${type}, not stdio`);
+  if (!Number.isInteger(connectionTimeout) || connectionTimeout < 60000) throw new Error('README.md · Continue: the first npx start needs a connectionTimeout of at least a minute');
+  found['README.md · Continue'] = argv(launch, 'README.md · Continue', ['command', 'args']);
+  const zedKeys = Object.keys(entries.zedSettings);
+  if (zedKeys.length !== 1 || zedKeys[0] !== 'context_servers') throw new Error(`README.md · Zed settings set ${zedKeys.join(', ')}`);
+  found['README.md · Zed settings'] = argv(only(entries.zedSettings.context_servers, 'README.md · Zed settings'), 'README.md · Zed settings', ['command', 'args']);
   return found;
 }
