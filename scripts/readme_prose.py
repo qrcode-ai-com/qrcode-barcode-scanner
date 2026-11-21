@@ -10,6 +10,7 @@ GUIDES = {
     'bindings/go/README.md': ('sdk/go', 'Go'),
     'bindings/kotlin/README.md': ('sdk/android', 'Android'),
     'bindings/php/README.md': ('sdk/php', 'PHP'),
+    'bindings/ruby/README.md': ('sdk/ruby', 'Ruby'),
     'bindings/swift/README.md': ('sdk/ios', 'iOS'),
     'crates/qrcode-ai-scanner/README.md': ('sdk/rust', 'Rust'),
     'crates/qrcode-ai-scanner-node/README.md': ('sdk/nodejs', 'Node.js'),

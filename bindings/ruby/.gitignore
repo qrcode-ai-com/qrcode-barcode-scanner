@@ -1,0 +1,5 @@
+# Written by scripts/ruby-gem.py stage and by the workflow, never checked in.
+/lib/qrcode_barcode_scanner/version.rb
+/lib/qrcode_barcode_scanner/generated/
+/lib/qrcode_barcode_scanner/native/
+*.gem

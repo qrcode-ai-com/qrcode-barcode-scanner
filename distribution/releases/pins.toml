@@ -76,6 +76,7 @@ paths = [
   "bindings/kotlin/qrcodeaiscanner/build.gradle.kts",
   "bindings/kotlin/README.md",
   "bindings/dotnet/README.md",
+  "bindings/ruby/README.md",
   "bindings/flutter/README.md",
   "crates/qrcode-ai-scanner/README.md",
   "crates/qrcode-ai-scanner-cli/README.md",
