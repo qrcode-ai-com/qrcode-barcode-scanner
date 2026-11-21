@@ -14,7 +14,7 @@ without notice.
 | File | `build/qrcode-barcode-scanner-chrome-0.1.0.zip` |
 | SHA-256 | `8d85941169527f57f85c4bcaa3c7170c7b01c9c0d5983285a190bfdeaf47d347` |
 | Made by | `npm ci && npm run build` in this folder, or the `browser-extension` artifact of the `integration-browser-extension` workflow |
-| Checked by | `npm run check:pins` (same bytes as [SHA256SUMS](../SHA256SUMS)), `npm run inspect`, and `node test/chromium.mjs --package` on that zip |
+| Checked by | `npm run check:pins` (same bytes as [SHA256SUMS](../SHA256SUMS)), `npm run inspect`, and `node test/chromium.mjs --package` on that zip, in Playwright's Chromium and with `--channel chrome` in Google Chrome |
 | Manifest | Manifest V3, version 0.1.0, permissions `contextMenus` and `activeTab`, optional host permissions `https://*/*` and `http://*/*`, no `update_url` |
 
 Rebuilding on any system with Node.js 22 or 24 gives the same bytes. If the hash differs, do
