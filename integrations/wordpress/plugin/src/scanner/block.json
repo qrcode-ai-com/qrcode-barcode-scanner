@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "qrcode-barcode-scanner/scanner",
+  "version": "0.1.0",
+  "title": "QR Code & Barcode Scanner",
+  "category": "widgets",
+  "description": "Let visitors read the QR codes and barcodes in an image or a photo. The image is read in their browser and is never uploaded.",
+  "keywords": ["qr code", "barcode", "scan", "scanner", "reader"],
+  "textdomain": "qrcode-barcode-scanner",
+  "attributes": {
+    "profile": { "type": "string", "enum": ["full", "fast", "frame"], "default": "full" },
+    "showReport": { "type": "boolean", "default": false },
+    "showCredit": { "type": "boolean", "default": false }
+  },
+  "supports": {
+    "html": false,
+    "align": ["wide", "full"],
+    "spacing": { "margin": true, "padding": true }
+  },
+  "editorScript": "file:./index.js",
+  "style": "qrcode-barcode-scanner",
+  "viewScriptModule": "qrcode-barcode-scanner-view",
+  "render": "file:./render.php"
+}

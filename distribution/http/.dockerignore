@@ -1,0 +1,10 @@
+# Only what the image copies: the build context of a host holds the whole repository.
+*
+!package.json
+!package-lock.json
+!server.mjs
+!LICENSE
+!LICENSE-NOTES.md
+!SOURCE.json
+!licenses
+!licenses/**

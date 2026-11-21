@@ -86,40 +86,35 @@ No remote code. The scanner engine is a WebAssembly module packaged inside the e
 
 ### Privacy
 
-The privacy statement is [PRIVACY.md](PRIVACY.md). Where a form asks for a privacy policy
-address, use its public address once this folder is on `main`:
-`https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/store/PRIVACY.md`.
+The extension's own privacy statement is [PRIVACY.md](PRIVACY.md). Where a form asks for a
+privacy policy address, use the publisher's privacy page, `https://qrcode-ai-com.github.io/privacy/`.
+That page and the terms and support pages below are planned on the organisation's GitHub Pages
+site and are live only after the owner's review: open each one before pasting it into a form.
+Until then, the public copy of PRIVACY.md is
+`https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/browser-extension/listing/PRIVACY.md`.
 
 ### Addresses
 
 - Website: `https://qrcode-ai.com/en-US/qr-code-scanner/integrations/browser-extension`
-- Support: `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues`
+- Privacy policy: `https://qrcode-ai-com.github.io/privacy/` (live after the owner's review)
+- Terms: `https://qrcode-ai-com.github.io/terms/` (live after the owner's review)
+- Support: `https://qrcode-ai-com.github.io/support/` (live after the owner's review); issues
+  also reach the maintainers at `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues`
 - Source: `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/browser-extension`
 
 ### Images
 
-- Icon 128 × 128: `build/store-assets/icon-128.png` (also `icons/icon-128.png` in each package).
+- Store icon 128 × 128, artwork 96 × 96 inside a transparent margin of 16 px:
+  `build/store-assets/icon-128.png`.
 - Logo 300 × 300, for Edge: `build/store-assets/logo-300.png`.
-- Screenshot 1280 × 800: `npm run test:chromium` writes
-  `build/acceptance/screenshots/result-1280x800.png`, the tab page after a scan of the mixed
-  fixture. Take more on a real browser if the store wants several.
+- Four screenshots, 1280 × 800, full bleed, and two promotional tiles, 440 × 280 and
+  1400 × 560: [images/](images/). `npm run store-images` captures them again from the real build
+  in Playwright's Chromium; CI does so on every run.
 
 ## Chrome Web Store (map-49)
 
-- **Account.** A Chrome Web Store developer account on a Google account with 2-Step
-  Verification on. Registration costs a one-time US$5 fee. The account declares trader or
-  non-trader status; a trader's address, email and phone are shown on the listing.
-- **Upload.** Developer Dashboard, "Add new item", then `build/qrcode-barcode-scanner-chrome-0.1.0.zip`.
-- **Store listing tab.** Description: the long description. Category: Tools, under
-  Productivity (pick the closest name in the dashboard's list). Language: English. Store icon,
-  screenshot and addresses as above.
-- **Privacy practices tab.** Single purpose, the three permission justifications (the host
-  permission one goes in the host permission field) and remote code "No, I am not using remote
-  code", as above. Data usage: tick no data type, because no user data leaves the browser.
-  Tick the three certifications. Privacy policy: the PRIVACY.md address.
-- **Distribution tab.** Free, public, all regions.
-- **Then** "Submit for review". Host permission patterns, even optional ones, may lengthen the
-  review.
+The account, the form values tab by tab, the images and the sources read are in
+[chrome-web-store.md](chrome-web-store.md).
 
 ## Microsoft Edge Add-ons (map-50)
 

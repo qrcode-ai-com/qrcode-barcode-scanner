@@ -1,0 +1,36 @@
+{
+  "name": "qrcode-barcode-scanner-adobe-express",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adobe Express add-on that reads the QR codes and barcodes of a page or an image with the published WASM",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/adobe-express"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "config": {
+    "wasmSha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/unit.test.mjs",
+    "test:express": "node test/express-panel.mjs",
+    "listing": "node scripts/listing-assets.mjs"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.61.0"
+  }
+}
