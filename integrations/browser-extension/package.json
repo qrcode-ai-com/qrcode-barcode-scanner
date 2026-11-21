@@ -22,6 +22,7 @@
     "build-for-amo": "node scripts/build.mjs",
     "check:pins": "node scripts/build.mjs --check",
     "pin": "node scripts/build.mjs --pin",
+    "store-images": "node scripts/store-images.mjs",
     "inspect": "node scripts/inspect.mjs build",
     "test": "node --test test/unit.test.mjs",
     "test:chromium": "node test/chromium.mjs",

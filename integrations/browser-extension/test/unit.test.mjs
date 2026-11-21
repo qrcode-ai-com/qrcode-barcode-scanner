@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -172,6 +173,51 @@ test('the icon is drawn the same way every time, at each size', () => {
     const icon = drawIcon(size);
     assert.equal(icon.readUInt32BE(16), size);
     assert.deepEqual(drawIcon(size), icon);
+  }
+});
+
+/** Alpha of each pixel of a PNG that encodePng wrote: one IDAT, filter 0 on every row. */
+function ownPngAlpha(png) {
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const length = png.readUInt32BE(33);
+  assert.equal(png.toString('latin1', 37, 41), 'IDAT');
+  const rows = inflateSync(png.subarray(41, 41 + length));
+  return { width, height, at: (x, y) => rows[y * (width * 4 + 1) + 1 + x * 4 + 3] };
+}
+
+test('the Chrome store icon is 128 px: 96 px of art inside 16 px of transparent margin', () => {
+  const { width, height, at } = ownPngAlpha(drawIcon(128, 16));
+  assert.equal(width, 128);
+  assert.equal(height, 128);
+  let [left, top, right, bottom] = [width, height, -1, -1];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (at(x, y) === 0) continue;
+      [left, top] = [Math.min(left, x), Math.min(top, y)];
+      [right, bottom] = [Math.max(right, x), Math.max(bottom, y)];
+    }
+  }
+  assert.deepEqual([left, top, right, bottom], [16, 16, 111, 111]);
+  assert.equal(at(64, 64), 255);
+});
+
+test('the committed store images have the sizes the stores take', () => {
+  const sizes = {
+    'promo-marquee-1400x560.png': [1400, 560],
+    'promo-small-440x280.png': [440, 280],
+    'screenshot-1-scan-1280x800.png': [1280, 800],
+    'screenshot-2-popup-1280x800.png': [1280, 800],
+    'screenshot-3-menu-1280x800.png': [1280, 800],
+    'screenshot-4-report-1280x800.png': [1280, 800],
+  };
+  const folder = join(HERE, 'listing', 'images');
+  assert.deepEqual(readdirSync(folder).sort(), Object.keys(sizes));
+  for (const [name, [width, height]] of Object.entries(sizes)) {
+    const png = readFileSync(join(folder, name));
+    assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+      name);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [width, height], name);
   }
 });
 
