@@ -6,6 +6,8 @@
 // Firefox's own WebDriver BiDi can (`webExtension.install`). The client needs Node.js 22's
 // global WebSocket and nothing else.
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { basename, extname } from 'node:path';
 
 /**
  * Start `binary` with a new profile and WebDriver BiDi on a free port. Resolves once Firefox
@@ -164,7 +166,14 @@ export class BidiPage {
     }, { query: selector, choice: value });
   }
 
-  /** Give a file input one file, through the protocol, as a user's file chooser would. */
+  /**
+   * Give a file input one file. On a web page this goes through the protocol, as a user's file
+   * chooser would (`input.setFiles`). On an add-on page release Firefox refuses that command
+   * ("does not support browsing contexts in privileged scope",
+   * remote/webdriver-bidi/modules/RootBiDiModule.sys.mjs); the page then receives the same bytes,
+   * name and type through a DataTransfer, which fires the same change event. `this.fileRoute`
+   * records which route the last file took.
+   */
   async setInputFiles(selector, path) {
     const found = await this.bidi.send('script.evaluate', {
       expression: `document.querySelector(${JSON.stringify(selector)})`,
@@ -175,10 +184,34 @@ export class BidiPage {
     if (found.type !== 'success' || found.result.type !== 'node') {
       throw new Error(`no element ${selector}`);
     }
-    await this.bidi.send('input.setFiles', {
-      context: this.context,
-      element: { sharedId: found.result.sharedId },
-      files: [path],
+    try {
+      await this.bidi.send('input.setFiles', {
+        context: this.context,
+        element: { sharedId: found.result.sharedId },
+        files: [path],
+      });
+      this.fileRoute = 'input.setFiles';
+      return;
+    } catch (error) {
+      if (!/unsupported operation: .*privileged scope/.test(error.message)) throw error;
+    }
+    const name = basename(path);
+    await this.evaluate(({ query, file, base64, type }) => {
+      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], file, { type }));
+      const element = document.querySelector(query);
+      element.files = transfer.files;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }, {
+      query: selector, file: name, base64: readFileSync(path).toString('base64'),
+      type: TYPES[extname(name).toLowerCase()] ?? '',
     });
+    this.fileRoute = 'DataTransfer';
   }
 }
+
+// The type a file chooser gives a file from its extension, as Firefox does.
+const TYPES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp' };

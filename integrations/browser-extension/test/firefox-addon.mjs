@@ -8,8 +8,9 @@
 // an unsigned add-on only that way, and the signed copy from Firefox Add-ons differs from this zip
 // only by Mozilla's signature files. Then it checks:
 //   install   the add-on ID, the two permissions, no site granted, the "Scan this image" item
-//   popup     the toolbar page in a tab: the mixed fixture, chosen through the file input, in
-//             fast, frame and full
+//   popup     the toolbar page in a tab: the mixed fixture, given to the file input, in fast,
+//             frame and full (release Firefox refuses input.setFiles on an add-on page, so the
+//             file goes through a DataTransfer there: test/bidi.mjs)
 //   states    an image with no code empties the previous result; a file that is not an image is
 //             an error and shows nothing
 //   network   a local page shows the request listener works; then no request of the add-on's
@@ -167,7 +168,8 @@ try {
 
   writeFileSync(join(out, 'firefox-addon-run.json'), `${JSON.stringify({
     checks: checkCount(), package: { path: packageZip, sha256: packageSha256 }, fixture,
-    browser: `firefox ${browserVersion}`, binary, requests: requests.map((row) => row.url),
+    browser: `firefox ${browserVersion}`, binary, file_route: page.fileRoute,
+    requests: requests.map((row) => row.url),
   }, null, 2)}\n`);
   await bidi.send('session.end', {}).catch(() => {});
   finishedCleanly = true;
