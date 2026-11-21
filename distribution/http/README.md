@@ -57,9 +57,11 @@ The picture is the page the service shows at its root address in a browser, with
 - `Dockerfile` and `.dockerignore`: the image, from `node:22.22.2-bookworm-slim` pinned by digest. It runs `npm ci --omit=dev --ignore-scripts`, compiles nothing and runs the service as user `1000:1000`.
 - `test/consumer.mjs`: a client that judges any running copy of the service from outside, in sixteen checks. `test/server.test.mjs`: the service's tests in one process.
 - `LICENSE` (MIT, for these files), `LICENSE-NOTES.md` (what the image holds and under which license) and `licenses/engine-0.11.0/` (the engine's third-party notices at tag `v0.11.0`).
+- `render.yaml`: the Render Blueprint, described in [Deploy it on a host](#deploy-it-on-a-host).
+- `mirror/test.yml`: the workflow of the service's own repository. It checks that every file comes from the engine, builds the image from the root as a host does and judges it with the consumer.
 - `media/`: the two pictures of this page, taken from the real service.
 
-Deploy hosts read their files at the root of a repository. `scripts/stage-http-satellite.py` in the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) therefore writes this folder as the tree of a repository of its own, with the test fixture and a `SOURCE.json` that names the engine commit it comes from. That repository is generated and never edited by hand: change the service in the engine repository, in `distribution/http`.
+Deploy hosts read their files at the root of a repository. `scripts/stage-http-satellite.py` in the [engine repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) therefore writes this folder as the tree of a repository of its own, [qrcode-ai-com/qrcode-barcode-scanner-http](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http), with the test fixture and a `SOURCE.json` that names the engine commit it comes from. That repository is generated and never edited by hand: change the service in the engine repository, in `distribution/http`.
 
 ## Run it
 
@@ -81,6 +83,12 @@ cd distribution/http
 npm ci --omit=dev --ignore-scripts
 node server.mjs
 ```
+
+## Deploy it on a host
+
+A host that builds a Dockerfile from a Git repository can run the service from [its own repository](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http): the Dockerfile is at the root, the service listens on the `PORT` the host sets, and `GET /healthz` is its health check. It needs no database, no disk and no secret.
+
+`render.yaml` is a [Render Blueprint](https://render.com/docs/blueprint-spec) for one web service built from that Dockerfile on Render's free plan, 0.1 CPU and 512 MB, with `/healthz` as its health check, automatic deploys off and one scan at a time. A Blueprint created from the repository in your own Render account deploys it there. Render's [free web services](https://render.com/docs/free) spin down after 15 minutes without traffic, take about a minute to wake up and are not meant for production; a paid plan keeps the service running. The workflow below checks the file against the schema Render publishes and runs the image as the file asks Render to run it. No deployment on Render itself has been recorded yet.
 
 ## Scan an image
 
@@ -147,6 +155,7 @@ The workflow `.github/workflows/http-service.yml` of the [engine repository](htt
 - `unit` runs `test/server.test.mjs` on the published engine: the consumer below, a report compared field for field with a direct call of the engine, the limits, the source record, the busy and failure answers, and the log.
 - `image` stages the tree of the service's repository, checks it against the commit, builds the image on Linux x64 and on Linux arm64 runners, and saves it with its sha256 and its config digest.
 - `consume` loads each saved image on its own architecture and checks its user, labels and health check. It runs it with a read-only root filesystem, no Linux capability, and on a Docker network that has no route out. `test/consumer.mjs` then judges it from a second container: health, the JSON and the browser page of `GET /`, the source links, the mixed QR code and Code 128 sample in `fast`, `frame` and `full` as a raw body and as a form, with exactly `https://qrc-ai.com/76xMa` and `STOCK-4827` and engine 0.11.0, then each refusal. The job checks that the service cannot reach the network and that its log holds no query or decoded text, then removes the container, the network and the image and checks that they are gone.
+- `hosts` checks `render.yaml` in the staged tree against the schema Render publishes on the day of the run, then runs the judged Linux x64 image as Render would: `PORT=10000`, the variables of the file, 0.1 CPU and 512 MB. The consumer judges it as above, and the job removes it.
 - `rehearse` pushes both judged images and their multi-architecture index to a local registry, exactly as the release does, reads the index back and pulls it.
 
 The same consumer judges a deployed copy: `node test/consumer.mjs https://example.com test/fixtures/mixed-code128-qr.png`, with your service's address in place of `https://example.com`.

@@ -1,0 +1,59 @@
+# Render Blueprint · owner kit
+
+Render has no store or template submission for a Blueprint. The publication is the file
+`render.yaml` at the root of a public repository, plus a Deploy to Render button in its README
+([Render's button page](https://render.com/docs/deploy-to-render), read on 21 November 2026). This
+kit holds what the owner needs to deploy it once for acceptance and then add the button.
+
+## What is ready
+
+| Item | Value |
+| --- | --- |
+| Repository | `https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http`, generated from `distribution/http` by `scripts/stage-http-satellite.py`; `SOURCE.json` names the engine commit |
+| Blueprint | `render.yaml` at its root: one `web` service named `qrcode-barcode-scanner-http`, `runtime: docker`, `plan: free`, `healthCheckPath: /healthz`, `autoDeployTrigger: 'off'`, `QRSCAN_HTTP_MAX_CONCURRENT=1` |
+| Image | built by Render from the `Dockerfile` at the root: Node.js 22 on `node:22.22.2-bookworm-slim` pinned by digest, the engine `@qrcode-ai-com/qrcode-barcode-scanner@0.11.0` from the lockfile's sha512, user `1000:1000` |
+| Port | the service reads `PORT`, which Render sets to `10000` for every web service |
+| Checked in the engine | `http-service.yml`, job `hosts`: `render.yaml` against `https://render.com/schema/render.yaml.json`, then the judged image run with `PORT=10000`, the file's variable, 0.1 CPU and 512 MB, judged by `test/consumer.mjs` (mixed QR code and Code 128 in fast, frame and full, exact payloads, every refusal) |
+| License | the image is AGPL-3.0-or-later (engine 0.11.0); every answer names its source in `X-Source-Code` |
+
+## Cost, read on render.com on 21 November 2026
+
+- The Blueprint selects the **Free** web service plan: 0 USD a month, 0.1 CPU and 512 MB. Render
+  grants 750 free instance hours per workspace and calendar month, spins a free web service down
+  after 15 minutes without inbound traffic, takes about a minute to wake it, may restart it at
+  any time, and says not to use free services for production ([render.com/docs/free](https://render.com/docs/free)).
+- The smallest paid plan, `0.5c-512mb` (0.5 CPU, 512 MB), is 7 USD a month; `1c-2g` is 25 USD a
+  month ([render.com/pricing](https://render.com/pricing)).
+- The Hobby workspace is 0 USD a month plus compute. Outbound bandwidth beyond the workspace's
+  included amount is 0.15 USD per GB. Check both pages again before choosing a plan.
+
+## Owner steps
+
+1. Sign in to Render with the account that should own the acceptance deployment. Creating an
+   account and accepting Render's terms are the owner's.
+2. Open `https://render.com/deploy?repo=https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http`.
+   Render shows the Blueprint: one web service, `qrcode-barcode-scanner-http`, plan Free. Give the
+   Blueprint a name, keep the region, and approve it.
+3. Wait for the deploy to end with the service live, then open `https://<service>.onrender.com/healthz`
+   (Render shows the address). It answers `{"status":"ok","service":"0.1.0","engine":"0.11.0"}`.
+4. From a clone of the repository, with Node.js 22, run the consumer against the deployed copy:
+   `node test/consumer.mjs https://<service>.onrender.com test/fixtures/mixed-code128-qr.png --revision <commit>`,
+   where `<commit>` is `engine.revision` in `SOURCE.json`. It must end with
+   `consumer: all 16 checks passed`. Keep its output for the record.
+5. Delete the web service (its **Settings**, **Delete Web Service**) and the Blueprint, then check
+   that the address no longer answers.
+6. Add the button to the README of `distribution/http` in the engine repository, or ask an agent to
+   do it, and record the commit, the date and the consumer's output:
+
+   ```markdown
+   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/qrcode-ai-com/qrcode-barcode-scanner-http)
+   ```
+
+Nothing in this kit has been run on Render. The button is not in any README yet, on purpose: it is
+added once step 4 has passed on a real deployment.
+
+## Upkeep
+
+A change to `distribution/http` reaches the repository when an agent stages it again and pushes it.
+`autoDeployTrigger: 'off'` keeps that push from redeploying anyone's copy: each user redeploys when
+they choose.
