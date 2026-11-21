@@ -23,10 +23,14 @@ import {
   pickImage,
   PROFILES,
   QrscanMissingError,
+  reportText,
   scanFile,
+  TIME_LIMITS,
   UnreadableImageError,
   type Profile,
   type ScanResult,
+  type Score,
+  type TimeLimit,
 } from "./qrscan";
 
 /** The two-dimensional formats, shown with a grid icon; the others are barcodes. */
@@ -44,6 +48,7 @@ const MATRIX = new Set([
 export interface ScanPreferences {
   qrscanPath?: string;
   profile?: string;
+  timeLimit?: string;
 }
 
 export type ScanState =
@@ -60,11 +65,14 @@ export async function loadScan(): Promise<ScanState> {
   const profile: Profile = PROFILES.includes(preferences.profile as Profile)
     ? (preferences.profile as Profile)
     : "full";
+  const limit: TimeLimit = TIME_LIMITS.includes(preferences.timeLimit as TimeLimit)
+    ? (preferences.timeLimit as TimeLimit)
+    : "profile";
   const picked = await pickImage({ finder: getSelectedFinderItems, clipboard: () => Clipboard.read() });
   if (picked.kind === "none") return { kind: "none", reason: picked.reason };
   try {
     const qrscan = await findQrscan(preferences.qrscanPath);
-    return { kind: "result", result: await scanFile(qrscan, picked.path, profile), name: picked.name };
+    return { kind: "result", result: await scanFile(qrscan, picked.path, profile, { limit }), name: picked.name };
   } catch (error) {
     if (error instanceof QrscanMissingError) return { kind: "missing", looked: error.looked };
     if (error instanceof UnreadableImageError) return { kind: "unreadable", name: picked.name, message: error.message };
@@ -78,14 +86,27 @@ export function oneLine(text: string): string {
 }
 
 function budgetNote(result: ScanResult): string {
-  return `The ${result.profile} profile ran out of time before the scan ended. Choose the full profile in the preferences to search longer.`;
+  return `The ${result.profile} profile ran out of time before the scan ended. Choose the full profile, or no time limit, in the preferences to search longer.`;
+}
+
+const PLACEHOLDER = "Filter the codes";
+
+/** The tag of the judged code: its score and grade, colored by grade. */
+export function scoreTag(score: Score): { value: string; color: Color } {
+  const color =
+    score.grade === "excellent" || score.grade === "good"
+      ? Color.Green
+      : score.grade === "acceptable"
+        ? Color.Yellow
+        : Color.Red;
+  return { value: `Score ${score.value} · ${score.grade}`, color };
 }
 
 export function ScanView({ state }: { state: ScanState }) {
-  if (state.kind === "loading") return <List isLoading searchBarPlaceholder="Filter the codes" />;
+  if (state.kind === "loading") return <List isLoading searchBarPlaceholder={PLACEHOLDER} />;
   if (state.kind === "missing") {
     return (
-      <List>
+      <List searchBarPlaceholder={PLACEHOLDER}>
         <List.EmptyView
           icon={Icon.Terminal}
           title="qrscan is not installed"
@@ -103,14 +124,14 @@ export function ScanView({ state }: { state: ScanState }) {
   }
   if (state.kind === "none") {
     return (
-      <List>
+      <List searchBarPlaceholder={PLACEHOLDER}>
         <List.EmptyView icon={Icon.Image} title="No image to scan" description={state.reason} />
       </List>
     );
   }
   if (state.kind === "unreadable") {
     return (
-      <List>
+      <List searchBarPlaceholder={PLACEHOLDER}>
         <List.EmptyView
           icon={Icon.Warning}
           title={`${state.name} could not be read as an image`}
@@ -121,7 +142,7 @@ export function ScanView({ state }: { state: ScanState }) {
   }
   if (state.kind === "failed") {
     return (
-      <List>
+      <List searchBarPlaceholder={PLACEHOLDER}>
         <List.EmptyView icon={Icon.Warning} title="The scan failed" description={state.message} />
       </List>
     );
@@ -129,7 +150,7 @@ export function ScanView({ state }: { state: ScanState }) {
   const { result, name } = state;
   if (result.codes.length === 0) {
     return (
-      <List navigationTitle={`Codes in ${name}`}>
+      <List searchBarPlaceholder={PLACEHOLDER}>
         <List.EmptyView
           icon={Icon.MagnifyingGlass}
           title="No QR code or barcode found"
@@ -139,9 +160,10 @@ export function ScanView({ state }: { state: ScanState }) {
     );
   }
   const all = allTexts(result.codes);
+  const report = reportText(result);
   const count = result.codes.length === 1 ? "1 code" : `${result.codes.length} codes`;
   return (
-    <List navigationTitle={`Codes in ${name}`} searchBarPlaceholder="Filter the codes">
+    <List searchBarPlaceholder={PLACEHOLDER}>
       <List.Section title={name} subtitle={result.budgetExhausted ? `${count} · ${budgetNote(result)}` : count}>
         {result.codes.map((code, index) => (
           <List.Item
@@ -150,12 +172,20 @@ export function ScanView({ state }: { state: ScanState }) {
             title={oneLine(code.text)}
             subtitle={code.label}
             keywords={[code.label, code.symbology]}
-            accessories={code.complete ? [] : [{ tag: { value: "incomplete text", color: Color.Orange } }]}
+            accessories={[
+              ...(code.complete ? [] : [{ tag: { value: "incomplete text", color: Color.Orange } }]),
+              ...(index === 0 && result.score ? [{ tag: scoreTag(result.score) }] : []),
+            ]}
             actions={
               <ActionPanel>
                 <Action.CopyToClipboard title="Copy Text" content={code.text} />
                 <Action.Paste title="Paste Text" content={code.text} />
                 <Action.CopyToClipboard title="Copy All Texts" content={all} shortcut={Keyboard.Shortcut.Common.Copy} />
+                <Action.CopyToClipboard
+                  title="Copy Scan Report"
+                  content={report}
+                  shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
+                />
               </ActionPanel>
             }
           />
