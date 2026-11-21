@@ -55,7 +55,22 @@ HOSTS = {
         "port": 10000,
         "plans": {"0.5c-512mb": {"cpus": "0.5", "memory": "512m"}},
     },
+    "railway": {
+        # Railway reads no file for this service: config as code is deprecated and no longer read
+        # after 2026-12-01 (https://docs.railway.com/reference/config-as-code). The template's
+        # settings live in Railway's composer (distribution/railway/LISTING.md), which sets the
+        # variables below. Railway injects PORT (https://docs.railway.com/deployments/healthchecks)
+        # without documenting its value: 3000 stands for it, a port that is not the service's
+        # default. The Free plan gives a service 1 vCPU and 0.5 GB (https://docs.railway.com/pricing/plans).
+        "file": None,
+        "port": 3000,
+        "plans": {"free": {"cpus": "1", "memory": "512m"}},
+        "plan": "free",
+        "env": {"QRSCAN_HTTP_MAX_CONCURRENT": "1", "QRSCAN_HTTP_BUDGET_SCALE": "2"},
+    },
 }
+# Files a host would read at the root in place of its composer: none may be staged.
+FOREIGN = ("railway.json", "railway.toml")
 
 
 class Refused(Exception):
@@ -158,6 +173,9 @@ def check(tree, schemas):
     server = (tree / "server.mjs").read_text(encoding="utf-8")
     if f'"{HEALTH}"' not in server or "process.env.PORT" not in server:
         raise Refused(f"server.mjs does not answer {HEALTH} or read PORT")
+    staged = [name for name in FOREIGN if (tree / name).exists()]
+    if staged:
+        raise Refused(f"{staged} would configure a host from a deprecated file: settings belong to its composer")
     results = {}
     for host, function in CHECKS.items():
         results[host] = function(tree, schemas.get(host))
@@ -166,7 +184,12 @@ def check(tree, schemas):
 
 
 def profile(host, tree):
-    checked = CHECKS[host](pathlib.Path(tree))
+    if HOSTS[host]["file"] is None:
+        limit_variables(HOSTS[host]["env"].items(), host)
+        budget_scale(HOSTS[host]["plans"][HOSTS[host]["plan"]]["cpus"], HOSTS[host]["env"], host)
+        checked = {"plan": HOSTS[host]["plan"], "env": HOSTS[host]["env"]}
+    else:
+        checked = CHECKS[host](pathlib.Path(tree))
     plan = HOSTS[host]["plans"][checked["plan"]]
     port = HOSTS[host]["port"]
     return {"schema": "qrscan-http-host/1", "host": host, "file": HOSTS[host]["file"], "plan": checked["plan"],
@@ -205,8 +228,20 @@ def self_test():
             got = profile("render", tree)
             if got["port"] != 10000 or got["env"].get("PORT") != "10000" or got["memory"] != "512m":
                 failures.append(f"the Render profile is {got}")
+            got = profile("railway", tree)
+            if got["port"] != 3000 or got["env"] != {"PORT": "3000", "QRSCAN_HTTP_MAX_CONCURRENT": "1", "QRSCAN_HTTP_BUDGET_SCALE": "2"} or \
+                    got["file"] is not None:
+                failures.append(f"the Railway profile is {got}")
         except Refused as error:
-            failures.append(f"the real render.yaml was refused: {error}")
+            failures.append(f"the real files were refused: {error}")
+        (tree / "railway.json").write_text("{}")
+        try:
+            check(tree, {})
+            failures.append("a railway.json was accepted")
+        except Refused as error:
+            if "deprecated" not in str(error):
+                failures.append(f"a railway.json was refused for another reason: {error}")
+        (tree / "railway.json").unlink()
         for name, (text, reason) in cases.items():
             if text == good:
                 failures.append(f"{name}: the mutation changed nothing")
@@ -220,7 +255,8 @@ def self_test():
                     failures.append(f"{name}: refused for another reason: {error}")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'ok' if not failures else 'FAILED'} (the real files, {len(cases)} refused render.yaml)")
+    print(f"self-test: {'ok' if not failures else 'FAILED'} (the real files, a deprecated railway.json, "
+          f"{len(cases)} refused render.yaml)")
     return 1 if failures else 0
 
 
