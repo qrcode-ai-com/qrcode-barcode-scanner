@@ -5,7 +5,8 @@ name: integration-browser-extension
 # hashes its SHA256SUMS pins, inspected and linted for Firefox. Each store zip is then extracted or
 # installed as a store receives it and driven in a new profile: the Chrome and the Edge zips in
 # Playwright's Chromium, the Firefox zip in the runner's own Firefox through WebDriver BiDi, and
-# the Firefox build's page in Playwright's Firefox. The reports are judged by the repository's page
+# the Firefox build's page in Playwright's Firefox. The store screenshots and promotional tiles
+# are captured again from the Chrome build. The reports are judged by the repository's page
 # and acceptance judges, the packages are rebuilt from the source zip, and the reproduce job
 # rebuilds them on Linux, macOS and Windows with Node.js 22 and 24 in two time zones, each time to
 # the pinned bytes. It uses the published WASM package: nothing is built from this repository's
@@ -79,6 +80,8 @@ jobs:
             node test/chromium.mjs --package "build/qrcode-barcode-scanner-$target-$version.zip" \
               --out "build/acceptance/$target"
           done
+      - name: The store images, captured from the Chrome build
+        run: node scripts/store-images.mjs --extension build/chrome --out build/store-images
       - name: The Firefox zip installed in the runner's Firefox
         timeout-minutes: 5
         run: |
@@ -126,6 +129,7 @@ jobs:
             integrations/browser-extension/build/*.json
             integrations/browser-extension/build/SHA256SUMS
             integrations/browser-extension/build/store-assets
+            integrations/browser-extension/build/store-images
             integrations/browser-extension/build/acceptance
             ${{ runner.temp }}/receipts
           if-no-files-found: error
