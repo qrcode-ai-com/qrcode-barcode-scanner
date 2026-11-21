@@ -74,6 +74,7 @@ integrations/obsidian/README.md
 integrations/openclaw/README.md
 integrations/photoshop-uxp/README.md
 integrations/raycast/README.md
+integrations/replicate/README.md
 integrations/vscode/README.md
 integrations/wasm-inline/README.md
 integrations/wordpress/README.md

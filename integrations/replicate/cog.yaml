@@ -1,0 +1,12 @@
+# The Cog definition of the Replicate model qrcode-ai-com/qrcode-barcode-scanner (not yet pushed).
+# `cog build` makes a CPU-only container image that runs the published engine wheel
+# qrcode-barcode-scanner 0.11.0 from PyPI; nothing is built from the engine's Rust source.
+# The engine repository's workflow integration-replicate.yml builds and runs it; `cog push` is the
+# owner's step, from the owner's own shell (README.md, LISTING.md).
+build:
+  gpu: false
+  python_version: "3.13"
+  python_requirements: requirements.txt
+  sdk_version: "0.23.1"
+image: "r8.im/qrcode-ai-com/qrcode-barcode-scanner"
+run: "run.py:Runner"

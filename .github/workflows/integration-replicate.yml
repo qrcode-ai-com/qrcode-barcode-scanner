@@ -1,0 +1,218 @@
+name: Integrations · Replicate model
+
+# The Replicate model under integrations/replicate, a Cog folder on the published engine wheel
+# qrcode-barcode-scanner 0.11.0. The runner job runs the model's tests in a new virtual environment
+# through the Python host kit: they call Runner.run on the mixed fixture in the fast, frame and full
+# profiles, the destination acceptance driver judges the three reports, then the scanner is removed
+# and must be gone. The image job installs the pinned Cog CLI (checked by SHA-256), builds the
+# container with `cog build`, checks the engine module inside it against the published wheel, runs
+# three predictions with `cog run`, judges them as a server's reports, checks that a file which is
+# not an image fails its prediction, then removes the image. Nothing is built from the engine's
+# Rust source, no token is used, nothing is pushed to Replicate or to any registry.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-replicate.yml
+      - integrations/replicate/**
+      - scripts/destination-acceptance.py
+      - scripts/python-host-consumer.py
+      - scripts/python_host_kit.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-replicate-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  runner:
+    name: Replicate runner · tests through the Python host kit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # cog.yaml's python_version.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: The runner's tests in a new environment, judged and removed
+        run: |
+          set -euo pipefail
+          mkdir -p receipt
+          python scripts/python-host-consumer.py run \
+            --destination "Replicate model runner from this checkout (not published)" \
+            --identifier r8.im/qrcode-ai-com/qrcode-barcode-scanner --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/replicate" \
+            --install "-r integrations/replicate/requirements.txt -r integrations/replicate/tests/requirements.txt" \
+            --scan "{python} -m pytest -q -p no:cacheprovider integrations/replicate/tests" \
+            --uninstall "qrcode-barcode-scanner cog coglet" \
+            --gone-import qrcode_barcode_scanner --gone-import cog \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-replicate-runner.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: integration-replicate-runner
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  image:
+    name: Replicate image · cog build and cog run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # The Cog CLI release the model is built with (cog.yaml pins the same build.sdk_version).
+      COG_URL: https://github.com/replicate/cog/releases/download/v0.23.1/cog_Linux_x86_64
+      COG_SHA256: c6bf4f89278609b4fcde28a59808bd2b51b559022a9178b08492c910d9dc115d
+      IMAGE: qrcode-barcode-scanner-cog
+      # The native module of the PyPI wheel qrcode_barcode_scanner-0.11.0, manylinux x86_64
+      # (examples/notebooks/scan-images.ipynb lists the module of every published wheel).
+      MODULE_SHA256: de30ac77aee57c90ec4552af10e075fbd83aa1f775b53031cf5acf84fc117e34
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Cog CLI, checked by SHA-256
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cog-download" "$RUNNER_TEMP/cog-bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$RUNNER_TEMP/cog-download/cog_Linux_x86_64" "$COG_URL"
+          echo "$COG_SHA256  $RUNNER_TEMP/cog-download/cog_Linux_x86_64" | sha256sum --check --strict
+          install -m 0755 "$RUNNER_TEMP/cog-download/cog_Linux_x86_64" "$RUNNER_TEMP/cog-bin/cog"
+          echo "$RUNNER_TEMP/cog-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/cog-bin/cog" --version
+      - name: Build the image with cog build
+        working-directory: integrations/replicate
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/receipt/log"
+          cog build --progress plain -t "$IMAGE" 2>&1 | tee "$GITHUB_WORKSPACE/receipt/log/cog-build.log"
+      - name: Inspect the image, its schema and the engine inside it
+        run: |
+          set -euo pipefail
+          id=$(docker image inspect --format '{{.Id}}' "$IMAGE")
+          echo "Image $IMAGE: $id"
+          echo "$id" > receipt/log/image-id.txt
+          docker image inspect --format '{{json .Config.Labels}}' "$IMAGE" > receipt/log/image-labels.json
+          python3 - receipt/log/image-labels.json <<'EOF'
+          import json
+          import sys
+
+          labels = json.load(open(sys.argv[1], encoding="utf-8"))
+          print("Labels:", ", ".join(sorted(labels)))
+          key = next(name for name in labels if name.endswith("openapi_schema"))
+          schema = json.loads(labels[key])
+          components = schema["components"]["schemas"]
+          fields = components["Input"]["properties"]
+          assert set(fields) == {"image", "profile", "budget_ms"}, sorted(fields)
+          assert fields["image"]["type"] == "string" and fields["image"]["format"] == "uri", fields["image"]
+
+          def members(node):
+              """The property and every schema it names through allOf, anyOf and $ref."""
+              yield node
+              for child in node.get("allOf", []) + node.get("anyOf", []):
+                  yield from members(child)
+              if "$ref" in node:
+                  yield from members(components[node["$ref"].rsplit("/", 1)[-1]])
+
+          def first(node, key):
+              return next((part[key] for part in members(node) if key in part), None)
+
+          assert first(fields["profile"], "enum") == ["fast", "frame", "full"], fields["profile"]
+          assert first(fields["profile"], "default") == "fast", fields["profile"]
+          budget = fields["budget_ms"]
+          assert (first(budget, "minimum"), first(budget, "maximum")) == (0, 60000), budget
+          response = schema["paths"]["/predictions"]["post"]["responses"]["200"]["content"]
+          output = response["application/json"]["schema"]
+          output = first(output, "properties") or output
+          kinds = {part.get("type") for part in members(output.get("output", output))} - {None}
+          assert kinds <= {"object"}, output
+          print("Schema: inputs image, profile (fast, frame, full) and budget_ms (0 to 60000);",
+                "output", sorted(kinds) or "any JSON value")
+          EOF
+          docker run --rm --network none --entrypoint python "$IMAGE" -c '
+          import hashlib, importlib.metadata, os, pathlib, platform
+          import qrcode_barcode_scanner as scanner
+          module = next(p for p in pathlib.Path(scanner.__file__).parent.iterdir() if p.suffix == ".so")
+          wheel = importlib.metadata.distribution("qrcode-barcode-scanner")
+          licence = [str(f) for f in wheel.files if "/licenses/" in str(f)]
+          print(platform.python_version(), wheel.version, hashlib.sha256(module.read_bytes()).hexdigest(),
+                wheel.metadata["License-Expression"], ",".join(licence) or "-", os.getcwd(),
+                ",".join(sorted(os.listdir("."))))
+          ' > receipt/log/engine-in-image.txt
+          read -r python version digest licence files folder model < receipt/log/engine-in-image.txt
+          echo "Python $python, qrcode-barcode-scanner $version, native module SHA-256 $digest"
+          echo "Engine licence $licence, in $files; model folder $folder: $model"
+          case "$python" in 3.13.*) ;; *) echo "::error::the image runs Python $python, not 3.13"; exit 1 ;; esac
+          [ "$version" = 0.11.0 ] || { echo "::error::the image holds the engine $version, not 0.11.0"; exit 1; }
+          [ "$digest" = "$MODULE_SHA256" ] || {
+            echo "::error::the native module in the image is not the one of the published wheel"; exit 1; }
+          [ "$licence" = AGPL-3.0-or-later ] && [ "$files" != - ] || {
+            echo "::error::the engine's licence text is not in the image"; exit 1; }
+          case ",$model," in *,LICENSE,*LICENSE-NOTES.md,*run.py,*) ;; *)
+            echo "::error::the model folder in the image lacks run.py or a licence file"; exit 1 ;; esac
+          case ",$model," in *,tests,*) echo "::error::the tests were copied into the image"; exit 1 ;; esac
+      - name: Three predictions with cog run, judged as a server's reports
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          mkdir -p receipt/reports
+          for profile in fast frame full; do
+            (cd integrations/replicate && cog run "$IMAGE" -i image=@"$image" -i profile="$profile" \
+              -i budget_ms=0 -o "$GITHUB_WORKSPACE/receipt/reports/$profile.json") 2>&1 \
+              | tee -a receipt/log/cog-run.log
+          done
+          python3 scripts/destination-acceptance.py reports --kind server \
+            --produced-by "cog run $IMAGE -i image=@<staged fixture> -i profile=<profile> -i budget_ms=0" \
+            --fast receipt/reports/fast.json --frame receipt/reports/frame.json \
+            --full receipt/reports/full.json \
+            --destination "Replicate model image, built by cog build (not pushed)" --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/replicate" \
+            --identifier r8.im/qrcode-ai-com/qrcode-barcode-scanner \
+            --install "cog build -t $IMAGE (Cog 0.23.1)" --run-url "$RUN_URL" \
+            --receipt receipt/acceptance-replicate-image.json
+      - name: A file that is not an image fails its prediction
+        run: |
+          set -euo pipefail
+          printf 'this is not an image\n' > "$RUNNER_TEMP/input/notes.png"
+          if output=$(cd integrations/replicate && cog run "$IMAGE" -i image=@"$RUNNER_TEMP/input/notes.png" \
+            -o "$RUNNER_TEMP/invalid.json" 2>&1); then
+            printf '%s\n' "$output"
+            echo "::error::the prediction on a text file succeeded"
+            exit 1
+          fi
+          printf '%s\n' "$output" | tee receipt/log/cog-run-invalid.log
+          found=$(printf '%s\n' "$output" | grep -c 'QRS-001' || true)
+          [ "$found" -ge 1 ] || { echo "::error::the failed prediction does not name QRS-001"; exit 1; }
+      - name: Remove the image and record it
+        run: |
+          set -euo pipefail
+          docker image rm "$IMAGE"
+          python3 scripts/destination-acceptance.py removed --gone "docker image inspect $IMAGE" \
+            --uninstall "docker image rm $IMAGE" --receipt receipt/acceptance-replicate-image.json
+          python3 scripts/destination-acceptance.py check receipt/acceptance-replicate-image.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: integration-replicate-image
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
