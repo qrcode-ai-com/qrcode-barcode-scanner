@@ -1,0 +1,110 @@
+name: Flutter public consumers
+
+# Read-only public installation tests. This workflow never stages or publishes a package.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/flutter-registry-consumer.yml
+      - tests/consumers/flutter/**
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: "1.99.1"
+  FLUTTER_VERSION: "3.47.9"
+  # Simulators require Flutter debug mode; the decoder needs optimized native code for its budgets.
+  # Default Rust opt-level 0 exceeded all three budgets in the retained first Android run.
+  CARGO_PROFILE_DEV_OPT_LEVEL: "2"
+
+jobs:
+  native:
+    name: pub.dev · ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Android
+            runner: ubuntu-24.04
+            targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          - platform: iOS
+            runner: macos-15
+            targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set isolated consumer paths
+        run: |
+          python3 - <<'PY'
+          import os
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              for name, directory in [('PUB_CACHE', 'public-pub-cache'), ('APP', 'public-flutter-consumer'),
+                                      ('RECEIPTS', 'flutter-public-receipts')]:
+                  output.write(f"{name}={os.environ['RUNNER_TEMP']}/{directory}\n")
+          PY
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.targets }}
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        if: matrix.platform == 'Android'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Verify the report collector and install from pub.dev
+        run: |
+          python3 tests/consumers/flutter/consumer.py --self-test
+          python3 tests/consumers/flutter/consumer.py prepare "$APP" "$RECEIPTS"
+      - name: Prepare the Android emulator
+        if: matrix.platform == 'Android'
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Scan through the installed Android package
+        if: matrix.platform == 'Android'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: python3 tests/consumers/flutter/consumer.py test "$APP" "$RECEIPTS" emulator-5554
+      - name: Scan through the installed iOS package
+        if: matrix.platform == 'iOS'
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '--json']))
+          candidates = [device for runtime in sorted(data['devices'], reverse=True) if '.iOS-' in runtime
+                        for device in data['devices'][runtime] if device['name'].startswith('iPhone')]
+          if not candidates:
+              raise SystemExit('No available iPhone simulator')
+          device = candidates[0]
+          if device['state'] != 'Booted':
+              subprocess.run(['xcrun', 'simctl', 'boot', device['udid']], check=True, timeout=60)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', device['udid'], '-b'], check=True, timeout=300)
+          subprocess.run(['python3', 'tests/consumers/flutter/consumer.py', 'test', os.environ['APP'],
+                          os.environ['RECEIPTS'], device['udid']], check=True, timeout=1800)
+          PY
+      - name: Check Android native library alignment
+        if: matrix.platform == 'Android'
+        run: python3 scripts/elf-load-alignment.py "$APP/build/app/outputs/flutter-apk/app-debug.apk" --json "$RECEIPTS/apk-alignment.json"
+      - name: Judge all three profiles and remove the dependency
+        run: python3 tests/consumers/flutter/consumer.py finish "$APP" "$RECEIPTS"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: flutter-public-${{ matrix.platform }}
+          path: ${{ runner.temp }}/flutter-public-receipts/
+          if-no-files-found: error
+          retention-days: 30
