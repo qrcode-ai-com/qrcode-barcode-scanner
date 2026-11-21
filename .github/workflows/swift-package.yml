@@ -45,9 +45,16 @@ jobs:
     timeout-minutes: 120
     outputs:
       sha256: ${{ steps.pack.outputs.sha256 }}
+    # This repository is checked out in head/ and the pinned engine in engine/, side by side:
+    # nested in this repository, the engine's excluded UniFFI crate would find this repository's
+    # Cargo.toml above its own workspace and refuse to build.
+    defaults:
+      run:
+        working-directory: head
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          path: head
           persist-credentials: false
       - name: Self-test the stage program
         run: python3 scripts/stage-swift-package.py --self-test
@@ -74,27 +81,30 @@ jobs:
         with:
           workspaces: engine/crates/qrcode-ai-scanner-uniffi
       - name: Build the static library for five targets
+        working-directory: engine
         env:
           IPHONEOS_DEPLOYMENT_TARGET: "13.0"
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           for target in aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios aarch64-apple-darwin x86_64-apple-darwin; do
-            cargo build --release --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --target "$target"
+            cargo build --release --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --target "$target"
           done
       # A plain module map: the xcframework holds static libraries with their headers, which SwiftPM
       # puts on the include path, where a `framework module` (--xcframework) finds no header.
       - name: Generate the Swift, the header and the module map
+        working-directory: engine
         run: |
-          lib=engine/crates/qrcode-ai-scanner-uniffi/target/aarch64-apple-ios/release/libqrcode_ai_scanner_uniffi.a
+          lib=crates/qrcode-ai-scanner-uniffi/target/aarch64-apple-ios/release/libqrcode_ai_scanner_uniffi.a
           mkdir -p "$RUNNER_TEMP/swift" "$RUNNER_TEMP/headers"
-          cargo run --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
+          cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
             "$lib" "$RUNNER_TEMP/swift" --swift-sources
-          cargo run --locked --manifest-path engine/crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
+          cargo run --locked --manifest-path crates/qrcode-ai-scanner-uniffi/Cargo.toml --bin uniffi-bindgen-swift -- \
             "$lib" "$RUNNER_TEMP/headers" --headers --modulemap --modulemap-filename module.modulemap
           ls -l "$RUNNER_TEMP/swift" "$RUNNER_TEMP/headers"
       - name: Assemble the xcframework
+        working-directory: engine
         run: |
-          t=engine/crates/qrcode-ai-scanner-uniffi/target
+          t=crates/qrcode-ai-scanner-uniffi/target
           lib=libqrcode_ai_scanner_uniffi.a
           mkdir -p "$RUNNER_TEMP/simulator" "$RUNNER_TEMP/macos" "$RUNNER_TEMP/framework"
           lipo -create "$t/aarch64-apple-ios-sim/release/$lib" "$t/x86_64-apple-ios/release/$lib" \
@@ -107,21 +117,21 @@ jobs:
             -library "$RUNNER_TEMP/macos/$lib" -headers "$RUNNER_TEMP/headers" \
             -output "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework"
           # The terms the library ships under travel inside the bundle SwiftPM extracts.
-          cp engine/LICENSE engine/crates/qrcode-ai-scanner/LICENSE-APACHE-2.0 \
-            engine/crates/qrcode-ai-scanner/THIRD-PARTY.md "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework/"
+          cp LICENSE crates/qrcode-ai-scanner/LICENSE-APACHE-2.0 crates/qrcode-ai-scanner/THIRD-PARTY.md \
+            "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework/"
           find "$RUNNER_TEMP/framework" -type f | sort
       - name: Pack the zip
         id: pack
         run: |
           python3 scripts/stage-swift-package.py pack "$RUNNER_TEMP/framework/QrcodeAiScannerFFI.xcframework" \
-            --swift "$RUNNER_TEMP/swift/qrcode_ai_scanner_uniffi.swift" --engine engine --out swift-xcframework
+            --swift "$RUNNER_TEMP/swift/qrcode_ai_scanner_uniffi.swift" --engine ../engine --out swift-xcframework
           sha=$(shasum -a 256 swift-xcframework/QrcodeAiScannerFFI.xcframework.zip | cut -d' ' -f1)
           test "$(swift package compute-checksum swift-xcframework/QrcodeAiScannerFFI.xcframework.zip)" = "$sha"
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         with:
           name: swift-xcframework
-          path: swift-xcframework/
+          path: head/swift-xcframework/
           if-no-files-found: error
           retention-days: 90
 
