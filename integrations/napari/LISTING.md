@@ -20,17 +20,20 @@ every 4 hours. There is no submission form.
 | Wheel | `napari_qrcode_barcode_scanner-0.1.0-py3-none-any.whl` |
 | sdist | `napari_qrcode_barcode_scanner-0.1.0.tar.gz` |
 
-The job `napari` of `integration-python-hosts` built commit `COMMIT` on CI (run RUN_URL), checked
-both files with `twine check --strict` and printed:
+The job `napari` of `integration-python-hosts` built commit `3612ef3` of pull request #137 on CI
+(run [44886529397](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44886529397), 21 November 2026), checked both files with
+`twine check --strict` and printed:
 
 ```text
-WHEEL_SHA256  napari_qrcode_barcode_scanner-0.1.0-py3-none-any.whl
-SDIST_SHA256  napari_qrcode_barcode_scanner-0.1.0.tar.gz
+e0074a12390d19b195bd29a583a5875658f9007fcbf810ed9783e473fdbe96e3  napari_qrcode_barcode_scanner-0.1.0-py3-none-any.whl
+06523bc8963baa0a152b368887aa7a9baa73dab366d3afd0fa934336805a3acc  napari_qrcode_barcode_scanner-0.1.0.tar.gz
 ```
 
-These are the digests of that commit's build. The wheel takes the dates of its entries from its
-commit, and the sdist's archive dates change with each build, so the tag's run builds other bytes.
-It prints the two digests it uploads: those are the ones PyPI must serve.
+These are the digests of that commit's build. Each build of a commit puts the same entries, with
+the same dates, in its wheel: a rebuild of `3612ef3` on macOS gave the same entries and other
+compressed bytes, as its zlib differs. The sdist's archive dates change with each build. So the
+tag's run builds other bytes, prints the two digests it uploads and uploads those very files: they
+are the ones PyPI must serve.
 
 ## What the listing reads
 
@@ -66,7 +69,8 @@ of a PyPI release cannot change after its upload.
 display (xvfb, 1600 by 1000). The job `napari-window` of `integration-python-hosts` installed the
 plugin's built wheel in a new environment, added its widget as the Plugins menu does, ran a `full`
 scan of the mixed sample and checked that both codes were outlined before saving the window
-(`tests/capture_window.py`). Run SHOT_RUN_URL, SHOT_SIZE, sha256 `SHOT_SHA256`.
+(`tests/capture_window.py`). It comes from the same run, [44886529397](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44886529397): 1440 by 900
+pixels, sha256 `a047712e60529ebded32f47d336c8836b960952ae3e2970f258848628b146f9f`.
 
 ## The owner's steps
 

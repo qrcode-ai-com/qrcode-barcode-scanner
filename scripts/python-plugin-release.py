@@ -20,8 +20,9 @@ is X.Y.Z and equals the package's own `__version__`, the engine is pinned exactl
 and judges without publishing).
 
 `build` builds the sdist and the wheel with `python -m build` (SOURCE_DATE_EPOCH from the commit,
-TZ=UTC: the wheel of a commit has the same bytes on each build; the sdist's archive dates do not
-follow it, so the publishing job uploads the files this build recorded, not a rebuild), then
+TZ=UTC: each build of a commit puts the same entries with the same dates in its wheel, though the
+compressed bytes follow the zlib that wrote them, and the sdist's archive dates change with each
+build; so the publishing job uploads the files this build recorded, never a rebuild), then
 inspects them and prints `sha256  name` for each. Under GitHub Actions it writes the outputs
 `sha256` (the SHA-256 of that listing), `files` and `engine` (the engine version the plugin pins).
 
