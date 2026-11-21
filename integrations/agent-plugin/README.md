@@ -191,11 +191,14 @@ Junie clones the default branch: check the commit it records. To remove it, unin
 
 ### Antigravity
 
+`agy plugin install` takes no tag, so clone the release tag and install the folder:
+
 ```sh
-agy plugin install https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin
+git clone --depth 1 --branch v0.3.0 https://github.com/qrcode-ai-com/qrcode-barcode-scanner-plugin
+agy plugin install ./qrcode-barcode-scanner-plugin
 ```
 
-To remove it, run `agy plugin uninstall qrcode-barcode-scanner`. The [Antigravity QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/antigravity) and the [Antigravity barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/antigravity) show the same install.
+Installing the GitHub address directly takes the default branch instead. To remove it, run `agy plugin uninstall qrcode-barcode-scanner`. The [Antigravity QR code guide](https://qrcode-ai.com/en-US/qr-code-scanner/integrations/antigravity) and the [Antigravity barcode guide](https://qrcode-ai.com/en-US/barcode-scanner/integrations/antigravity) show the same install.
 
 ### goose
 
