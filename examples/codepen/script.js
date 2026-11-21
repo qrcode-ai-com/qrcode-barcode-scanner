@@ -25,7 +25,9 @@
   var PACKAGE_JSON_URL = CDN + 'package.json';
   // wasm.sha256 of the package's build-info.json at 0.11.0.
   var WASM_SHA256 = 'a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68';
-  var SAMPLE_URL = 'https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/' +
+  // The tagged sample through jsDelivr's GitHub files, which carry CORS headers and do not answer
+  // HTTP 429 to busy shared addresses as raw.githubusercontent.com does.
+  var SAMPLE_URL = 'https://cdn.jsdelivr.net/gh/qrcode-ai-com/qrcode-barcode-scanner-rust@' +
     'v0.11.0/fixtures/symbology/mixed-code128-qr.png';
   var SAMPLE_SHA256 = 'c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8';
   var SAMPLE_CODES = ['code128:STOCK-4827', 'qr_code:https://qrc-ai.com/76xMa'];

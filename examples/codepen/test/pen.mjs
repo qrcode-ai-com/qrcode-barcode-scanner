@@ -25,7 +25,7 @@ if (!url || !fixture || !notImage || !out) {
 const { chromium } = createRequire(join(process.cwd(), 'package.json'))('playwright');
 
 const CDN = 'https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/';
-const SAMPLE = 'https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png';
+const SAMPLE = 'https://cdn.jsdelivr.net/gh/qrcode-ai-com/qrcode-barcode-scanner-rust@v0.11.0/fixtures/symbology/mixed-code128-qr.png';
 const WASM_SHA256 = 'a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68';
 const CODES = ['code128:STOCK-4827', 'qr_code:https://qrc-ai.com/76xMa'];
 const failures = [];
@@ -56,6 +56,7 @@ async function judgeSample(page, runtime, label) {
   await sampleDone(page);
   const facts = await page.evaluate(() => ({
     status: document.getElementById('sample-status').dataset.state,
+    said: document.getElementById('sample-status').textContent,
     rows: [...document.querySelectorAll('#sample-table tbody tr')].map((row) => ({
       profile: row.dataset.profile, state: row.dataset.state, codes: row.dataset.codes,
       budget: row.dataset.budgetExhausted, engine: row.dataset.engine })),
@@ -63,7 +64,7 @@ async function judgeSample(page, runtime, label) {
     runtime: document.getElementById('runtime').textContent,
     wasm: document.getElementById('wasm-sha256').textContent,
   }));
-  check(facts.status === 'pass', `${label}: the sample passes (${facts.status})`);
+  check(facts.status === 'pass', `${label}: the sample passes (${facts.status}: ${facts.said})`);
   for (const row of facts.rows) {
     check(row.state === 'pass' && row.codes === JSON.stringify(CODES) && row.budget === 'false' &&
       row.engine === '0.11.0', `${label}: ${row.profile} returns ${row.codes}, budget_exhausted ${row.budget}, engine ${row.engine}`);

@@ -74,9 +74,9 @@ Open <http://127.0.0.1:8000/>. The page needs the network for jsDelivr and for t
    digest is not the pinned one is refused before it runs: nothing is scanned.
 3. It starts a module worker that imports the package's `auto.js` loader and receives the
    checked bytes. When the browser cannot start that worker, the same loader runs on the page.
-4. It downloads the sample from the `v0.11.0` tag of this repository, checks its SHA-256, and
-   scans it with the `fast`, `frame` and `full` profiles. Each row of the table shows the codes
-   read, the time and whether the scan ran to its end.
+4. It downloads the sample from the `v0.11.0` tag of this repository, through jsDelivr, checks
+   its SHA-256, and scans it with the `fast`, `frame` and `full` profiles. Each row of the table
+   shows the codes read, the time and whether the scan ran to its end.
 5. It scans the image you choose or drop on the page, with the profile you select, and shows each
    code with its symbology, the kind of payload and the decoded text. **Full report (JSON)** shows
    the complete report the scanner returned.
@@ -106,7 +106,7 @@ The page loads five addresses, and nothing else:
 | `https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/qrcode-barcode-scanner.js`, imported by `auto.js` | the exact version |
 | `https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/qrcode-barcode-scanner_bg.wasm` | the version and SHA-256 `a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68` |
 | `https://cdn.jsdelivr.net/npm/@qrcode-ai-com/qrcode-barcode-scanner-wasm@0.11.0/package.json` | the exact version |
-| `https://raw.githubusercontent.com/qrcode-ai-com/qrcode-barcode-scanner-rust/v0.11.0/fixtures/symbology/mixed-code128-qr.png` | the tag and SHA-256 `c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8` |
+| `https://cdn.jsdelivr.net/gh/qrcode-ai-com/qrcode-barcode-scanner-rust@v0.11.0/fixtures/symbology/mixed-code128-qr.png`, this repository's file at the tag | the tag and SHA-256 `c636e8d56df483ff1ec06dbe9b5bcba226c579f8fc1c3d10c4ccf4e100762ec8` |
 
 The two JavaScript files are pinned by their version only: a browser cannot check the digest of
 a module it imports. The WebAssembly module, which holds the engine, is checked byte for byte;
@@ -133,7 +133,8 @@ files it carries must equal the files of this folder byte for byte.
 ## Privacy
 
 The page sends nothing about your image anywhere. Its only requests are the five addresses above.
-jsDelivr and GitHub see those requests, as they see any visitor's; CodePen hosts the page itself.
+All five are on jsDelivr, which sees those requests as it sees any visitor's; CodePen hosts the page
+itself.
 
 ## License
 
