@@ -137,6 +137,7 @@ paths = [
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
   ".github/workflows/integration-github-action.yml",
+  ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
