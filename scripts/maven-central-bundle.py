@@ -152,18 +152,21 @@ def bundle(repo, version, when):
 
 # ------------------------------------------------------------------ inspection
 
-def read_zip(data):
-    require(len(data) <= LIMIT, "the bundle exceeds its size limit")
+def read_zip(data, what="the bundle", directories=False):
+    """{name: bytes} of the files of a zip. The bundle holds files only; an archive Gradle built
+    inside it (DIRECTORIES) may list its directories, which carry no bytes and are left out."""
+    require(len(data) <= LIMIT, f"{what} exceeds its size limit")
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             infos = archive.infolist()
             names = [info.filename for info in infos]
-            require(len(names) == len(set(names)), "the bundle names a file twice")
-            require(all(not info.is_dir() for info in infos), "the bundle holds a directory entry")
-            require(sum(info.file_size for info in infos) <= LIMIT, "the expanded bundle exceeds its size limit")
-            return {info.filename: archive.read(info) for info in infos}, infos
+            require(len(names) == len(set(names)), f"{what} names a file twice")
+            require(directories or all(not info.is_dir() for info in infos), f"{what} holds a directory entry")
+            require(sum(info.file_size for info in infos) <= LIMIT, f"the expanded {what} exceeds its size limit")
+            files = [info for info in infos if not info.is_dir()]
+            return {info.filename: archive.read(info) for info in files}, files
     except zipfile.BadZipFile as error:
-        raise Refused(f"not a zip: {error}") from error
+        raise Refused(f"{what} is not a zip: {error}") from error
 
 
 def pom_problems(pom, version):
@@ -223,18 +226,18 @@ def inspect(data, version, commit, signed=False):
     base = f"{folder(version)}/{stem(version)}"
     problems = pom_problems(files[f"{base}.pom"], version)
     require(not problems, "; ".join(problems))
-    aar, _ = read_zip(files[f"{base}.aar"])
+    aar, _ = read_zip(files[f"{base}.aar"], "the AAR", directories=True)
     libraries = sorted(name for name in aar if name.startswith("jni/"))
     require(libraries == sorted(f"jni/{abi}/{LIBRARY}" for abi in ABIS),
             f"the AAR carries {libraries}, not the native library of the four ABIs {list(ABIS)}")
     require("classes.jar" in aar and "AndroidManifest.xml" in aar, "the AAR has no classes.jar or manifest")
     for name, words in NOTICES.items():
         require(words in aar.get(name, b""), f"the AAR carries no {name} at its root")
-    sources, _ = read_zip(files[f"{base}-sources.jar"])
+    sources, _ = read_zip(files[f"{base}-sources.jar"], "the sources jar", directories=True)
     kotlin = sorted(name for name in sources if name.endswith(".kt"))
     require(any(name.endswith("qrcode_ai_scanner_uniffi.kt") for name in kotlin),
             "the sources jar holds no generated Kotlin")
-    javadoc, _ = read_zip(files[f"{base}-javadoc.jar"])
+    javadoc, _ = read_zip(files[f"{base}-javadoc.jar"], "the javadoc jar")
     require(set(javadoc) == {"META-INF/MANIFEST.MF", "README.txt"}, "the javadoc jar is not the bundle's own")
     return {"schema": "qrscan-maven-central-bundle/1", "coordinate": f"{GROUP}:{ARTIFACT}:{version}",
             "commit": commit, "sha256": digest("sha256", data), "size": len(data), "signed": signed,
@@ -277,15 +280,31 @@ def self_test():
 </project>
 """
 
+    def gradle_zip(entries, when):
+        """A zip as Gradle writes an AAR or a jar: each directory listed before its files."""
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+            listed = set()
+            for name in sorted(entries):
+                parts = name.split("/")[:-1]
+                for depth in range(1, len(parts) + 1):
+                    folder_name = "/".join(parts[:depth]) + "/"
+                    if folder_name not in listed:
+                        listed.add(folder_name)
+                        archive.writestr(zipfile.ZipInfo(folder_name, when), b"")
+                archive.writestr(zipfile.ZipInfo(name, when), entries[name])
+        return out.getvalue()
+
     def publication(tmp, **change):
         source = tmp / folder(version)
         source.mkdir(parents=True)
         aar = change.get("aar", {f"jni/{abi}/{LIBRARY}": abi.encode() for abi in ABIS} |
                          {"classes.jar": b"jar", "AndroidManifest.xml": b"<manifest/>"} | NOTICES)
-        (source / f"{stem(version)}.aar").write_bytes(write_zip(aar, when))
+        archive = gradle_zip if change.get("directories") else write_zip
+        (source / f"{stem(version)}.aar").write_bytes(archive(aar, when))
         (source / f"{stem(version)}.pom").write_text(change.get("pom", pom))
         (source / f"{stem(version)}-sources.jar").write_bytes(
-            write_zip({"uniffi/qrcode_ai_scanner_uniffi/qrcode_ai_scanner_uniffi.kt": b"package x"}, when))
+            archive({"uniffi/qrcode_ai_scanner_uniffi/qrcode_ai_scanner_uniffi.kt": b"package x"}, when))
         if change.get("module"):
             (source / f"{stem(version)}.module").write_text("{}")
         return tmp
@@ -299,6 +318,13 @@ def self_test():
               sorted(report["abis"]) == sorted(ABIS))
         check("the same publication gives the same zip", write_zip(bundle(repo, version, when), when) == data)
         check("the javadoc jar is written", f"{stem(version)}-javadoc.jar" in report["files"])
+        listed = inspect(write_zip(bundle(publication(tmp / "listed", directories=True), version, when), when),
+                         version, commit)
+        check("an AAR and a sources jar that list their directories are accepted",
+              listed["abis"] == report["abis"] and listed["kotlin_sources"] == report["kotlin_sources"])
+        refused("a bundle that lists a directory is refused",
+                lambda: inspect(gradle_zip(bundle(repo, version, when), when), version, commit),
+                "the bundle holds a directory entry")
         entries = bundle(repo, version, when)
         refused("a missing checksum is refused",
                 lambda: inspect(write_zip({k: v for k, v in entries.items() if not k.endswith(".sha512")}, when),
