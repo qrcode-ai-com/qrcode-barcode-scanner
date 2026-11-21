@@ -8,7 +8,7 @@ owner's steps. Nothing here is submitted.
 
 ## The folder the pull request carries
 
-`scripts/stage-raycast-store.py` writes it from a commit of this repository. It takes the files
+`scripts/stage-store.py` writes it from a commit of this repository. It takes the files
 the Store ships (`package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.js`,
 `.prettierrc`, `.gitignore`, `CHANGELOG.md`, `LICENSE`, `src/`, `assets/`, and `metadata/` once
 the screenshots exist), puts [STORE.md](STORE.md) in place of the README, sets the author and
@@ -16,8 +16,8 @@ drops the `test` script, which needs files that stay here. It refuses any file i
 classify, and it checks the result against the Store rules it can check offline.
 
 ```sh
-python3 scripts/stage-raycast-store.py stage --out /absolute/new/folder --author <raycast-username>
-python3 scripts/stage-raycast-store.py check /absolute/new/folder
+python3 integrations/raycast/scripts/stage-store.py stage --out /absolute/new/folder --author <raycast-username>
+python3 integrations/raycast/scripts/stage-store.py check /absolute/new/folder
 ```
 
 The job `store` of [integration-raycast.yml](../../.github/workflows/integration-raycast.yml)
@@ -117,7 +117,7 @@ written, the Description is the place.
    repository:
 
    ```sh
-   python3 scripts/stage-raycast-store.py fork --clone /path/to/the/fork --author <raycast-username>
+   python3 integrations/raycast/scripts/stage-store.py fork --clone /path/to/the/fork --author <raycast-username>
    ```
 
    It checks that the clone is raycast/extensions or a fork with a clean tree and no

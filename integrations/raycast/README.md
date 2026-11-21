@@ -155,7 +155,7 @@ The extension runs the `qrscan` command line. The Rust, Node.js, browser and Pyt
 
 ## Raycast Store
 
-The Store takes an extension through a pull request to [raycast/extensions](https://github.com/raycast/extensions). [`scripts/stage-raycast-store.py`](../../scripts/stage-raycast-store.py) writes the folder that pull request carries from a commit of this repository, with [STORE.md](STORE.md) as its README, and checks it against the Store rules. It can also commit that folder on a new branch of a clone of the fork; it never pushes.
+The Store takes an extension through a pull request to [raycast/extensions](https://github.com/raycast/extensions). [`scripts/stage-store.py`](scripts/stage-store.py) writes the folder that pull request carries from a commit of this repository, with [STORE.md](STORE.md) as its README, and checks it against the Store rules. It can also commit that folder on a new branch of a clone of the fork; it never pushes.
 
 [LISTING.md](LISTING.md) holds the listing values, the pull request text and the steps left to the owner: a Raycast account whose username becomes the author, the screenshots, the fork and the pull request.
 
@@ -179,7 +179,7 @@ QRSCAN=/opt/homebrew/bin/qrscan npm test
 A second CI job checks the Store folder the way raycast/extensions does. It stages the folder twice in two time zones and compares the archives, runs `npm ci`, `ray validate` against the Store schema and `ray build -e dist`, and runs Raycast's own screenshot checker at a pinned commit. `ray validate` reports one expected error until the owner's Raycast username is the author, and the job refuses any other. The built extension is then copied into a new folder, scans the mixed fixture with the published `qrscan` in the three profiles, and the destination acceptance driver judges the reports, removes the folder and closes the receipt. Locally, after `npx ray build --environment dist --output <folder>`:
 
 ```sh
-python3 ../../scripts/stage-raycast-store.py --self-test
+python3 scripts/stage-store.py --self-test
 node test/dist-consumer.mjs --build <folder> --qrscan /opt/homebrew/bin/qrscan \
   --image ../../fixtures/symbology/mixed-code128-qr.png --reports /absolute/reports/folder
 ```

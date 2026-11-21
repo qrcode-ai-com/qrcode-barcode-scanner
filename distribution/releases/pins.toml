@@ -193,7 +193,6 @@ paths = [
   "distribution/termux/**",
   "scripts/check-packaging-recipes.py",
   "scripts/stage-glama-package.py",
-  "scripts/stage-raycast-store.py",
   ".github/workflows/integration-glama.yml",
   ".github/workflows/integration-packaging-lint.yml",
   ".github/workflows/integration-snap.yml",

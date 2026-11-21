@@ -8,7 +8,7 @@ name: Integration · Raycast
 # profiles.
 #
 # `store` writes the folder a pull request to raycast/extensions would carry, with
-# scripts/stage-raycast-store.py, and checks it the way that repository's CI does: `npm ci`,
+# integrations/raycast/scripts/stage-store.py, and checks it the way that repository's CI does: `npm ci`,
 # `ray validate` against the Store schema, `ray build -e dist`, and Raycast's own screenshot
 # checker, fetched at a pinned commit and verified by its sha256. `ray validate` looks the author
 # up in Raycast's user directory; until the owner's Raycast username is the author, that single
@@ -23,7 +23,6 @@ on:
       - .github/workflows/integration-raycast.yml
       - integrations/raycast/**
       - integrations/github-action/src/**
-      - scripts/stage-raycast-store.py
       - scripts/destination-acceptance.py
       - scripts/consumer_truth.py
       - fixtures/consumer-truth.json
@@ -98,17 +97,17 @@ jobs:
         with:
           python-version: "3.11"
       - name: Self-test of the stager
-        run: python scripts/stage-raycast-store.py --self-test
+        run: python integrations/raycast/scripts/stage-store.py --self-test
       # The Store folder sits in the layout of raycast/extensions, beside the checker's scripts/.
       - name: Stage the Store folder, twice, and compare
         run: |
           store="$RUNNER_TEMP/store/extensions/qrcode-barcode-scanner"
           echo "STORE_DIR=$store" >> "$GITHUB_ENV"
           mkdir -p kit
-          TZ=UTC python scripts/stage-raycast-store.py stage --out "$store" --archive "$ARCHIVE"
-          TZ=Asia/Dubai python scripts/stage-raycast-store.py stage --out "$RUNNER_TEMP/again" --archive "$RUNNER_TEMP/again.tar.gz"
+          TZ=UTC python integrations/raycast/scripts/stage-store.py stage --out "$store" --archive "$ARCHIVE"
+          TZ=Asia/Dubai python integrations/raycast/scripts/stage-store.py stage --out "$RUNNER_TEMP/again" --archive "$RUNNER_TEMP/again.tar.gz"
           cmp "$ARCHIVE" "$RUNNER_TEMP/again.tar.gz"
-          python scripts/stage-raycast-store.py check "$store"
+          python integrations/raycast/scripts/stage-store.py check "$store"
           (cd kit && shasum -a 256 "$(basename "$ARCHIVE")" | tee SHA256SUMS)
       - name: Install its dependencies as raycast/extensions does
         run: cd "$STORE_DIR" && npm ci --silent
@@ -123,7 +122,7 @@ jobs:
           cat "$RUNNER_TEMP/validate.log"
           echo "ray validate exit status: $status"
           cp "$RUNNER_TEMP/validate.log" "$GITHUB_WORKSPACE/kit/ray-validate.log"
-          python "$GITHUB_WORKSPACE/scripts/stage-raycast-store.py" validate-log "$RUNNER_TEMP/validate.log"
+          python "$GITHUB_WORKSPACE/integrations/raycast/scripts/stage-store.py" validate-log "$RUNNER_TEMP/validate.log"
       - name: ray build, for distribution
         run: cd "$STORE_DIR" && npx ray build -e dist --non-interactive --emoji --exit-on-error --output "$RUNNER_TEMP/store-build"
       - name: Raycast's screenshot checker

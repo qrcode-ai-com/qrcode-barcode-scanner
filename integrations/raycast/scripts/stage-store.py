@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Stage the Raycast extension as the folder raycast/extensions receives, and copy it into a fork.
 
-  stage-raycast-store.py stage --out DIR [--revision REV] [--author HANDLE] [--metadata DIR]
+  integrations/raycast/scripts/stage-store.py stage --out DIR [--revision REV] [--author HANDLE] [--metadata DIR]
       [--archive FILE]
-  stage-raycast-store.py fork --clone PATH --author HANDLE [--branch NAME] [--revision REV]
+  integrations/raycast/scripts/stage-store.py fork --clone PATH --author HANDLE [--branch NAME] [--revision REV]
       [--metadata DIR] [--update]
-  stage-raycast-store.py check DIR
-  stage-raycast-store.py validate-log LOG
-  stage-raycast-store.py --self-test
+  integrations/raycast/scripts/stage-store.py check DIR
+  integrations/raycast/scripts/stage-store.py validate-log LOG
+  integrations/raycast/scripts/stage-store.py --self-test
 
 The Raycast Store publishes an extension once a pull request adds its folder under `extensions/`
 of github.com/raycast/extensions and Raycast's reviewers merge it. The source stays in
@@ -58,7 +58,7 @@ import sys
 import tarfile
 import tempfile
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[3]
 PACKAGE = "integrations/raycast"
 SCHEMA_URL = "https://www.raycast.com/schemas/extension.json"
 # Shipped as they are, plus everything under these folders.
@@ -67,7 +67,7 @@ SHIPPED_FILES = ("package.json", "package-lock.json", "tsconfig.json", "eslint.c
 SHIPPED_FOLDERS = ("src/", "assets/", "metadata/", "media/")
 # Kept in this repository only.
 ENGINE_ONLY_FILES = ("README.md", "LISTING.md", "STORE.md")
-ENGINE_ONLY_FOLDERS = ("test/",)
+ENGINE_ONLY_FOLDERS = ("test/", "scripts/")
 CATEGORIES = {"Applications", "Communication", "Data", "Documentation", "Design Tools", "Developer Tools",
               "Finance", "Fun", "Media", "News", "Productivity", "Security", "System", "Web", "Other"}
 # Lower-case words Apple's style keeps in a title.
