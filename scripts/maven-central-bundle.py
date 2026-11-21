@@ -50,7 +50,7 @@ ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 DIGESTS = ("md5", "sha1", "sha256", "sha512")
 POM_NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 HOMEPAGE = "https://qrcode-ai.com/en-US/qr-code-scanner/sdk/android"
-REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner"
+REPOSITORY = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
 JAVADOC_README = """QR Code & Barcode Scanner for Android, version {version}
 
 The public API of this AAR is Kotlin that UniFFI generates from the engine; its sources are in
