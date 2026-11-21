@@ -10,8 +10,9 @@ name: integration-browser-extension
 # are captured again from the Chrome build. The reports are judged by the repository's page
 # and acceptance judges, the packages are rebuilt from the source zip, and the reproduce job
 # rebuilds them on Linux, macOS and Windows with Node.js 22 and 24 in two time zones, each time to
-# the pinned bytes. It uses the published WASM package: nothing is built from this repository's
-# Rust source, and nothing is uploaded to a store.
+# the pinned bytes. The packages carry the published WASM package; the wasm-rebuild job builds
+# that module again from the Rust source at tag v0.11.0 and requires the same bytes. Nothing is
+# uploaded to a store.
 on:
   workflow_dispatch:
   pull_request:
@@ -151,6 +152,60 @@ jobs:
             integrations/browser-extension/build/acceptance
             ${{ runner.temp }}/receipts
           if-no-files-found: error
+
+  # The WebAssembly module every package carries, rebuilt from its Rust source at tag v0.11.0 with
+  # the release job's own pinned tools (npm-publish.yml, build-wasm, at that tag) and held to the
+  # SHA-256 that package.json pins (config.wasmSha256; a unit test keeps the two equal). SOURCE.md
+  # gives a Firefox Add-ons reviewer the same steps. Nothing is published.
+  wasm-rebuild:
+    name: Rebuild the WebAssembly module from tag v0.11.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # The Rust of the v0.11.0 release (npm-publish.yml at that tag). It equals the repository's
+      # RUST_TOOLCHAIN today, and check-publish-guards.py wants one value: when the repository
+      # moves on, the next engine release's tag replaces v0.11.0 here.
+      RUST_TOOLCHAIN: "1.99.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v0.11.0
+          persist-credentials: false
+      - name: The tag is the revision the package records
+        run: test "$(git rev-parse HEAD)" = 176ac96ef16ee330dbfc6ada10327d0b4e23a8b2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: wasm-pack@0.13.1
+      - name: binaryen version_130, sha256-verified
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/binaryen-version_130-x86_64-linux.tar.gz"
+          release=https://github.com/WebAssembly/binaryen/releases/download/version_130
+          curl -sSfL -o "$archive" "$release/binaryen-version_130-x86_64-linux.tar.gz"
+          echo "0a18362361ad05465118cd8eeb72edaeec89de6894bc283576ef4e07aa3babcc  $archive" \
+            | sha256sum -c -
+          tar xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_130/bin" >> "$GITHUB_PATH"
+      - name: Build with the tag's scripts/build-wasm.sh
+        run: |
+          set -euo pipefail
+          echo "CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}"
+          ./scripts/build-wasm.sh
+      - name: The module is the one the packages carry
+        run: |
+          set -euo pipefail
+          module=crates/qrcode-ai-scanner-wasm/pkg/qrcode-barcode-scanner_bg.wasm
+          sha256sum "$module"
+          echo "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68  $module" \
+            | sha256sum -c -
 
   # The same bytes everywhere: three systems, the two supported Node.js lines and two time zones,
   # each build held to SHA256SUMS. Only the build's own dependency is installed, as SOURCE.md tells

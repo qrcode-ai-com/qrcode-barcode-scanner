@@ -3,7 +3,7 @@
 //
 //   node --test test/unit.test.mjs
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { inflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
@@ -143,7 +143,7 @@ test('Chrome and Edge run a service worker; Firefox an event page with its ID', 
   const firefox = manifestFor('firefox', own.version);
   assert.deepEqual(firefox.background, { scripts: ['background.js'] });
   assert.deepEqual(firefox.browser_specific_settings, { gecko: {
-    id: GECKO_ID, strict_min_version: '140.0', data_collection_permissions: { required: ['none'] },
+    id: GECKO_ID, strict_min_version: '142.0', data_collection_permissions: { required: ['none'] },
   } });
   assert.throws(() => manifestFor('safari', own.version), /unknown target/);
 });
@@ -390,6 +390,20 @@ test('every archive hash a store kit quotes is the pinned one', () => {
       assert.ok(known.has(hash), `${name} quotes ${hash}, which SHA256SUMS does not pin`);
     }
   }
+});
+
+// The workflow is in the repository, not in the source package: there the test is skipped.
+const WORKFLOW = join(HERE, '..', '..', '.github', 'workflows', 'integration-browser-extension.yml');
+test('the workflow rebuilds the pinned WebAssembly module from the recorded revision',
+  { skip: !existsSync(WORKFLOW) && 'no workflow outside the repository' }, () => {
+  const workflow = readFileSync(WORKFLOW, 'utf8');
+  const job = workflow.slice(workflow.indexOf('\n  wasm-rebuild:'));
+  assert.ok(job.includes(`echo "${own.config.wasmSha256}  $module"`));
+  const info = JSON.parse(readFileSync(join(HERE, 'node_modules',
+    '@qrcode-ai-com', 'qrcode-barcode-scanner-wasm', 'build-info.json'), 'utf8'));
+  assert.ok(job.includes(`= ${info.source_revision}`));
+  assert.ok(job.includes(`RUST_TOOLCHAIN: "${/release: (\S+)/.exec(info.toolchain.rustc)[1]}"`));
+  assert.ok(job.includes(`tool: ${info.toolchain.wasm_pack.replace(' ', '@')}`));
 });
 
 // ------------------------------------------------------------------ store texts
