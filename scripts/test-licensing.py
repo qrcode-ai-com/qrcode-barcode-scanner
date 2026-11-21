@@ -48,6 +48,8 @@ class LicensingTests(unittest.TestCase):
         self.assertEqual(json.loads((ROOT / 'bindings/php/composer.json').read_text())['license'], 'MIT')
         project = ET.parse(ROOT / 'bindings/dotnet/src/QRCodeAI.QRCodeBarcodeScanner/QRCodeAI.QRCodeBarcodeScanner.csproj')
         self.assertEqual(project.find('.//PackageLicenseExpression').text, 'MIT')
+        gemspec = (ROOT / 'bindings/ruby/qrcode-barcode-scanner.gemspec').read_text()
+        self.assertIn("spec.license = 'MIT'", gemspec)
         gradle = (ROOT / 'bindings/kotlin/qrcodeaiscanner/build.gradle.kts').read_text()
         self.assertIn('name.set("MIT")', gradle)
         self.assertNotIn('name.set("AGPL-3.0-or-later")', gradle)

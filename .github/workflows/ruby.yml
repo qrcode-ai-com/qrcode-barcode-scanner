@@ -1,0 +1,428 @@
+name: Ruby gem
+
+# The gem under bindings/ruby scans in process through the engine's UniFFI library, the one the
+# Kotlin, Swift and .NET bindings use. Four steps, from one commit:
+#
+#   binding    on Linux: the library of the host, the Ruby generated from that very file, the
+#              tests on Ruby 3.3, three scans judged by the destination acceptance driver;
+#   natives    the library for the five systems of the gem, at the floor of the prebuilt qrscan,
+#              each file read for what it needs from the system that loads it;
+#   pack       one platform gem per system, with the Ruby `binding` generated, inspected file
+#              by file and built again to the same bytes, then asked of RubyGems which gem each
+#              platform gets;
+#   consumer   on the five systems a clean Ruby installs its gem from the file, scans and
+#              uninstalls it; Linux x64 also on Ruby 4.0.
+#
+# Branches inspect only. Engine tags may publish after all consumers and the owner's protected
+# rubygems approval, through RubyGems trusted publishing. No account, trusted publisher or
+# protected environment is created by this workflow.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/ruby.yml
+      - bindings/ruby/**
+      - scripts/ruby-gem.py
+      - scripts/dotnet-package.py
+      - scripts/native-floor.py
+      - crates/qrcode-ai-scanner-uniffi/**
+      - scripts/destination-acceptance.py
+      - fixtures/consumer-truth.json
+      - fixtures/symbology/mixed-code128-qr.png
+      - fixtures/clean/gen_v5_q.png
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ruby-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # The toolchain CI tests (ci.yml RUST_TOOLCHAIN).
+  RUST_TOOLCHAIN: "1.99.1"
+  UNIFFI_CRATE: crates/qrcode-ai-scanner-uniffi
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prove the owner and protected environment before scheduling publication
+        id: preflight
+        run: python3 scripts/ruby-gem.py preflight
+
+  binding:
+    name: Ruby binding · x86_64-unknown-linux-gnu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      LIBRARY: libqrcode_ai_scanner_uniffi.so
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      # Ruby 3.3, the oldest line the gem supports. The consumers run 3.3 and 4.0.
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1.343.0
+        with:
+          ruby-version: "3.3"
+      - name: Read the engine version from the workspace
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version'])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "engine $version"
+      # The crate is its own cargo root, with its own lock: UniFFI 0.31.2.
+      - name: Build the native library with the locked UniFFI
+        run: |
+          cargo build --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml"
+          ls -l "$UNIFFI_CRATE/target/release/$LIBRARY"
+      # Generated from the library that was just built, by the uniffi-bindgen of the same crate,
+      # never from a checked-in file. The five gems carry this one file: the libraries built at
+      # their floor through cargo-zigbuild have no symbol table, the only place it is read from.
+      - name: Generate the Ruby from the built library
+        run: |
+          cargo run --release --locked --manifest-path "$UNIFFI_CRATE/Cargo.toml" --bin uniffi-bindgen -- \
+            generate --library "$UNIFFI_CRATE/target/release/$LIBRARY" --language ruby \
+            --config bindings/ruby/uniffi.toml --no-format --out-dir "$RUNNER_TEMP/generated"
+          wc -l "$RUNNER_TEMP"/generated/*.rb
+          mkdir receipt
+          cp "$RUNNER_TEMP/generated/qrcode_ai_scanner_uniffi.rb" receipt/
+      - name: Stage the gem tree with the library of this host
+        run: |
+          python3 scripts/ruby-gem.py stage --version "$ENGINE_VERSION" \
+            --generated "$RUNNER_TEMP/generated/qrcode_ai_scanner_uniffi.rb" \
+            --library "$UNIFFI_CRATE/target/release/$LIBRARY" --out "$RUNNER_TEMP/staged"
+          gem install --no-document ffi --version "~> 1.17"
+          ruby -rffi -e 'puts "ffi #{FFI::VERSION} on #{RUBY_DESCRIPTION}"'
+      - name: Run the tests of the gem against the engine's fixtures
+        env:
+          QRSCAN_FIXTURES: ${{ github.workspace }}/fixtures
+          QRSCAN_ENGINE_VERSION: ${{ env.ENGINE_VERSION }}
+        run: ruby -I "$RUNNER_TEMP/staged/lib" bindings/ruby/test/test_scanner.rb --verbose
+      - name: Scan the mixed fixture with the three profiles through the public API
+        run: |
+          image=$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          ruby -I "$RUNNER_TEMP/staged/lib" bindings/ruby/acceptance/scan.rb "$image" "$RUNNER_TEMP/reports"
+          cp "$RUNNER_TEMP/reports/facts.json" receipt/facts-binding.json
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "ruby scan.rb (bindings/ruby/acceptance/scan.rb)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Ruby gem tree from this checkout (not built, not published)" \
+            --identifier "qrcode-barcode-scanner" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/ruby" \
+            --install "cargo build of the UniFFI crate, its uniffi-bindgen for Ruby, gem install ffi" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-ruby-binding.json
+          python3 scripts/destination-acceptance.py removed --not-applicable \
+            --receipt receipt/acceptance-ruby-binding.json
+          python3 scripts/destination-acceptance.py check receipt/acceptance-ruby-binding.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: ruby-binding
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 30
+
+  # The floors are those of the prebuilt qrscan (scripts/cli-release.py TARGETS) and of the .NET
+  # package, judged by the same program: the GNU rows link against glibc 2.28 through
+  # cargo-zigbuild, macOS x86_64 cross-builds on arm64 with its own deployment target, Windows
+  # links its C runtime statically.
+  natives:
+    name: Native library · ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04, library: libqrcode_ai_scanner_uniffi.so }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04, library: libqrcode_ai_scanner_uniffi.so }
+          - { target: x86_64-apple-darwin, runner: macos-15, library: libqrcode_ai_scanner_uniffi.dylib, deployment: "10.15" }
+          - { target: aarch64-apple-darwin, runner: macos-15, library: libqrcode_ai_scanner_uniffi.dylib, deployment: "11.0" }
+          - { target: x86_64-pc-windows-msvc, runner: windows-2025, library: qrcode_ai_scanner_uniffi.dll }
+    env:
+      TARGET: ${{ matrix.target }}
+      LIBRARY: ${{ matrix.library }}
+      DEPLOYMENT: ${{ matrix.deployment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One Python on every host: the Windows image has no python3 command.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target }}
+      # Zig for the GNU rows, from ziglang.org and checked against the sha256 its download index
+      # publishes, as cli-archives.yml does.
+      - name: Zig 0.14.1, sha256-verified
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/zig-x86_64-linux-0.14.1.tar.xz"
+          curl -sSfL -o "$archive" https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz
+          echo "24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c  $archive" | sha256sum -c -
+          tar xJf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.14.1" >> "$GITHUB_PATH"
+          mkdir "$RUNNER_TEMP/zig-global-cache"
+          echo "ZIG_GLOBAL_CACHE_DIR=$RUNNER_TEMP/zig-global-cache" >> "$GITHUB_ENV"
+      - name: cargo-zigbuild 0.23.4
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-zigbuild@0.23.4
+      - name: Build the library at the floor of its target
+        run: |
+          manifest="$UNIFFI_CRATE/Cargo.toml"
+          case "$TARGET" in
+            *-linux-gnu)
+              cargo zigbuild --release --locked --lib --manifest-path "$manifest" --target "$TARGET.2.28" ;;
+            *-apple-darwin)
+              MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT" \
+                cargo build --release --locked --lib --manifest-path "$manifest" --target "$TARGET" ;;
+            *-windows-msvc)
+              RUSTFLAGS="-Ctarget-feature=+crt-static" \
+                cargo build --release --locked --lib --manifest-path "$manifest" --target "$TARGET" ;;
+          esac
+      - name: Read what the file needs from the system that loads it
+        run: |
+          python scripts/ruby-gem.py native --target "$TARGET" \
+            --library "$UNIFFI_CRATE/target/$TARGET/release/$LIBRARY" --out "$RUNNER_TEMP/native"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: ruby-native-${{ matrix.target }}
+          path: ${{ runner.temp }}/native/
+          if-no-files-found: error
+          retention-days: 30
+
+  # The image's own Ruby builds and reads the gems, the Ruby the publishing job reads them with
+  # again: RubyGems 3.4, which names the glibc platforms -gnu.
+  pack:
+    name: Platform gems
+    outputs:
+      receipt_sha256: ${{ steps.receipt.outputs.sha256 }}
+    needs: [binding, natives]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the engine version and the image's Ruby
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version'])")
+          echo "ENGINE_VERSION=$version" >> "$GITHUB_ENV"
+          ruby --version
+          gem --version
+          python3 scripts/ruby-gem.py --self-test
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ruby-native-*
+          path: ${{ runner.temp }}/natives
+          merge-multiple: true
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ruby-binding
+          path: ${{ runner.temp }}/binding
+          digest-mismatch: error
+      - name: Build one platform gem per system, twice
+        run: |
+          for target in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin \
+              aarch64-apple-darwin x86_64-pc-windows-msvc; do
+            for round in feed again; do
+              python3 scripts/ruby-gem.py stage --version "$ENGINE_VERSION" \
+                --generated "$RUNNER_TEMP/binding/qrcode_ai_scanner_uniffi.rb" \
+                --natives "$RUNNER_TEMP/natives" --target "$target" --out "$RUNNER_TEMP/tree-$round-$target"
+              python3 scripts/ruby-gem.py build "$RUNNER_TEMP/tree-$round-$target" --target "$target" \
+                --out "$RUNNER_TEMP/$round"
+            done
+          done
+          ls -l "$RUNNER_TEMP/feed"
+          # The same commit gives the same bytes: the gem's dates are the commit's.
+          (cd "$RUNNER_TEMP/feed" && sha256sum ./*.gem) > "$RUNNER_TEMP/feed.sha256"
+          (cd "$RUNNER_TEMP/again" && sha256sum -c "$RUNNER_TEMP/feed.sha256")
+      - name: Inspect the five gems file by file and ask RubyGems which gem each Ruby gets
+        run: |
+          mkdir receipt
+          python3 scripts/ruby-gem.py inspect "$RUNNER_TEMP/feed" --natives "$RUNNER_TEMP/natives" \
+            --version "$ENGINE_VERSION" --commit "$GITHUB_SHA" --out receipt/gems.json
+          python3 scripts/ruby-gem.py match "$RUNNER_TEMP/feed" --version "$ENGINE_VERSION"
+      - name: Bind the producer receipt to the gems consumers judged
+        id: receipt
+        run: |
+          echo "sha256=$(sha256sum receipt/gems.json | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/ruby-gems"
+          cp -R "$RUNNER_TEMP/feed" "$RUNNER_TEMP/ruby-gems/feed"
+          cp receipt/gems.json "$RUNNER_TEMP/ruby-gems/"
+      - name: Exercise the publisher's read-only inspection on the staged gems
+        env:
+          RECEIPT_SHA256: ${{ steps.receipt.outputs.sha256 }}
+        run: python3 scripts/ruby-gem.py candidate --folder "$RUNNER_TEMP/ruby-gems" --natives "$RUNNER_TEMP/natives" --receipt-sha256 "$RECEIPT_SHA256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: ruby-gems
+          path: ${{ runner.temp }}/ruby-gems/
+          if-no-files-found: error
+          retention-days: 30
+
+  # A clean Ruby on each of the five systems. Its gem comes from the file RubyGems itself picks
+  # for that Ruby, into an empty gem home; ffi comes from rubygems.org as its own platform gem.
+  consumer:
+    name: Gem in a clean Ruby · ${{ matrix.platform }} · Ruby ${{ matrix.ruby }}
+    needs: pack
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: x86_64-linux-gnu, runner: ubuntu-24.04, ruby: "3.3" }
+          - { platform: x86_64-linux-gnu, runner: ubuntu-24.04, ruby: "4.0" }
+          - { platform: aarch64-linux-gnu, runner: ubuntu-24.04-arm, ruby: "3.3" }
+          - { platform: x86_64-darwin, runner: macos-15-intel, ruby: "3.3" }
+          - { platform: arm64-darwin, runner: macos-15, ruby: "3.3" }
+          - { platform: x64-mingw-ucrt, runner: windows-2025, ruby: "3.3" }
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      RUBY_LINE: ${{ matrix.ruby }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1.343.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ruby-gems
+          path: ${{ runner.temp }}/download
+          digest-mismatch: error
+      - name: Install the gem RubyGems picks for this Ruby into an empty gem home
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version'])")
+          {
+            echo "ENGINE_VERSION=$version"
+            echo "GEM_HOME=$RUNNER_TEMP/gems"
+            echo "GEM_PATH=$RUNNER_TEMP/gems"
+          } >> "$GITHUB_ENV"
+          export GEM_HOME="$RUNNER_TEMP/gems" GEM_PATH="$RUNNER_TEMP/gems"
+          ruby -e 'puts "#{RUBY_DESCRIPTION}, RubyGems #{Gem::VERSION}, platform #{Gem::Platform.local}"'
+          gem=$(ruby bindings/ruby/acceptance/select.rb "$RUNNER_TEMP/download/feed")
+          echo "RubyGems picks $gem"
+          case "$gem" in
+            *"/qrcode-barcode-scanner-$version-$PLATFORM.gem") ;;
+            *) echo "::error::this Ruby gets $gem, not the $PLATFORM gem"; exit 1 ;;
+          esac
+          gem install --no-document "$gem"
+          gem list
+      - name: Scan the mixed fixture with the three profiles
+        run: |
+          mkdir receipt
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          # Away from the checkout: the gem is found in the gem home, the way an application finds it.
+          (cd "$RUNNER_TEMP" && ruby "$GITHUB_WORKSPACE/bindings/ruby/acceptance/scan.rb" "$image" "$RUNNER_TEMP/reports")
+          cp "$RUNNER_TEMP/reports/facts.json" "receipt/facts-$PLATFORM-ruby$RUBY_LINE.json"
+          cat "$RUNNER_TEMP/reports/facts.json"
+          # The gem that answered is the installed one, and ffi is its own platform gem: no
+          # compiler took part.
+          ruby -rjson -e 'f = JSON.parse(File.read(ARGV[0])); home = File.realpath(ENV.fetch("GEM_HOME"));
+            abort "the gem answered from #{f["gem"]}" unless File.realpath(f.dig("gem", "path")).start_with?(home)
+            abort "ffi was built from source" if f.dig("ffi", "platform") == "ruby"
+            abort "the gem is #{f.dig("gem", "platform")}" unless f.dig("gem", "platform") == ENV.fetch("PLATFORM")' \
+            "$RUNNER_TEMP/reports/facts.json"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "ruby scan.rb (bindings/ruby/acceptance/scan.rb)" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Ruby platform gem of this commit, installed from its file (not published)" \
+            --identifier "qrcode-barcode-scanner" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/bindings/ruby" \
+            --install "gem install qrcode-barcode-scanner-$ENGINE_VERSION-$PLATFORM.gem" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "receipt/acceptance-ruby-gem-$PLATFORM-ruby$RUBY_LINE.json"
+      - name: Uninstall the gem and close the receipt
+        run: |
+          gem uninstall --executables qrcode-barcode-scanner
+          python scripts/destination-acceptance.py removed \
+            --gone "ruby -rqrcode_barcode_scanner -e0" \
+            --uninstall "gem uninstall --executables qrcode-barcode-scanner" \
+            --receipt "receipt/acceptance-ruby-gem-$PLATFORM-ruby$RUBY_LINE.json"
+          python scripts/destination-acceptance.py check "receipt/acceptance-ruby-gem-$PLATFORM-ruby$RUBY_LINE.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: ruby-gem-consumer-${{ matrix.platform }}-ruby${{ matrix.ruby }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish the qualified platform gems
+    needs: [preflight, binding, natives, pack, consumer]
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust' && github.repository_id == '1126991539' && needs.preflight.outputs.publish_allowed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: rubygems
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: publish-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      RECEIPT_SHA256: ${{ needs.pack.outputs.receipt_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/package-inspect.py versions --tag "$GITHUB_REF" --strict --quiet
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ruby-gems
+          path: ruby-gems
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ruby-native-*
+          path: ruby-natives
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Reinspect the gems and list those rubygems.org does not hold, before authentication
+        run: python3 scripts/ruby-gem.py candidate --folder "$PWD/ruby-gems" --natives "$PWD/ruby-natives" --receipt-sha256 "$RECEIPT_SHA256" --require-absent --pending "$RUNNER_TEMP/ruby-pending.txt"
+      # A token from rubygems.org's trusted publisher for this workflow and environment, scoped
+      # to the gem and short-lived; no stored secret.
+      - uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+        with:
+          trusted-publisher: "true"
+      - name: Push exactly the inspected gems that rubygems.org does not hold
+        run: |
+          python3 scripts/ruby-gem.py candidate --folder "$PWD/ruby-gems" --natives "$PWD/ruby-natives" --receipt-sha256 "$RECEIPT_SHA256" --require-absent --pending "$RUNNER_TEMP/ruby-pending.txt"
+          while read -r file; do gem push "$PWD/ruby-gems/feed/$file" --host https://rubygems.org; done < "$RUNNER_TEMP/ruby-pending.txt"
