@@ -382,11 +382,51 @@ own output name the session's platform. mybinder.org limits launches from most c
 so this does not run on a hosted CI runner. A session ends by itself after about ten minutes of
 inactivity.
 
+## Run it for a Python host
+
+A Python host runs the published wheel `qrcode-barcode-scanner` inside a program of its own: a
+napari plugin, a Streamlit app, a notebook, a Cog predictor, a JupyterLab server. Its user installs
+it with pip into an environment, so [`scripts/python-host-consumer.py`](../../scripts/python-host-consumer.py)
+judges it in a new virtual environment, every step in one command:
+
+```sh
+python3 scripts/python-host-consumer.py run \
+  --destination "napari plugin from this checkout" \
+  --identifier napari-qrcode-barcode-scanner --version 0.11.0 \
+  --url https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/napari \
+  --install "dist/napari_qrcode_barcode_scanner-0.1.0-py3-none-any.whl" \
+  --install "-r integrations/napari/tests/requirements.txt" \
+  --scan "{python} -m pytest -q -p no:cacheprovider integrations/napari/tests" \
+  --uninstall "napari-qrcode-barcode-scanner qrcode-barcode-scanner" \
+  --gone-import napari_qrcode_barcode_scanner --gone-import qrcode_barcode_scanner \
+  --receipt receipt.json
+```
+
+It creates the environment outside the checkout, installs each `--install` with the
+environment's own pip, runs `pip check`, prints `pip freeze` and the SHA-256 of every local file
+it installed, and copies the fixture outside the checkout. It then runs the host's `--scan`
+command in the environment with two variables set: `QRSCAN_ACCEPTANCE_IMAGE`, the copied fixture,
+and `QRSCAN_ACCEPTANCE_DIR`, the folder where the host writes `fast.json`, `frame.json` and
+`full.json` through its own entry point. Without `--scan`, `drivers/python-package.py` scans
+through the wheel itself. The three reports are judged as above, each `--uninstall` package is
+removed with pip, every `--gone-import` module must then fail to import in that environment, and
+the receipt is checked. Exit 0 means `PASS`.
+
+A host's tests use [`scripts/python_host_kit.py`](../../scripts/python_host_kit.py) for the same
+contract inside pytest: `mixed_path()` finds the fixture (or the copy an acceptance run names) and
+checks its SHA-256, `assert_mixed(report, profile)` fails on any departure from the two expected
+codes, an uncut scan, no panic, the engine version and a score in every profile but `frame`, and
+`write_acceptance_reports(scan)` writes the three reports when `QRSCAN_ACCEPTANCE_DIR` is set.
+
+The workflow [`integration-python-hosts.yml`](../../.github/workflows/integration-python-hosts.yml)
+runs the harness's self-test and the harness itself on the public wheel, on Linux and macOS.
+
 ## What is covered today
 
 Four kinds of surface: an installed `qrscan` command, a container image, a language package, with
 programs for Node.js and Python, and a web page that follows the page contract. A notebook
-session is judged as a language package, through `binder-session.mjs`. Other bindings, host
+session is judged as a language package, through `binder-session.mjs`, and a Python host in a new
+virtual environment, through `python-host-consumer.py`. Other bindings, host
 integrations and agent clients keep their own consumers, listed in
 [`RELEASING.md`](../../RELEASING.md), until a program of this contract exists for each.
 
