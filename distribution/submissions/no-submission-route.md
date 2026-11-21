@@ -78,8 +78,7 @@ Ran, with the Homebrew Amp CLI `0.0.1785443059-g182e67` (released 2026-07-30), `
 
 Not run: `amp skill add`, `amp skill list` and `amp mcp doctor` start Amp's sign-in flow, and no
 sign-in was done. Amp loading the skill and a thread calling `scan_image` were not observed. The
-first `amp skill add` attempt ran before a browser guard was set and may have opened Amp's sign-in
-page in the browser; nothing was entered. The installed CLI is older than the pages read.
+installed CLI is older than the pages read.
 
 ### agent-continue · Continue
 
