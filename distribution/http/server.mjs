@@ -15,9 +15,13 @@ export const DEFAULT_PROFILE = "frame";
 export const HARD_LIMITS = Object.freeze({ inputBytes: 8 * 1024 * 1024, dimension: 4096, pixels: 16_000_000, concurrent: 2 });
 // A multipart body carries boundaries and part headers around the image bytes.
 const MULTIPART_OVERHEAD = 64 * 1024;
-// Time to receive a whole request, and its headers. A scan itself is bounded by its profile budget.
+// Time to receive a whole request, and its headers, checked every 2 seconds. A scan itself is
+// bounded by its profile budget.
 const REQUEST_TIMEOUT_MS = 30_000;
 const HEADERS_TIMEOUT_MS = 15_000;
+const TIMEOUT_CHECK_MS = 2_000;
+// Engine refusals of the image itself; any other engine error is the server's.
+const INPUT_ERRORS = new Set(["QRS-001", "QRS-002", "QRS-003"]);
 const RAW_TYPES = /^(?:image\/[a-z0-9.+-]+|application\/octet-stream)$/;
 const VARIABLES = Object.freeze({
   inputBytes: "QRSCAN_HTTP_MAX_INPUT_BYTES",
@@ -200,13 +204,30 @@ button { justify-self: start; padding: .4rem 1rem; }
 `;
 }
 
+/** The path of a request target, never interpreted as an authority: `//scan` is the path `//scan`. */
+function pathOf(target) {
+  try {
+    return new URL(`http://service.invalid${target.startsWith("/") ? "" : "/"}${target}`);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The HTTP server. ENGINE is the loaded engine module ({ scan, version }); LOG receives one line
- * per request (method, path, status, milliseconds), never a query, an image or a report.
+ * per request (method, path, status or `aborted`, milliseconds), never a query, an image or a
+ * report.
+ *
+ * A scan slot (limits.concurrent) is held only while the engine scans. Reading a body holds an
+ * upload slot, twice as many, so slow uploads cannot hold the scans, and the images held in
+ * memory stay bounded.
  */
 export function createScanServer({ engine, limits = limitsFromEnvironment(), source = sourceFromRecord(), log = () => {} }) {
   if (engine?.version?.() !== ENGINE_VERSION) throw new Error(`Scanner engine ${ENGINE_VERSION} is required`);
+  const uploadSlots = 2 * limits.concurrent;
   let active = 0;
+  let uploads = 0;
+  const busy = (what, slots) => new Refusal(503, "QRSHTTP_BUSY", `At most ${slots} ${what} run at once; retry shortly`, { "retry-after": "1" });
   const common = {
     "x-content-type-options": "nosniff",
     "cache-control": "no-store",
@@ -234,31 +255,47 @@ export function createScanServer({ engine, limits = limitsFromEnvironment(), sou
   }
 
   async function scan(request, response, url) {
-    if (active >= limits.concurrent) {
-      throw new Refusal(503, "QRSHTTP_BUSY", `At most ${limits.concurrent} scans run at once; retry shortly`, { "retry-after": "1" });
-    }
-    active += 1;
+    let read;
+    if (uploads >= uploadSlots) throw busy("uploads", uploadSlots);
+    uploads += 1;
     try {
-      const { bytes, mode } = await readScanRequest(request, url, limits);
-      let report;
-      try {
-        report = await engine.scan(bytes, { profile: mode, maxDimension: limits.dimension, maxPixels: limits.pixels });
-      } catch (error) {
-        const tag = error?.message?.match(/\[?(QRS-\d{3})\]?/)?.[1];
-        if (tag) throw new Refusal(422, tag, clean(error.message));
-        throw new Refusal(500, "QRSHTTP_ENGINE", "The scanner engine could not complete the scan");
-      }
-      json(response, 200, report);
+      read = await readScanRequest(request, url, limits);
+    } finally {
+      uploads -= 1;
+    }
+    if (active >= limits.concurrent) throw busy("scans", limits.concurrent);
+    active += 1;
+    let report;
+    try {
+      report = await engine.scan(read.bytes, { profile: read.mode, maxDimension: limits.dimension, maxPixels: limits.pixels });
+    } catch (error) {
+      const tag = error?.message?.match(/\[?(QRS-\d{3})\]?/)?.[1];
+      if (INPUT_ERRORS.has(tag)) throw new Refusal(422, tag, clean(error.message));
+      throw new Refusal(500, "QRSHTTP_ENGINE", "The scanner engine could not complete the scan");
     } finally {
       active -= 1;
     }
+    json(response, 200, report);
+  }
+
+  // One line per request, once: when the answer is sent, or when the connection closes first.
+  function record(request, response, path) {
+    const started = process.hrtime.bigint();
+    let done = false;
+    const line = (status) => {
+      if (done) return;
+      done = true;
+      log(`${clean(request.method)} ${clean(path).slice(0, 80)} ${status} ${Number((process.hrtime.bigint() - started) / 1_000_000n)}ms`);
+    };
+    response.on("finish", () => line(response.statusCode));
+    response.on("close", () => line(response.writableFinished ? response.statusCode : "aborted"));
   }
 
   async function handle(request, response) {
-    const started = process.hrtime.bigint();
-    const url = new URL(request.url ?? "/", "http://service.invalid");
-    response.on("finish", () => log(`${clean(request.method)} ${clean(url.pathname).slice(0, 80)} ${response.statusCode} ${Number((process.hrtime.bigint() - started) / 1_000_000n)}ms`));
+    const url = pathOf(request.url ?? "/");
+    record(request, response, url?.pathname ?? "/");
     try {
+      if (!url) throw new Refusal(400, "QRSHTTP_TARGET", "The request target is not a path");
       if (url.pathname === "/scan") {
         if (request.method !== "POST") throw new Refusal(405, "QRSHTTP_METHOD", "Use POST /scan", { allow: "POST" });
         await scan(request, response, url);
@@ -279,19 +316,33 @@ export function createScanServer({ engine, limits = limitsFromEnvironment(), sou
     }
   }
 
-  const server = createServer({ requestTimeout: REQUEST_TIMEOUT_MS, headersTimeout: HEADERS_TIMEOUT_MS }, (request, response) => {
-    handle(request, response);
-  });
-  // A client that asks before sending a body too large is told so, and never sends it.
+  // handle answers every error itself; this only keeps a defect from ending the process.
+  const serve = (request, response) => {
+    handle(request, response).catch(() => response.destroy());
+  };
+  const server = createServer({
+    requestTimeout: REQUEST_TIMEOUT_MS,
+    headersTimeout: HEADERS_TIMEOUT_MS,
+    connectionsCheckingInterval: TIMEOUT_CHECK_MS,
+  }, serve);
+  // A client that asks before sending a body is told before it sends one that is too large, or
+  // that every upload slot is taken.
   server.on("checkContinue", (request, response) => {
     const declared = Number(request.headers["content-length"]);
     const max = limits.inputBytes + (mediaType(request) === "multipart/form-data" ? MULTIPART_OVERHEAD : 0);
+    let refusal = null;
     if (Number.isFinite(declared) && declared > max) {
-      refuse(response, new Refusal(413, "QRSHTTP_INPUT_LIMIT", `The request body exceeds ${max} bytes`), true);
+      refusal = new Refusal(413, "QRSHTTP_INPUT_LIMIT", `The request body exceeds ${max} bytes`);
+    } else if (pathOf(request.url ?? "/")?.pathname === "/scan" && uploads >= uploadSlots) {
+      refusal = busy("uploads", uploadSlots);
+    }
+    if (refusal) {
+      record(request, response, pathOf(request.url ?? "/")?.pathname ?? "/");
+      refuse(response, refusal, true);
       return;
     }
     response.writeContinue();
-    handle(request, response);
+    serve(request, response);
   });
   return server;
 }

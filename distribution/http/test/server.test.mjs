@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
@@ -22,6 +23,20 @@ const source = Object.freeze({ revision: "0".repeat(40), service: `https://githu
 function listen(server) {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${server.address().port}`)));
 }
+
+/** Send RAW bytes over a new connection and read the status line of the answer, if any. */
+function rawStatus(base, raw) {
+  return new Promise((resolve, reject) => {
+    const { port } = new URL(base);
+    const socket = connect(Number(port), "127.0.0.1", () => socket.end(raw));
+    let text = "";
+    socket.on("data", (chunk) => { text += chunk; });
+    socket.on("close", () => resolve(text.split("\r\n")[0]));
+    socket.on("error", reject);
+  });
+}
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function exchange(base, method, path, { body, headers = {}, chunked = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -97,10 +112,25 @@ describe("the service on the installed engine", () => {
     assert.equal(answer.headers["x-content-type-options"], "nosniff");
   });
 
-  test("the log names the method, the path and the status, never a query", () => {
+  test("a request target that is not a URL path is refused, and the service keeps serving", async () => {
+    for (const target of ["//a:65536", "//%", "//[", "*", "//scan"]) {
+      const line = await rawStatus(base, `GET ${target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+      assert.match(line, /^HTTP\/1\.1 4\d\d /, `${target} is answered with a refusal`);
+      assert.equal((await exchange(base, "GET", "/healthz")).status, 200, `the service still serves after ${target}`);
+    }
+  });
+
+  test("a body over the limit announced with Expect: 100-continue is refused before it is sent", async () => {
+    const answer = await rawStatus(base, `POST /scan HTTP/1.1\r\nHost: x\r\nContent-Type: image/png\r\nContent-Length: ${HARD_LIMITS.inputBytes + 1}\r\nExpect: 100-continue\r\n\r\n`);
+    assert.equal(answer, "HTTP/1.1 413 Payload Too Large");
+  });
+
+  test("the log names the method, the path and the status, never a query", async () => {
+    await pause(50);
     assert.ok(lines.length > 10);
-    for (const line of lines) assert.match(line, /^(GET|HEAD|POST) \/[a-z]* \d{3} \d+ms$/);
+    for (const line of lines) assert.match(line, /^(GET|HEAD|POST) \/\S{0,79} (\d{3}|aborted) \d+ms$/);
     assert.ok(!lines.some((line) => line.includes("mode=")));
+    assert.ok(lines.some((line) => /^POST \/scan 413 /.test(line)), "the 100-continue refusal is logged");
   });
 });
 
@@ -129,6 +159,52 @@ describe("what the service refuses before a scan", () => {
       writeFileSync(join(folder, "SOURCE.json"), JSON.stringify({ engine: { repository: "https://example.com/fork", revision } }));
       assert.equal(sourceFromRecord(directory).revision, null);
     } finally { rmSync(folder, { recursive: true }); }
+  });
+
+  test("a slow upload holds no scan slot, and an aborted upload frees its own", async () => {
+    const server = createScanServer({ engine, limits: limitsFromEnvironment({ QRSCAN_HTTP_MAX_CONCURRENT: "1" }), source });
+    const base = await listen(server);
+    try {
+      const { port } = new URL(base);
+      const slow = connect(Number(port), "127.0.0.1");
+      await new Promise((resolve) => slow.on("connect", resolve));
+      slow.write(`POST /scan HTTP/1.1\r\nHost: x\r\nContent-Type: image/png\r\nContent-Length: ${fixture.length}\r\n\r\n`);
+      slow.write(fixture.subarray(0, 100));
+      await pause(100);
+      const scanned = await exchange(base, "POST", "/scan", { body: fixture, headers: { "content-type": "image/png" } });
+      assert.equal(scanned.status, 200, "a scan runs while another client is still uploading");
+      slow.destroy();
+      await pause(100);
+      for (let round = 0; round < 3; round += 1) {
+        const answer = await exchange(base, "POST", "/scan", { body: fixture, headers: { "content-type": "image/png" } });
+        assert.equal(answer.status, 200, "the aborted upload gave its slot back");
+      }
+    } finally { server.close(); }
+  });
+
+  test("uploads past their slots are refused, and an engine error about its options is the server's", async () => {
+    const failing = { version: () => "0.11.0", scan: async () => { throw new Error("[QRS-006] budgetMs out of range"); } };
+    const server = createScanServer({ engine: failing, limits: limitsFromEnvironment({ QRSCAN_HTTP_MAX_CONCURRENT: "1" }), source });
+    const base = await listen(server);
+    const held = [];
+    try {
+      const { port } = new URL(base);
+      for (let slot = 0; slot < 2; slot += 1) {
+        const socket = connect(Number(port), "127.0.0.1");
+        await new Promise((resolve) => socket.on("connect", resolve));
+        socket.write(`POST /scan HTTP/1.1\r\nHost: x\r\nContent-Type: image/png\r\nContent-Length: ${fixture.length}\r\n\r\n`);
+        held.push(socket);
+      }
+      await pause(100);
+      const third = await exchange(base, "POST", "/scan", { body: fixture, headers: { "content-type": "image/png" } });
+      assert.equal(third.status, 503);
+      assert.equal(JSON.parse(third.body).error.code, "QRSHTTP_BUSY");
+      for (const socket of held) socket.destroy();
+      await pause(100);
+      const answer = await exchange(base, "POST", "/scan", { body: fixture, headers: { "content-type": "image/png" } });
+      assert.equal(answer.status, 500);
+      assert.equal(JSON.parse(answer.body).error.code, "QRSHTTP_ENGINE");
+    } finally { server.close(); }
   });
 
   test("scans past the concurrency limit are refused, and an engine failure is not a 200", async () => {

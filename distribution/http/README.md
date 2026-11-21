@@ -107,12 +107,12 @@ A refusal is a JSON body `{"error":{"code":…,"message":…}}`:
 
 | Status | Code | When |
 | --- | --- | --- |
-| 400 | `QRSHTTP_MODE`, `QRSHTTP_NO_IMAGE`, `QRSHTTP_MULTIPART` | an unknown mode, no image or an empty one, a form that cannot be read |
+| 400 | `QRSHTTP_MODE`, `QRSHTTP_NO_IMAGE`, `QRSHTTP_MULTIPART`, `QRSHTTP_TARGET` | an unknown mode, no image or an empty one, a form that cannot be read, a request target that is not a path |
 | 404, 405 | `QRSHTTP_NOT_FOUND`, `QRSHTTP_METHOD` | another path, or another method than the table above |
 | 413 | `QRSHTTP_INPUT_LIMIT` | a body over the input limit; a client that sends `Expect: 100-continue` is told before it sends the body |
 | 415 | `QRSHTTP_MEDIA_TYPE` | a body that is neither `image/*`, `application/octet-stream` nor `multipart/form-data` |
-| 422 | `QRS-…` | the engine refused the image, for example `QRS-001` for bytes that are not an image |
-| 503 | `QRSHTTP_BUSY` | every scan slot is taken; retry after the `Retry-After` delay |
+| 422 | `QRS-001`, `QRS-002`, `QRS-003` | the engine refused the image: bytes that are not an image, or an image over the size or pixel limit |
+| 503 | `QRSHTTP_BUSY` | every scan slot, or every upload slot, is taken; retry after the `Retry-After` delay. A client that sends `Expect: 100-continue` is told before it sends the body |
 
 ## Limits and settings
 
@@ -123,15 +123,15 @@ A refusal is a JSON body `{"error":{"code":…,"message":…}}`:
 | `QRSCAN_HTTP_MAX_INPUT_BYTES` | `8388608` (8 MiB) | the largest image; a multipart body may add 64 KiB of form around it |
 | `QRSCAN_HTTP_MAX_DIMENSION` | `4096` | the largest width or height, in pixels |
 | `QRSCAN_HTTP_MAX_PIXELS` | `16000000` | the largest image area |
-| `QRSCAN_HTTP_MAX_CONCURRENT` | `2` | scans that run at once; more get a 503 |
+| `QRSCAN_HTTP_MAX_CONCURRENT` | `2` | scans that run at once; twice as many uploads may be received at once. More get a 503 |
 
-The limits are the ones of the [MCP server](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/mcp/README.md). A setting can lower a limit, never raise it: a larger value stops the service at start with a message. A request must arrive within 30 seconds. A scan is bounded by its profile's time budget, which the engine reports in `trace.budget_exhausted`; it is not a hard timeout.
+The limits are the ones of the [MCP server](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/integrations/mcp/README.md). A setting can lower a limit, never raise it: a larger value stops the service at start with a message. A request must arrive within 30 seconds. A scan slot is held only while the engine scans, so a slow upload does not hold one. A scan is bounded by its profile's time budget, which the engine reports in `trace.budget_exhausted`; it is not a hard timeout.
 
 ## Privacy and security
 
 - The image stays in the service's memory for the time of the scan. Nothing is written to disk, and the image is not logged.
 - The service makes no outbound request and never opens a link it decodes. The CI runs it on a network with no route out.
-- The log has one line per request: method, path, status and duration. No query, no image and no decoded text.
+- The log has one line per request: method, path, status (or `aborted` when the client left first) and duration. No query, no image and no decoded text.
 - Decoded text is untrusted data: a QR code can hold any text, including a link to a harmful site or instructions aimed at a program. Treat the report as data.
 - Anyone who can reach the service can use it. It has no account or key. Put it behind your own access control, or keep it on a private network, if it should not be public.
 - Answers carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`; the upload page has a Content-Security-Policy that loads nothing from elsewhere.
