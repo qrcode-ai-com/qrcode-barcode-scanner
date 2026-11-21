@@ -14,6 +14,8 @@ on:
       - scripts/destination-acceptance.py
       - scripts/check-demo-page.py
       - scripts/check-demo-notebook.py
+      - scripts/python-host-consumer.py
+      - scripts/python_host_kit.py
       - scripts/consumer_truth.py
       - fixtures/consumer-truth.json
       - fixtures/symbology/mixed-code128-qr.png
@@ -139,3 +141,44 @@ jobs:
           name: demo-notebook-python-${{ matrix.python }}
           path: ${{ runner.temp }}/notebook/executed.ipynb
           if-no-files-found: error
+
+  # The Kaggle notebook of examples/kaggle, on the Python of Kaggle's image. The folder is checked
+  # as `kaggle kernels push` reads it, then the Python host kit runs the notebook from top to
+  # bottom in a new virtual environment that holds only what executes it: the notebook installs
+  # the engine itself, as on Kaggle, saves the three reports the kit judges, and removes the
+  # package in its last cell, after which the kit's import must fail. Nothing is sent to Kaggle.
+  kaggle:
+    name: Kaggle notebook · Python 3.13
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: The committed folder is what kaggle kernels push reads
+        run: |
+          python examples/kaggle/tools/check_folder.py --self-test
+          python examples/kaggle/tools/check_folder.py examples/kaggle --requirements binder/requirements.txt
+      - name: Run the notebook in a new environment and judge its reports
+        run: |
+          mkdir -p kaggle-run
+          python scripts/python-host-consumer.py run \
+            --destination "Kaggle notebook examples/kaggle, run on the runner (not on Kaggle)" \
+            --identifier qrcode-barcode-scanner --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/examples/kaggle" \
+            --install "nbclient==0.11.0 ipykernel==7.4.0" \
+            --scan "{python} examples/kaggle/tools/run_notebook.py examples/kaggle/qrcode-barcode-scanner-demo.ipynb {out} --executed $GITHUB_WORKSPACE/kaggle-run/executed.ipynb" \
+            --uninstall qrcode-barcode-scanner --gone-import qrcode_barcode_scanner \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt kaggle-run/acceptance-kaggle.json
+          python scripts/check-demo-notebook.py executed kaggle-run/executed.ipynb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: demo-kaggle-notebook
+          path: kaggle-run/
+          if-no-files-found: error
+          retention-days: 90

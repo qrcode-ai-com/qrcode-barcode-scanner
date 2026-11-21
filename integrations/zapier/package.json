@@ -1,0 +1,37 @@
+{
+  "name": "qrcode-barcode-scanner-zapier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zapier integration that reads QR codes and barcodes in image files, inside the Zap step, with the open-source QR Code AI engine",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/zapier",
+  "author": {
+    "name": "SuperNovae Studio",
+    "email": "contact@supernovae.studio",
+    "url": "https://qrcode-ai.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/zapier"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "validate": "zapier-platform validate --without-style",
+    "build": "zapier-platform build"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "zapier-platform-core": "19.3.0"
+  },
+  "devDependencies": {
+    "zapier-platform-cli": "19.3.0"
+  }
+}

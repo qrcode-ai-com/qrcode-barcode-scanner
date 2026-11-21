@@ -1,0 +1,22 @@
+{
+  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
+  "name": "mod_qrcodebarcodescanner",
+  "version": "0.1.0",
+  "description": "The scanner's script module and stylesheet.",
+  "license": "GPL-3.0-or-later",
+  "assets": [
+    {
+      "name": "mod_qrcodebarcodescanner.view",
+      "type": "script",
+      "uri": "mod_qrcodebarcodescanner/view.js",
+      "attributes": { "type": "module" },
+      "version": "0.1.0"
+    },
+    {
+      "name": "mod_qrcodebarcodescanner.scanner",
+      "type": "style",
+      "uri": "mod_qrcodebarcodescanner/scanner.css",
+      "version": "0.1.0"
+    }
+  ]
+}

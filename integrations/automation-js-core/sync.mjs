@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Write the shared scan core into each automation host, or check that every copy is current.
-//   node sync.mjs          write the three copies
+//   node sync.mjs          write the four copies
 //   node sync.mjs --check  fail when a copy differs from src/scan-core.ts
 //   node sync.mjs --dist   also write dist/scan-core.cjs, the build this folder's tests load
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -36,6 +36,7 @@ const copies = {
 	'n8n/nodes/QrcodeBarcodeScanner/scanCore.ts': (path) => stamped(path, source),
 	'activepieces/src/lib/scan-core.ts': (path) => stamped(path, source),
 	'node-red/nodes/scan-core.js': transpiled,
+	'zapier/lib/scan-core.js': transpiled,
 };
 
 const args = new Set(process.argv.slice(2));

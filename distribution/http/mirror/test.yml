@@ -1,0 +1,75 @@
+name: Test
+
+# This repository is generated from the engine repository,
+# https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust (distribution/http):
+# SOURCE.json names the commit and the sha256 of every file. Nothing here is edited by hand.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  provenance:
+    name: Every file comes from the engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The engine's own program stages the commit SOURCE.json names and compares it with this
+      # tree: same files, same bytes, nothing else.
+      - name: Stage the recorded engine commit again and compare
+        run: |
+          revision=$(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])")
+          git init --quiet "$RUNNER_TEMP/engine"
+          git -C "$RUNNER_TEMP/engine" remote add origin https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
+          git -C "$RUNNER_TEMP/engine" fetch --quiet --depth 1 origin "$revision"
+          git -C "$RUNNER_TEMP/engine" checkout --quiet FETCH_HEAD
+          python3 "$RUNNER_TEMP/engine/scripts/stage-http-satellite.py" verify "$GITHUB_WORKSPACE"
+
+  service:
+    name: Build the image as a host does and judge it
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      # A deploy host builds the Dockerfile at the root with no build argument and sets PORT.
+      - name: Build the image from the root of this repository
+        run: docker build --tag qrscan-http .
+      - name: Run it read-only on the port a host sets and judge it from outside
+        run: |
+          set -euo pipefail
+          revision=$(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])")
+          docker run --detach --name qrscan-http --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --env PORT=10000 --env QRSCAN_HTTP_MAX_CONCURRENT=1 --memory 512m \
+            --health-interval 2s --publish 127.0.0.1:10000:10000 qrscan-http
+          for _ in $(seq 60); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' qrscan-http)
+            if [ "$status" = healthy ]; then break; fi
+            sleep 1
+          done
+          test "$status" = healthy
+          node test/consumer.mjs http://127.0.0.1:10000 test/fixtures/mixed-code128-qr.png --revision "$revision"
+      - name: Remove the container and the image
+        if: always()
+        run: |
+          docker rm --force qrscan-http || true
+          docker image rm --force qrscan-http || true

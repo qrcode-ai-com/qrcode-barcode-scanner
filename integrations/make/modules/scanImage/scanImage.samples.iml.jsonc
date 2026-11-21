@@ -1,0 +1,19 @@
+{
+  "count": 2,
+  "detections": [
+    {
+      "symbology": "qr_code",
+      "content": { "text": "https://example.com/", "raw": "aHR0cHM6Ly9leGFtcGxlLmNvbS8=", "charset": "utf8" },
+      "payload": { "kind": "url", "url": "https://example.com/" }
+    },
+    {
+      "symbology": "code128",
+      "content": { "text": "STOCK-0001", "raw": "U1RPQ0stMDAwMQ==", "charset": "utf8" },
+      "payload": { "kind": "text" }
+    }
+  ],
+  "score": null,
+  "hints": [],
+  "trace": { "engine_panics": 0, "budget_exhausted": false },
+  "versions": { "scanner": "0.11.0", "pipeline": 5, "score_contract": 5 }
+}

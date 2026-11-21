@@ -1,0 +1,4 @@
+[
+  { "label": "Scan", "modules": ["scanImage"] },
+  { "label": "Other", "modules": ["makeApiCall"] }
+]

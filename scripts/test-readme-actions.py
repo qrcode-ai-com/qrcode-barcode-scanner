@@ -15,6 +15,12 @@ builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
 
 
+def listed_readmes():
+    """The committed list of maintained READMEs (scripts/maintained-readmes.txt)."""
+    lines = (ROOT / 'scripts/maintained-readmes.txt').read_text().splitlines()
+    return [line for line in lines if line and not line.startswith('#')]
+
+
 class ReadmeActions(unittest.TestCase):
     def test_prefill_routes_keep_exact_text_and_paste_routes_use_only_official_homepages(self):
         prompt = question('Flutter & café', 'https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/bindings/flutter/README.md')
@@ -96,7 +102,8 @@ class ReadmeActions(unittest.TestCase):
 
     def test_frozen_and_vendored_readmes_are_not_targets(self):
         paths = builder.maintained_readmes()
-        self.assertEqual(len(paths), 70)
+        self.assertEqual(sorted(str(path) for path in paths), listed_readmes(),
+                         'add or remove the README in scripts/maintained-readmes.txt (sorted)')
         self.assertNotIn('distribution/docker/v0.11/README.md', paths)
         self.assertNotIn('docs/assets/readme/README.md', paths)
         self.assertFalse(any('/cargokit/' in path for path in paths))

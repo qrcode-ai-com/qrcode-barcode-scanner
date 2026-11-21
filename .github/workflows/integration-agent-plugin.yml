@@ -3,9 +3,10 @@ name: Integration · agent plugin
 # integrations/agent-plugin is one plugin root for fourteen agent clients; its own repository,
 # qrcode-ai-com/qrcode-barcode-scanner-plugin, is written from a commit of this one by
 # scripts/stage-agent-plugin-satellite.py. This workflow stages that tree from this commit,
-# checks every manifest against its published JSON schema, then starts the pinned MCP server with
-# each client configuration and scans the mixed fixture in the three profiles, and runs the
-# skill's helper the same way. The destination acceptance contract judges every route, removal
+# checks every manifest against its published JSON schema, runs Gemini CLI's extension validator
+# and the vally skill lint of the awesome-copilot marketplace on it, then starts the pinned MCP
+# server with each client configuration and scans the mixed fixture in the three profiles, and runs
+# the skill's helper the same way. The destination acceptance contract judges every route, removal
 # included. Nothing is built from the engine's Rust source and nothing is published.
 on:
   workflow_dispatch:
@@ -44,7 +45,7 @@ jobs:
   manifests:
     name: Stage the plugin repository and check its manifests
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,6 +63,21 @@ jobs:
         run: npm install --prefix "$RUNNER_TEMP/tools" --ignore-scripts --no-audit --no-fund --save-exact ajv@8.20.0 ajv-formats@3.0.1
       - name: Check every manifest against its published schema
         run: node integrations/agent-plugin/test/check-manifests.mjs "$RUNNER_TEMP/plugin" --tools "$RUNNER_TEMP/tools"
+      # The Gemini CLI extension gallery lists a repository "if it passes validation"; the CLI's own
+      # validator is the published form of that check. A new home with usage statistics turned off,
+      # so nothing is reported to Google from this job and no earlier setting is read.
+      - name: Validate the Gemini CLI extension with Gemini CLI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/gemini" --ignore-scripts --no-audit --no-fund --save-exact @google/gemini-cli@0.70.0
+          mkdir -p "$RUNNER_TEMP/gemini-home/.gemini"
+          echo '{"privacy":{"usageStatisticsEnabled":false}}' > "$RUNNER_TEMP/gemini-home/.gemini/settings.json"
+          HOME="$RUNNER_TEMP/gemini-home" GEMINI_CLI_NO_RELAUNCH=1 \
+            node "$RUNNER_TEMP/gemini/node_modules/@google/gemini-cli/bundle/gemini.js" extensions validate "$RUNNER_TEMP/plugin"
+      # github/awesome-copilot runs vally on every external plugin it reviews; a failure blocks review.
+      - name: Lint the skills with vally, the check of the awesome-copilot marketplace
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vally" --ignore-scripts --no-audit --no-fund --save-exact @microsoft/vally@0.20.0
+          node integrations/agent-plugin/test/lint-skills.mjs "$RUNNER_TEMP/plugin" --tools "$RUNNER_TEMP/vally"
       # Pi and OpenCode install the tree as an npm package: it must pack the entry points and the skill.
       - name: Pack the staged tree as an npm package, without publishing it
         run: |

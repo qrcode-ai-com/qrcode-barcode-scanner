@@ -95,7 +95,7 @@ test('the engine is pinned in one place and resolved by literal names', () => {
 	const source = readFileSync(new URL('../src/scan-core.ts', import.meta.url), 'utf8');
 	const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 	assert.equal(manifest.devDependencies[core.ENGINE_PACKAGE], core.ENGINE_VERSION);
-	for (const host of ['n8n', 'node-red', 'activepieces']) {
+	for (const host of ['n8n', 'node-red', 'activepieces', 'zapier']) {
 		const hostManifest = JSON.parse(readFileSync(new URL(`../../${host}/package.json`, import.meta.url), 'utf8'));
 		assert.equal(hostManifest.dependencies[core.ENGINE_PACKAGE], core.ENGINE_VERSION, `${host} pins the engine`);
 	}

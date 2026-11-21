@@ -1,0 +1,30 @@
+[
+  {
+    "name": "fileName",
+    "type": "filename",
+    "label": "File name",
+    "required": true,
+    "semantic": "file:name"
+  },
+  {
+    "name": "data",
+    "type": "buffer",
+    "label": "Data",
+    "required": true,
+    "semantic": "file:data",
+    "help": "A PNG, JPEG, WebP or GIF file, at most 8 MiB and 4096 pixels per side, unless the scan service sets other limits."
+  },
+  {
+    "name": "mode",
+    "type": "select",
+    "label": "Profile",
+    "required": true,
+    "default": "frame",
+    "help": "Frame decodes without scoring. Fast and Full also score how well a QR code scans.",
+    "options": [
+      { "label": "Frame: decode without scoring", "value": "frame" },
+      { "label": "Fast: decode and score with a short budget", "value": "fast" },
+      { "label": "Full: decode and score QR scannability", "value": "full" }
+    ]
+  }
+]
