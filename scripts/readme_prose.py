@@ -39,6 +39,7 @@ GUIDES = {
     'integrations/wordpress/README.md': ('integrations/wordpress', 'WordPress'),
     'integrations/raycast/README.md': ('integrations/raycast', 'Raycast'),
     'integrations/wasm-inline/README.md': ('sdk/javascript', 'JavaScript'),
+    'integrations/canva/README.md': ('integrations/canva', 'Canva'),
     'skills/qrcode-barcode-scanner/README.md': ('skills', 'agent skill'),
     'tests/consumers/jitpack-android/README.md': ('sdk/android', 'Android'),
 }

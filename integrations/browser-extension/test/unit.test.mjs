@@ -3,13 +3,16 @@
 //
 //   node --test test/unit.test.mjs
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { crc32, encodePng, readZip, writeZip } from '../scripts/bytes.mjs';
-import { packageFiles, scannerPackage } from '../scripts/build.mjs';
+import {
+  packageFiles, pinsText, readPins, scannerPackage, sourceFiles,
+} from '../scripts/build.mjs';
 import { ICON_SIZES, drawIcon } from '../scripts/icons.mjs';
 import { EXPECTED_FILES, inspectStore } from '../scripts/inspect.mjs';
 import { LIMITS, SIX_LINKS, amoMetadata, listingTexts } from '../scripts/listing.mjs';
@@ -301,6 +304,45 @@ test('each store package holds exactly the expected files, with the pinned modul
     assert.match(notice, /AGPL-3\.0-or-later/);
     assert.match(notice, /MIT License/);
     assert.match(notice, new RegExp(scanner.source_revision));
+  }
+});
+
+test('SHA256SUMS pins one hash per archive, in sha256sum form, sorted by name', () => {
+  const pins = readPins(join(HERE, 'SHA256SUMS'));
+  const names = [...TARGETS.map((target) => `qrcode-barcode-scanner-${target}-${own.version}.zip`),
+    `qrcode-barcode-scanner-source-${own.version}.zip`].sort();
+  assert.deepEqual([...pins.keys()], names);
+  for (const hash of pins.values()) assert.match(hash, /^[0-9a-f]{64}$/);
+  const archives = [...pins].map(([path, sha256]) => ({ path, sha256 })).reverse();
+  assert.equal(pinsText(archives), readFileSync(join(HERE, 'SHA256SUMS'), 'utf8'));
+  // An extracted source package has no pin: the build there only builds.
+  assert.equal(readPins(join(mkdtempSync(join(tmpdir(), 'qrscan-pins-')), 'SHA256SUMS')), null);
+});
+
+test('the source package rebuilds the stores and quotes no archive hash', () => {
+  const files = sourceFiles(own.version);
+  const top = `qrcode-barcode-scanner-browser-extension-${own.version}/`;
+  const inside = [...files.keys()].map((name) => name.slice(top.length));
+  for (const need of ['SOURCE.md', 'package-lock.json', 'listing/texts.md', 'scripts/build.mjs']) {
+    assert.ok(inside.includes(need), need);
+  }
+  assert.ok(!inside.includes('SHA256SUMS') && !inside.includes('README.md'));
+  assert.deepEqual(inside.filter((name) => name.startsWith('listing/')).sort(),
+    ['listing/PRIVACY.md', 'listing/texts.md']);
+  const pins = [...readPins(join(HERE, 'SHA256SUMS')).values()];
+  for (const [name, bytes] of files) {
+    for (const hash of pins) assert.ok(!bytes.toString('latin1').includes(hash), name);
+  }
+});
+
+test('every archive hash a store kit quotes is the pinned one', () => {
+  const pins = readPins(join(HERE, 'SHA256SUMS'));
+  const known = new Set([...pins.values(), own.config.wasmSha256]);
+  for (const name of readdirSync(join(HERE, 'listing')).filter((file) => file.endsWith('.md'))) {
+    const text = readFileSync(join(HERE, 'listing', name), 'utf8');
+    for (const [hash] of text.matchAll(/\b[0-9a-f]{64}\b/g)) {
+      assert.ok(known.has(hash), `${name} quotes ${hash}, which SHA256SUMS does not pin`);
+    }
   }
 });
 
