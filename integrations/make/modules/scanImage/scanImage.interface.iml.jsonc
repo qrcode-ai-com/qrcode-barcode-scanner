@@ -1,0 +1,42 @@
+[
+  { "name": "count", "type": "number", "label": "Number of codes" },
+  {
+    "name": "detections",
+    "type": "array",
+    "label": "Codes",
+    "spec": {
+      "type": "collection",
+      "spec": [
+        { "name": "symbology", "type": "text", "label": "Symbology" },
+        {
+          "name": "content",
+          "type": "collection",
+          "label": "Content",
+          "spec": [
+            { "name": "text", "type": "text", "label": "Text" },
+            { "name": "raw", "type": "text", "label": "Bytes (base64)" },
+            { "name": "charset", "type": "text", "label": "Charset" }
+          ]
+        },
+        { "name": "payload", "type": "any", "label": "Payload" },
+        { "name": "corners", "type": "any", "label": "Corners" },
+        { "name": "meta", "type": "any", "label": "Meta" },
+        { "name": "engines", "type": "any", "label": "Engines" },
+        { "name": "occurrences", "type": "any", "label": "Occurrences" }
+      ]
+    }
+  },
+  { "name": "score", "type": "any", "label": "Score" },
+  { "name": "hints", "type": "any", "label": "Hints" },
+  { "name": "trace", "type": "any", "label": "Trace" },
+  {
+    "name": "versions",
+    "type": "collection",
+    "label": "Versions",
+    "spec": [
+      { "name": "scanner", "type": "text", "label": "Scanner" },
+      { "name": "pipeline", "type": "number", "label": "Pipeline" },
+      { "name": "score_contract", "type": "number", "label": "Score contract" }
+    ]
+  }
+]

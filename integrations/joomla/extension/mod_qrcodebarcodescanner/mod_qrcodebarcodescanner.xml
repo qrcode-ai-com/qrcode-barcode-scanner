@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="module" client="site" method="upgrade">
+	<name>mod_qrcodebarcodescanner</name>
+	<author>QR Code AI</author>
+	<authorUrl>https://qrcode-ai.com/</authorUrl>
+	<creationDate>2026-11</creationDate>
+	<copyright>(C) 2026 SuperNovae Studio, QR Code AI</copyright>
+	<license>GNU General Public License version 3 or later; the bundled scanner engine files in media/mod_qrcodebarcodescanner/vendor are AGPL-3.0-or-later, see LICENSE-ENGINE.txt</license>
+	<version>0.1.0</version>
+	<description>MOD_QRCODEBARCODESCANNER_XML_DESCRIPTION</description>
+	<namespace path="src">QRCodeAI\Module\QrcodeBarcodeScanner</namespace>
+	<files>
+		<folder module="mod_qrcodebarcodescanner">services</folder>
+		<folder>src</folder>
+		<folder>tmpl</folder>
+		<filename>LICENSE-ENGINE.txt</filename>
+	</files>
+	<media folder="media" destination="mod_qrcodebarcodescanner">
+		<filename>joomla.asset.json</filename>
+		<folder>css</folder>
+		<folder>js</folder>
+		<folder>vendor</folder>
+	</media>
+	<languages folder="language">
+		<language tag="en-GB">en-GB/mod_qrcodebarcodescanner.ini</language>
+		<language tag="en-GB">en-GB/mod_qrcodebarcodescanner.sys.ini</language>
+	</languages>
+	<config>
+		<fields name="params">
+			<fieldset name="basic">
+				<field name="profile" type="list" default="full" label="MOD_QRCODEBARCODESCANNER_FIELD_PROFILE_LABEL" description="MOD_QRCODEBARCODESCANNER_FIELD_PROFILE_DESC" validate="options">
+					<option value="full">MOD_QRCODEBARCODESCANNER_PROFILE_FULL</option>
+					<option value="fast">MOD_QRCODEBARCODESCANNER_PROFILE_FAST</option>
+					<option value="frame">MOD_QRCODEBARCODESCANNER_PROFILE_FRAME</option>
+				</field>
+				<field name="show_report" type="radio" default="0" layout="joomla.form.field.radio.switcher" label="MOD_QRCODEBARCODESCANNER_FIELD_SHOW_REPORT_LABEL" description="MOD_QRCODEBARCODESCANNER_FIELD_SHOW_REPORT_DESC" filter="integer">
+					<option value="0">JNO</option>
+					<option value="1">JYES</option>
+				</field>
+				<field name="show_credit" type="radio" default="0" layout="joomla.form.field.radio.switcher" label="MOD_QRCODEBARCODESCANNER_FIELD_SHOW_CREDIT_LABEL" description="MOD_QRCODEBARCODESCANNER_FIELD_SHOW_CREDIT_DESC" filter="integer">
+					<option value="0">JNO</option>
+					<option value="1">JYES</option>
+				</field>
+			</fieldset>
+			<fieldset name="advanced">
+				<field name="layout" type="modulelayout" label="JFIELD_ALT_LAYOUT_LABEL" class="form-select" validate="moduleLayout" />
+				<field name="moduleclass_sfx" type="textarea" label="COM_MODULES_FIELD_MODULECLASS_SFX_LABEL" rows="3" validate="CssIdentifier" />
+			</fieldset>
+		</fields>
+	</config>
+</extension>

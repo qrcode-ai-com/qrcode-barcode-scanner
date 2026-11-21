@@ -1,0 +1,8 @@
+node_modules/
+lib/
+dist/
+/licenses/
+tsconfig.tsbuildinfo
+jupyterlab_qrcode_barcode_scanner/labextension/
+jupyterlab_qrcode_barcode_scanner/_version.py
+*.egg-info/

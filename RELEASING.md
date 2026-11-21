@@ -503,6 +503,7 @@ repository tokens — hence step 0, at merge.
 | npm-publish › publish-native · publish-wasm | `npm` | npm trusted publishing (npm CLI ≥ 11.5.1 on Node 24), provenance attested automatically; a version the owner uploads by hand (the first under a new name) carries no npm provenance | the very tarballs pack-native and build-wasm packed and inspected, read back again in the job and uploaded unchanged with `npm publish <tarball> --ignore-scripts`; each `npm publish` first checks that its operand is an absolute path to a regular `.tgz` file whose path and sha256 the in-job re-inspection recorded, and stops the job otherwise; after every upload, and for a version already live, the registry's `dist.integrity` must be that tarball's sha512 |
 | python › release | `release` | PyPI trusted publishing: a pending publisher on the new project `qrcode-barcode-scanner` (owner step 5); the 0.9.0 files of the former project `qrcode-ai-scanner` carry PEP 740 attestations | `dist/`, read back in the job: exactly one wheel per row of the wheels matrix and the sdist; before the upload, every file PyPI already serves at the version must be the one read back (sha256), and PyPI may serve no other file there, so `skip-existing` (which goes by file name) skips only proven copies |
 | flutter › publish | `pub` | pub.dev automated publishing; a pushed tag only (pub.dev accepts no other trigger) | the portable archive created once by the unprivileged stage job and consumed by host/native checks; extracted outside the checkout, re-inspected with `package-inspect.py flutter --package-root … --strict --release-set --record …`, with file hashes checked immediately before publishing (dormant pending owner step 6) |
+| ruby › publish | `rubygems` | RubyGems trusted publishing: `rubygems/configure-rubygems-credentials` trades the OIDC token for a short-lived token scoped to the gem; a pending publisher creates the gem on its first push ([bindings/ruby/LISTING.md](bindings/ruby/LISTING.md)) | the five platform gems the pack job built and inspected (`ruby-gems`), checked again against that receipt in the job; only those rubygems.org does not hold are pushed with `gem push`, and one it holds must be the same file |
 | mobile › ios-release | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write` | the CI-built xcframework zip and its `checksum.txt`, only into the owner's draft (the one release of the tag, targeting the tagged commit), only where no zip is, and only when its sha256 is the one Package.swift pins, compared before any upload; an attached zip is verified against that pin, never replaced; it never creates, edits or publishes a release |
 | cli-archives › attach | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write`, held by four fixed `gh` steps only | the CLI assets assemble wrote once (`cli-release-set`), re-inspected in the job against the SHA256SUMS sha256 every consumer judged, only into the owner's draft targeting the tagged commit: the missing ones, archives, then source, then SHA256SUMS, each file found in the re-inspection record before its upload, then read back; a draft holding other CLI bytes, or a published release lacking any, is refused with nothing uploaded |
 
@@ -537,7 +538,9 @@ and judged, and it is never marked as the latest release. Since 11 November
 `agents-v*`: only the owner creates, moves or deletes such a tag.
 `mcpb-vX.Y.Z` (the MCP Bundle, numbered after the MCP server it holds) follows
 the same rule; adding `mcpb-v*` to that ruleset is an owner step of
-[MCP Bundle](#mcp-bundle).
+[MCP Bundle](#mcp-bundle). So does `napari-vX.Y.Z`, the napari plugin's PyPI
+release: adding `napari-v*` is an owner step of
+[Python plugin packages](#python-plugin-packages).
 
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
@@ -1361,6 +1364,54 @@ Claude for macOS and Windows or another MCPB host. The manifest's tools carry
 a name and a description only, as the MCPB schema requires (`mcpb validate`
 refuses `inputSchema`, which the consumer checks).
 
+### Python plugin packages
+
+A Python plugin package lives under `integrations/`, installs the published
+engine wheel `qrcode-barcode-scanner` at the exact version it pins and ships
+no engine of its own. The napari plugin `napari-qrcode-barcode-scanner` is the
+first; its PyPI release is numbered after the plugin, under its own tag
+`napari-vX.Y.Z`, and the engine's releases stay as published.
+`integrations/napari/LISTING.md` lists what its napari hub listing reads and
+the steps below with every value filled in.
+
+`.github/workflows/python-plugins-publish.yml` runs on that tag or a dispatch.
+`napari-build` reads only: it runs the gate in dry-run form, builds the sdist
+and the wheel with `scripts/python-plugin-release.py build`, which prints
+each file's sha256 and records the digest of that list as its output, runs
+`twine check --strict`, then the Python host kit's clean consumer
+(`scripts/python-host-consumer.py run`): the wheel, napari and the test
+requirements in a new environment, the plugin's tests on the mixed sample in
+the three profiles, the uninstall and the imports that must fail. It uploads
+`napari-dist`. On a tag `napari-v*` only, `napari-publish` runs in the
+protected environment `pypi-napari`, with `contents: read` and
+`id-token: write` only. It runs the gate first (the tag must name the version
+the plugin states), downloads `napari-dist` once with `digest-mismatch:
+error`, re-inspects those two files against the build job's digest, compares
+them with what PyPI already serves at that version (`pypi-live`), and uploads
+them with the same pinned `pypa/gh-action-pypi-publish` as `python.yml`,
+through OIDC: no token is stored. A dispatch builds and judges, and stops
+before PyPI. `scripts/check-publish-guards.py` holds every publishing job of
+that workflow to its row of `PYPI_PLUGINS`: the next plugin (the JupyterLab
+extension) is one row there, one in `PLUGINS` of
+`scripts/python-plugin-release.py` and its two jobs.
+
+**Owner steps, once per plugin.** On PyPI, add a pending trusted publisher
+for the project `napari-qrcode-barcode-scanner`: owner `qrcode-ai-com`,
+repository `qrcode-barcode-scanner-rust`, workflow
+`python-plugins-publish.yml`, environment `pypi-napari`. Create the
+environment `pypi-napari`: deployment tags `napari-v*` only, the owner as
+its required reviewer, no administrator bypass, no secret. Add `napari-v*`
+to the tag ruleset of distribution tags.
+
+**Each release.** Merge the change to `main`, with
+`integration-python-hosts` green on its pull request and the README's status
+saying it is on PyPI. Tag the merged commit and push the tag
+(`git tag -a napari-v0.1.0 <commit> -m 'napari plugin 0.1.0'`, then
+`git push origin napari-v0.1.0`), approve `napari-publish` once
+`napari-build` is green, then read back the project page on PyPI, the napari
+hub and napari's plugin manager as `LISTING.md` says. A file on PyPI is
+immutable: a mistake is a new plugin version and a new tag.
+
 ## PHP package — its own repository
 
 The PHP package of `bindings/php` is published on Packagist as
@@ -1486,6 +1537,63 @@ same OCI tag; both native anonymous consumers must succeed before public deliver
 is claimed. Retain those receipts separately from producer and inspector results.
 Producer artifacts have 14-day retention: complete this activation while those
 exact artifacts are available; expiry is not authority to substitute a rebuild.
+
+## HTTP service image
+
+`distribution/http` is a small HTTP service around the published npm package
+`@qrcode-ai-com/qrcode-barcode-scanner@0.11.0`: `POST /scan` answers with the
+engine's report, unchanged. Its image runs Node.js 22 from a base pinned by
+digest and installs the engine and its six native packages from the lockfile's
+sha512, so it compiles nothing. It is a packaging release with its own version
+(`SERVICE_VERSION` in `server.mjs`, the same in `package.json` and the
+`Dockerfile` label) and its own tag `http-v<version>`. The engine tag `v0.11.0`
+and its packages stay as published. A new engine needs its pins, its lockfile,
+its notices and the constants of `scripts/stage-http-satellite.py` changed in
+one commit.
+
+`scripts/stage-http-satellite.py` writes the folder as the tree of its own
+repository, `qrcode-ai-com/qrcode-barcode-scanner-http`, with the test fixture
+and a `SOURCE.json` that names the engine commit. Deploy hosts build that tree.
+`.github/workflows/http-service.yml` builds the image from the same staged
+tree, on Linux x64 and arm64 runners, and saves it with its sha256 and config
+digest. Its consumers (`scripts/http-service-release.py consume`) run each
+image fresh with a read-only root filesystem, no capability and no route out,
+judge it from a second container with `distribution/http/test/consumer.mjs`
+(the mixed QR code and Code 128 sample in fast, frame and full, raw and
+multipart, exact payloads, every refusal), check that it cannot reach the
+network, then remove it. `rehearse` pushes both judged images and their index
+to a local registry and pulls them back, as the release does.
+
+On a pull request or a dispatch, nothing more runs. On a tag `http-v*`,
+`publish` runs in the protected environment `container-http`. It runs the gate
+first (`http-service-release.py gate`: the tag must be `http-v` and the service
+version, and the engine pin 0.11.0), downloads the images the consumers judged,
+requires their sha256 and config digest to be the ones the consumers recorded,
+then pushes them as `0.1.0-amd64` and `0.1.0-arm64` and their index as `0.1.0`
+to `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner-http` with the job's own
+`github.token`, and reads each back. It never rebuilds, never moves `latest`
+and holds `contents: read` and `packages: write` only.
+`scripts/check-publish-guards.py` holds that job to this contract.
+
+**Owner steps, once.** Create the environment `container-http`: deployment tags
+`http-v*` only, no branch rule, `ThibautMelen` as its required reviewer, no
+administrator bypass. Add `http-v*` to the tag ruleset of distribution tags.
+
+**Each image.**
+
+1. Merge the change to `main`, with `http-service.yml` green on its pull
+   request.
+2. Tag the merged commit and push the tag:
+   `git tag -a http-v0.1.0 <commit> -m 'HTTP service 0.1.0'`, then
+   `git push origin http-v0.1.0`.
+3. Approve `publish` in the environment once the consumers are green. Its
+   artifact `http-published` records the digests it pushed.
+4. A new GitHub package starts private: in the package settings of
+   `qrcode-barcode-scanner-http`, link it to this repository and make it
+   public.
+5. Signed out, pull `ghcr.io/qrcode-ai-com/qrcode-barcode-scanner-http:0.1.0`
+   and compare its index digest with the receipt. Only then may a README name
+   the image as published.
 
 ## Docker publishing — historical 0.10 distribution
 
@@ -1653,6 +1761,24 @@ other members with the qualified archive, and installs/scans/removes from five f
 See [account setup, tag approval and receipts](bindings/dotnet/PUBLISHING.md). No account setup,
 environment approval, tag or publication is performed by a branch rehearsal.
 
+## Ruby / RubyGems
+
+The gem `qrcode-barcode-scanner` remains unpublished. Its build and its engine-tag publisher live
+in `.github/workflows/ruby.yml`: the Ruby that the UniFFI crate's own `uniffi-bindgen` generates
+from the Linux host's library, the tests of `bindings/ruby` on Ruby 3.3, the five native floors of
+the .NET package (`scripts/dotnet-package.py`, the same five libraries), one platform gem per
+system built twice to the same bytes and inspected file by file (`scripts/ruby-gem.py`), RubyGems
+asked which gem each platform gets (none for musl), then six clean Rubies (five systems on 3.3,
+Linux x64 on 4.0) that install their gem from the file, scan and uninstall it. Branch and manual
+runs inspect only.
+
+Tags require the existing protected `rubygems` environment (reviewer `ThibautMelen`, tags `v*`)
+and the owner's pending trusted publisher on rubygems.org for `ruby.yml` and that environment.
+The job checks the receipt, gems, natives, tag and environment before the token is requested and
+again before the push, and pushes only the gems rubygems.org does not hold; a gem it holds must
+be the same file. See [the account setup and the listing fields](bindings/ruby/LISTING.md). No
+account, trusted publisher, environment, tag or publication is created by a branch rehearsal.
+
 ## README actions
 
 Run `python3 scripts/build-readme-actions.py` after changing a maintained README,
@@ -1660,7 +1786,11 @@ then `python3 scripts/test-readme-actions.py` and
 `python3 scripts/build-readme-actions.py --check`. Release preparation also renders
 these blocks. The generator preserves the text outside its exact marked block;
 frozen evidence and vendored documentation are excluded. Native npm package
-READMEs inherit the maintained distribution template.
+READMEs inherit the maintained distribution template. A pull request that adds or
+removes a maintained README adds or removes its path in
+`scripts/maintained-readmes.txt` (sorted); both README tests compare that list with
+what the generator finds, so two pull requests adding two READMEs change two lines
+instead of racing on one shared count.
 
 Before freezing any package or archive, review each maintained README separately.
 Its introduction must explain that directory's actual role, prerequisites and

@@ -1,0 +1,7 @@
+{
+  "includeInBuild": [
+    "/node_modules/@qrcode-ai-com/qrcode-barcode-scanner-wasm/.*",
+    "/node_modules/.+/(license|licence|copying|notice)[^/]*$",
+    "/node_modules/(.+/)?(isarray|urlsafe-base64)/readme\\.md$"
+  ]
+}

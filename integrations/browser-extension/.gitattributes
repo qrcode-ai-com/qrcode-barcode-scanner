@@ -1,0 +1,4 @@
+# The store packages and the source package must have the same bytes on every system: LF line
+# endings on checkout everywhere, Windows included, and the images as binary.
+* text=auto eol=lf
+*.png binary

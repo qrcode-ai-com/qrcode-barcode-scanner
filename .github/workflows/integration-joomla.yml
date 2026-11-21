@@ -1,0 +1,145 @@
+name: integration-joomla
+
+# The Joomla package of integrations/joomla, checked the way its README describes: installed from
+# its own lockfile, built into the package zip with its update file, inspected, unit-tested,
+# installed from the zip on a new site of the official Joomla Docker image (Joomla 6.2 on PHP 8.4,
+# and Joomla 5.4 on PHP 8.3), published as a site module and used there in Playwright's Chromium as
+# a visitor, uninstalled, and judged by the repository's page and acceptance judges; then rebuilt
+# to the committed updates.xml on Linux and macOS with Node.js 22 and 24. It uses the published
+# WASM package: nothing is built from this repository's Rust source, and nothing is uploaded to
+# the Joomla Extensions Directory or to a release.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-joomla.yml
+      - integrations/joomla/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-joomla.yml
+      - integrations/joomla/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+      - scripts/check-demo-page.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-joomla-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Joomla package · ${{ matrix.joomla.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        joomla:
+          - name: Joomla 6.2 on PHP 8.4
+            slug: joomla-6.2
+            image: joomla:6.2.0-php8.4-apache@sha256:0e1d5c2d7902133caa2f0cd05707de82611f07034dc207c9075f7bbb63dc054c
+          - name: Joomla 5.4 on PHP 8.3
+            slug: joomla-5.4
+            image: joomla:5.4.10-php8.3-apache@sha256:f842910afa51d612c7ff5575e8a5ca07510a232b24b608bc07a3dab82c973301
+    runs-on: ubuntu-24.04
+    # On an Apple Silicon laptop the build took 1 s and one Docker run about 3 minutes on
+    # 21 November 2026, the images already pulled; no timing from this job exists yet.
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/joomla
+    env:
+      JOOMLA_IMAGE: ${{ matrix.joomla.image }}
+      DB_IMAGE: mariadb:11.8@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
+      RECORD: ${{ matrix.joomla.slug }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+          docker --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Install Playwright's Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Pull the Joomla and MariaDB images by digest
+        run: |
+          docker pull --quiet "$JOOMLA_IMAGE"
+          docker pull --quiet "$DB_IMAGE"
+      - name: Build the package and check updates.xml
+        run: node scripts/build.mjs --check
+      - name: Inspect the package
+        run: npm run inspect
+      - name: Unit tests
+        run: npm test
+      - name: The package on a new Joomla site
+        run: >-
+          node test/joomla.mjs --image "$JOOMLA_IMAGE" --db-image "$DB_IMAGE"
+          --out "build/acceptance/$RECORD" --screenshots "build/screenshots/$RECORD"
+      - name: Check the receipt
+        working-directory: .
+        run: python3 scripts/destination-acceptance.py check "integrations/joomla/build/acceptance/$RECORD/receipts/module.json"
+      - name: Rebuild in two time zones and compare
+        run: npm run test:reproduce
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: joomla-package-${{ matrix.joomla.slug }}
+          path: |
+            integrations/joomla/build/*.zip
+            integrations/joomla/build/*.json
+            integrations/joomla/build/updates.xml
+            integrations/joomla/build/mod_qrcodebarcodescanner
+            integrations/joomla/build/acceptance
+            integrations/joomla/build/screenshots
+          if-no-files-found: error
+
+  reproduce:
+    name: Reproduce the package · ${{ matrix.os }} · Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+        node: ["22", "24"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/joomla
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+          node -p 'process.platform + "-" + process.arch + " zlib " + process.versions.zlib'
+      - name: Install the build's one dependency from the lockfile
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Build in UTC, then in UTC+14, each to the committed updates.xml
+        run: |
+          set -euo pipefail
+          TZ=UTC node scripts/build.mjs --out "$RUNNER_TEMP/utc" --check
+          TZ=Pacific/Kiritimati node scripts/build.mjs --out "$RUNNER_TEMP/kiritimati" --check
+          cmp "$RUNNER_TEMP/utc/updates.xml" updates.xml
+          cmp "$RUNNER_TEMP/kiritimati/updates.xml" updates.xml
+          grep '<sha256>' updates.xml

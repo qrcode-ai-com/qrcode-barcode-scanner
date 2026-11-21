@@ -3,13 +3,17 @@
 //
 //   node --test test/unit.test.mjs
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { crc32, encodePng, readZip, writeZip } from '../scripts/bytes.mjs';
-import { packageFiles, scannerPackage } from '../scripts/build.mjs';
+import {
+  packageFiles, pinsText, readPins, scannerPackage, sourceFiles,
+} from '../scripts/build.mjs';
 import { ICON_SIZES, drawIcon } from '../scripts/icons.mjs';
 import { EXPECTED_FILES, inspectStore } from '../scripts/inspect.mjs';
 import { LIMITS, SIX_LINKS, amoMetadata, listingTexts } from '../scripts/listing.mjs';
@@ -130,18 +134,24 @@ test('every manifest asks for the same two permissions and no site at install', 
   assert.ok(NAME.length <= 45);
 });
 
-test('Chrome and Edge run a service worker; Firefox an event page with its ID', () => {
+test('Chrome, Edge and Safari run a service worker; Firefox an event page with its ID', () => {
   for (const target of ['chrome', 'edge']) {
     const manifest = manifestFor(target, own.version);
     assert.deepEqual(manifest.background, { service_worker: 'background.js' });
     assert.equal(manifest.browser_specific_settings, undefined);
+    assert.equal(manifest.minimum_chrome_version, '103');
   }
+  const safari = manifestFor('safari', own.version);
+  assert.deepEqual(safari.background, { service_worker: 'background.js' });
+  // Safari 26.0 is the first to read 'wasm-unsafe-eval' in an extension policy.
+  assert.deepEqual(safari.browser_specific_settings, { safari: { strict_min_version: '26.0' } });
+  assert.equal(safari.minimum_chrome_version, undefined);
   const firefox = manifestFor('firefox', own.version);
   assert.deepEqual(firefox.background, { scripts: ['background.js'] });
   assert.deepEqual(firefox.browser_specific_settings, { gecko: {
-    id: GECKO_ID, strict_min_version: '140.0', data_collection_permissions: { required: ['none'] },
+    id: GECKO_ID, strict_min_version: '142.0', data_collection_permissions: { required: ['none'] },
   } });
-  assert.throws(() => manifestFor('safari', own.version), /unknown target/);
+  assert.throws(() => manifestFor('opera', own.version), /unknown target/);
 });
 
 // ------------------------------------------------------------------ bytes
@@ -169,6 +179,51 @@ test('the icon is drawn the same way every time, at each size', () => {
     const icon = drawIcon(size);
     assert.equal(icon.readUInt32BE(16), size);
     assert.deepEqual(drawIcon(size), icon);
+  }
+});
+
+/** Alpha of each pixel of a PNG that encodePng wrote: one IDAT, filter 0 on every row. */
+function ownPngAlpha(png) {
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const length = png.readUInt32BE(33);
+  assert.equal(png.toString('latin1', 37, 41), 'IDAT');
+  const rows = inflateSync(png.subarray(41, 41 + length));
+  return { width, height, at: (x, y) => rows[y * (width * 4 + 1) + 1 + x * 4 + 3] };
+}
+
+test('the Chrome store icon is 128 px: 96 px of art inside 16 px of transparent margin', () => {
+  const { width, height, at } = ownPngAlpha(drawIcon(128, 16));
+  assert.equal(width, 128);
+  assert.equal(height, 128);
+  let [left, top, right, bottom] = [width, height, -1, -1];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (at(x, y) === 0) continue;
+      [left, top] = [Math.min(left, x), Math.min(top, y)];
+      [right, bottom] = [Math.max(right, x), Math.max(bottom, y)];
+    }
+  }
+  assert.deepEqual([left, top, right, bottom], [16, 16, 111, 111]);
+  assert.equal(at(64, 64), 255);
+});
+
+test('the committed store images have the sizes the stores take', () => {
+  const sizes = {
+    'promo-marquee-1400x560.png': [1400, 560],
+    'promo-small-440x280.png': [440, 280],
+    'screenshot-1-scan-1280x800.png': [1280, 800],
+    'screenshot-2-popup-1280x800.png': [1280, 800],
+    'screenshot-3-menu-1280x800.png': [1280, 800],
+    'screenshot-4-report-1280x800.png': [1280, 800],
+  };
+  const folder = join(HERE, 'listing', 'images');
+  assert.deepEqual(readdirSync(folder).sort(), Object.keys(sizes));
+  for (const [name, [width, height]] of Object.entries(sizes)) {
+    const png = readFileSync(join(folder, name));
+    assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+      name);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [width, height], name);
   }
 });
 
@@ -302,6 +357,59 @@ test('each store package holds exactly the expected files, with the pinned modul
     assert.match(notice, /MIT License/);
     assert.match(notice, new RegExp(scanner.source_revision));
   }
+});
+
+test('SHA256SUMS pins one hash per archive, in sha256sum form, sorted by name', () => {
+  const pins = readPins(join(HERE, 'SHA256SUMS'));
+  const names = [...TARGETS.map((target) => `qrcode-barcode-scanner-${target}-${own.version}.zip`),
+    `qrcode-barcode-scanner-source-${own.version}.zip`].sort();
+  assert.deepEqual([...pins.keys()], names);
+  for (const hash of pins.values()) assert.match(hash, /^[0-9a-f]{64}$/);
+  const archives = [...pins].map(([path, sha256]) => ({ path, sha256 })).reverse();
+  assert.equal(pinsText(archives), readFileSync(join(HERE, 'SHA256SUMS'), 'utf8'));
+  // An extracted source package has no pin: the build there only builds.
+  assert.equal(readPins(join(mkdtempSync(join(tmpdir(), 'qrscan-pins-')), 'SHA256SUMS')), null);
+});
+
+test('the source package rebuilds the stores and quotes no archive hash', () => {
+  const files = sourceFiles(own.version);
+  const top = `qrcode-barcode-scanner-browser-extension-${own.version}/`;
+  const inside = [...files.keys()].map((name) => name.slice(top.length));
+  for (const need of ['SOURCE.md', 'package-lock.json', 'listing/texts.md', 'scripts/build.mjs']) {
+    assert.ok(inside.includes(need), need);
+  }
+  assert.ok(!inside.includes('SHA256SUMS') && !inside.includes('README.md'));
+  assert.deepEqual(inside.filter((name) => name.startsWith('listing/')).sort(),
+    ['listing/PRIVACY.md', 'listing/texts.md']);
+  const pins = [...readPins(join(HERE, 'SHA256SUMS')).values()];
+  for (const [name, bytes] of files) {
+    for (const hash of pins) assert.ok(!bytes.toString('latin1').includes(hash), name);
+  }
+});
+
+test('every archive hash a store kit quotes is the pinned one', () => {
+  const pins = readPins(join(HERE, 'SHA256SUMS'));
+  const known = new Set([...pins.values(), own.config.wasmSha256]);
+  for (const name of readdirSync(join(HERE, 'listing')).filter((file) => file.endsWith('.md'))) {
+    const text = readFileSync(join(HERE, 'listing', name), 'utf8');
+    for (const [hash] of text.matchAll(/\b[0-9a-f]{64}\b/g)) {
+      assert.ok(known.has(hash), `${name} quotes ${hash}, which SHA256SUMS does not pin`);
+    }
+  }
+});
+
+// The workflow is in the repository, not in the source package: there the test is skipped.
+const WORKFLOW = join(HERE, '..', '..', '.github', 'workflows', 'integration-browser-extension.yml');
+test('the workflow rebuilds the pinned WebAssembly module from the recorded revision',
+  { skip: !existsSync(WORKFLOW) && 'no workflow outside the repository' }, () => {
+  const workflow = readFileSync(WORKFLOW, 'utf8');
+  const job = workflow.slice(workflow.indexOf('\n  wasm-rebuild:'));
+  assert.ok(job.includes(`echo "${own.config.wasmSha256}  $module"`));
+  const info = JSON.parse(readFileSync(join(HERE, 'node_modules',
+    '@qrcode-ai-com', 'qrcode-barcode-scanner-wasm', 'build-info.json'), 'utf8'));
+  assert.ok(job.includes(`= ${info.source_revision}`));
+  assert.ok(job.includes(`RUST_TOOLCHAIN: "${/release: (\S+)/.exec(info.toolchain.rustc)[1]}"`));
+  assert.ok(job.includes(`tool: ${info.toolchain.wasm_pack.replace(' ', '@')}`));
 });
 
 // ------------------------------------------------------------------ store texts

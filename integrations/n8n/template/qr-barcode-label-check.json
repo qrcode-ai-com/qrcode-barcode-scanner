@@ -3,66 +3,65 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Check QR codes and barcodes before you publish them\n\nThis workflow reads every label image in a folder, decodes its QR codes and barcodes on this n8n instance, and compares what it read with the value you expect.\n\nEach image ends in one of four results: **Expected value found**, **Wrong value**, **No code found** or **Unreadable image**.\n\n### Requirements\n- Self-hosted n8n with the community node `@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner` 0.1.0 (Settings, Community Nodes, Install). n8n Cloud cannot install it.\n- The images in a folder this n8n may read.\n\nThe scan runs locally with the open-source QR Code & Barcode Scanner engine: no API key, no upload, and decoded links are never opened.",
-        "height": 560,
-        "width": 420,
-        "color": 4
+        "content": "### How it works\nThis workflow helps print, packaging and labeling teams confirm that every label carries the right code before it ships. It reads each image file you name, decodes its QR codes and barcodes on this n8n instance with the open-source QR Code & Barcode Scanner engine, and compares the decoded texts with the value you expect. Each image ends in one branch: **Expected value found**, **Wrong value**, **No code found** or **Unreadable image**, with the file name and what was read. Nothing is uploaded to another service, and decoded links are never opened.\n\n### Setup\n1. Self-host n8n and install the community node `@qrcode-ai-com/n8n-nodes-qrcode-barcode-scanner` 0.1.0 under **Settings**, **Community nodes** ([installation guide](https://docs.n8n.io/integrations/community-nodes/installation-and-management)). n8n Cloud cannot install it. Tested on n8n 2.48.7.\n2. Put the label images (PNG, JPEG, WebP or GIF) in a folder n8n may read. The default is `~/.n8n-files`; `N8N_RESTRICT_FILE_ACCESS_TO` changes it.\n3. In **Settings**, set `expectedText` to the value the labels must carry and `imageFiles` to a path or a pattern such as `/home/node/.n8n-files/labels/*.png`.\n4. Click **Execute workflow**.\n\n### Customization\nChoose the **Full** profile in the scan node to also score how well each QR code scans. Connect a spreadsheet, a chat message or a ticket after the branches you care about.",
+        "height": 640,
+        "width": 480
       },
       "id": "a8aa6315-fc9d-57fe-861a-a0d866f03f63",
       "name": "Overview",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -460,
-        -360
+        -580,
+        -400
       ]
     },
     {
       "parameters": {
-        "content": "### Setup\n1. Open **Settings** and set `expectedText` to the value your labels must carry, and `imageFiles` to the image files to check, as a path or a pattern such as `/home/node/.n8n-files/labels/*.png`.\n2. n8n reads files only from the folders it allows. The default is `~/.n8n-files`; `N8N_RESTRICT_FILE_ACCESS_TO` changes it.\n3. Click **Execute workflow**.",
-        "height": 200,
-        "width": 520,
-        "color": 6
+        "content": "## Choose the label images\nSettings holds the two values to change. The file step reads every image that matches `imageFiles`.",
+        "height": 360,
+        "width": 620,
+        "color": 7
       },
       "id": "7a078ddc-ed0b-5a76-a115-761b0adfe214",
-      "name": "Setup",
+      "name": "Choose the label images",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        0,
-        -360
+        -60,
+        -180
       ]
     },
     {
       "parameters": {
-        "content": "### Scan\nThe scanner reads the binary field `data` of each file. Profile **Frame** decodes without scoring. Choose **Full** to also score QR scannability.\n\nA corrupt image goes to the error output instead of stopping the run.",
-        "height": 320,
-        "width": 300,
+        "content": "## Scan each image\nDecodes every QR code and barcode locally. A corrupt file takes the error output, so the run goes on.",
+        "height": 360,
+        "width": 260,
         "color": 7
       },
       "id": "06083fae-e039-58b5-ac8c-c4488cdf491c",
-      "name": "Scan section",
+      "name": "Scan each image",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        560,
-        -120
+        600,
+        -180
       ]
     },
     {
       "parameters": {
-        "content": "### Results\nEach branch writes one item per image with its `status`: the file name and what was read, or, for an unreadable image, the error and its code. Connect a spreadsheet, a chat message or a ticket after them.",
-        "height": 140,
+        "content": "## Sort the results\nEach image takes one branch, with its file name and the texts read. Connect your own report or alert after them.",
+        "height": 840,
         "width": 560,
         "color": 7
       },
       "id": "aebb2c0e-3ea1-5cc0-a3f2-7f645fd5b54d",
-      "name": "Results section",
+      "name": "Sort the results",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        900,
-        -320
+        880,
+        -400
       ]
     },
     {
@@ -126,6 +125,7 @@
         "profile": "frame",
         "output": "image",
         "options": {
+          "budgetMs": 0,
           "includeReport": false
         }
       },
@@ -205,7 +205,7 @@
       "typeVersion": 3.2,
       "position": [
         920,
-        -100
+        -60
       ]
     },
     {
@@ -234,7 +234,7 @@
       "typeVersion": 3.4,
       "position": [
         1200,
-        -260
+        -220
       ]
     },
     {
@@ -269,7 +269,7 @@
       "typeVersion": 3.4,
       "position": [
         1200,
-        -100
+        -60
       ]
     },
     {
@@ -310,13 +310,19 @@
       "typeVersion": 3.4,
       "position": [
         1200,
-        60
+        100
       ]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
+            {
+              "id": "0c1f9a3e-5d84-5b2e-9a47-6f0e2d1b7c58",
+              "name": "file",
+              "value": "={{ $('Read label images').item.json.fileName }}",
+              "type": "string"
+            },
             {
               "id": "1b404756-d88f-5761-85c4-bf324166c36c",
               "name": "status",
@@ -332,7 +338,7 @@
             {
               "id": "ce3fbbc3-3c90-51fd-862a-1b254ed75a7b",
               "name": "code",
-              "value": "={{ $json.code }}",
+              "value": "={{ ($json.error.match(/\\[([A-Z]+-[0-9]+)\\]$/) || [])[1] }}",
               "type": "string"
             }
           ]
@@ -344,8 +350,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        920,
-        160
+        1200,
+        280
       ]
     }
   ],

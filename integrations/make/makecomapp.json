@@ -1,0 +1,61 @@
+{
+  "fileVersion": 1,
+  "generalCodeFiles": {
+    "base": "general/base.iml.jsonc",
+    "common": "general/common.json",
+    "readme": "general/readme.md",
+    "groups": "modules/groups.json"
+  },
+  "components": {
+    "connection": {
+      "scanService": {
+        "label": "QR Code AI scan service",
+        "connectionType": "basic",
+        "codeFiles": {
+          "communication": "connections/scanService/scanService.communication.iml.jsonc",
+          "params": "connections/scanService/scanService.params.iml.jsonc",
+          "common": "connections/scanService/scanService.common.json"
+        }
+      }
+    },
+    "webhook": {},
+    "module": {
+      "scanImage": {
+        "label": "Scan an Image",
+        "description": "Reads every QR code and barcode in an image file.",
+        "moduleType": "action",
+        "actionCrud": "read",
+        "connection": "scanService",
+        "altConnection": null,
+        "codeFiles": {
+          "communication": "modules/scanImage/scanImage.communication.iml.jsonc",
+          "staticParams": "modules/scanImage/scanImage.static-params.iml.jsonc",
+          "mappableParams": "modules/scanImage/scanImage.mappable-params.iml.jsonc",
+          "interface": "modules/scanImage/scanImage.interface.iml.jsonc",
+          "samples": "modules/scanImage/scanImage.samples.iml.jsonc",
+          "scope": "modules/scanImage/scanImage.scope.iml.jsonc"
+        }
+      },
+      "makeApiCall": {
+        "label": "Make an API call",
+        "description": "Performs an arbitrary authorized API call.",
+        "moduleType": "universal",
+        "actionCrud": null,
+        "connection": "scanService",
+        "altConnection": null,
+        "codeFiles": {
+          "communication": "modules/makeApiCall/makeApiCall.communication.iml.jsonc",
+          "staticParams": "modules/makeApiCall/makeApiCall.static-params.iml.jsonc",
+          "mappableParams": "modules/makeApiCall/makeApiCall.mappable-params.iml.jsonc",
+          "interface": "modules/makeApiCall/makeApiCall.interface.iml.jsonc",
+          "samples": "modules/makeApiCall/makeApiCall.samples.iml.jsonc",
+          "scope": "modules/makeApiCall/makeApiCall.scope.iml.jsonc"
+        }
+      }
+    },
+    "rpc": {},
+    "function": {},
+    "endpoint": {}
+  },
+  "origins": []
+}

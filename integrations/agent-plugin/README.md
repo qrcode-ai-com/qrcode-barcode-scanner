@@ -331,7 +331,7 @@ The Rust, Node.js, browser and Python packages hold the engine. The Go and PHP p
 
 ## How this folder is checked
 
-The engine repository checks this folder on every change with [its own workflow](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/.github/workflows/integration-agent-plugin.yml). It validates each manifest against its published JSON schema where one exists, starts the pinned server from every client configuration and scans the mixed test image in the `fast`, `frame` and `full` profiles, and runs the skill's helper the same way. It also stages the plugin repository and checks that the staged tree matches the commit it names.
+The engine repository checks this folder on every change with [its own workflow](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/.github/workflows/integration-agent-plugin.yml). It validates each manifest against its published JSON schema where one exists, runs `gemini extensions validate` from Gemini CLI 0.70.0 on the tree, and lints the skill with vally 0.20.0, the check the awesome-copilot marketplace runs on the plugins it reviews. It then starts the pinned server from every client configuration and scans the mixed test image in the `fast`, `frame` and `full` profiles, and runs the skill's helper the same way. It also stages the plugin repository and checks that the staged tree matches the commit it names.
 
 ## License
 

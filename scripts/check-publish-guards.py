@@ -25,11 +25,11 @@ than a local workflow of the same directory, which this check reads.
 A job is PRIVILEGED when it publishes (cargo publish/yank/owner, npm
 publish/unpublish/deprecate/dist-tag/owner/access/stage, pnpm/yarn/bun
 publish, napi pre-publish unless it uploads nothing, pub publish,
-twine/uv/maturin/poetry publish, gh release create/upload/edit/delete or a
+gem push/yank/owner, twine/uv/maturin/poetry publish, gh release create/upload/edit/delete or a
 `gh api` call naming a release, an HTTP client (curl, wget, Invoke-WebRequest,
 Invoke-RestMethod, iwr, irm) on a line naming the GitHub API,
-pypa/gh-action-pypi-publish, rust-lang/crates-io-auth-action or a release
-action: RELEASE_ACTIONS), with options before the subcommand (gh's before
+pypa/gh-action-pypi-publish, rust-lang/crates-io-auth-action,
+rubygems/configure-rubygems-credentials or a release action: RELEASE_ACTIONS), with options before the subcommand (gh's before
 either word), npm's abbreviations and backslash-continued lines included,
 or when it holds a write permission (`id-token: write` included: it can
 mint registry tokens). Every privileged job must:
@@ -120,6 +120,16 @@ mint registry tokens). Every privileged job must:
                tag deployment rule), contents read/actions read/packages write,
                the exact OCI tag/BOM gate and in-job frozen artifact reinspection.
                No old registry job gains this permission or tag exception.
+  Ruby         ruby.yml > publish pushes the five inspected platform gems on a v*
+               tag, in the protected environment rubygems, with exactly contents
+               read and id-token write. It needs preflight, binding, natives,
+               pack and consumer, binds only pack's receipt digest, runs the
+               gate, RUBY_CANDIDATE (which lists the gems rubygems.org lacks and
+               refuses one it holds with other bytes) before one pinned
+               rubygems/configure-rubygems-credentials step taking only
+               trusted-publisher, then RUBY_PUSH. Its steps use only checkout,
+               download-artifact and that action, with no `if:` and no step env.
+               No other job inherits this exception.
   MCP          npm-mcp-publish.yml > publish uses agents-v* tags, npm-agents,
                an independent metadata/environment gate, its own seven-file
                archive inspector and the same inspected-operand discipline.
@@ -143,6 +153,37 @@ mint registry tokens). Every privileged job must:
                download-artifact and that action, with no `if:`. It uploads
                nothing and creates no release; the owner attaches the file.
                No other job inherits this exception.
+  PyPI plugins python-plugins-publish.yml holds one publishing job per row of
+               PYPI_PLUGINS (napari-publish today), keyed by (workflow, job):
+               the row names the plugin's tag family, its protected
+               environment, its build job, the artifact and the folder, and
+               the gate its first step runs. The job runs on that tag family
+               only, in that environment, with exactly contents read and
+               id-token write, in six steps and no other, none with `if:`:
+               the checkout, the gate, one download of the artifact into dist
+               with digest-mismatch error, its re-inspection against the build
+               job's output sha256 (`python-plugin-release.py inspect`), its
+               comparison with what PyPI serves (`python-plugin-release.py
+               pypi-live`) and one pinned pypa/gh-action-pypi-publish step,
+               packages-dir dist and skip-existing true. The build job reads
+               only, records sha256 from the step that runs
+               `python-plugin-release.py build`, runs the clean consumer
+               `python-host-consumer.py run` on the wheel before uploading it,
+               and is the only job uploading the artifact, once. A new plugin
+               is one more row; no other job inherits this exception.
+  HTTP         http-service.yml > publish pushes the scanner HTTP service image to
+               ghcr.io on an http-v* tag only, in the protected environment
+               container-http, with exactly contents read and packages write. It
+               needs image (which builds it from the staged tree), consume (the
+               clean consumers of both architectures) and rehearse (the same
+               publication to a local registry); runs the gate
+               `http-service-release.py gate` first; downloads the image archives
+               and the consumer receipts once each, with digest-mismatch error;
+               re-inspects them (http-service-release.py verify) before the one
+               step that holds the token, which runs exactly HTTP_PUBLISH_RUN.
+               Its steps use only checkout, download-artifact and upload-artifact,
+               with no `if:`. Only image uploads http-image-*, only consume
+               uploads http-consumed-*. No other job inherits this exception.
   Pages        pages.yml > deploy serves the browser example examples/web-vite
                on GitHub Pages: no registry, no release. It deploys from main
                of the canonical repository, after build, in the github-pages
@@ -261,6 +302,17 @@ DOTNET_PUSH = "\n".join((
     'version=$(python3 -c "import tomllib; print(tomllib.load(open(\'Cargo.toml\', \'rb\'))[\'workspace\'][\'package\'][\'version\'])")',
     'dotnet nuget push "$PWD/dotnet-package/feed/QRCodeAI.QRCodeBarcodeScanner.$version.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --timeout 120',
 ))
+# The Ruby gem: its trusted-publisher token is minted by one reviewed action, and only the
+# inspected platform gems rubygems.org does not hold yet are pushed (ruby-gem.py candidate).
+RUBY_JOB = ("ruby.yml", "publish")
+RUBY_CANDIDATE = ('python3 scripts/ruby-gem.py candidate --folder "$PWD/ruby-gems" --natives "$PWD/ruby-natives" '
+                  '--receipt-sha256 "$RECEIPT_SHA256" --require-absent --pending "$RUNNER_TEMP/ruby-pending.txt"')
+RUBY_PUSH = "\n".join((
+    RUBY_CANDIDATE,
+    'while read -r file; do gem push "$PWD/ruby-gems/feed/$file" --host https://rubygems.org; done < "$RUNNER_TEMP/ruby-pending.txt"',
+))
+RUBY_CREDENTIALS = {"uses": "rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a",
+                    "with": {"trusted-publisher": "true"}}
 MCP_JOB = ("npm-mcp-publish.yml", "publish")
 MCP_GUARD = "startsWith(github.ref, 'refs/tags/agents-v')"
 MCP_GATE_RUN = 'python3 scripts/mcp-release.py gate --ref "$GITHUB_REF" --environment npm-agents'
@@ -296,6 +348,65 @@ MCPB_REINSPECT_RUN = "\n".join((
 ))
 MCPB_ATTEST = {"subject-path": "mcpb/*.mcpb"}
 MCPB_OUTPUT = "${{ steps.build.outputs.sha256 }}"
+# Python plugin packages under integrations/ that install the published engine wheel: one row per
+# (workflow, publishing job). A row names the plugin's tag family, its protected environment, the
+# build job and the artifact it uploads, the plugin folder and the gate the job runs first; the
+# guard, the download, the re-inspection and the PyPI comparison follow from it. A new plugin
+# (the JupyterLab extension next) is one more row and its two jobs in PYPI_PLUGIN_WORKFLOW.
+PYPI_PLUGIN_WORKFLOW = "python-plugins-publish.yml"
+PYPI_PLUGIN_RELEASE = "scripts/python-plugin-release.py"
+PYPI_PLUGINS = {
+    (PYPI_PLUGIN_WORKFLOW, "napari-publish"): {
+        "tag": "napari-v",
+        "environment": "pypi-napari",
+        "build": "napari-build",
+        "artifact": "napari-dist",
+        "folder": "integrations/napari",
+        "gate": f'python3 {PYPI_PLUGIN_RELEASE} gate --ref "$GITHUB_REF" --folder integrations/napari',
+    },
+}
+PYPI_PLUGIN_PERMISSIONS = {"contents": "read", "id-token": "write"}
+PYPI_PLUGIN_USES = ("actions/checkout", "actions/download-artifact", "pypa/gh-action-pypi-publish")
+PYPI_PLUGIN_UPLOAD = {"packages-dir": "dist", "skip-existing": "true"}
+PYPI_PLUGIN_OUTPUT = "${{ steps.build.outputs.sha256 }}"
+
+
+def pypi_plugin(row: dict) -> dict:
+    """The exact values a PYPI_PLUGINS row asks of its publishing job and its build job."""
+    folder, build = row["folder"], row["build"]
+    return {
+        "guard": f"startsWith(github.ref, 'refs/tags/{row['tag']}')",
+        "download": {"name": row["artifact"], "path": "dist", "digest-mismatch": "error"},
+        "sha_env": {"DIST_SHA256": f"${{{{ needs.{build}.outputs.sha256 }}}}"},
+        "inspect": f'python3 {PYPI_PLUGIN_RELEASE} inspect dist --folder {folder} --sha256 "$DIST_SHA256"',
+        "live": f"python3 {PYPI_PLUGIN_RELEASE} pypi-live dist --folder {folder}",
+        "build_run": rf"\bscripts/python-plugin-release\.py\s+build\s+--folder\s+{re.escape(folder)}\s+--out\s+dist$",
+        "consumer_run": r"\bscripts/python-host-consumer\.py\s+run\b",
+    }
+
+# The HTTP service image: publish pushes the images the consumers judged, and reads them back.
+HTTP_WORKFLOW = "http-service.yml"
+HTTP_JOB = (HTTP_WORKFLOW, "publish")
+HTTP_GUARD = "startsWith(github.ref, 'refs/tags/http-v')"
+HTTP_GATE_RUN = 'python3 scripts/http-service-release.py gate --ref "$GITHUB_REF"'
+HTTP_PERMISSIONS = {"contents": "read", "packages": "write"}
+HTTP_USES = ("actions/checkout", "actions/download-artifact", "actions/upload-artifact")
+HTTP_DOWNLOADS = (
+    {"pattern": "http-image-*", "merge-multiple": "true", "path": "images", "digest-mismatch": "error"},
+    {"pattern": "http-consumed-*", "merge-multiple": "true", "path": "consumed", "digest-mismatch": "error"},
+)
+HTTP_VERIFY_RUN = 'python3 scripts/http-service-release.py verify --images "$PWD/images" --receipts "$PWD/consumed"'
+HTTP_TOKEN_ENV = {"GHCR_TOKEN": "${{ github.token }}", "DOCKER_CONFIG": "${{ runner.temp }}/qrscan-http-docker"}
+HTTP_PUBLISH_RUN = "\n".join((
+    "set -euo pipefail",
+    'mkdir -p "$DOCKER_CONFIG"',
+    'chmod 700 "$DOCKER_CONFIG"',
+    "trap 'docker logout ghcr.io' EXIT",
+    'printf \'%s\' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin',
+    'python3 scripts/http-service-release.py publish --images "$PWD/images" --receipts "$PWD/consumed" \\',
+    '  --ref "$GITHUB_REF" --receipt "$PWD/published/registry.json"',
+))
+HTTP_SETS = {"http-image-": "image", "http-consumed-": "consume"}
 # GitHub Pages serves the browser example: deploy holds the Pages token in one pinned step.
 PAGES_WORKFLOW = "pages.yml"
 PAGES_JOB = (PAGES_WORKFLOW, "deploy")
@@ -487,11 +598,14 @@ NOT_ON_TAG = {"!startsWith(github.ref, 'refs/tags/')", "!startsWith(github.ref, 
 # zip, builds) what it uploads. A publishing job missing here fails.
 INSPECTION = {
     DOTNET_JOB: "pack",
+    RUBY_JOB: "pack",
     MCP_JOB: "pack",
     MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
     PAGES_JOB: "build",
     MCPB_JOB: "bundle",
+    **{job: row["build"] for job, row in PYPI_PLUGINS.items()},
+    HTTP_JOB: "image",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
     ("npm-publish.yml", "publish-wasm"): "build-wasm",
@@ -504,8 +618,10 @@ INSPECTION = {
 # Archive shape and installed runtime are separate release gates.
 CONSUMERS = {
     DOTNET_JOB: {"preflight", "binding", "natives", "consumer"},
+    RUBY_JOB: {"preflight", "binding", "natives", "consumer"},
     MCP_JOB: {"preflight", "consume", "operand-proof"},
     MCPB_JOB: {"consume", "offline"},
+    HTTP_JOB: {"consume", "rehearse"},
     ("npm-publish.yml", "publish-native"): {"consume-native", "consume-native-musl"},
     ("npm-publish.yml", "publish-wasm"): {"consume-wasm", "consume-wasm-browser"},
     ("python.yml", "release"): {"consume-wheels", "consume-wheels-musl", "consume-sdist-wheel"},
@@ -542,6 +658,7 @@ PUBLISHING_TOOLS = (
     ("uv", frozenset({"publish"}), "uv publish"),
     ("maturin", frozenset({"publish", "upload"}), "maturin publish"),
     ("poetry", frozenset({"publish"}), "poetry publish"),
+    ("gem", frozenset({"push", "yank", "owner"}), "gem push"),
 )
 # GitHub release writes. gh takes its options before either word (`gh -R o/r
 # release create`); a line is read as written and with its quotes stripped.
@@ -588,7 +705,8 @@ PUBLISHING_RUN = (
     (GH_API_RELEASE, RELEASE),
     (re.compile(HTTP_CLIENT.pattern + r".*(?:" + GITHUB_API.pattern + r")", re.I), RELEASE),
 )
-PUBLISHING_ACTIONS = ("NuGet/login", "pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action") + RELEASE_ACTIONS
+PUBLISHING_ACTIONS = ("NuGet/login", "pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action",
+                      "rubygems/configure-rubygems-credentials") + RELEASE_ACTIONS
 NPM_FETCH = frozenset({"install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal",
                        "isntall", "add", "update", "up", "upgrade", "udpate", "exec", "x", "init", "create",
                        "innit", "install-test", "it"})
@@ -1658,6 +1776,61 @@ def _dotnet_contract_problems(wf, publisher, first_publish):
     return out
 
 
+def _ruby_contract_problems(wf, publisher, first_publish):
+    """No broad RubyGems exception: one reviewed trusted-publisher action and the exact inspected gems."""
+    out = []
+    def fail(message, index=-1):
+        out.append(("ruby-contract", message, index))
+    for condition in ("github.event_name == 'push'",
+                      "github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'",
+                      "github.repository_id == '1126991539'",
+                      "needs.preflight.outputs.publish_allowed == 'true'"):
+        if _conjunct(publisher.get("if"), {condition}):
+            fail("publisher must bind tag-push, canonical identity and preflight approval readiness")
+    if publisher.get("env") != {"RECEIPT_SHA256": "${{ needs.pack.outputs.receipt_sha256 }}"}:
+        fail("bind the producer receipt digest, and nothing else")
+    jobs, steps = wf["jobs"], _steps(publisher)
+    preflight = jobs.get("preflight", {})
+    if preflight.get("outputs") != {"publish_allowed": "${{ steps.preflight.outputs.publish_allowed }}"} or not any(
+            step.get("id") == "preflight" and step.get("run") == "python3 scripts/ruby-gem.py preflight" and
+            "env" not in step for step in _steps(preflight)):
+        fail("prove the existing protected environment before scheduling publication")
+    for name in ("preflight", "binding", "natives", "pack", "consumer"):
+        job = jobs.get(name, {})
+        if "if" in job or "continue-on-error" in job:
+            fail(f"{name} may not skip or ignore its gate")
+        if any("continue-on-error" in step for step in _steps(job)):
+            fail(f"{name} may not ignore a failed step")
+    if jobs.get("pack", {}).get("outputs") != {"receipt_sha256": "${{ steps.receipt.outputs.sha256 }}"}:
+        fail("pack must export the digest of its gem inspection receipt")
+    if not any(_block(step.get("run")) == RUBY_CANDIDATE and set(step) <= {"name", "run"}
+               for step in steps[:first_publish]):
+        fail("reinspect the receipt, native floors and gems, and list what rubygems.org lacks before OIDC")
+    credentials = [step for step in steps if _uses(step)[0] == "rubygems/configure-rubygems-credentials"]
+    if credentials != [RUBY_CREDENTIALS]:
+        fail("use only the reviewed RubyGems trusted-publisher action, with no stored token or role")
+    runs = [_block(step.get("run")) for step in steps if "run" in step]
+    if runs != [GATE_RUN, RUBY_CANDIDATE, RUBY_PUSH]:
+        fail("publisher may run only the version gate, candidate reinspection and the exact gem pushes")
+    for i, step in enumerate(steps):
+        action = _uses(step)[0]
+        if action and action not in {"actions/checkout", "actions/download-artifact",
+                                     "rubygems/configure-rubygems-credentials"}:
+            fail("an unreviewed action would see the publishing job", i)
+        if "if" in step or "continue-on-error" in step:
+            fail("publisher steps cannot skip or ignore checks", i)
+        if "run" in step and "env" in step:
+            fail("no step passes its own credential: the trusted publisher's token is the only one", i)
+    for name, job in jobs.items():
+        for step in _steps(job):
+            given = step.get("with", {})
+            if _uses(step)[0] == "actions/download-artifact" and given.get("digest-mismatch") != "error":
+                fail(f"{name} must refuse artifact digest mismatches")
+            if _uses(step)[0] == "actions/upload-artifact" and "overwrite" in given:
+                fail(f"{name} cannot overwrite a qualified artifact")
+    return out
+
+
 def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> list:
     """One independent adapter publisher; no other job gains its tag or environment."""
     out = []
@@ -1887,6 +2060,127 @@ def _mcpb_contract_problems(wf: dict, job: dict) -> list:
     return out
 
 
+def _pypi_plugin_contract_problems(wf: dict, job: dict, row: dict) -> list:
+    """(code, message, step index or -1) for each way a PYPI_PLUGINS publishing job could upload other
+    files than the two its build job built, judged in a new environment and recorded, or let other
+    code hold its OIDC token."""
+    out, steps, want = [], _steps(job), pypi_plugin(row)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("pypi-plugin-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in PYPI_PLUGIN_USES:
+            fail(f"{step.get('uses')}: a plugin upload uses only {', '.join(PYPI_PLUGIN_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on a plugin upload step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    if len(downloads) != 1 or set(steps[downloads[0]]) - {"name", "uses", "with"} or \
+            steps[downloads[0]].get("with") != want["download"]:
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly one, with {want['download']} and no other key")
+    uploads = [i for i, step in enumerate(steps) if _uses(step)[0] == "pypa/gh-action-pypi-publish"]
+    if len(uploads) != 1 or uploads[0] != len(steps) - 1 or set(steps[uploads[0]]) - {"name", "uses", "with"} or \
+            steps[uploads[0]].get("with") != PYPI_PLUGIN_UPLOAD:
+        fail(f"PyPI upload steps {[i + 1 for i in uploads]}: exactly one, the last, with {PYPI_PLUGIN_UPLOAD} and "
+             "no other key")
+
+    def at(run: str, env: dict) -> list:
+        return [i for i, step in enumerate(steps) if set(step) <= {"name", "env", "run"} and
+                _block(step.get("run")) == run and _bare(step.get("env")) == _bare(env)]
+
+    inspected, compared = at(want["inspect"], want["sha_env"]), at(want["live"], {})
+    if not (downloads[:1] and uploads[:1] and any(downloads[0] < i < uploads[0] for i in inspected)):
+        fail(f"between the download and the upload, run exactly `{want['inspect']}` with "
+             f"{want['sha_env']} and no other key: the files uploaded are the set the build job recorded")
+    if not (inspected and uploads[:1] and any(inspected[0] < i < uploads[0] for i in compared)):
+        fail(f"after the re-inspection and before the upload, run exactly `{want['live']}`, no key but name")
+    # The OIDC token is there for every step of the job: no step may run but these six.
+    if len(steps) != 6 or _uses(steps[0])[0] != "actions/checkout" or downloads != [2] or inspected != [3] or \
+            compared != [4] or uploads != [5]:
+        fail("the job is exactly six steps, in this order: checkout, the gate, the download, the "
+             "re-inspection, the comparison with PyPI and the upload")
+    build = jobs.get(row["build"], {})
+    outputs = build.get("outputs") if isinstance(build.get("outputs"), dict) else {}
+    build_steps = _steps(build)
+    built = next((i for i, s in enumerate(build_steps) if str(s.get("id")) == "build"), None)
+    if build.get("permissions") != {"contents": "read"} or build.get("if") is not None or \
+            "continue-on-error" in build:
+        fail(f"{row['build']} holds contents read and nothing else, with no `if:` or continue-on-error")
+    if re.sub(r"\s+", "", str(outputs.get("sha256", ""))) != re.sub(r"\s+", "", PYPI_PLUGIN_OUTPUT) or \
+            built is None or not any(re.search(want["build_run"], line)
+                                     for line in _code_lines(build_steps[built].get("run"))):
+        fail(f"{row['build']}'s output sha256 must be {PYPI_PLUGIN_OUTPUT}, from the step that runs "
+             f"`python-plugin-release.py build --folder {row['folder']} --out dist`")
+    shipped = [i for i, s in enumerate(build_steps) if _action_in(_uses(s)[0], ("actions/upload-artifact",))
+               and isinstance(s.get("with"), dict) and s["with"].get("name") == row["artifact"]]
+    consumed = [i for i, s in enumerate(build_steps)
+                if any(re.search(want["consumer_run"], line) and "dist/" in line
+                       for line in _code_lines(s.get("run")))]
+    if built is None or not shipped or not any(built < i < shipped[0] for i in consumed) or \
+            any(set(build_steps[i]) & {"if", "continue-on-error"} for i in consumed):
+        fail(f"{row['build']} runs `python-host-consumer.py run` on the wheel it built, after building and before "
+             f"uploading {row['artifact']}, unconditionally: the clean installed-package gate")
+    uploaded = [(other, step.get("with") if isinstance(step.get("with"), dict) else {})
+                for other, body in jobs.items() for step in _steps(body)
+                if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    named = [other for other, given in uploaded
+             if re.fullmatch(".*".join(map(re.escape, re.split(r"\$\{\{.*?\}\}", str(given.get("name", "artifact"))))),
+                             row["artifact"])]
+    paths = {str(given.get("path", "")).strip().rstrip("/") for other, given in uploaded
+             if given.get("name") == row["artifact"]}
+    if named != [row["build"]] or paths != {"dist"} or any("overwrite" in given for _, given in uploaded):
+        fail(f"{row['artifact']} may be uploaded by {named or 'no job'}: one upload of dist, {row['build']}'s, "
+             "written once")
+    return out
+
+
+def _http_contract_problems(wf: dict, job: dict) -> list:
+    """(code, message, step index or -1) for each way http-service.yml › publish could push other
+    images than the ones the consumers judged, or let other code hold its token."""
+    out, steps = [], _steps(job)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("http-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in HTTP_USES:
+            fail(f"{step.get('uses')}: publish uses only {', '.join(HTTP_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on a publish step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    given = tuple({k: str(v) for k, v in (steps[i].get("with") or {}).items()} for i in downloads)
+    if given != HTTP_DOWNLOADS or any(set(steps[i]) - {"name", "uses", "with"} for i in downloads):
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly {list(HTTP_DOWNLOADS)}, in that order")
+    holders = [i for i, step in enumerate(steps) if TOKEN.search(_text(step))]
+    verify = [i for i, step in enumerate(steps) if set(step) <= {"name", "run"} and _block(step.get("run")) == HTTP_VERIFY_RUN]
+    if len(holders) != 1 or set(steps[holders[0]]) - {"name", "env", "run"} or \
+            _block(steps[holders[0]].get("run")) != HTTP_PUBLISH_RUN or \
+            _bare(steps[holders[0]].get("env")) != _bare(HTTP_TOKEN_ENV):
+        fail(f"steps holding the token {[i + 1 for i in holders]}: exactly one, running HTTP_PUBLISH_RUN with "
+             "env GHCR_TOKEN and DOCKER_CONFIG and no other key")
+    elif not verify or not downloads or not max(downloads) < verify[0] < holders[0]:
+        fail("after both downloads and before the token, re-inspect exactly as HTTP_VERIFY_RUN says: the images "
+             "pushed are the archives the consumers judged")
+    image = jobs.get("image", {})
+    if not any("scripts/stage-http-satellite.py stage" in line for step in _steps(image)
+               for line in _code_lines(step.get("run"))):
+        fail("image must build from the tree scripts/stage-http-satellite.py stages")
+    uploads = [(other, step.get("with") if isinstance(step.get("with"), dict) else {})
+               for other, body in jobs.items() for step in _steps(body)
+               if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    for prefix, owner in HTTP_SETS.items():
+        named = sorted({other for other, given_with in uploads if str(given_with.get("name", "")).startswith(prefix)})
+        if named != [owner]:
+            fail(f"{prefix}* may be uploaded by {named or 'no job'}: by {owner} only")
+    if any("overwrite" in given_with for _, given_with in uploads):
+        fail("no upload of this workflow overwrites an artifact")
+    return out
+
+
 def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     steps = _steps(job)
     publishing = publishing_steps(steps)
@@ -1900,11 +2194,15 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     oci = (workflow, job_id) == OCI_JOB
     mcp = (workflow, job_id) == MCP_JOB
     dotnet = (workflow, job_id) == DOTNET_JOB
+    ruby = (workflow, job_id) == RUBY_JOB
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     pages = (workflow, job_id) == PAGES_JOB
     mcpb = (workflow, job_id) == MCPB_JOB
+    plugin = PYPI_PLUGINS.get((workflow, job_id))
+    http = (workflow, job_id) == HTTP_JOB
     guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
-             else OCI_GUARD if oci else MCPB_GUARD if mcpb else GUARD)
+             else OCI_GUARD if oci else MCPB_GUARD if mcpb else HTTP_GUARD if http
+             else pypi_plugin(plugin)["guard"] if plugin else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -1921,8 +2219,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
-                            else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"container"} if oci
-                            else {"mcpb"} if mcpb else ENVIRONMENTS)
+                            else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"rubygems"} if ruby else {"container"} if oci
+                            else {"mcpb"} if mcpb else {"container-http"} if http
+                            else {plugin["environment"]} if plugin else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -1933,7 +2232,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif oci:
         if perms != {"contents": "read", "actions": "read", "packages": "write"}:
             flag("permissions", "OCI publisher needs exactly contents read, actions read and packages write; no id-token")
-    elif mcp_registry or dotnet:
+    elif mcp_registry or dotnet or ruby:
         if perms != {"contents": "read", "id-token": "write"}:
             flag("permissions", "this publisher needs exactly contents read and id-token write")
     elif pages:
@@ -1943,6 +2242,12 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
         if perms != MCPB_PERMISSIONS:
             flag("permissions", "the bundle attestation needs exactly contents read, id-token write and "
                                 "attestations write")
+    elif plugin:
+        if perms != PYPI_PLUGIN_PERMISSIONS:
+            flag("permissions", "a plugin upload needs exactly contents read and id-token write (OIDC)")
+    elif http:
+        if perms != HTTP_PERMISSIONS:
+            flag("permissions", "the HTTP image publisher needs exactly contents read and packages write; no id-token")
     else:
         for scope, level in perms.items():
             level = str(level)
@@ -2026,7 +2331,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     checkout = next((i for i, step in enumerate(steps) if _uses(step)[0] == "actions/checkout"), None)
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
-                     else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else GATE_RUN)
+                     else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else HTTP_GATE_RUN if http
+                     else plugin["gate"] if plugin else GATE_RUN)
     # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
     if not pages and (set(gate) - {"run", "name", "working-directory"} or
                       str(gate.get("run", "")).strip() != required_gate):
@@ -2038,11 +2344,20 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     if dotnet:
         for code, message, index in _dotnet_contract_problems(wf, job, first_publish):
             flag(code, message, index)
+    if ruby:
+        for code, message, index in _ruby_contract_problems(wf, job, first_publish):
+            flag(code, message, index)
     if mcp:
         for code, message, index in _mcp_contract_problems(wf, job, first_publish):
             flag(code, message, index)
     if mcpb:
         for code, message, index in _mcpb_contract_problems(wf, job):
+            flag(code, message, index)
+    if plugin:
+        for code, message, index in _pypi_plugin_contract_problems(wf, job, plugin):
+            flag(code, message, index)
+    if http:
+        for code, message, index in _http_contract_problems(wf, job):
             flag(code, message, index)
     if (workflow, job_id) in REINSPECT_JOBS and not any(
             re.search(r"package-inspect\.py\s+archive\b", line) and "--strict" in _words(line)
@@ -2063,10 +2378,11 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     if pypi:
         inputs = [step.get("with") if isinstance(step.get("with"), dict) else {} for step in pypi]
         dirs = sorted({str(given.get("packages-dir", "dist")).strip().rstrip("/") for given in inputs})
-        compared = any(set(step) <= {"name", "run"} and str(step.get("run", "")).strip() == PYPI_LIVE_RUN
+        live_run = pypi_plugin(plugin)["live"] if plugin else PYPI_LIVE_RUN
+        compared = any(set(step) <= {"name", "run"} and str(step.get("run", "")).strip() == live_run
                        for step in steps[:first_publish])
         if not compared or dirs != ["dist"]:
-            flag("pypi-live", f"run exactly `{PYPI_LIVE_RUN}` (no key but name) before the first publishing step and "
+            flag("pypi-live", f"run exactly `{live_run}` (no key but name) before the first publishing step and "
                               f"upload that dist (packages-dir {dirs}): skip-existing skips a file PyPI already serves "
                               "by name alone, so each must first be proven the inspected file")
     for runtime, block in PRINTED.items():
@@ -2477,6 +2793,9 @@ LINE_CASES = (
 # The real tree passes both modes; each mutated copy must exit as said, with
 # the needle printed.
 P, T = "publish", "toolchains"
+PL_JOB = (PYPI_PLUGIN_WORKFLOW, "napari-publish")
+PL_WF, PL_ROW, PL = PYPI_PLUGIN_WORKFLOW, PYPI_PLUGINS[PL_JOB], " › ".join(PL_JOB)
+PL_GUARD, PL_GATE = pypi_plugin(PL_ROW)["guard"], PL_ROW["gate"]
 MUTATIONS = (
     # The independently versioned MCP publisher gets one exact exception only.
     ("MCP uses an engine tag", P, [(MCP_JOB[0], MCP_GUARD, "startsWith(github.ref, 'refs/tags/v')")], {}, 1,
@@ -2658,6 +2977,108 @@ MUTATIONS = (
                                          "          if-no-files-found: error\n          overwrite: true\n"
                                          "          retention-days: 30")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
     ("mcpb.yml as reviewed", P, [], {}, 0, "mcpb.yml › attest, "),
+    # -- the Python plugin packages: one PYPI_PLUGINS row, the napari plugin
+    ("plugin upload without its tag guard", P, [(PL_WF, "    if: " + PL_GUARD + "\n", "")], {}, 1, PL + " [guard]"),
+    ("plugin upload on the engine tag family", P, [(PL_WF, "    if: " + PL_GUARD, "    if: " + GUARD)], {}, 1,
+     PL + " [guard]"),
+    ("plugin upload on any tag", P, [(PL_WF, "    if: " + PL_GUARD, "    if: startsWith(github.ref, 'refs/tags/')")],
+     {}, 1, PL + " [guard]"),
+    ("plugin upload outside its environment", P, [(PL_WF, "    environment: pypi-napari\n", "")], {}, 1,
+     PL + " [environment]"),
+    ("plugin upload in the engine's release environment", P, [(PL_WF, "    environment: pypi-napari",
+                                                               "    environment: release")], {}, 1,
+     PL + " [environment]"),
+    ("plugin upload writes contents", P, [(PL_WF, "      contents: read\n      id-token: write",
+                                           "      contents: write\n      id-token: write")], {}, 1,
+     PL + " [permissions]"),
+    ("plugin upload with an extra permission", P, [(PL_WF, "      id-token: write # trusted",
+                                                    "      attestations: write\n      id-token: write # trusted")],
+     {}, 1, PL + " [permissions]"),
+    ("plugin gate omitted", P, [(PL_WF, "      - run: " + PL_GATE + "\n", "")], {}, 1, PL + " [gate]"),
+    ("plugin gate as a dry run", P, [(PL_WF, "      - run: " + PL_GATE + "\n", "      - run: " + PL_GATE + " --dry-run\n")],
+     {}, 1, PL + " [gate]"),
+    ("plugin upload action unpinned", P, [(PL_WF, "pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086",
+                                           "pypa/gh-action-pypi-publish@release/v1")], {}, 1, PL + " [unpinned-action]"),
+    ("plugin re-inspection omitted", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["inspect"] + "\n",
+                                          "        run: ls dist\n")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin judged hash replaced", P, [(PL_WF, "          DIST_SHA256: ${{ needs.napari-build.outputs.sha256 }}",
+                                         "          DIST_SHA256: arbitrary")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin PyPI comparison omitted", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["live"] + "\n",
+                                            "        run: ls dist\n")], {}, 1, PL + " [pypi-live]"),
+    ("plugin PyPI comparison of the engine", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["live"] + "\n",
+                                                  "        run: " + PYPI_LIVE_RUN + "\n")], {}, 1, PL + " [pypi-live]"),
+    ("plugin download ignores the artifact digest", P, [(PL_WF, "          digest-mismatch: error",
+                                                         "          digest-mismatch: ignore")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin uploads another folder", P, [(PL_WF, "          packages-dir: dist\n", "          packages-dir: dist/x\n")],
+     {}, 1, PL + " [pypi-live]"),
+    ("plugin upload made conditional", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                            "      - if: success()\n        uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract] (step 6)"),
+    ("plugin upload runs another action", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                               "      - uses: actions/github-script@" + "e" * 40 + " # v8\n        with:\n"
+                                               "          script: core.info('x')\n"
+                                               "      - uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract] (step 6) actions/github-script@"),
+    ("plugin upload with a stored token", P, [(PL_WF, "          skip-existing: true\n",
+                                               "          skip-existing: true\n"
+                                               "          password: ${{ secrets.PYPI_API_TOKEN }}\n")], {}, 1,
+     PL + " [secrets]"),
+    ("plugin upload runs one more script", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                                "      - run: python3 -m pip install twine\n"
+                                                "      - uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin build output faked", P, [(PL_WF, "      sha256: ${{ steps.build.outputs.sha256 }}", "      sha256: arbitrary")],
+     {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin clean consumer omitted", P, [(PL_WF, "python scripts/python-host-consumer.py run \\",
+                                           "echo python-host-consumer skipped \\")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin build job writes contents", P, [(PL_WF, "    permissions:\n      contents: read\n    outputs:",
+                                              "    permissions:\n      contents: write\n    outputs:")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin distributions overwritten", P, [(PL_WF, "          path: dist/\n", "          path: dist/\n"
+                                              "          overwrite: true\n")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin upload cancels a run in progress", P, [(PL_WF, "      cancel-in-progress: false",
+                                                     "      cancel-in-progress: true")], {}, 1, PL + " [concurrency]"),
+    ("python-plugins-publish.yml as reviewed", P, [], {}, 0, PL + ", "),
+    # == http-service.yml › publish: the judged HTTP service images, pushed to ghcr.io on http-v* only
+    ("HTTP publish without the tag guard", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD + "\n", "")], {}, 1,
+     "http-service.yml › publish [guard]"),
+    ("HTTP publish on the engine tag family", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD, "    if: " + GUARD)], {},
+     1, "http-service.yml › publish [guard]"),
+    ("HTTP publish in the OCI environment", P,
+     [(HTTP_WORKFLOW, "    environment: container-http", "    environment: container")], {}, 1,
+     "http-service.yml › publish [environment]"),
+    ("HTTP publish mints an OIDC token", P,
+     [(HTTP_WORKFLOW, "      packages: write\n", "      packages: write\n      id-token: write\n")], {}, 1,
+     "http-service.yml › publish [permissions]"),
+    ("HTTP publish without the clean consumers", P,
+     [(HTTP_WORKFLOW, "    needs: [image, consume, rehearse]", "    needs: [image, rehearse]")], {}, 1,
+     "http-service.yml › publish [needs]"),
+    ("HTTP publish without its gate", P, [(HTTP_WORKFLOW, "        run: " + HTTP_GATE_RUN + "\n",
+                                           "        run: echo gate\n")], {}, 1, "http-service.yml › publish [gate]"),
+    ("HTTP publish without the re-inspection", P,
+     [(HTTP_WORKFLOW, "        run: " + HTTP_VERIFY_RUN + "\n", "        run: echo verified\n")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP publish downloads without the digest check", P,
+     [(HTTP_WORKFLOW, "          path: consumed\n          digest-mismatch: error\n      - name: Re-inspect",
+       "          path: consumed\n      - name: Re-inspect")], {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP publish lends its token to a second step", P,
+     [(HTTP_WORKFLOW, "        run: " + HTTP_VERIFY_RUN + "\n",
+       "        env:\n          GH_TOKEN: ${{ github.token }}\n        run: " + HTTP_VERIFY_RUN + "\n")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP publish skips a failing step", P,
+     [(HTTP_WORKFLOW, "      - name: Push the judged images", "      - continue-on-error: true\n        name: Push the judged images")],
+     {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP image no longer built from the staged tree", P,
+     [(HTTP_WORKFLOW, "python3 scripts/stage-http-satellite.py stage --out", "mkdir -p")], {}, 1,
+     "http-service.yml › publish [http-contract]"),
+    ("HTTP a consumer uploads an image set", P,
+     [(HTTP_WORKFLOW, "          name: http-consumed-${{ matrix.architecture }}", "          name: http-image-${{ matrix.architecture }}")],
+     {}, 1, "http-service.yml › publish [http-contract]"),
+    ("HTTP publish cancels in progress", P,
+     [(HTTP_WORKFLOW, "-${{ github.ref }}\n      cancel-in-progress: false\n", "-${{ github.ref }}\n      cancel-in-progress: true\n")],
+     {}, 1, "http-service.yml › publish [concurrency]"),
+    ("http-service.yml as reviewed", P, [], {}, 0, "http-service.yml › publish, "),
     # -- the tag guard, raw
     ("tag guard removed", P, [("crates-publish.yml", CRATES_IF, CRATES_IF.split("\n", 1)[1])], {}, 1,
      "crates-publish.yml › publish [guard]"),
@@ -3218,6 +3639,46 @@ MUTATIONS += (
     ("OCI publisher omits in-job reinspection", P, [("oci-publish.yml", "      - name: re-inspect both downloaded images before registry authentication\n        run: |\n          " + OCI_REINSPECT_RUN.replace("\n", "\n          ") + "\n", "")], {}, 1, "re-inspect both downloaded archives"),
     ("unknown job claims OCI package write", P, [("oci-publish.yml", "  publish:\n", "  surprise:\n")], {}, 1, "no inspection job declared"),
     ("OCI download ignores official digest", P, [("oci-publish.yml", "          digest-mismatch: error", "          digest-mismatch: ignore")], {}, 1, "exact frozen platform artifact"),
+)
+
+# The Ruby gem publisher as ruby.yml ships it: one exception, held whole.
+RUBY_PUSH_STEP = ("      - name: Push exactly the inspected gems that rubygems.org does not hold\n        run: |\n"
+                  + "".join(f"          {line}\n" for line in RUBY_PUSH.split("\n")))
+MUTATIONS += (
+    ("Ruby uses another environment", P, [("ruby.yml", "    environment: rubygems", "    environment: npm")], {}, 1,
+     "ruby.yml › publish [environment]"),
+    ("Ruby ignores canonical repository", P, [("ruby.yml", " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'", "")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby publishes on a manual run", P, [("ruby.yml", " && github.event_name == 'push' && github.repository ==", " && github.repository ==")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby skips the installed consumers", P, [("ruby.yml", "    needs: [preflight, binding, natives, pack, consumer]",
+                                                "    needs: [preflight, binding, natives, pack]")], {}, 1, "ruby.yml › publish [needs]"),
+    ("Ruby consumer may fail quietly", P, [("ruby.yml", "    needs: pack\n", "    needs: pack\n    continue-on-error: true\n")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby reinspection omitted", P, [("ruby.yml", "        run: " + RUBY_CANDIDATE + "\n", "        run: echo skipped\n")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby pushes every gem whatever rubygems.org holds", P, [("ruby.yml", 'done < "$RUNNER_TEMP/ruby-pending.txt"',
+                                                              'done < <(ls "$PWD/ruby-gems/feed")')], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby stored API token", P, [("ruby.yml", '          trusted-publisher: "true"', "          api-token: stored")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby push step passes its own key", P, [("ruby.yml", RUBY_PUSH_STEP, RUBY_PUSH_STEP.replace(
+        "        run: |\n", "        env:\n          GEM_HOST_API_KEY: stored\n        run: |\n", 1))], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby unreviewed setup action sees the token", P, [("ruby.yml", RUBY_PUSH_STEP,
+        "      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18\n        with:\n          ruby-version: \"3.4.7\"\n"
+        + RUBY_PUSH_STEP)], {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby publisher writes contents", P, [("ruby.yml", "      contents: read\n      id-token: write",
+                                            "      contents: write\n      id-token: write")], {}, 1,
+     "ruby.yml › publish [permissions]"),
+    ("Ruby pack job pushes a gem", P, [("ruby.yml", '          cp receipt/gems.json "$RUNNER_TEMP/ruby-gems/"\n',
+                                        '          cp receipt/gems.json "$RUNNER_TEMP/ruby-gems/"\n          gem push "$RUNNER_TEMP/ruby-gems/feed/x.gem"\n')],
+     {}, 1, "ruby.yml › pack ["),
+    ("Ruby preflight output faked", P, [("ruby.yml", "publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}",
+                                         "publish_allowed: 'true'")], {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby gem download ignores its digest", P, [("ruby.yml", "          name: ruby-gems\n          path: ruby-gems\n          digest-mismatch: error",
+                                                  "          name: ruby-gems\n          path: ruby-gems\n          digest-mismatch: warn")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
 )
 
 # The mutations edit cli-archives.yml as it ships. attach's steps: 1 checkout,

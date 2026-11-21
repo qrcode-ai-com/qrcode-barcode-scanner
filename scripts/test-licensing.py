@@ -14,6 +14,12 @@ readmes = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(readmes)
 
 
+def listed_readmes():
+    """The committed list of maintained READMEs (scripts/maintained-readmes.txt)."""
+    lines = (ROOT / 'scripts/maintained-readmes.txt').read_text().splitlines()
+    return [line for line in lines if line and not line.startswith('#')]
+
+
 class LicensingTests(unittest.TestCase):
     def test_owned_license_copies_are_standard_mit_with_requested_credits(self):
         license_text = (ROOT / 'LICENSE').read_text()
@@ -42,6 +48,8 @@ class LicensingTests(unittest.TestCase):
         self.assertEqual(json.loads((ROOT / 'bindings/php/composer.json').read_text())['license'], 'MIT')
         project = ET.parse(ROOT / 'bindings/dotnet/src/QRCodeAI.QRCodeBarcodeScanner/QRCodeAI.QRCodeBarcodeScanner.csproj')
         self.assertEqual(project.find('.//PackageLicenseExpression').text, 'MIT')
+        gemspec = (ROOT / 'bindings/ruby/qrcode-barcode-scanner.gemspec').read_text()
+        self.assertIn("spec.license = 'MIT'", gemspec)
         gradle = (ROOT / 'bindings/kotlin/qrcodeaiscanner/build.gradle.kts').read_text()
         self.assertIn('name.set("MIT")', gradle)
         self.assertNotIn('name.set("AGPL-3.0-or-later")', gradle)
@@ -52,7 +60,8 @@ class LicensingTests(unittest.TestCase):
 
     def test_all_maintained_readmes_distinguish_source_and_archive_licenses(self):
         paths = readmes.maintained_readmes()
-        self.assertEqual(len(paths), 68)
+        self.assertEqual(sorted(str(path) for path in paths), listed_readmes(),
+                         'add or remove the README in scripts/maintained-readmes.txt (sorted)')
         for path in paths:
             with self.subTest(path=path):
                 text = (ROOT / path).read_text()

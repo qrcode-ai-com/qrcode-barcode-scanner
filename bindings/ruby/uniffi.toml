@@ -1,0 +1,4 @@
+# The generated Ruby loads the one library its gem carries, under lib/qrcode_barcode_scanner/native/
+# (lib/qrcode_barcode_scanner/native.rb names it): no search path decides which library answers.
+[bindings.ruby]
+cdylib_path = "QrcodeBarcodeScanner::Native::LIBRARY"

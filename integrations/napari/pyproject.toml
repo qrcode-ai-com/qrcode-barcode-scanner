@@ -33,9 +33,11 @@ classifiers = [
 [project.optional-dependencies]
 all = ["napari[all]"]
 
+# The napari hub draws its GitHub link from "Source Code" (a repository root) and shows the others.
 [project.urls]
 Homepage = "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/napari"
-Source = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/napari"
+Documentation = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/main/integrations/napari"
+"Source Code" = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust"
 "Bug Tracker" = "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
 
 [project.entry-points."napari.manifest"]
