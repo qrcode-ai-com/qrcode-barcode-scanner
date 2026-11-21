@@ -22,6 +22,7 @@ GUIDES = {
     'examples/web-vite/README.md': ('sdk/javascript', 'JavaScript'),
     'playground/README.md': ('sdk/javascript', 'JavaScript'),
     'integrations/activepieces/README.md': ('integrations/activepieces', 'Activepieces'),
+    'integrations/adobe-express/README.md': ('integrations/adobe-express', 'Adobe Express'),
     'integrations/agent-plugin/README.md': ('integrations', 'agent integrations'),
     'integrations/github-action/README.md': ('integrations/github-actions', 'GitHub Actions'),
     'integrations/browser-extension/README.md': ('integrations/browser-extension', 'browser extension'),

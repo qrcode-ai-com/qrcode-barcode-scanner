@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: MIT */
+/* The panel follows Adobe Express's light and dark themes through data-theme on <html>. */
+:root {
+  --bg: #ffffff;
+  --fg: #222222;
+  --muted: #6e6e6e;
+  --line: #d5d5d5;
+  --field: #ffffff;
+  --accent: #3b63fb;
+  --accent-fg: #ffffff;
+  --match: #0f7c3c;
+  --differ: #c9252d;
+  font-family: "Adobe Clean", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #1d1d1d;
+  --fg: #ebebeb;
+  --muted: #a8a8a8;
+  --line: #4a4a4a;
+  --field: #2c2c2c;
+  --accent: #5d82ff;
+  --match: #3fbf73;
+  --differ: #ff6b6b;
+  color-scheme: dark;
+}
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+main { padding: 16px; display: grid; gap: 12px; }
+h1 { font-size: 16px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+p { margin: 0; }
+.help, footer { color: var(--muted); font-size: 12px; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+legend, .field { font-weight: 700; padding: 0; margin-bottom: 4px; }
+.optional { font-weight: 400; color: var(--muted); }
+.segments { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.segments label { text-align: center; padding: 6px 0; cursor: pointer; }
+.segments label + label { border-left: 1px solid var(--line); }
+.segments input { position: absolute; opacity: 0; }
+.segments label:has(input:checked) { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.segments label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -3px; }
+input[type="text"] { font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.actions { display: grid; gap: 8px; }
+button, .button { font: inherit; font-weight: 700; border-radius: 16px; padding: 7px 14px; border: 2px solid var(--fg); background: transparent; color: var(--fg); cursor: pointer; text-align: center; position: relative; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button:disabled, .button[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+#items { display: grid; gap: 14px; margin-top: 8px; }
+.detections { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.detection .format { font-weight: 700; font-size: 12px; }
+.detection .text { overflow-wrap: anywhere; user-select: text; }
+.badge { display: inline-block; justify-self: start; font-size: 12px; font-weight: 700; padding: 0 8px; border-radius: 10px; color: #fff; margin-top: 2px; }
+.badge.match { background: var(--match); }
+.badge.differ { background: var(--differ); }
+.error { color: var(--differ); }
+#report pre { max-height: 300px; overflow: auto; font-size: 11px; white-space: pre-wrap; word-break: break-all; }
+footer { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
+.source { user-select: text; }
