@@ -153,6 +153,24 @@ mint registry tokens). Every privileged job must:
                download-artifact and that action, with no `if:`. It uploads
                nothing and creates no release; the owner attaches the file.
                No other job inherits this exception.
+  PyPI plugins python-plugins-publish.yml holds one publishing job per row of
+               PYPI_PLUGINS (napari-publish today), keyed by (workflow, job):
+               the row names the plugin's tag family, its protected
+               environment, its build job, the artifact and the folder, and
+               the gate its first step runs. The job runs on that tag family
+               only, in that environment, with exactly contents read and
+               id-token write, in six steps and no other, none with `if:`:
+               the checkout, the gate, one download of the artifact into dist
+               with digest-mismatch error, its re-inspection against the build
+               job's output sha256 (`python-plugin-release.py inspect`), its
+               comparison with what PyPI serves (`python-plugin-release.py
+               pypi-live`) and one pinned pypa/gh-action-pypi-publish step,
+               packages-dir dist and skip-existing true. The build job reads
+               only, records sha256 from the step that runs
+               `python-plugin-release.py build`, runs the clean consumer
+               `python-host-consumer.py run` on the wheel before uploading it,
+               and is the only job uploading the artifact, once. A new plugin
+               is one more row; no other job inherits this exception.
   HTTP         http-service.yml > publish pushes the scanner HTTP service image to
                ghcr.io on an http-v* tag only, in the protected environment
                container-http, with exactly contents read and packages write. It
@@ -330,6 +348,42 @@ MCPB_REINSPECT_RUN = "\n".join((
 ))
 MCPB_ATTEST = {"subject-path": "mcpb/*.mcpb"}
 MCPB_OUTPUT = "${{ steps.build.outputs.sha256 }}"
+# Python plugin packages under integrations/ that install the published engine wheel: one row per
+# (workflow, publishing job). A row names the plugin's tag family, its protected environment, the
+# build job and the artifact it uploads, the plugin folder and the gate the job runs first; the
+# guard, the download, the re-inspection and the PyPI comparison follow from it. A new plugin
+# (the JupyterLab extension next) is one more row and its two jobs in PYPI_PLUGIN_WORKFLOW.
+PYPI_PLUGIN_WORKFLOW = "python-plugins-publish.yml"
+PYPI_PLUGIN_RELEASE = "scripts/python-plugin-release.py"
+PYPI_PLUGINS = {
+    (PYPI_PLUGIN_WORKFLOW, "napari-publish"): {
+        "tag": "napari-v",
+        "environment": "pypi-napari",
+        "build": "napari-build",
+        "artifact": "napari-dist",
+        "folder": "integrations/napari",
+        "gate": f'python3 {PYPI_PLUGIN_RELEASE} gate --ref "$GITHUB_REF" --folder integrations/napari',
+    },
+}
+PYPI_PLUGIN_PERMISSIONS = {"contents": "read", "id-token": "write"}
+PYPI_PLUGIN_USES = ("actions/checkout", "actions/download-artifact", "pypa/gh-action-pypi-publish")
+PYPI_PLUGIN_UPLOAD = {"packages-dir": "dist", "skip-existing": "true"}
+PYPI_PLUGIN_OUTPUT = "${{ steps.build.outputs.sha256 }}"
+
+
+def pypi_plugin(row: dict) -> dict:
+    """The exact values a PYPI_PLUGINS row asks of its publishing job and its build job."""
+    folder, build = row["folder"], row["build"]
+    return {
+        "guard": f"startsWith(github.ref, 'refs/tags/{row['tag']}')",
+        "download": {"name": row["artifact"], "path": "dist", "digest-mismatch": "error"},
+        "sha_env": {"DIST_SHA256": f"${{{{ needs.{build}.outputs.sha256 }}}}"},
+        "inspect": f'python3 {PYPI_PLUGIN_RELEASE} inspect dist --folder {folder} --sha256 "$DIST_SHA256"',
+        "live": f"python3 {PYPI_PLUGIN_RELEASE} pypi-live dist --folder {folder}",
+        "build_run": rf"\bscripts/python-plugin-release\.py\s+build\s+--folder\s+{re.escape(folder)}\s+--out\s+dist$",
+        "consumer_run": r"\bscripts/python-host-consumer\.py\s+run\b",
+    }
+
 # The HTTP service image: publish pushes the images the consumers judged, and reads them back.
 HTTP_WORKFLOW = "http-service.yml"
 HTTP_JOB = (HTTP_WORKFLOW, "publish")
@@ -550,6 +604,7 @@ INSPECTION = {
     OCI_JOB: "inspect",
     PAGES_JOB: "build",
     MCPB_JOB: "bundle",
+    **{job: row["build"] for job, row in PYPI_PLUGINS.items()},
     HTTP_JOB: "image",
     ("crates-publish.yml", "publish"): "package",
     ("npm-publish.yml", "publish-native"): "pack-native",
@@ -2005,6 +2060,81 @@ def _mcpb_contract_problems(wf: dict, job: dict) -> list:
     return out
 
 
+def _pypi_plugin_contract_problems(wf: dict, job: dict, row: dict) -> list:
+    """(code, message, step index or -1) for each way a PYPI_PLUGINS publishing job could upload other
+    files than the two its build job built, judged in a new environment and recorded, or let other
+    code hold its OIDC token."""
+    out, steps, want = [], _steps(job), pypi_plugin(row)
+    jobs = {k: v if isinstance(v, dict) else {} for k, v in wf["jobs"].items()}
+
+    def fail(message: str, index: int = -1) -> None:
+        out.append(("pypi-plugin-contract", message, index))
+
+    for i, step in enumerate(steps):
+        if step.get("uses") is not None and _uses(step)[0] not in PYPI_PLUGIN_USES:
+            fail(f"{step.get('uses')}: a plugin upload uses only {', '.join(PYPI_PLUGIN_USES)}", i)
+        for key in ("if", "continue-on-error"):
+            if key in step:
+                fail(f"`{key}:` on a plugin upload step: each step runs, and its failure stops the job", i)
+    downloads = [i for i, step in enumerate(steps) if _uses(step)[0] == "actions/download-artifact"]
+    if len(downloads) != 1 or set(steps[downloads[0]]) - {"name", "uses", "with"} or \
+            steps[downloads[0]].get("with") != want["download"]:
+        fail(f"download steps {[i + 1 for i in downloads]}: exactly one, with {want['download']} and no other key")
+    uploads = [i for i, step in enumerate(steps) if _uses(step)[0] == "pypa/gh-action-pypi-publish"]
+    if len(uploads) != 1 or uploads[0] != len(steps) - 1 or set(steps[uploads[0]]) - {"name", "uses", "with"} or \
+            steps[uploads[0]].get("with") != PYPI_PLUGIN_UPLOAD:
+        fail(f"PyPI upload steps {[i + 1 for i in uploads]}: exactly one, the last, with {PYPI_PLUGIN_UPLOAD} and "
+             "no other key")
+
+    def at(run: str, env: dict) -> list:
+        return [i for i, step in enumerate(steps) if set(step) <= {"name", "env", "run"} and
+                _block(step.get("run")) == run and _bare(step.get("env")) == _bare(env)]
+
+    inspected, compared = at(want["inspect"], want["sha_env"]), at(want["live"], {})
+    if not (downloads[:1] and uploads[:1] and any(downloads[0] < i < uploads[0] for i in inspected)):
+        fail(f"between the download and the upload, run exactly `{want['inspect']}` with "
+             f"{want['sha_env']} and no other key: the files uploaded are the set the build job recorded")
+    if not (inspected and uploads[:1] and any(inspected[0] < i < uploads[0] for i in compared)):
+        fail(f"after the re-inspection and before the upload, run exactly `{want['live']}`, no key but name")
+    # The OIDC token is there for every step of the job: no step may run but these six.
+    if len(steps) != 6 or _uses(steps[0])[0] != "actions/checkout" or downloads != [2] or inspected != [3] or \
+            compared != [4] or uploads != [5]:
+        fail("the job is exactly six steps, in this order: checkout, the gate, the download, the "
+             "re-inspection, the comparison with PyPI and the upload")
+    build = jobs.get(row["build"], {})
+    outputs = build.get("outputs") if isinstance(build.get("outputs"), dict) else {}
+    build_steps = _steps(build)
+    built = next((i for i, s in enumerate(build_steps) if str(s.get("id")) == "build"), None)
+    if build.get("permissions") != {"contents": "read"} or build.get("if") is not None or \
+            "continue-on-error" in build:
+        fail(f"{row['build']} holds contents read and nothing else, with no `if:` or continue-on-error")
+    if re.sub(r"\s+", "", str(outputs.get("sha256", ""))) != re.sub(r"\s+", "", PYPI_PLUGIN_OUTPUT) or \
+            built is None or not any(re.search(want["build_run"], line)
+                                     for line in _code_lines(build_steps[built].get("run"))):
+        fail(f"{row['build']}'s output sha256 must be {PYPI_PLUGIN_OUTPUT}, from the step that runs "
+             f"`python-plugin-release.py build --folder {row['folder']} --out dist`")
+    shipped = [i for i, s in enumerate(build_steps) if _action_in(_uses(s)[0], ("actions/upload-artifact",))
+               and isinstance(s.get("with"), dict) and s["with"].get("name") == row["artifact"]]
+    consumed = [i for i, s in enumerate(build_steps)
+                if any(re.search(want["consumer_run"], line) and "dist/" in line
+                       for line in _code_lines(s.get("run")))]
+    if built is None or not shipped or not any(built < i < shipped[0] for i in consumed) or \
+            any(set(build_steps[i]) & {"if", "continue-on-error"} for i in consumed):
+        fail(f"{row['build']} runs `python-host-consumer.py run` on the wheel it built, after building and before "
+             f"uploading {row['artifact']}, unconditionally: the clean installed-package gate")
+    uploaded = [(other, step.get("with") if isinstance(step.get("with"), dict) else {})
+                for other, body in jobs.items() for step in _steps(body)
+                if _action_in(_uses(step)[0], ("actions/upload-artifact",))]
+    named = [other for other, given in uploaded
+             if re.fullmatch(".*".join(map(re.escape, re.split(r"\$\{\{.*?\}\}", str(given.get("name", "artifact"))))),
+                             row["artifact"])]
+    paths = {str(given.get("path", "")).strip().rstrip("/") for other, given in uploaded
+             if given.get("name") == row["artifact"]}
+    if named != [row["build"]] or paths != {"dist"} or any("overwrite" in given for _, given in uploaded):
+        fail(f"{row['artifact']} may be uploaded by {named or 'no job'}: one upload of dist, {row['build']}'s, "
+             "written once")
+    return out
+
 
 def _http_contract_problems(wf: dict, job: dict) -> list:
     """(code, message, step index or -1) for each way http-service.yml › publish could push other
@@ -2068,9 +2198,11 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     pages = (workflow, job_id) == PAGES_JOB
     mcpb = (workflow, job_id) == MCPB_JOB
+    plugin = PYPI_PLUGINS.get((workflow, job_id))
     http = (workflow, job_id) == HTTP_JOB
     guard = (MCP_REGISTRY_GUARD if mcp_registry else PAGES_GUARD if pages else MCP_GUARD if mcp
-             else OCI_GUARD if oci else MCPB_GUARD if mcpb else HTTP_GUARD if http else GUARD)
+             else OCI_GUARD if oci else MCPB_GUARD if mcpb else HTTP_GUARD if http
+             else pypi_plugin(plugin)["guard"] if plugin else GUARD)
     condition_check = _conjunct(job.get("if"), {guard})
     if condition_check:
         flag("guard", condition_check)
@@ -2088,7 +2220,8 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
                             else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"rubygems"} if ruby else {"container"} if oci
-                            else {"mcpb"} if mcpb else {"container-http"} if http else ENVIRONMENTS)
+                            else {"mcpb"} if mcpb else {"container-http"} if http
+                            else {plugin["environment"]} if plugin else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
     perms = job.get("permissions")
@@ -2109,6 +2242,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
         if perms != MCPB_PERMISSIONS:
             flag("permissions", "the bundle attestation needs exactly contents read, id-token write and "
                                 "attestations write")
+    elif plugin:
+        if perms != PYPI_PLUGIN_PERMISSIONS:
+            flag("permissions", "a plugin upload needs exactly contents read and id-token write (OIDC)")
     elif http:
         if perms != HTTP_PERMISSIONS:
             flag("permissions", "the HTTP image publisher needs exactly contents read and packages write; no id-token")
@@ -2196,7 +2332,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     gate = steps[checkout + 1] if checkout is not None and checkout + 1 < len(steps) else {}
     required_gate = (MCP_REGISTRY_PUBLISH_RUN if mcp_registry else MCP_GATE_RUN if mcp
                      else OCI_GATE_RUN if oci else MCPB_GATE_RUN if mcpb else HTTP_GATE_RUN if http
-                     else GATE_RUN)
+                     else plugin["gate"] if plugin else GATE_RUN)
     # The Pages deployment checks nothing out and runs no script: its contract holds its one step.
     if not pages and (set(gate) - {"run", "name", "working-directory"} or
                       str(gate.get("run", "")).strip() != required_gate):
@@ -2216,6 +2352,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag(code, message, index)
     if mcpb:
         for code, message, index in _mcpb_contract_problems(wf, job):
+            flag(code, message, index)
+    if plugin:
+        for code, message, index in _pypi_plugin_contract_problems(wf, job, plugin):
             flag(code, message, index)
     if http:
         for code, message, index in _http_contract_problems(wf, job):
@@ -2239,10 +2378,11 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     if pypi:
         inputs = [step.get("with") if isinstance(step.get("with"), dict) else {} for step in pypi]
         dirs = sorted({str(given.get("packages-dir", "dist")).strip().rstrip("/") for given in inputs})
-        compared = any(set(step) <= {"name", "run"} and str(step.get("run", "")).strip() == PYPI_LIVE_RUN
+        live_run = pypi_plugin(plugin)["live"] if plugin else PYPI_LIVE_RUN
+        compared = any(set(step) <= {"name", "run"} and str(step.get("run", "")).strip() == live_run
                        for step in steps[:first_publish])
         if not compared or dirs != ["dist"]:
-            flag("pypi-live", f"run exactly `{PYPI_LIVE_RUN}` (no key but name) before the first publishing step and "
+            flag("pypi-live", f"run exactly `{live_run}` (no key but name) before the first publishing step and "
                               f"upload that dist (packages-dir {dirs}): skip-existing skips a file PyPI already serves "
                               "by name alone, so each must first be proven the inspected file")
     for runtime, block in PRINTED.items():
@@ -2653,6 +2793,9 @@ LINE_CASES = (
 # The real tree passes both modes; each mutated copy must exit as said, with
 # the needle printed.
 P, T = "publish", "toolchains"
+PL_JOB = (PYPI_PLUGIN_WORKFLOW, "napari-publish")
+PL_WF, PL_ROW, PL = PYPI_PLUGIN_WORKFLOW, PYPI_PLUGINS[PL_JOB], " › ".join(PL_JOB)
+PL_GUARD, PL_GATE = pypi_plugin(PL_ROW)["guard"], PL_ROW["gate"]
 MUTATIONS = (
     # The independently versioned MCP publisher gets one exact exception only.
     ("MCP uses an engine tag", P, [(MCP_JOB[0], MCP_GUARD, "startsWith(github.ref, 'refs/tags/v')")], {}, 1,
@@ -2834,6 +2977,69 @@ MUTATIONS = (
                                          "          if-no-files-found: error\n          overwrite: true\n"
                                          "          retention-days: 30")], {}, 1, "mcpb.yml › attest [mcpb-contract]"),
     ("mcpb.yml as reviewed", P, [], {}, 0, "mcpb.yml › attest, "),
+    # -- the Python plugin packages: one PYPI_PLUGINS row, the napari plugin
+    ("plugin upload without its tag guard", P, [(PL_WF, "    if: " + PL_GUARD + "\n", "")], {}, 1, PL + " [guard]"),
+    ("plugin upload on the engine tag family", P, [(PL_WF, "    if: " + PL_GUARD, "    if: " + GUARD)], {}, 1,
+     PL + " [guard]"),
+    ("plugin upload on any tag", P, [(PL_WF, "    if: " + PL_GUARD, "    if: startsWith(github.ref, 'refs/tags/')")],
+     {}, 1, PL + " [guard]"),
+    ("plugin upload outside its environment", P, [(PL_WF, "    environment: pypi-napari\n", "")], {}, 1,
+     PL + " [environment]"),
+    ("plugin upload in the engine's release environment", P, [(PL_WF, "    environment: pypi-napari",
+                                                               "    environment: release")], {}, 1,
+     PL + " [environment]"),
+    ("plugin upload writes contents", P, [(PL_WF, "      contents: read\n      id-token: write",
+                                           "      contents: write\n      id-token: write")], {}, 1,
+     PL + " [permissions]"),
+    ("plugin upload with an extra permission", P, [(PL_WF, "      id-token: write # trusted",
+                                                    "      attestations: write\n      id-token: write # trusted")],
+     {}, 1, PL + " [permissions]"),
+    ("plugin gate omitted", P, [(PL_WF, "      - run: " + PL_GATE + "\n", "")], {}, 1, PL + " [gate]"),
+    ("plugin gate as a dry run", P, [(PL_WF, "      - run: " + PL_GATE + "\n", "      - run: " + PL_GATE + " --dry-run\n")],
+     {}, 1, PL + " [gate]"),
+    ("plugin upload action unpinned", P, [(PL_WF, "pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086",
+                                           "pypa/gh-action-pypi-publish@release/v1")], {}, 1, PL + " [unpinned-action]"),
+    ("plugin re-inspection omitted", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["inspect"] + "\n",
+                                          "        run: ls dist\n")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin judged hash replaced", P, [(PL_WF, "          DIST_SHA256: ${{ needs.napari-build.outputs.sha256 }}",
+                                         "          DIST_SHA256: arbitrary")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin PyPI comparison omitted", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["live"] + "\n",
+                                            "        run: ls dist\n")], {}, 1, PL + " [pypi-live]"),
+    ("plugin PyPI comparison of the engine", P, [(PL_WF, "        run: " + pypi_plugin(PL_ROW)["live"] + "\n",
+                                                  "        run: " + PYPI_LIVE_RUN + "\n")], {}, 1, PL + " [pypi-live]"),
+    ("plugin download ignores the artifact digest", P, [(PL_WF, "          digest-mismatch: error",
+                                                         "          digest-mismatch: ignore")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin uploads another folder", P, [(PL_WF, "          packages-dir: dist\n", "          packages-dir: dist/x\n")],
+     {}, 1, PL + " [pypi-live]"),
+    ("plugin upload made conditional", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                            "      - if: success()\n        uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract] (step 6)"),
+    ("plugin upload runs another action", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                               "      - uses: actions/github-script@" + "e" * 40 + " # v8\n        with:\n"
+                                               "          script: core.info('x')\n"
+                                               "      - uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract] (step 6) actions/github-script@"),
+    ("plugin upload with a stored token", P, [(PL_WF, "          skip-existing: true\n",
+                                               "          skip-existing: true\n"
+                                               "          password: ${{ secrets.PYPI_API_TOKEN }}\n")], {}, 1,
+     PL + " [secrets]"),
+    ("plugin upload runs one more script", P, [(PL_WF, "      - uses: pypa/gh-action-pypi-publish@",
+                                                "      - run: python3 -m pip install twine\n"
+                                                "      - uses: pypa/gh-action-pypi-publish@")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin build output faked", P, [(PL_WF, "      sha256: ${{ steps.build.outputs.sha256 }}", "      sha256: arbitrary")],
+     {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin clean consumer omitted", P, [(PL_WF, "python scripts/python-host-consumer.py run \\",
+                                           "echo python-host-consumer skipped \\")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin build job writes contents", P, [(PL_WF, "    permissions:\n      contents: read\n    outputs:",
+                                              "    permissions:\n      contents: write\n    outputs:")], {}, 1,
+     PL + " [pypi-plugin-contract]"),
+    ("plugin distributions overwritten", P, [(PL_WF, "          path: dist/\n", "          path: dist/\n"
+                                              "          overwrite: true\n")], {}, 1, PL + " [pypi-plugin-contract]"),
+    ("plugin upload cancels a run in progress", P, [(PL_WF, "      cancel-in-progress: false",
+                                                     "      cancel-in-progress: true")], {}, 1, PL + " [concurrency]"),
+    ("python-plugins-publish.yml as reviewed", P, [], {}, 0, PL + ", "),
     # == http-service.yml › publish: the judged HTTP service images, pushed to ghcr.io on http-v* only
     ("HTTP publish without the tag guard", P, [(HTTP_WORKFLOW, "    if: " + HTTP_GUARD + "\n", "")], {}, 1,
      "http-service.yml › publish [guard]"),
