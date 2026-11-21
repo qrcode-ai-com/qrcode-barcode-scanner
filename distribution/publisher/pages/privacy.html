@@ -107,8 +107,10 @@ What Zapier records about each run, such as the Zap history, follows Zapier's ow
 
 <dt id="apify">Apify Actor</dt>
 <dd>The Actor runs on Apify's platform, under your Apify account. It downloads each image address
-you give it, stores the images nowhere and keeps only the result items in your dataset, under your
-account's storage retention. It never opens what a code points to.</dd>
+you give it. An image you upload in the input form is kept by Apify Console in a key-value store
+of your account, and the Actor reads it from there. The Actor itself stores the images nowhere and
+keeps only the result items in your dataset, under your account's storage retention. It never
+opens what a code points to.</dd>
 
 <dt id="replicate">Replicate model</dt>
 <dd>Each image you send is uploaded to Replicate and scanned on Replicate's servers, under your
