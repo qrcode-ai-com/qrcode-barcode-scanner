@@ -104,10 +104,11 @@ fn wire__crate__api__scan__scan_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_image = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_profile = <String>::sse_decode(&mut deserializer);
+            let api_budget_ms = <Option<u64>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
-                    let output_ok = crate::api::scan::scan(api_image, api_profile)?;
+                    let output_ok = crate::api::scan::scan(api_image, api_profile, api_budget_ms)?;
                     Ok(output_ok)
                 })())
             }
@@ -140,11 +141,17 @@ fn wire__crate__api__scan__scan_frame_impl(
             let api_width = <u32>::sse_decode(&mut deserializer);
             let api_height = <u32>::sse_decode(&mut deserializer);
             let api_profile = <String>::sse_decode(&mut deserializer);
+            let api_budget_ms = <Option<u64>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
-                    let output_ok =
-                        crate::api::scan::scan_frame(api_rgba, api_width, api_height, api_profile)?;
+                    let output_ok = crate::api::scan::scan_frame(
+                        api_rgba,
+                        api_width,
+                        api_height,
+                        api_profile,
+                        api_budget_ms,
+                    )?;
                     Ok(output_ok)
                 })())
             }
@@ -174,10 +181,28 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u32::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
     }
 }
 
@@ -254,10 +279,27 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u64>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
     }
 }
 

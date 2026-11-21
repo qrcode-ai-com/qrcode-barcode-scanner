@@ -6,22 +6,36 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `parse_profile`
+// These functions are ignored because they are not marked as `pub`: `parse_profile`, `profile_with_budget`
 
 /// Decode + score an encoded image (PNG · JPEG · WebP · GIF).
 ///
 /// Returns the `ScanReport` as a JSON string. "No QR found" is a normal result
-/// (empty `detections`); `Err` only for invalid input / a bad profile name.
-Future<String> scan({required List<int> image, required String profile}) =>
-    RustLib.instance.api.crateApiScanScan(image: image, profile: profile);
+/// (empty `detections`); `Err` only for invalid input, an option outside its
+/// domain (`QRS-006`, a `budget_ms` above 4 294 967 295) or a bad profile name.
+/// `budget_ms` overrides the profile's wall-clock budget: unset keeps the
+/// profile default, `0` is unbounded (the reproducible mode).
+Future<String> scan(
+        {required List<int> image,
+        required String profile,
+        BigInt? budgetMs}) =>
+    RustLib.instance.api
+        .crateApiScanScan(image: image, profile: profile, budgetMs: budgetMs);
 
 /// Decode + score a raw RGBA frame (e.g. a camera frame), no format roundtrip.
 ///
-/// `rgba` must be `width * height * 4` bytes.
+/// `rgba` must be `width * height * 4` bytes. `budget_ms` overrides the
+/// profile's wall-clock budget as in [`scan`] (unset = the profile default,
+/// `0` = unbounded): the camera loop's per-frame bound.
 Future<String> scanFrame(
         {required List<int> rgba,
         required int width,
         required int height,
-        required String profile}) =>
+        required String profile,
+        BigInt? budgetMs}) =>
     RustLib.instance.api.crateApiScanScanFrame(
-        rgba: rgba, width: width, height: height, profile: profile);
+        rgba: rgba,
+        width: width,
+        height: height,
+        profile: profile,
+        budgetMs: budgetMs);
