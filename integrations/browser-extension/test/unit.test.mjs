@@ -134,18 +134,24 @@ test('every manifest asks for the same two permissions and no site at install', 
   assert.ok(NAME.length <= 45);
 });
 
-test('Chrome and Edge run a service worker; Firefox an event page with its ID', () => {
+test('Chrome, Edge and Safari run a service worker; Firefox an event page with its ID', () => {
   for (const target of ['chrome', 'edge']) {
     const manifest = manifestFor(target, own.version);
     assert.deepEqual(manifest.background, { service_worker: 'background.js' });
     assert.equal(manifest.browser_specific_settings, undefined);
+    assert.equal(manifest.minimum_chrome_version, '103');
   }
+  const safari = manifestFor('safari', own.version);
+  assert.deepEqual(safari.background, { service_worker: 'background.js' });
+  // Safari 26.0 is the first to read 'wasm-unsafe-eval' in an extension policy.
+  assert.deepEqual(safari.browser_specific_settings, { safari: { strict_min_version: '26.0' } });
+  assert.equal(safari.minimum_chrome_version, undefined);
   const firefox = manifestFor('firefox', own.version);
   assert.deepEqual(firefox.background, { scripts: ['background.js'] });
   assert.deepEqual(firefox.browser_specific_settings, { gecko: {
     id: GECKO_ID, strict_min_version: '142.0', data_collection_permissions: { required: ['none'] },
   } });
-  assert.throws(() => manifestFor('safari', own.version), /unknown target/);
+  assert.throws(() => manifestFor('opera', own.version), /unknown target/);
 });
 
 // ------------------------------------------------------------------ bytes

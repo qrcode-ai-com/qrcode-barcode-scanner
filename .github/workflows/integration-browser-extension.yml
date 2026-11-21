@@ -1,18 +1,18 @@
 name: integration-browser-extension
 
 # The browser extension of integrations/browser-extension, checked the way its README describes:
-# installed from its own lockfile, built into the three store zips and the source zip, held to the
-# hashes its SHA256SUMS pins, inspected and linted for Firefox. Each store zip is then extracted or
-# installed as a store receives it and driven in a new profile: the Chrome and the Edge zips in
-# Playwright's Chromium, then each again in the runner's Google Chrome or Microsoft Edge, the
-# Firefox zip in the runner's own Firefox through WebDriver BiDi, and
-# the Firefox build's page in Playwright's Firefox. The store screenshots and promotional tiles
-# are captured again from the Chrome build. The reports are judged by the repository's page
-# and acceptance judges, the packages are rebuilt from the source zip, and the reproduce job
-# rebuilds them on Linux, macOS and Windows with Node.js 22 and 24 in two time zones, each time to
-# the pinned bytes. The packages carry the published WASM package; the wasm-rebuild job builds
-# that module again from the Rust source at tag v0.11.0 and requires the same bytes. Nothing is
-# uploaded to a store.
+# installed from its own lockfile, built into the four store zips (Chrome, Edge, Firefox, Safari)
+# and the source zip, held to the hashes its SHA256SUMS pins, inspected and linted for Firefox.
+# Each store zip is then extracted or installed as a store receives it and driven in a new
+# profile: the Chrome and the Edge zips in Playwright's Chromium, then each again in the runner's
+# Google Chrome or Microsoft Edge; the Firefox zip in the runner's own Firefox through WebDriver
+# BiDi; the Firefox build's page in Playwright's Firefox. The store screenshots and promotional
+# tiles are captured again from the Chrome build. The reports are judged by the repository's page
+# and acceptance judges, and the packages are rebuilt from the source zip. Three more jobs: safari
+# builds the Safari app on macOS, wasm-rebuild builds the WebAssembly module again from its Rust
+# source at tag v0.11.0 and requires the same bytes, and reproduce rebuilds the packages on Linux,
+# macOS and Windows with Node.js 22 and 24 in two time zones, each time to the pinned bytes.
+# Nothing is uploaded to a store.
 on:
   workflow_dispatch:
   pull_request:
@@ -123,7 +123,7 @@ jobs:
               --example "$here" --page-key integrations/browser-extension
             case "$record" in
               firefox-addon) driver="node test/firefox-addon.mjs" ;;
-              firefox-page) driver="node test/firefox-page.mjs" ;;
+              firefox-page) driver="node test/engine-page.mjs --browser firefox" ;;
               *) driver="node test/chromium.mjs" ;;
             esac
             python3 scripts/destination-acceptance.py reports --kind page \
@@ -151,6 +151,61 @@ jobs:
             integrations/browser-extension/build/store-images
             integrations/browser-extension/build/acceptance
             ${{ runner.temp }}/receipts
+          if-no-files-found: error
+
+  # The Safari app for macOS: Apple's packager writes a macOS-only Xcode project from build/safari,
+  # xcodebuild builds the app without signing, and scripts/safari.mjs opens the built extension
+  # and requires the files of build/safari, byte for byte. The project is
+  # generated here on every run and never committed (listing/safari.md says why). Then the Safari
+  # build's page runs in Playwright's WebKit under the manifest's policy. Signing, notarizing and
+  # App Store Connect are the owner's.
+  safari:
+    name: Safari · Xcode project, unsigned macOS app, WebKit page
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/browser-extension
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Xcode 26, whose Safari 26 reads 'wasm-unsafe-eval' in an extension policy
+        run: |
+          set -euo pipefail
+          ls -d /Applications/Xcode*.app
+          xcode=$(ls -d /Applications/Xcode_26*.app | sort -t. -k2,2n -k3,3n | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          sw_vers
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build the packages, to the pinned hashes
+        run: TZ=UTC npm run check:pins
+      - name: Generate the Xcode project, build the macOS app unsigned and inspect it
+        run: node scripts/safari.mjs --out build/safari-xcode
+      - name: The Safari build's page in Playwright's WebKit
+        run: |
+          set -euo pipefail
+          node node_modules/playwright/cli.js install webkit
+          npm run test:webkit-page
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: browser-extension-safari
+          path: |
+            integrations/browser-extension/build/qrcode-barcode-scanner-safari-*.zip
+            integrations/browser-extension/build/SHA256SUMS
+            integrations/browser-extension/build/safari-xcode/*.json
+            integrations/browser-extension/build/safari-xcode/*.log
+            integrations/browser-extension/build/safari-xcode/*.zip
+            integrations/browser-extension/build/acceptance/webkit-page
+            integrations/browser-extension/build/acceptance/webkit-page-run.json
           if-no-files-found: error
 
   # The WebAssembly module every package carries, rebuilt from its Rust source at tag v0.11.0 with

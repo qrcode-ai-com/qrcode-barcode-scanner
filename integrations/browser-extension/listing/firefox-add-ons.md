@@ -15,7 +15,7 @@ effect on 1 December 2026: open each page again before submitting.
 | Add-on | `build/qrcode-barcode-scanner-firefox-0.1.0.zip` |
 | SHA-256 | `b7f58e3d17e92143f0557b7f7affff4640c6f58a8b73be033e56e3fb9b9f60d2` |
 | Source package | `build/qrcode-barcode-scanner-source-0.1.0.zip` |
-| SHA-256 | `68e6073cf348d9e614b4598c9015e123496e487130bd7329fa6bf8805ccb3701` |
+| SHA-256 | `daab04820df331bafa63fa88dda27279c6eb7b88321f771c678a5a442e76bda2` |
 | Listing metadata | `build/amo-metadata.json`, written by the build from [texts.md](texts.md) |
 | Made by | `npm ci && npm run build` in this folder, or the `browser-extension` artifact of the `integration-browser-extension` workflow |
 | Checked by | `npm run check:pins` (same bytes as [SHA256SUMS](../SHA256SUMS)), `npm run inspect`, `npm run lint:firefox` (no error, warning or notice), `npm run test:firefox-addon` (the zip installed in release Firefox), `npm run test:reproduce` (the source package rebuilds every archive) |

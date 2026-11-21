@@ -1,11 +1,11 @@
-// Build the three store packages and the source package from this folder.
+// Build the four store packages and the source package from this folder.
 //
 //   node scripts/build.mjs [--out DIR] [--check | --pin]
 //
 // Run `npm ci` first: the scanner files are copied from the exact npm package in node_modules,
 // after its version and the SHA-256 of its WebAssembly module are checked against the pins in
 // package.json. Writes, under DIR (default ./build):
-//   chrome/ edge/ firefox/                       the unpacked extensions
+//   chrome/ edge/ firefox/ safari/               the unpacked extensions
 //   qrcode-barcode-scanner-<target>-<version>.zip  one per store
 //   qrcode-barcode-scanner-source-<version>.zip    the source package for Firefox review
 //   store-assets/                                the icon and logo the store forms ask for
