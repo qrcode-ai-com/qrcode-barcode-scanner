@@ -8,6 +8,7 @@ import inspect
 import json
 import os
 import pathlib
+import re
 
 import napari
 import numpy as np
@@ -179,6 +180,11 @@ def test_the_package_metadata_follows_the_napari_hub_rules():
     assert "qrcode-barcode-scanner==0.11.0" in project["dependencies"]
     assert not any(dep.split("[")[0].startswith(("napari", "PyQt", "PySide")) for dep in project["dependencies"])
     assert project["license"] == "MIT"
+    # The hub's GitHub link is read from Homepage or "Source Code", a repository root only.
+    assert re.fullmatch(r"https://github\.com/[^/]+/[^/]+", project["urls"]["Source Code"])
+    assert all(url.startswith("https://") for url in project["urls"].values())
+    manifest = PluginManifest.from_file(PLUGIN_ROOT / "src/napari_qrcode_barcode_scanner/napari.yaml")
+    assert (manifest.display_name, str(manifest.visibility)) == ("QR Code & Barcode Scanner", "public")
 
 
 def test_the_acceptance_reports_are_written_through_the_widget(mixed_rgb, notes):

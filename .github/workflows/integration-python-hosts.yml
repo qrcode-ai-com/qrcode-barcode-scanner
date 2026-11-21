@@ -6,8 +6,10 @@ name: Integrations · Python hosts
 # through the integration's own entry point; the destination acceptance driver judges those three
 # reports, then the scanner is removed and must be gone. The ComfyUI node and the Dify plugin are
 # also staged as the tree of their own repository, which must verify and pass its own tests.
-# Nothing is built from the engine's Rust source, no host application runs (ComfyUI, Dify, the
-# Apify platform, a napari window, Streamlit Community Cloud) and nothing is published.
+# The napari plugin's built wheel runs through the Python host kit, then in a napari window on a
+# virtual display, whose picture is kept. Nothing is built from the engine's Rust source, no other
+# host application runs (ComfyUI, Dify, the Apify platform, Streamlit Community Cloud) and nothing
+# is published.
 # The kit job runs the Python host kit (scripts/python-host-consumer.py) on the published wheel.
 on:
   workflow_dispatch:
@@ -25,6 +27,7 @@ on:
       - scripts/destination-acceptance.py
       - scripts/python-host-consumer.py
       - scripts/python_host_kit.py
+      - scripts/python-plugin-release.py
       - distribution/acceptance/drivers/python-package.py
       - scripts/consumer_truth.py
       - fixtures/consumer-truth.json
@@ -123,16 +126,6 @@ jobs:
             identifier: qrcode-barcode-scanner@0.1
             uninstall: python -m pip uninstall -y qrcode-barcode-scanner
             gone: python -c "import qrcode_barcode_scanner"
-          # The wheel built in the step below is what the tests import.
-          - name: napari plugin
-            folder: integrations/napari
-            pins: integrations/napari/pyproject.toml
-            install: >-
-              python -m pip install "$(ls dist/napari_qrcode_barcode_scanner-*.whl)"
-              -r integrations/napari/tests/requirements.txt
-            identifier: napari-qrcode-barcode-scanner@0.1.0
-            uninstall: python -m pip uninstall -y napari-qrcode-barcode-scanner
-            gone: python -c "import napari_qrcode_barcode_scanner"
           - name: Streamlit app
             folder: examples/streamlit
             pins: examples/streamlit/requirements.txt
@@ -165,13 +158,6 @@ jobs:
           test "$(printf '%s\n' "$pins" | wc -l)" -eq 1
           echo "ENGINE_VERSION=${pins#qrcode-barcode-scanner==}" >> "$GITHUB_ENV"
           echo "$pins"
-      # The sdist and the wheel a PyPI upload would carry, checked the way PyPI reads them.
-      - name: Build the napari plugin's distributions
-        if: matrix.folder == 'integrations/napari'
-        run: |
-          python -m pip install build==1.3.0 twine==7.0.0
-          python -m build --outdir dist integrations/napari
-          python -m twine check --strict dist/*
       - name: Install the integration's requirements and the test tools
         run: |
           eval "$INSTALL"
@@ -213,6 +199,111 @@ jobs:
         with:
           name: acceptance-${{ strategy.job-index }}
           path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The napari plugin as PyPI would carry it, the steps python-plugins-publish.yml runs before an
+  # upload: the sdist and the wheel built by scripts/python-plugin-release.py, which prints their
+  # sha256, checked the way PyPI reads them; then the Python host kit's clean consumer: the built
+  # wheel, napari and the test requirements in a new environment, the plugin's tests on the mixed
+  # fixture in the three profiles, both packages removed and their imports gone.
+  napari:
+    name: napari plugin · the built wheel in a new environment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: python scripts/python-plugin-release.py --self-test
+      - run: python scripts/python-plugin-release.py gate --ref "$GITHUB_REF" --folder integrations/napari --dry-run
+      - name: Build the sdist and the wheel and print their sha256
+        id: build
+        run: |
+          python -m pip install build==1.3.0 twine==7.0.0
+          python scripts/python-plugin-release.py build --folder integrations/napari --out dist
+          python -m twine check --strict dist/*
+      # The engine version the reports must name is the one the plugin pins (the build step's output).
+      - name: The built wheel in a new environment, its tests on the mixed fixture
+        env:
+          ENGINE_VERSION: ${{ steps.build.outputs.engine }}
+        run: |
+          mkdir -p receipt
+          python scripts/python-host-consumer.py run \
+            --destination "napari plugin from this checkout (not published)" \
+            --identifier napari-qrcode-barcode-scanner@0.1.0 --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/napari" \
+            --install "$(ls dist/napari_qrcode_barcode_scanner-*-py3-none-any.whl)" \
+            --install "-r integrations/napari/tests/requirements.txt" \
+            --scan "{python} -m pytest -q -p no:cacheprovider integrations/napari/tests" \
+            --uninstall "napari-qrcode-barcode-scanner qrcode-barcode-scanner" \
+            --gone-import napari_qrcode_barcode_scanner --gone-import qrcode_barcode_scanner \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-integrations-napari.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: napari-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: acceptance-napari
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The plugin in a napari window, as its users run it: the built wheel, napari and a pinned PyQt6 in
+  # a new environment, on a virtual display. tests/capture_window.py adds the plugin's widget as the
+  # Plugins menu does, runs a full scan of the mixed fixture, requires both codes outlined and saves
+  # the window; integrations/napari/media/napari-window.png is a picture this job took.
+  napari-window:
+    name: napari plugin · a napari window
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Qt's system libraries and a virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils libegl1 libgl1 \
+            libopengl0 libglx-mesa0 libgl1-mesa-dri libdbus-1-3 libfontconfig1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xinput0 libxcb-xfixes0 \
+            fonts-dejavu-core
+      - name: Build the plugin's wheel
+        run: |
+          python -m pip install build==1.3.0
+          python scripts/python-plugin-release.py build --folder integrations/napari --out dist
+      - name: The built wheel, napari and PyQt6 in a new environment
+        run: |
+          python -m venv "$RUNNER_TEMP/window"
+          "$RUNNER_TEMP/window/bin/python" -m pip install \
+            "$(ls dist/napari_qrcode_barcode_scanner-*-py3-none-any.whl)" \
+            -r integrations/napari/tests/requirements.txt -r integrations/napari/tests/window-requirements.txt
+          "$RUNNER_TEMP/window/bin/python" -m pip check
+      - name: Run the plugin in a napari window and keep its picture
+        env:
+          QT_QPA_PLATFORM: xcb
+        run: |
+          mkdir -p window
+          xvfb-run --auto-servernum --server-args="-screen 0 1600x1000x24" \
+            "$RUNNER_TEMP/window/bin/python" integrations/napari/tests/capture_window.py \
+            --out window/napari-window.png
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: napari-window
+          path: window/
           if-no-files-found: error
           retention-days: 90
 

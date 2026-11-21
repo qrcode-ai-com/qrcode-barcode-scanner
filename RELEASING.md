@@ -537,7 +537,9 @@ and judged, and it is never marked as the latest release. Since 11 November
 `agents-v*`: only the owner creates, moves or deletes such a tag.
 `mcpb-vX.Y.Z` (the MCP Bundle, numbered after the MCP server it holds) follows
 the same rule; adding `mcpb-v*` to that ruleset is an owner step of
-[MCP Bundle](#mcp-bundle).
+[MCP Bundle](#mcp-bundle). So does `napari-vX.Y.Z`, the napari plugin's PyPI
+release: adding `napari-v*` is an owner step of
+[Python plugin packages](#python-plugin-packages).
 
 **What npm reads as the operand.** npm reads a relative path with one slash
 (`npm-wasm/<file>.tgz`) as the GitHub repository of that name, not as a
@@ -1360,6 +1362,54 @@ The bundle is not listed there. Users install it from the release file in
 Claude for macOS and Windows or another MCPB host. The manifest's tools carry
 a name and a description only, as the MCPB schema requires (`mcpb validate`
 refuses `inputSchema`, which the consumer checks).
+
+### Python plugin packages
+
+A Python plugin package lives under `integrations/`, installs the published
+engine wheel `qrcode-barcode-scanner` at the exact version it pins and ships
+no engine of its own. The napari plugin `napari-qrcode-barcode-scanner` is the
+first; its PyPI release is numbered after the plugin, under its own tag
+`napari-vX.Y.Z`, and the engine's releases stay as published.
+`integrations/napari/LISTING.md` lists what its napari hub listing reads and
+the steps below with every value filled in.
+
+`.github/workflows/python-plugins-publish.yml` runs on that tag or a dispatch.
+`napari-build` reads only: it runs the gate in dry-run form, builds the sdist
+and the wheel with `scripts/python-plugin-release.py build`, which prints
+each file's sha256 and records the digest of that list as its output, runs
+`twine check --strict`, then the Python host kit's clean consumer
+(`scripts/python-host-consumer.py run`): the wheel, napari and the test
+requirements in a new environment, the plugin's tests on the mixed sample in
+the three profiles, the uninstall and the imports that must fail. It uploads
+`napari-dist`. On a tag `napari-v*` only, `napari-publish` runs in the
+protected environment `pypi-napari`, with `contents: read` and
+`id-token: write` only. It runs the gate first (the tag must name the version
+the plugin states), downloads `napari-dist` once with `digest-mismatch:
+error`, re-inspects those two files against the build job's digest, compares
+them with what PyPI already serves at that version (`pypi-live`), and uploads
+them with the same pinned `pypa/gh-action-pypi-publish` as `python.yml`,
+through OIDC: no token is stored. A dispatch builds and judges, and stops
+before PyPI. `scripts/check-publish-guards.py` holds every publishing job of
+that workflow to its row of `PYPI_PLUGINS`: the next plugin (the JupyterLab
+extension) is one row there, one in `PLUGINS` of
+`scripts/python-plugin-release.py` and its two jobs.
+
+**Owner steps, once per plugin.** On PyPI, add a pending trusted publisher
+for the project `napari-qrcode-barcode-scanner`: owner `qrcode-ai-com`,
+repository `qrcode-barcode-scanner-rust`, workflow
+`python-plugins-publish.yml`, environment `pypi-napari`. Create the
+environment `pypi-napari`: deployment tags `napari-v*` only, the owner as
+its required reviewer, no administrator bypass, no secret. Add `napari-v*`
+to the tag ruleset of distribution tags.
+
+**Each release.** Merge the change to `main`, with
+`integration-python-hosts` green on its pull request and the README's status
+saying it is on PyPI. Tag the merged commit and push the tag
+(`git tag -a napari-v0.1.0 <commit> -m 'napari plugin 0.1.0'`, then
+`git push origin napari-v0.1.0`), approve `napari-publish` once
+`napari-build` is green, then read back the project page on PyPI, the napari
+hub and napari's plugin manager as `LISTING.md` says. A file on PyPI is
+immutable: a mistake is a new plugin version and a new tag.
 
 ## PHP package — its own repository
 
