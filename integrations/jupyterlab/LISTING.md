@@ -32,13 +32,20 @@ the browser tab.
 | Wheel | `jupyterlab_qrcode_barcode_scanner-0.1.0-py3-none-any.whl`, about 1 MB |
 | sdist | `jupyterlab_qrcode_barcode_scanner-0.1.0.tar.gz`, with the built labextension |
 
-The workflow `integration-jupyterlab` built commit `COMMIT` on CI (run RUN_URL), checked both
-files with `twine check --strict` and printed:
+The workflow `integration-jupyterlab` built pull request #143 at head `637393f9` (merge commit
+`c7500ff0`) in
+[run 44895450468](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44895450468),
+checked both files with `twine check --strict`, uploaded them as the artifact `jupyterlab-dist`
+and printed:
 
 ```text
-WHEEL_SHA256  jupyterlab_qrcode_barcode_scanner-0.1.0-py3-none-any.whl
-SDIST_SHA256  jupyterlab_qrcode_barcode_scanner-0.1.0.tar.gz
+9dbef94d36faf9307ecc1c3f2f30cc1d5d7a5ec114c1562fbb5cdf982d23cd60  jupyterlab_qrcode_barcode_scanner-0.1.0-py3-none-any.whl
+9c078315351c5282f5b2ff9dfe567e532ced9a2a3e499b30adf8a408ec1bfd00  jupyterlab_qrcode_barcode_scanner-0.1.0.tar.gz
 ```
+
+The same run installed that wheel with JupyterLab 4.6.6 in a new environment, scanned the mixed
+fixture through the panel with the three profiles and from the file browser, and closed its
+receipt with the verdict PASS after the uninstall.
 
 These are the digests of that commit's build. The wheel takes the dates of its entries from its
 commit, so the tag's run builds other bytes; the run prints the digests it uploads, and those are
@@ -93,6 +100,9 @@ yet.
    | Repository name | `qrcode-barcode-scanner-rust` |
    | Workflow name | `python-plugins-publish.yml` |
    | Environment name | `pypi-jupyterlab` |
+
+   The jobs `jupyterlab-build` and `jupyterlab-publish` join that workflow beside the napari
+   plugin's: until they are on `main`, a tag has nothing to run.
 
    Press **Add**. The first upload from that workflow and environment creates the project.
 
