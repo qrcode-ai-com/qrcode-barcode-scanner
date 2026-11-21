@@ -12,15 +12,17 @@ before(async () => {
   q = await bundleSource('src/qrscan.ts');
 });
 
-const REPORT = JSON.stringify({
+const REPORT_OBJECT = {
   versions: { scanner: '0.11.0' },
   detections: [
     { symbology: 'qr_code', content: { text: QR, charset: 'utf8' } },
     { symbology: 'code128', content: { text: CODE128, charset: 'iso8859_1' } },
     { symbology: 'future_format', content: { text: 'caf?', charset: 'unknown' } },
   ],
+  score: { value: 93, grade: 'excellent', weights_run: 100 },
   trace: { budget_exhausted: false },
-});
+};
+const REPORT = JSON.stringify(REPORT_OBJECT);
 
 /** A stand-in for execFile that records the call and answers with EXIT. */
 function fakeRun(exit) {
@@ -69,7 +71,7 @@ test('qrscan is found at the preferred path, or in the usual places', async () =
 
 test('a report becomes codes; the file and the profile are the only arguments', async () => {
   const { run, calls } = fakeRun({ code: 0, stdout: REPORT });
-  const result = await q.scanFile('/opt/homebrew/bin/qrscan', '/tmp/-label.png', 'fast', run);
+  const result = await q.scanFile('/opt/homebrew/bin/qrscan', '/tmp/-label.png', 'fast', { run });
   assert.deepEqual(calls.map((call) => [call.file, call.args]), [['/opt/homebrew/bin/qrscan', ['/tmp/-label.png', '--profile', 'fast']]]);
   assert.equal(calls[0].options.timeout, 30000);
   assert.deepEqual(result.codes, [
@@ -80,10 +82,33 @@ test('a report becomes codes; the file and the profile are the only arguments', 
   assert.equal(result.engine, '0.11.0');
   assert.equal(result.budgetExhausted, false);
   assert.equal(q.allTexts(result.codes), `${QR}\n${CODE128}\ncaf?`);
+  assert.deepEqual(result.score, { value: 93, grade: 'excellent' });
+  // The report is kept as qrscan printed it, and copied indented.
+  assert.deepEqual(result.report, REPORT_OBJECT);
+  assert.equal(q.reportText(result), JSON.stringify(REPORT_OBJECT, null, 2));
+});
+
+test('with no time limit, qrscan gets an unbounded budget and a longer stop', async () => {
+  const { run, calls } = fakeRun({ code: 0, stdout: REPORT });
+  await q.scanFile('/q', '/a.png', 'frame', { run, limit: 'none' });
+  assert.deepEqual(calls[0].args, ['/a.png', '--profile', 'frame', '--budget-ms', '0']);
+  assert.equal(calls[0].options.timeout, 120000);
+  await q.scanFile('/q', '/a.png', 'frame', { run, limit: 'profile' });
+  assert.deepEqual([calls[1].args, calls[1].options.timeout], [['/a.png', '--profile', 'frame'], 30000]);
+  await assert.rejects(q.scanFile('/q', '/a.png', 'frame', { run, limit: '0' }), /unknown time limit/);
+  assert.equal(calls.length, 2);
+});
+
+test('a report without a judgment, or with a malformed one, has no score', async () => {
+  for (const score of [null, undefined, { value: '93', grade: 'excellent' }, { value: 93 }]) {
+    const stdout = JSON.stringify({ ...REPORT_OBJECT, score });
+    const result = await q.scanFile('/q', '/a.png', 'frame', { run: fakeRun({ code: 0, stdout }).run });
+    assert.equal(result.score, null, JSON.stringify(score));
+  }
 });
 
 test('every way qrscan can end is told apart', async () => {
-  const none = await q.scanFile('/q', '/a.png', 'full', fakeRun({ code: 1, stdout: JSON.stringify({ detections: [], trace: { budget_exhausted: true } }) }).run);
+  const none = await q.scanFile('/q', '/a.png', 'full', { run: fakeRun({ code: 1, stdout: JSON.stringify({ detections: [], trace: { budget_exhausted: true } }) }).run });
   assert.deepEqual([none.codes, none.budgetExhausted], [[], true]);
   const cases = [
     [{ code: 2, stderr: '✖ unsupported or corrupt image: The image format could not be determined [QRS-001]\n' }, 'UnreadableImageError', 'unsupported or corrupt image: The image format could not be determined [QRS-001]'],
@@ -94,13 +119,13 @@ test('every way qrscan can end is told apart', async () => {
     [{ code: 0, stdout: '{"detections": 3}' }, 'ScanFailedError', 'qrscan did not print a scan report'],
   ];
   for (const [exit, name, message] of cases) {
-    await assert.rejects(q.scanFile('/q', '/a.png', 'full', fakeRun(exit).run), (error) => {
+    await assert.rejects(q.scanFile('/q', '/a.png', 'full', { run: fakeRun(exit).run }), (error) => {
       assert.equal(error.name, name, JSON.stringify(exit));
       assert.equal(error.message, message);
       return true;
     });
   }
-  await assert.rejects(q.scanFile('/q', '/a.png', '--help', fakeRun({ code: 0 }).run), /unknown profile/);
+  await assert.rejects(q.scanFile('/q', '/a.png', '--help', { run: fakeRun({ code: 0 }).run }), /unknown profile/);
 });
 
 test('the image comes from Finder first, then from the clipboard', async () => {
@@ -124,6 +149,9 @@ describe('the published qrscan', { skip: live.skip }, () => {
   for (const profile of ['fast', 'frame', 'full']) {
     test(`profile ${profile} reads both codes of the mixed fixture`, async (t) => {
       const result = await q.scanFile(live.path, mixedFixture(), profile);
+      const unbounded = await q.scanFile(live.path, mixedFixture(), profile, { limit: 'none' });
+      // Within the profile's budget a slow machine may cut the scan; without a limit it never is.
+      assert.deepEqual([unbounded.codes.map((code) => code.text), unbounded.budgetExhausted], [[QR, CODE128], false]);
       assert.deepEqual(new Set(result.codes.map((code) => code.text)), new Set([QR, CODE128]));
       assert.deepEqual(new Set(result.codes.map((code) => code.label)), new Set(['QR Code', 'Code 128']));
       assert.ok(result.codes.every((code) => code.complete));

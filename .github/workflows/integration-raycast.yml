@@ -1,11 +1,21 @@
 name: Integration · Raycast
 
-# The Raycast extension under integrations/raycast. It is checked the way the Raycast store
-# builds it (type check, ESLint and Prettier with the Raycast config, `ray build` for
-# distribution, which needs no Raycast account), then its tests run with the published qrscan,
+# The Raycast extension under integrations/raycast, in two jobs.
+#
+# `extension` checks the source the way it is developed (type check, ESLint and Prettier with the
+# Raycast config, `ray build` for distribution), then runs its tests with the published qrscan,
 # downloaded and checked by the GitHub Action's installer, on the mixed fixture in the three
-# profiles. `ray lint` is not run: it asks the Raycast store about the author. Nothing is
-# published.
+# profiles.
+#
+# `store` writes the folder a pull request to raycast/extensions would carry, with
+# integrations/raycast/scripts/stage-store.py, and checks it the way that repository's CI does: `npm ci`,
+# `ray validate` against the Store schema, `ray build -e dist`, and Raycast's own screenshot
+# checker, fetched at a pinned commit and verified by its sha256. `ray validate` looks the author
+# up in Raycast's user directory; until the owner's Raycast username is the author, that single
+# error is expected and the log is judged by the stager, which refuses any other. The built
+# extension is then installed in a new folder and scans the fixture in fast, frame and full; the
+# destination acceptance driver judges the three reports, the folder is removed and the receipt
+# closed. The staged folder is kept as a deterministic archive. Nothing is published.
 on:
   workflow_dispatch:
   pull_request:
@@ -13,6 +23,9 @@ on:
       - .github/workflows/integration-raycast.yml
       - integrations/raycast/**
       - integrations/github-action/src/**
+      - scripts/destination-acceptance.py
+      - scripts/consumer_truth.py
+      - fixtures/consumer-truth.json
       - fixtures/symbology/mixed-code128-qr.png
 
 permissions:
@@ -25,6 +38,9 @@ concurrency:
 defaults:
   run:
     shell: bash
+
+env:
+  ENGINE_VERSION: 0.11.0
 
 jobs:
   extension:
@@ -51,10 +67,120 @@ jobs:
         run: npx ray build --non-interactive --environment dist --output "$RUNNER_TEMP/raycast-build"
       - name: Install the published qrscan
         id: qrscan
-        run: echo "path=$(node integrations/github-action/src/install-cli.mjs "$RUNNER_TEMP/qrscan")" >> "$GITHUB_OUTPUT"
+        run: echo "path=$(node integrations/github-action/src/install-cli.mjs "$RUNNER_TEMP/qrscan" "$ENGINE_VERSION")" >> "$GITHUB_OUTPUT"
       - name: Tests, with the published qrscan on the mixed fixture
         working-directory: integrations/raycast
         env:
           QRSCAN: ${{ steps.qrscan.outputs.path }}
           QRSCAN_RAYCAST_LIVE: required
         run: npm test
+
+  store:
+    name: Stage the Store folder and check it the way raycast/extensions does
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      # Raycast's screenshot checker, as its Metadata Image Enforcer runs it.
+      RAYCAST_COMMIT: 1aef446889476810eebd08301d03f2ff8ae74c0b
+      METADATA_CHECKER_SHA256: b57381660862663a43335248c255c412e870ac292e359d3b1ad55ba111aa1c26
+      IMAGE_CHECKER_SHA256: 186688ce436f21037de66a33bdf761c9fc65fb3fa758e9ac79fbec23fe63dc9a
+      ARCHIVE: kit/qrcode-barcode-scanner-raycast-store.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The Node version of raycast/extensions' CI, and the Python of its screenshot checker.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.22.2
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Self-test of the stager
+        run: python integrations/raycast/scripts/stage-store.py --self-test
+      # The Store folder sits in the layout of raycast/extensions, beside the checker's scripts/.
+      - name: Stage the Store folder, twice, and compare
+        run: |
+          store="$RUNNER_TEMP/store/extensions/qrcode-barcode-scanner"
+          echo "STORE_DIR=$store" >> "$GITHUB_ENV"
+          mkdir -p kit
+          TZ=UTC python integrations/raycast/scripts/stage-store.py stage --out "$store" --archive "$ARCHIVE"
+          TZ=Asia/Dubai python integrations/raycast/scripts/stage-store.py stage --out "$RUNNER_TEMP/again" --archive "$RUNNER_TEMP/again.tar.gz"
+          cmp "$ARCHIVE" "$RUNNER_TEMP/again.tar.gz"
+          python integrations/raycast/scripts/stage-store.py check "$store"
+          (cd kit && shasum -a 256 "$(basename "$ARCHIVE")" | tee SHA256SUMS)
+      - name: Install its dependencies as raycast/extensions does
+        run: cd "$STORE_DIR" && npm ci --silent
+      - name: ray validate, against the Store schema
+        run: |
+          cd "$STORE_DIR"
+          set +e
+          npx ray validate --skip-owner -s https://www.raycast.com/schemas/extension.json \
+            --non-interactive --emoji --exit-on-error > "$RUNNER_TEMP/validate.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/validate.log"
+          echo "ray validate exit status: $status"
+          cp "$RUNNER_TEMP/validate.log" "$GITHUB_WORKSPACE/kit/ray-validate.log"
+          python "$GITHUB_WORKSPACE/integrations/raycast/scripts/stage-store.py" validate-log "$RUNNER_TEMP/validate.log"
+      - name: ray build, for distribution
+        run: cd "$STORE_DIR" && npx ray build -e dist --non-interactive --emoji --exit-on-error --output "$RUNNER_TEMP/store-build"
+      - name: Raycast's screenshot checker
+        run: |
+          scripts="$RUNNER_TEMP/store/scripts"
+          mkdir -p "$scripts"
+          base="https://raw.githubusercontent.com/raycast/extensions/$RAYCAST_COMMIT/scripts"
+          curl -fsSL --retry 3 "$base/check_metadata_images.py" -o "$scripts/check_metadata_images.py"
+          curl -fsSL --retry 3 "$base/check_raycast_images.py" -o "$scripts/check_raycast_images.py"
+          printf '%s  %s\n' "$METADATA_CHECKER_SHA256" "$scripts/check_metadata_images.py" \
+            "$IMAGE_CHECKER_SHA256" "$scripts/check_raycast_images.py" | shasum -a 256 -c
+          python -m pip install --disable-pip-version-check numpy==2.4.6 pillow==13.0.0
+          python "$scripts/check_metadata_images.py" "$STORE_DIR"
+      - name: Install the published qrscan
+        id: qrscan
+        run: |
+          path=$(node integrations/github-action/src/install-cli.mjs "$RUNNER_TEMP/qrscan" "$ENGINE_VERSION")
+          "$path" --version | grep -F "$ENGINE_VERSION"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+      # The build is copied into a new folder, as Raycast installs an extension, and scans the
+      # staged copy of the checked fixture in the three profiles.
+      - name: Run the built extension on the mixed fixture
+        env:
+          QRSCAN: ${{ steps.qrscan.outputs.path }}
+        run: |
+          image=$(python scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")
+          node integrations/raycast/test/dist-consumer.mjs --build "$RUNNER_TEMP/store-build" \
+            --qrscan "$QRSCAN" --image "$image" --reports "$RUNNER_TEMP/reports" \
+            --home "$RUNNER_TEMP/installed" --packages "$STORE_DIR"
+      - name: Judge the three reports
+        run: |
+          echo "RECEIPT=kit/acceptance-raycast.json" >> "$GITHUB_ENV"
+          python scripts/destination-acceptance.py reports --kind package \
+            --produced-by "node integrations/raycast/test/dist-consumer.mjs" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Raycast Store build from this checkout (not published)" \
+            --identifier qrcode-barcode-scanner \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/raycast" \
+            --install "ray build -e dist of the staged Store folder, copied into a new folder" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt kit/acceptance-raycast.json
+      - name: Remove the installed extension and close the receipt
+        env:
+          UNINSTALL: >-
+            node -e "require('fs').rmSync(process.argv[1], {recursive: true})" ${{ runner.temp }}/installed
+          GONE: >-
+            node -e "require(process.argv[1])" ${{ runner.temp }}/installed/extension/scan-image.js
+        run: |
+          eval "$UNINSTALL"
+          python scripts/destination-acceptance.py removed --gone "$GONE" --uninstall "$UNINSTALL" --receipt "$RECEIPT"
+          python scripts/destination-acceptance.py check "$RECEIPT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: raycast-store-kit
+          path: kit/
+          if-no-files-found: error
+          retention-days: 90

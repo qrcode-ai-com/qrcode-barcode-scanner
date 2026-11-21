@@ -111,8 +111,14 @@ test('a corrupt image stops the node with the engine code, or becomes an error i
 		return true;
 	});
 	const [output] = await run([...items, { json: {}, binary: binary(fixture) }], {}, { continueOnFail: true });
-	assert.equal(output[0].json.code, 'QRS-001');
-	assert.match(output[0].json.error, /\[QRS-001\]/);
+	// The json n8n gives an error item, and the item's own error, which n8n reads to send it to the
+	// error output.
+	assert.deepEqual(Object.keys(output[0].json), ['error']);
+	assert.match(output[0].json.error, /\[QRS-001\]$/);
+	assert.ok(output[0].error instanceof NodeOperationError);
+	assert.equal(output[0].error.message, output[0].json.error);
+	assert.equal(output[0].error.description, 'Scanner error QRS-001');
+	assert.equal(output[1].error, undefined);
 	assert.deepEqual(output[1].json.texts, EXPECTED);
 });
 
@@ -154,5 +160,7 @@ test('the template routes a scan to the branch its result calls for', () => {
 	assert.equal(template.connections[router.name].main.length, 3, 'no code, expected value, wrong value');
 	const scanner = template.nodes.find((node) => node.type.endsWith('.qrcodeBarcodeScanner'));
 	assert.equal(scanner.onError, 'continueErrorOutput');
+	// A budget cut on a busy machine would drop the barcode and report a good label as a wrong value.
+	assert.equal(scanner.parameters.options.budgetMs, 0);
 	assert.equal(template.connections[scanner.name].main.length, 2, 'results and the error output');
 });
