@@ -82,4 +82,5 @@ integrations/zapier/README.md
 playground/README.md
 skills/qrcode-barcode-scanner/README.md
 spec/README.md
+tests/consumers/flutter/README.md
 tests/consumers/jitpack-android/README.md

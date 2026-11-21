@@ -52,22 +52,19 @@ acceptance driver judges the three reports. The dependency is then removed with
 ## Native build settings
 
 Simulators and emulators only run Flutter in debug mode, and in debug mode cargokit builds the
-package's Rust core with Cargo's dev profile. The workflow sets these environment variables so
-that this build gets the code generation of the package's own `[profile.release]`
-(`rust/Cargo.toml`), the build a release app gets on a device:
+package's Rust core with Cargo's dev profile. The workflow gives that build opt-level 3, the
+optimization of the package's own `[profile.release]` (`rust/Cargo.toml`):
 
 | Variable | Value | The package's release profile |
 | --- | --- | --- |
 | `CARGO_PROFILE_DEV_OPT_LEVEL` | `3` | `3`, Cargo's release default |
 | `CARGO_PROFILE_DEV_DEBUG_ASSERTIONS` | `false` | `false` |
-| `CARGO_PROFILE_DEV_LTO` | `thin` | `thin` |
-| `CARGO_PROFILE_DEV_CODEGEN_UNITS` | `1` | `1` |
-| `CARGO_PROFILE_DEV_INCREMENTAL` | `false` | `false` |
-| `CARGO_PROFILE_DEV_DEBUG` | `0` | `0` |
 
-Overflow checks stay on for every crate, which is stricter than the release profile: it keeps
-them for `rxing` only. No package file changes. The receipt `public-package.json` records the
-variables the job ran with.
+The rest of the release profile (thin LTO, one codegen unit, no debug info) is not set: with it,
+the iOS test app never connected to the test runner (runs listed below).
+
+Overflow checks stay on for every crate, as in the dev profile. No package file changes. The
+receipt `public-package.json` records the variables the job ran with.
 
 The Flutter 0.11 facade does not expose a budget override. Tests use its documented defaults
 (`fast` 800 ms, `frame` 80 ms, `full` 4000 ms) and require `budgetExhausted == false`; this is
@@ -98,6 +95,24 @@ The second run, [43278040726](https://github.com/qrcode-ai-com/qrcode-barcode-sc
 set only `CARGO_PROFILE_DEV_OPT_LEVEL=2`. Android passed every case (fast 688 ms). The iPhone
 simulator read both codes in every profile, but its first scan, fast, took 1250 ms and was cut
 by the 800 ms budget; frame, full and both negative cases passed.
+
+## Runs of 21 November 2026
+
+Each run installed `qr_barcode_scanner` 0.11.0 from pub.dev (archive sha256 `460e3a09…`, 198
+public files equal to the archive) into a new app, and every scan decoded both payloads of the
+mixed fixture unless noted.
+
+| Run | Platform | Rust build | Result |
+| --- | --- | --- | --- |
+| [44882430387](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44882430387) (two attempts), [44887343863](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44887343863) | iOS simulator | opt-level 3, thin LTO, one codegen unit, no debug info | Built; the test app never connected, and the step timed out after 1800 s, three times |
+| [44900149034](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44900149034) | iOS simulator | Cargo's default dev profile | Connected; fast 7336 ms, frame 277 ms (QR code only), full 6438 ms, all cut by their budgets |
+| [44901416134](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44901416134) | iOS simulator | opt-level 3 alone | Connected; fast 1815 ms (cut), frame 1660 ms (passed), full 6315 ms (cut) |
+| [44887343863](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/actions/runs/44887343863) | Android emulator | opt-level 3, thin LTO, one codegen unit, no debug info | fast 733 ms, cut by its 800 ms budget; frame and full passed |
+
+The hang comes from the extra release settings, not from the runner image. With a build that
+connects, the simulator and the emulator still miss the fast budget, and the iOS simulator also
+misses the full budget: this is the open engine note for the next Flutter release, together with a
+budget the facade can set.
 
 <!-- qrscan-source-license:v1 -->
 

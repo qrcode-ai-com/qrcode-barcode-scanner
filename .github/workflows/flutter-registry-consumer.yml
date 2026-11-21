@@ -17,45 +17,33 @@ env:
 
 jobs:
   native:
-    name: pub.dev · ${{ matrix.platform }} · ${{ matrix.codegen }} codegen
+    name: pub.dev · ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        # One diagnostic run: iOS with opt-level 3 and nothing else. With the full release code
-        # generation the test never connected (44882430387 twice, 44887343863); with Cargo's default
-        # dev profile it connected and every scan exceeded its budget (44900149034).
+        # opt-level 3 alone. The full release code generation (thin LTO, one codegen unit, no
+        # debug info) kept the iOS test from ever connecting; the README lists the runs.
         include:
+          - platform: Android
+            runner: ubuntu-24.04
+            targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
           - platform: iOS
             runner: macos-15
             targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
-            codegen: opt3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Simulators and emulators run Flutter in debug mode, so cargokit builds the Rust core with
-      # Cargo's dev profile. `release` gives that build the code generation of the package's own
-      # [profile.release] (rust/Cargo.toml: opt-level 3, thin LTO, one codegen unit, no debug
-      # assertions); `opt3` sets opt-level 3 alone; `default` leaves Cargo's dev profile as it is. The receipt records which.
-      - name: Give the Rust core opt-level 3 only
-        if: matrix.codegen == 'opt3'
+      # Cargo's dev profile. This gives that build opt-level 3 without debug assertions; the
+      # receipt records the variables.
+      - name: Give the Rust core opt-level 3
         run: |
           {
             echo "CARGO_PROFILE_DEV_OPT_LEVEL=3"
             echo "CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false"
-          } >> "$GITHUB_ENV"
-      - name: Give the Rust core the release code generation
-        if: matrix.codegen == 'release'
-        run: |
-          {
-            echo "CARGO_PROFILE_DEV_OPT_LEVEL=3"
-            echo "CARGO_PROFILE_DEV_DEBUG_ASSERTIONS=false"
-            echo "CARGO_PROFILE_DEV_LTO=thin"
-            echo "CARGO_PROFILE_DEV_CODEGEN_UNITS=1"
-            echo "CARGO_PROFILE_DEV_INCREMENTAL=false"
-            echo "CARGO_PROFILE_DEV_DEBUG=0"
           } >> "$GITHUB_ENV"
       - name: Set isolated consumer paths
         run: |
@@ -132,7 +120,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
         if: always()
         with:
-          name: flutter-public-${{ matrix.platform }}-${{ matrix.codegen }}
+          name: flutter-public-${{ matrix.platform }}
           path: ${{ runner.temp }}/flutter-public-receipts/
           if-no-files-found: error
           retention-days: 30
