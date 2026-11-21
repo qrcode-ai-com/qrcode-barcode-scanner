@@ -1,8 +1,8 @@
 <p align="center">
-  <a href="https://pypi.org/project/qrcode-barcode-scanner/">
+  <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-dark.gif?v=05df706be1b2">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-python-light.gif?v=c050b0a71771" alt="QR Code &amp; Barcode Scanner for Python: the Python logo, the quick start in Python, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-kaggle-dark.gif?v=faa11cc60a1e">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-kaggle-light.gif?v=54ff7f24fb5b" alt="QR Code &amp; Barcode Scanner in a Kaggle notebook: the Kaggle logo, Run All and the three saved reports, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
