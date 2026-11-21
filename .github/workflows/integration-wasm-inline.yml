@@ -1,0 +1,75 @@
+name: integration-wasm-inline
+
+# The shared build step of integrations/wasm-inline: the published WebAssembly engine inlined in
+# one JavaScript module, for hosts that load a single script (a Canva app, a Photoshop UXP panel,
+# a classic worker). Installed from its own lockfile, then tested as its README describes: the
+# pins it checks, the one glue line it changes, the generated module run on the mixed fixture in
+# fast, frame and full under Node 22 and 24, and one-file bundles from esbuild and webpack 5, with
+# control builds of the package as published. Nothing is built from this repository's Rust
+# source and nothing is published.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-wasm-inline.yml
+      - integrations/wasm-inline/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-wasm-inline.yml
+      - integrations/wasm-inline/**
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-wasm-inline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inline:
+    name: Inline the engine · Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    runs-on: ubuntu-24.04
+    # The tests took 6 s on an Apple Silicon laptop on 21 November 2026.
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/wasm-inline
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Tests
+        run: npm test
+      - name: Write the inlined module and its receipt
+        run: |
+          set -euo pipefail
+          npm run inline
+          cat build/inline-receipt.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: matrix.node == '24'
+        with:
+          name: wasm-inline
+          path: |
+            integrations/wasm-inline/build/qrcode-barcode-scanner.inline.js
+            integrations/wasm-inline/build/inline-receipt.json
+          if-no-files-found: error
