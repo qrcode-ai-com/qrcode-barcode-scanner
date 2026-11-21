@@ -59,14 +59,20 @@ overflow-checks = true
 # opt-level 3 is the release profile's optimization, and debug-assertions off
 # drops the standard library's and the dependencies' debug checks from the
 # pixel loops, as release does. Overflow checks stay on, the dev default, for
-# every crate; rxing is pinned below like in release. Debug info, incremental
-# builds and codegen units keep Cargo's dev defaults: no LTO and no single
-# codegen unit here, because a debug build with thin LTO and one codegen unit
-# built but its iOS simulator test app never connected to the test runner.
+# every crate; rxing is pinned below like in release. Incremental builds are
+# off and every crate is split into 16 codegen units, rustc's split for a
+# non-incremental build: incrementally, this crate and the vendored core
+# would be split into up to 256 units, which limits inlining between them,
+# and the build would depend on whether the consuming machine sets
+# CARGO_INCREMENTAL. Debug info keeps the dev default. No LTO and no single
+# codegen unit here: a debug build with thin LTO and one codegen unit built
+# but its iOS simulator test app never connected to the test runner.
 [profile.dev]
 opt-level = 3
 debug-assertions = false
 overflow-checks = true
+incremental = false
+codegen-units = 16
 
 [profile.dev.package.rxing]
 overflow-checks = true
