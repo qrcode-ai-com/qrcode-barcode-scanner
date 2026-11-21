@@ -102,7 +102,7 @@ The open question is how a reviewer reads AGPL engine files next to GPL extensio
 2. **Submit as it is.** The package already follows the rules that name the case. A refusal costs one review cycle and asks for the same answer.
 3. **Change the engine's licence.** The engine 0.11.0 is published under AGPL-3.0-or-later only. A version under the GPL or a GPL-compatible permissive licence would be the owner's licensing decision and a new engine release. That is out of this kit's scope.
 
-The question for option 1, at `https://extensions.joomla.org/about-jed/listing-support`:
+The question for option 1, as a JED support ticket. The checklists link the ticket form at `https://extensions.joomla.org/about-jed/listing-support`; it answered 404 to a request without sign-in on 21 November 2026, so open it signed in, or from the support links of the JED profile.
 
 > We would like to list a free site module, QR Code & Barcode Scanner. All of its PHP, XML, language files, JavaScript and CSS are licensed GPLv3 or later, with the GPL notice in each PHP file. It bundles, unchanged, the files of a published npm package that holds a WebAssembly module and its JavaScript loader. That package is licensed AGPL-3.0-or-later, its source is public, and the extension includes a TXT file for its licence and names it in the XML license tag, as the "Other File Types" section of "The GPL & the JED" describes. Can the extension be listed with these bundled AGPL files? This message was drafted with AI assistance.
 

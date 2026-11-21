@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-joomla-dark.gif?v=0">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-joomla-light.gif?v=0" alt="QR Code &amp; Barcode Scanner, a Joomla site module: the steps to add it to a page, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-joomla-dark.gif?v=bdf589ac9b99">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-joomla-light.gif?v=962d55fb02c2" alt="QR Code &amp; Barcode Scanner, a Joomla site module: a new site module placed in a position with its first profile, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
