@@ -1,7 +1,7 @@
 # Rebuilding the QR Code & Barcode Scanner add-on from source
 
 This is the source package of the QR Code & Barcode Scanner browser extension, version 0.1.0.
-It builds the Firefox add-on and the Chrome and Edge packages. These notes are written for a
+It builds the Firefox add-on and the Chrome, Edge and Safari packages. These notes are written for a
 Firefox Add-ons reviewer who wants to rebuild the uploaded add-on and compare it.
 
 ## What you need
@@ -29,7 +29,7 @@ npm run build-for-amo
 install script. `npm run build-for-amo` runs `node scripts/build.mjs`. It writes:
 
 - `build/firefox/`, the unpacked add-on, and `build/qrcode-barcode-scanner-firefox-0.1.0.zip`;
-- the same for `chrome` and `edge`;
+- the same for `chrome`, `edge` and `safari`;
 - `build/qrcode-barcode-scanner-source-0.1.0.zip`, this source package;
 - `build/build-receipt.json`, with the size and SHA-256 of every archive.
 
@@ -128,11 +128,12 @@ npm run lint:firefox        # Mozilla's add-on linter, through web-ext
 npm run test:chromium       # the Chrome build in Playwright's Chromium
 npm run test:firefox-addon  # the Firefox zip installed in Firefox (FIREFOX=/path/to/firefox)
 npm run test:firefox-page   # the Firefox build's page in Playwright's Firefox
+npm run test:webkit-page    # the Safari build's page in Playwright's WebKit
 npm run test:reproduce      # rebuild from the source zip and compare the archives
 ```
 
 The browser tests need Playwright's browsers:
-`node node_modules/playwright/cli.js install chromium firefox`.
+`node node_modules/playwright/cli.js install chromium firefox webkit`.
 
 ## License
 

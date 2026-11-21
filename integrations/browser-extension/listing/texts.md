@@ -3,8 +3,8 @@
 The texts every store shows. This file is the one copy of them: the build writes
 `build/amo-metadata.json` for Firefox Add-ons from it, and `npm test` checks their lengths and
 the six links. Each store's form, step by step, with its package and the owner's steps, is in its
-own kit: [chrome-web-store.md](chrome-web-store.md), [edge-add-ons.md](edge-add-ons.md) and
-[firefox-add-ons.md](firefox-add-ons.md).
+own kit: [chrome-web-store.md](chrome-web-store.md), [edge-add-ons.md](edge-add-ons.md),
+[firefox-add-ons.md](firefox-add-ons.md) and [safari.md](safari.md).
 
 Nothing here is submitted. Each store needs its owner's account, its own review, and a check of
 the live listing once it is public.
