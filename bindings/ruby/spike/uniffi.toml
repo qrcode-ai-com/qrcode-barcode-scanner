@@ -1,0 +1,4 @@
+# The generated Ruby loads the library from the exact file the workflow built, named by an
+# environment variable: no search path decides which library answers.
+[bindings.ruby]
+cdylib_path = "ENV.fetch('QRSCAN_UNIFFI_LIBRARY')"
