@@ -121,24 +121,24 @@ publishing {
                     // Project-authored source is MIT; dependencies retain their own notices.
                     license {
                         name.set("MIT")
-                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner/blob/main/LICENSE")
+                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/main/LICENSE")
                     }
                 }
                 developers {
                     developer {
                         id.set("qrcode-ai-com")
                         name.set("QR Code AI")
-                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
+                        url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust")
                     }
                 }
                 scm {
-                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner")
-                    connection.set("scm:git:https://github.com/qrcode-ai-com/qrcode-barcode-scanner.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/qrcode-ai-com/qrcode-barcode-scanner.git")
+                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust")
+                    connection.set("scm:git:https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git")
                 }
                 issueManagement {
                     system.set("GitHub")
-                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner/issues")
+                    url.set("https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues")
                 }
             }
         }

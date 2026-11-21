@@ -22,7 +22,7 @@ import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY = "qrcode-ai-com/qrcode-barcode-scanner"
+REPOSITORY = "qrcode-ai-com/qrcode-barcode-scanner-rust"
 REPOSITORY_ID = "1126991539"
 PACKAGE = "QRCodeAI.QRCodeBarcodeScanner"
 FEED = "https://api.nuget.org/v3-flatcontainer/" + PACKAGE.lower()
