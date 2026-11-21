@@ -52,7 +52,7 @@ class LicensingTests(unittest.TestCase):
 
     def test_all_maintained_readmes_distinguish_source_and_archive_licenses(self):
         paths = readmes.maintained_readmes()
-        self.assertEqual(len(paths), 67)
+        self.assertEqual(len(paths), 68)
         for path in paths:
             with self.subTest(path=path):
                 text = (ROOT / path).read_text()
