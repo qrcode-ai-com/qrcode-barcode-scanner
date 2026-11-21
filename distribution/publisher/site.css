@@ -1,0 +1,201 @@
+/* The one stylesheet of the publisher site: system fonts, light and dark, nothing loaded. */
+:root {
+  color-scheme: light dark;
+  --text: #1b1f24;
+  --muted: #59636e;
+  --background: #ffffff;
+  --surface: #f6f8fa;
+  --border: #d1d9e0;
+  --link: #0a5bd3;
+  --focus: #0a5bd3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #e6edf3;
+    --muted: #9da7b3;
+    --background: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --link: #6cb6ff;
+    --focus: #6cb6ff;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.skip:focus {
+  top: 1rem;
+}
+
+header,
+main,
+footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+header {
+  padding-top: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.brand a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+nav a[aria-current="page"] {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+main {
+  padding-top: 1.5rem;
+  padding-bottom: 2.5rem;
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 2rem;
+  margin: 0.5rem 0 1rem;
+}
+
+h2 {
+  font-size: 1.35rem;
+  margin: 2.25rem 0 0.75rem;
+}
+
+p,
+li,
+dd {
+  max-width: 42rem;
+  text-wrap: pretty;
+}
+
+.lead {
+  font-size: 1.15rem;
+}
+
+a {
+  color: var(--link);
+  text-underline-offset: 0.15em;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+dt {
+  margin-top: 1.25rem;
+  font-weight: 600;
+}
+
+dd {
+  margin: 0.25rem 0 0;
+}
+
+.table {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: 0.5rem;
+}
+
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+tbody th {
+  font-weight: 600;
+}
+
+footer {
+  padding-top: 1rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.95rem;
+}

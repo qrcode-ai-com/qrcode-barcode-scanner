@@ -1,0 +1,83 @@
+name: Check
+
+# This repository is generated from the engine repository,
+# https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust (distribution/publisher):
+# SOURCE.json names the commit and the sha256 of every file. Nothing here is edited by hand.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      readback:
+        description: Also read the published site back and compare it with this tree
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  provenance:
+    name: Every file comes from the engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The stage reads the recorded engine commit and the commit the skill release was built
+      # from; a shallow fetch of each is enough.
+      - name: Fetch the recorded engine commit and the skill's release commit
+        run: |
+          revision=$(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])")
+          git init --quiet "$RUNNER_TEMP/engine"
+          git -C "$RUNNER_TEMP/engine" remote add origin https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
+          git -C "$RUNNER_TEMP/engine" fetch --quiet --depth 1 origin "$revision"
+          skill=$(git -C "$RUNNER_TEMP/engine" show "$revision:distribution/publisher/site.json" \
+            | python3 -c "import json, sys; print(json.load(sys.stdin)['skill']['revision'])")
+          git -C "$RUNNER_TEMP/engine" fetch --quiet --depth 1 origin "$skill"
+          git -C "$RUNNER_TEMP/engine" checkout --quiet "$revision"
+      # The engine's own program stages the commit SOURCE.json names, with the skill archive of
+      # this tree, and compares it with this tree: same files, same bytes, nothing else.
+      - name: Stage the recorded engine commit again and compare
+        run: python3 "$RUNNER_TEMP/engine/scripts/stage-publisher-site.py" verify "$GITHUB_WORKSPACE"
+
+  readback:
+    name: The published site serves this tree
+    if: github.event_name == 'workflow_dispatch' && inputs.readback
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch the recorded engine commit
+        run: |
+          revision=$(python3 -c "import json; print(json.load(open('SOURCE.json'))['engine']['revision'])")
+          git init --quiet "$RUNNER_TEMP/engine"
+          git -C "$RUNNER_TEMP/engine" remote add origin https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust
+          git -C "$RUNNER_TEMP/engine" fetch --quiet --depth 1 origin "$revision"
+          git -C "$RUNNER_TEMP/engine" checkout --quiet "$revision"
+      # Each page, the stylesheet and every file of the skill indexes, read over HTTPS from the
+      # published site: the same bytes as this tree, with the content type the file needs.
+      - name: Read the published site back
+        run: |
+          mkdir receipt
+          python3 "$RUNNER_TEMP/engine/scripts/stage-publisher-site.py" readback "$GITHUB_WORKSPACE" \
+            https://qrcode-ai-com.github.io --receipt receipt/readback.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: readback
+          path: receipt/
+          if-no-files-found: ignore
+          retention-days: 90

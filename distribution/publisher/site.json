@@ -1,0 +1,53 @@
+{
+  "schema": "qrscan-publisher-site-source/1",
+  "repository": "qrcode-ai-com/qrcode-ai-com.github.io",
+  "origin": "https://qrcode-ai-com.github.io",
+  "brand": "QR Code AI",
+  "product": "QR Code & Barcode Scanner",
+  "pages": [
+    {
+      "source": "pages/index.html",
+      "path": "index.html",
+      "url": "/",
+      "nav": "Home",
+      "title": "QR Code & Barcode Scanner",
+      "description": "The open-source QR Code & Barcode Scanner by QR Code AI: where each integration is published and where its source lives."
+    },
+    {
+      "source": "pages/privacy.html",
+      "path": "privacy/index.html",
+      "url": "/privacy/",
+      "nav": "Privacy",
+      "title": "Privacy",
+      "description": "What the QR Code & Barcode Scanner and its integrations read, store and send."
+    },
+    {
+      "source": "pages/terms.html",
+      "path": "terms/index.html",
+      "url": "/terms/",
+      "nav": "Licences",
+      "title": "Software licences",
+      "description": "The licences under which the QR Code & Barcode Scanner and its integrations are published."
+    },
+    {
+      "source": "pages/support.html",
+      "path": "support/index.html",
+      "url": "/support/",
+      "nav": "Support",
+      "title": "Support",
+      "description": "Where to ask a question, report a problem or report a vulnerability in the QR Code & Barcode Scanner."
+    }
+  ],
+  "skill": {
+    "name": "qrcode-barcode-scanner",
+    "version": "0.2.0",
+    "release": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/tag/agents-v0.2.1",
+    "archive": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/agents-v0.2.1/qrcode-barcode-scanner-skill-0.2.0.tar.gz",
+    "sha256": "e73e7b5fe8c6da40ce5c1971e35d1f27d923aa8bf574eeb5c70b55e7a18899a8",
+    "revision": "610879c31302337a2b409b21bd18324e2fece178",
+    "path": "skills/qrcode-barcode-scanner"
+  },
+  "links_read_outside_the_engine": {
+    "https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages": "GitHub's statement that a visit to a GitHub Pages site logs the visitor's IP address, read on 21 November 2026"
+  }
+}

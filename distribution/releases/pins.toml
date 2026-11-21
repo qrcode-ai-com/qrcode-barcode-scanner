@@ -145,6 +145,10 @@ paths = [
 ]
 
 [[file]]
+held = "the publisher site: its pages state the licences of the published releases and move when the owner reviews them again"
+paths = ["distribution/publisher/**", "scripts/stage-publisher-site.py", ".github/workflows/publisher-site.yml"]
+
+[[file]]
 held = "the MCP Bundle, under its own tag mcpb-v: it carries the published server and engine it was built from"
 paths = ["distribution/mcpb/**", "scripts/build-mcpb-bundle.py", ".github/workflows/mcpb.yml"]
 
