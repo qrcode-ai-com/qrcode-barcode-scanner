@@ -49,8 +49,11 @@ export function manifestFor(target, version) {
     manifest.browser_specific_settings = {
       gecko: {
         id: GECKO_ID,
-        // 140 is the first release that reads data_collection_permissions.
-        strict_min_version: '140.0',
+        // Desktop Firefox reads data_collection_permissions from 140 and Firefox for Android
+        // from 142. 142 keeps `web-ext lint` free of warnings; the supported releases (160, and
+        // ESR 153) are above both. Without a gecko_android key the add-on is offered on desktop
+        // only.
+        strict_min_version: '142.0',
         data_collection_permissions: { required: ['none'] },
       },
     };
