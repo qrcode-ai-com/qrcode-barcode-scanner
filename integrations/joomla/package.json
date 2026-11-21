@@ -1,0 +1,34 @@
+{
+  "name": "qrcode-barcode-scanner-joomla",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Joomla package that reads QR codes and barcodes in the visitor's browser with the published WASM",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/joomla",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/joomla"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0"
+  },
+  "config": {
+    "wasmSha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "inspect": "node scripts/inspect.mjs build",
+    "test": "node --test test/unit.test.mjs",
+    "test:joomla": "node test/joomla.mjs",
+    "test:reproduce": "node test/reproduce.mjs",
+    "assets": "node scripts/listing-assets.mjs"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "playwright": "1.61.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "url": "{{parameters.baseUrl}}/healthz",
+  "method": "GET",
+  "headers": {
+    "accept": "application/json"
+  },
+  "response": {
+    "error": {
+      "message": "[{{statusCode}}] The scan service did not answer GET /healthz with its status."
+    },
+    "metadata": {
+      "type": "text",
+      "value": "scan service {{body.service}}, engine {{body.engine}}"
+    }
+  },
+  "log": {
+    "sanitize": ["request.headers.authorization"]
+  }
+}

@@ -3,7 +3,7 @@
 
   http-service-release.py gate --ref REF
   http-service-release.py save --tag TAG --architecture ARCH --revision SHA --out DIR
-  http-service-release.py consume --images DIR --architecture ARCH --fixture FILE --receipt FILE
+  http-service-release.py consume --images DIR --architecture ARCH --fixture FILE --receipt FILE [--host FILE]
   http-service-release.py verify --images DIR --receipts DIR
   http-service-release.py rehearse --images DIR --receipts DIR --receipt FILE
   http-service-release.py publish --images DIR --receipts DIR --ref REF --receipt FILE
@@ -21,6 +21,8 @@ scripts/stage-http-satellite.py writes, once per architecture, and saved as a ta
             and no route out of an internal network, judges it with distribution/http/test/
             consumer.mjs from a second container, proves the service has no outbound access,
             then removes the container, the network and the image and checks they are gone.
+            With --host, a profile of scripts/check-http-hosts.py, the service runs as that host
+            runs it: the host's PORT and variables, the memory and CPU of its plan.
   verify    every downloaded tar has the sha256 that a passing consumer receipt names.
   rehearse  verify, then publish to a local registry (registry 3.0.0, pinned by digest) exactly as
             the tag does, read the index back and pull it, then remove everything.
@@ -174,8 +176,28 @@ def inspect_image(reference, record):
         raise Refused("the image is not the one the recipe describes: " + "; ".join(problems))
 
 
-def consume(images, architecture, fixture, receipt):
+def host_profile(path):
+    """The host profile of scripts/check-http-hosts.py, refused unless it is one."""
+    profile = json.loads(pathlib.Path(path).read_text())
+    env = profile.get("env")
+    if profile.get("schema") != "qrscan-http-host/1" or not isinstance(env, dict) or \
+            env.get("PORT") != str(profile.get("port")) or \
+            not re.fullmatch(r"\d+m", str(profile.get("memory"))) or \
+            not re.fullmatch(r"\d+(\.\d+)?", str(profile.get("cpus"))) or \
+            any(not re.fullmatch(r"PORT|QRSCAN_HTTP_[A-Z_]+", key) or not re.fullmatch(r"\d+", value)
+                for key, value in env.items()):
+        raise Refused(f"{path} is not a host profile")
+    return profile
+
+
+def consume(images, architecture, fixture, receipt, host=None):
     record, tar_path = image_record(images, architecture)
+    profile = host_profile(host) if host else None
+    port = profile["port"] if profile else 8080
+    memory = profile["memory"] if profile else "768m"
+    settings = [argument for key, value in sorted((profile or {}).get("env", {}).items())
+                for argument in ("--env", f"{key}={value}")]
+    settings += ["--cpus", profile["cpus"]] if profile else []
     fixture = pathlib.Path(fixture).resolve()
     if sha256(fixture) != FIXTURE_SHA256:
         raise Refused(f"{fixture} is not the mixed fixture")
@@ -189,7 +211,7 @@ def consume(images, architecture, fixture, receipt):
         run("docker", "network", "create", "--internal", network)
         run("docker", "run", "--detach", "--name", name, "--network", network, "--read-only",
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "128",
-            "--memory", "768m", "--health-interval", "2s", "--health-start-period", "1s", reference)
+            "--memory", memory, *settings, "--health-interval", "2s", "--health-start-period", "1s", reference)
         for _ in range(60):
             status = run("docker", "inspect", "--format", "{{.State.Health.Status}}", name).stdout.strip()
             if status == "healthy":
@@ -203,7 +225,7 @@ def consume(images, architecture, fixture, receipt):
         judge = run("docker", "run", "--rm", "--network", network, "--read-only", "--user", "1000:1000",
                     "--volume", f"{consumer}:/judge/consumer.mjs:ro", "--volume", f"{fixture}:/judge/fixture.png:ro",
                     "--volume", f"{out}:/out", NODE_IMAGE, "node", "/judge/consumer.mjs",
-                    f"http://{name}:8080", "/judge/fixture.png", "--revision", record["revision"],
+                    f"http://{name}:{port}", "/judge/fixture.png", "--revision", record["revision"],
                     "--receipt", "/out/consumer.json", check=False)
         print(judge.stdout, end="")
         if judge.returncode != 0:
@@ -233,11 +255,14 @@ def consume(images, architecture, fixture, receipt):
               "config": record["config"], "version": record["version"], "revision": record["revision"],
               "isolation": "read-only root filesystem, no capability, internal network with no route out",
               "removed": True, "passed": bool(judged.get("passed")), "consumer": judged}
+    if profile:
+        result["host"] = profile
     if not result["passed"]:
         raise Refused("the consumer receipt does not say passed")
     pathlib.Path(receipt).parent.mkdir(parents=True, exist_ok=True)
     pathlib.Path(receipt).write_text(json.dumps(result, indent=2) + "\n")
-    print(f"consumed {architecture}: {record['sha256']} ({record['config']}), removed")
+    print(f"consumed {architecture}{' as ' + profile['host'] + ' runs it' if profile else ''}: "
+          f"{record['sha256']} ({record['config']}), removed")
     return result
 
 
@@ -249,6 +274,8 @@ def verify(images, receipts):
         if consumed.get("schema") != "qrscan-http-consumed/1" or consumed.get("passed") is not True or \
                 consumed.get("removed") is not True:
             raise Refused(f"the {architecture} consumer receipt is not a passing one")
+        if "host" in consumed:
+            raise Refused(f"the {architecture} receipt judged a host's run, not the image's own")
         for key in ("sha256", "config", "version", "revision"):
             if consumed.get(key) != record[key]:
                 raise Refused(f"the {architecture} image is not the one its consumer judged ({key})")
@@ -391,9 +418,24 @@ def self_test():
         refused("a failed consumer", lambda: verify(images, receipts), "is not a passing one")
         (receipts / "amd64.json").write_text(json.dumps(dict(failed, config="sha256:" + "4" * 64)))
         refused("another image judged", lambda: verify(images, receipts), "is not the one its consumer judged (config)")
+        (receipts / "amd64.json").write_text(json.dumps(dict(failed, host={"host": "render"})))
+        refused("a host's run", lambda: verify(images, receipts), "judged a host's run")
+        good = {"schema": "qrscan-http-host/1", "host": "render", "port": 10000, "cpus": "0.1", "memory": "512m",
+                "env": {"PORT": "10000", "QRSCAN_HTTP_MAX_CONCURRENT": "1"}}
+        profile = box / "profile.json"
+        profile.write_text(json.dumps(good))
+        try:
+            host_profile(profile)
+        except Refused as error:
+            failures.append(f"a host profile was refused: {error}")
+        for name, bad in (("a profile whose PORT is not its port", dict(good, port=8080)),
+                          ("a profile with another variable", dict(good, env={**good["env"], "NODE_OPTIONS": "1"})),
+                          ("a profile with an option in its memory", dict(good, memory="512m --privileged"))):
+            profile.write_text(json.dumps(bad))
+            refused(name, lambda: host_profile(profile), "is not a host profile")
     for failure in failures:
         print(f"SELF-TEST FAILED · {failure}", file=sys.stderr)
-    print(f"self-test: {'FAILED' if failures else 'ok'} (gate, two archive layouts, verify on 3 defects)")
+    print(f"self-test: {'FAILED' if failures else 'ok'} (gate, two archive layouts, verify on 4 defects, host profiles)")
     return 1 if failures else 0
 
 
@@ -413,6 +455,7 @@ def main():
     three.add_argument("--architecture", required=True, choices=ARCHITECTURES)
     three.add_argument("--fixture", required=True)
     three.add_argument("--receipt", required=True)
+    three.add_argument("--host")
     four = commands.add_parser("verify")
     four.add_argument("--images", required=True)
     four.add_argument("--receipts", required=True)
@@ -434,7 +477,7 @@ def main():
         elif args.command == "save":
             save(args.tag, args.architecture, args.revision, args.out)
         elif args.command == "consume":
-            consume(args.images, args.architecture, args.fixture, args.receipt)
+            consume(args.images, args.architecture, args.fixture, args.receipt, args.host)
         elif args.command == "verify":
             verify(args.images, args.receipts)
         elif args.command == "rehearse":

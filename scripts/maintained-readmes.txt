@@ -13,6 +13,7 @@ bindings/flutter/example/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.
 bindings/go/README.md
 bindings/kotlin/README.md
 bindings/php/README.md
+bindings/ruby/README.md
 bindings/swift/README.md
 crates/qrcode-ai-scanner-cli/README.md
 crates/qrcode-ai-scanner-node/README.md
@@ -47,6 +48,8 @@ distribution/rpm/README.md
 distribution/snap/README.md
 distribution/termux/README.md
 examples/README.md
+examples/codepen/README.md
+examples/kaggle/README.md
 examples/notebooks/README.md
 examples/streamlit/README.md
 examples/web-vite/README.md
@@ -60,6 +63,9 @@ integrations/canva/README.md
 integrations/comfyui/README.md
 integrations/dify/README.md
 integrations/github-action/README.md
+integrations/joomla/README.md
+integrations/jupyterlab/README.md
+integrations/make/README.md
 integrations/mcp/README.md
 integrations/n8n/README.md
 integrations/n8n/template/README.md
@@ -67,10 +73,13 @@ integrations/napari/README.md
 integrations/node-red/README.md
 integrations/obsidian/README.md
 integrations/openclaw/README.md
+integrations/photoshop-uxp/README.md
 integrations/raycast/README.md
+integrations/replicate/README.md
 integrations/vscode/README.md
 integrations/wasm-inline/README.md
 integrations/wordpress/README.md
+integrations/zapier/README.md
 playground/README.md
 skills/qrcode-barcode-scanner/README.md
 spec/README.md

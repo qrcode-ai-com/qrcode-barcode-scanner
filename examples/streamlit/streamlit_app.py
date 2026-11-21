@@ -18,6 +18,14 @@ st.write(
     "[QR Code & Barcode Scanner](https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust) engine, "
     f"version {scanner.__version__}. The scan runs on the machine that serves this page, "
     "and the image is read in memory: this app stores nothing.")
+st.caption(
+    "On Streamlit Community Cloud, that machine is a Streamlit server in the United States, and "
+    "Streamlit records usage statistics of the page. Run the app on your own machine to keep your "
+    "images there.")
+st.markdown(
+    "From [QR Code AI](https://qrcode-ai.com/): the "
+    "[QR code scanner](https://qrcode-ai.com/en-US/qr-code-scanner) and the "
+    "[barcode scanner](https://qrcode-ai.com/en-US/barcode-scanner) in the browser.")
 
 source = st.radio("Image", ["Sample image", "Upload an image"], horizontal=True)
 profile = st.selectbox("Scan profile", list(scan_view.PROFILES), format_func=scan_view.PROFILES.get)

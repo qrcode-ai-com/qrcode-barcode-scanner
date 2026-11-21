@@ -6,8 +6,10 @@ name: HTTP service
 # each architecture and saves it. consume runs each saved image fresh, read-only, with no route
 # out of an internal network, judges it from a second container (fast, frame and full, raw and
 # multipart, exact payloads, every refusal) and removes it. rehearse publishes both images to a
-# local registry exactly as the tag does and pulls them back. On an http-v* tag only, publish
-# pushes the judged images to ghcr.io in the protected environment container-http.
+# local registry exactly as the tag does and pulls them back. hosts checks each deploy host's file
+# against the schema the host publishes and runs the judged image as that host runs it (its PORT,
+# its variables, the memory and CPU of its plan), judged the same way. On an http-v* tag only,
+# publish pushes the judged images to ghcr.io in the protected environment container-http.
 on:
   workflow_dispatch:
   pull_request:
@@ -15,6 +17,7 @@ on:
       - .github/workflows/http-service.yml
       - distribution/http/**
       - scripts/http-service-release.py
+      - scripts/check-http-hosts.py
       - scripts/stage-http-satellite.py
       - scripts/satellite_stage.py
       - fixtures/symbology/mixed-code128-qr.png
@@ -24,6 +27,7 @@ on:
       - .github/workflows/http-service.yml
       - distribution/http/**
       - scripts/http-service-release.py
+      - scripts/check-http-hosts.py
       - scripts/stage-http-satellite.py
       - scripts/satellite_stage.py
     tags: ["http-v*"]
@@ -53,8 +57,13 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
-      - run: python3 scripts/stage-http-satellite.py --self-test
-      - run: python3 scripts/http-service-release.py --self-test
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --disable-pip-version-check 'PyYAML==6.0.3'
+      - run: python scripts/stage-http-satellite.py --self-test
+      - run: python scripts/http-service-release.py --self-test
+      - run: python scripts/check-http-hosts.py --self-test
 
   image:
     name: Image · ${{ matrix.architecture }}
@@ -159,6 +168,55 @@ jobs:
         with:
           name: http-rehearsal
           path: rehearsal/
+          if-no-files-found: error
+
+  hosts:
+    name: Deploy host · ${{ matrix.host }}
+    needs: [image]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: render
+            schema: https://render.com/schema/render.yaml.json
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --disable-pip-version-check 'PyYAML==6.0.3' 'jsonschema==4.26.0'
+      - name: Check the host's file in the staged tree against the schema the host publishes today
+        env:
+          HOST: ${{ matrix.host }}
+          SCHEMA: ${{ matrix.schema }}
+        run: |
+          set -euo pipefail
+          python scripts/stage-http-satellite.py stage --out "$RUNNER_TEMP/staged"
+          curl --fail --silent --show-error --location --proto '=https' --retry 3 \
+            --output "$RUNNER_TEMP/schema.json" "$SCHEMA"
+          sha256sum "$RUNNER_TEMP/schema.json"
+          python scripts/check-http-hosts.py check --tree "$RUNNER_TEMP/staged" --schema "$HOST=$RUNNER_TEMP/schema.json"
+          python scripts/check-http-hosts.py profile "$HOST" --tree "$RUNNER_TEMP/staged" --out "$RUNNER_TEMP/profile.json"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: http-image-amd64
+          path: images
+          digest-mismatch: error
+      - name: Run the judged image as the host runs it, judge it from outside and remove it
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          python scripts/http-service-release.py consume --images "$PWD/images" --architecture amd64 \
+            --fixture fixtures/symbology/mixed-code128-qr.png --receipt "$PWD/hosts/$HOST.json" \
+            --host "$RUNNER_TEMP/profile.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        with:
+          name: http-host-${{ matrix.host }}
+          path: hosts/
           if-no-files-found: error
 
   publish:

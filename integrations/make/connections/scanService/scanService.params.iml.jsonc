@@ -1,0 +1,9 @@
+[
+  {
+    "name": "baseUrl",
+    "type": "url",
+    "label": "Base URL",
+    "required": true,
+    "help": "The address of the scan service you run, without a trailing slash, such as `https://scan.example.com`. It is `distribution/http` of the open-source scanner repository."
+  }
+]

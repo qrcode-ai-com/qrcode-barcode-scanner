@@ -9,6 +9,9 @@ name: Integrations · Python hosts
 # Nothing is built from the engine's Rust source, no host application runs (ComfyUI, Dify, the
 # Apify platform, a napari window, Streamlit Community Cloud) and nothing is published.
 # The kit job runs the Python host kit (scripts/python-host-consumer.py) on the published wheel.
+# The streamlit-served job starts the Streamlit app the way Community Cloud starts it, in a new
+# environment through the same kit, then scans through the app's file input with Streamlit's
+# test runner; it deploys nothing.
 on:
   workflow_dispatch:
   pull_request:
@@ -212,6 +215,44 @@ jobs:
         if: always()
         with:
           name: acceptance-${{ strategy.job-index }}
+          path: receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The Streamlit app the way Streamlit Community Cloud starts it, in a new environment from its
+  # own two requirement files: `streamlit run examples/streamlit/streamlit_app.py` from the
+  # repository root, with the configuration beside the app. The server must answer its health
+  # check and serve its page; the app's tests then upload the fixture through its file input in
+  # the three profiles, with Streamlit's test runner; the scans must leave no file behind and the
+  # server log no traceback. Nothing is deployed.
+  streamlit-served:
+    name: Streamlit app · started as Community Cloud starts it
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Serve the app and scan through it in a new environment
+        run: |
+          mkdir -p receipt
+          python scripts/python-host-consumer.py run \
+            --destination "Streamlit app started as Community Cloud starts it (not deployed)" \
+            --identifier examples/streamlit/streamlit_app.py --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/examples/streamlit" \
+            --install "-r examples/streamlit/requirements.txt" \
+            --install "-r examples/streamlit/tests/requirements.txt" \
+            --scan "{python} examples/streamlit/tests/served_smoke.py --port 8501" \
+            --uninstall qrcode-barcode-scanner --gone-import qrcode_barcode_scanner \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt receipt/acceptance-streamlit-served.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: acceptance-streamlit-served
           path: receipt/
           if-no-files-found: error
           retention-days: 90

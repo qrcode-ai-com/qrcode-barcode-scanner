@@ -1,0 +1,32 @@
+{
+  "name": "qrcode-barcode-scanner-make",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Make custom app that reads QR codes and barcodes in image files through the self-hosted QR Code AI scan service",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/make",
+  "author": {
+    "name": "SuperNovae Studio",
+    "email": "contact@supernovae.studio",
+    "url": "https://qrcode-ai.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/make"
+  },
+  "bugs": {
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0",
+    "ajv": "8.20.0"
+  }
+}

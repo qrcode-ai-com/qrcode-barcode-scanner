@@ -1,0 +1,73 @@
+name: Integrations · Make
+
+# The Make custom app in integrations/make. Its makecomapp.json and every file it names must pass
+# the Make Apps Editor's own JSON schemas, pinned by commit and SHA-256, and use only the IML
+# expressions its tests evaluate. Then the connection and both modules send their real requests:
+# to a contract stub of the scan service backed by the published WebAssembly engine, and, once
+# distribution/http is on the revision under test, to that service itself, started here. The mixed
+# fixture must give its QR code and its Code 128 in the fast, frame and full profiles. Nothing is
+# deployed to Make, no service is hosted and no secret is used.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-make.yml
+      - integrations/make/**
+      - distribution/http/**
+      - fixtures/symbology/mixed-code128-qr.png
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-make.yml
+      - integrations/make/**
+      - distribution/http/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-make-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  make:
+    name: Make app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Install the test tools
+        working-directory: integrations/make
+        run: |
+          set -euo pipefail
+          node --version
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Schemas, expressions, review rules and the contract stub
+        working-directory: integrations/make
+        run: npm test
+      - name: The same requests against the scan service of this revision
+        run: |
+          set -euo pipefail
+          if [ ! -f distribution/http/server.mjs ]; then
+            echo "::notice::distribution/http is not on this revision: the live service run is pending, the contract stub ran instead."
+            exit 0
+          fi
+          (cd distribution/http && npm ci --ignore-scripts --no-audit --no-fund)
+          PORT=18765 HOST=127.0.0.1 node distribution/http/server.mjs > "$RUNNER_TEMP/http.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:18765/healthz > /dev/null; then break; fi
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:18765/healthz
+          (cd integrations/make && QRSCAN_MAKE_SERVICE_URL=http://127.0.0.1:18765 npm test)
+          cat "$RUNNER_TEMP/http.log"

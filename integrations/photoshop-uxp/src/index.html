@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>QR Code &amp; Barcode Scanner</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <h1>Read the codes in your document</h1>
+    <p class="help">Scan the document, the selection or an image file to see which QR codes and barcodes it holds and their exact text.</p>
+
+    <label class="field" for="profile">Profile</label>
+    <select id="profile">
+      <option value="full" selected>Full</option>
+      <option value="fast">Fast</option>
+      <option value="frame">Frame</option>
+    </select>
+    <p class="help">Full reads the most and also scores QR codes. Fast suits clear images. Frame is the quickest.</p>
+
+    <label class="field" for="expected">Expected text (optional)</label>
+    <input id="expected" type="text" autocomplete="off" spellcheck="false">
+    <p class="help">Each code is compared with it, character for character.</p>
+
+    <div class="actions">
+      <button id="scan-document" class="primary" type="button" disabled>Scan the document</button>
+      <button id="scan-selection" type="button" disabled>Scan the selection</button>
+      <button id="scan-file" type="button" disabled>Scan an image file</button>
+    </div>
+
+    <div id="result" data-state="loading" data-scan="0">
+      <p id="summary">Loading the scanner…</p>
+      <p id="note" class="help"></p>
+      <div id="items"></div>
+    </div>
+
+    <button id="toggle-report" class="quiet" type="button" disabled>Show the full report</button>
+    <div id="report-json" class="report" data-scan="0" data-profile="" style="display: none"></div>
+
+    <div class="footer">
+      <p id="about" data-package="" data-version="" data-wasm-sha256="" data-engine-version="">Open-source QR Code &amp; Barcode Scanner by QR Code AI. It runs in this panel: your document is not sent anywhere.</p>
+      <p>The plugin is licensed AGPL-3.0-or-later. Source code: github.com/qrcode-ai-com/qrcode-barcode-scanner-rust</p>
+    </div>
+  </main>
+  <script src="index.js"></script>
+</body>
+</html>

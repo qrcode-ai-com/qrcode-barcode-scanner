@@ -503,6 +503,7 @@ repository tokens — hence step 0, at merge.
 | npm-publish › publish-native · publish-wasm | `npm` | npm trusted publishing (npm CLI ≥ 11.5.1 on Node 24), provenance attested automatically; a version the owner uploads by hand (the first under a new name) carries no npm provenance | the very tarballs pack-native and build-wasm packed and inspected, read back again in the job and uploaded unchanged with `npm publish <tarball> --ignore-scripts`; each `npm publish` first checks that its operand is an absolute path to a regular `.tgz` file whose path and sha256 the in-job re-inspection recorded, and stops the job otherwise; after every upload, and for a version already live, the registry's `dist.integrity` must be that tarball's sha512 |
 | python › release | `release` | PyPI trusted publishing: a pending publisher on the new project `qrcode-barcode-scanner` (owner step 5); the 0.9.0 files of the former project `qrcode-ai-scanner` carry PEP 740 attestations | `dist/`, read back in the job: exactly one wheel per row of the wheels matrix and the sdist; before the upload, every file PyPI already serves at the version must be the one read back (sha256), and PyPI may serve no other file there, so `skip-existing` (which goes by file name) skips only proven copies |
 | flutter › publish | `pub` | pub.dev automated publishing; a pushed tag only (pub.dev accepts no other trigger) | the portable archive created once by the unprivileged stage job and consumed by host/native checks; extracted outside the checkout, re-inspected with `package-inspect.py flutter --package-root … --strict --release-set --record …`, with file hashes checked immediately before publishing (dormant pending owner step 6) |
+| ruby › publish | `rubygems` | RubyGems trusted publishing: `rubygems/configure-rubygems-credentials` trades the OIDC token for a short-lived token scoped to the gem; a pending publisher creates the gem on its first push ([bindings/ruby/LISTING.md](bindings/ruby/LISTING.md)) | the five platform gems the pack job built and inspected (`ruby-gems`), checked again against that receipt in the job; only those rubygems.org does not hold are pushed with `gem push`, and one it holds must be the same file |
 | mobile › ios-release | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write` | the CI-built xcframework zip and its `checksum.txt`, only into the owner's draft (the one release of the tag, targeting the tagged commit), only where no zip is, and only when its sha256 is the one Package.swift pins, compared before any upload; an attached zip is verified against that pin, never replaced; it never creates, edits or publishes a release |
 | cli-archives › attach | `release` | the workflow's own `GITHUB_TOKEN`, `contents: write`, held by four fixed `gh` steps only | the CLI assets assemble wrote once (`cli-release-set`), re-inspected in the job against the SHA256SUMS sha256 every consumer judged, only into the owner's draft targeting the tagged commit: the missing ones, archives, then source, then SHA256SUMS, each file found in the re-inspection record before its upload, then read back; a draft holding other CLI bytes, or a published release lacking any, is refused with nothing uploaded |
 
@@ -1709,6 +1710,24 @@ nuget.org's repository signature, validates it with `dotnet nuget verify --all`,
 other members with the qualified archive, and installs/scans/removes from five fresh projects.
 See [account setup, tag approval and receipts](bindings/dotnet/PUBLISHING.md). No account setup,
 environment approval, tag or publication is performed by a branch rehearsal.
+
+## Ruby / RubyGems
+
+The gem `qrcode-barcode-scanner` remains unpublished. Its build and its engine-tag publisher live
+in `.github/workflows/ruby.yml`: the Ruby that the UniFFI crate's own `uniffi-bindgen` generates
+from the Linux host's library, the tests of `bindings/ruby` on Ruby 3.3, the five native floors of
+the .NET package (`scripts/dotnet-package.py`, the same five libraries), one platform gem per
+system built twice to the same bytes and inspected file by file (`scripts/ruby-gem.py`), RubyGems
+asked which gem each platform gets (none for musl), then six clean Rubies (five systems on 3.3,
+Linux x64 on 4.0) that install their gem from the file, scan and uninstall it. Branch and manual
+runs inspect only.
+
+Tags require the existing protected `rubygems` environment (reviewer `ThibautMelen`, tags `v*`)
+and the owner's pending trusted publisher on rubygems.org for `ruby.yml` and that environment.
+The job checks the receipt, gems, natives, tag and environment before the token is requested and
+again before the push, and pushes only the gems rubygems.org does not hold; a gem it holds must
+be the same file. See [the account setup and the listing fields](bindings/ruby/LISTING.md). No
+account, trusted publisher, environment, tag or publication is created by a branch rehearsal.
 
 ## README actions
 

@@ -38,8 +38,8 @@ To prepare an exploratory Android input without changing the required mixed-code
 A small Android app that consumes the Kotlin binding the way an outside project does: from
 `jitpack.io`, with no engine source and no local build of the library.
 
-The workflow [`binding-consumers.yml`](../../../.github/workflows/binding-consumers.yml) runs it
-on an emulator. It scans the shared mixed fixture (`fixtures/symbology/mixed-code128-qr.png`,
+The workflow [`binding-consumers.yml`](../../../.github/workflows/binding-consumers.yml) copies it
+out of the checkout, builds it there with a cold Gradle cache and runs it on an emulator. It scans the shared mixed fixture (`fixtures/symbology/mixed-code128-qr.png`,
 case `qr-and-code128` of `fixtures/consumer-truth.json`) with the `fast`, `full` and `frame`
 profiles and expects both contents each time: the QR code `https://qrc-ai.com/76xMa` and the
 Code 128 `STOCK-4827`.

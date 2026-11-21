@@ -1,16 +1,18 @@
 name: integration-browser-extension
 
 # The browser extension of integrations/browser-extension, checked the way its README describes:
-# installed from its own lockfile, built into the three store zips and the source zip, held to the
-# hashes its SHA256SUMS pins, inspected and linted for Firefox. Each store zip is then extracted or
-# installed as a store receives it and driven in a new profile: the Chrome and the Edge zips in
-# Playwright's Chromium, the Chrome zip again in the runner's Google Chrome, the Firefox zip in the runner's own Firefox through WebDriver BiDi, and
-# the Firefox build's page in Playwright's Firefox. The store screenshots and promotional tiles
-# are captured again from the Chrome build. The reports are judged by the repository's page
-# and acceptance judges, the packages are rebuilt from the source zip, and the reproduce job
-# rebuilds them on Linux, macOS and Windows with Node.js 22 and 24 in two time zones, each time to
-# the pinned bytes. It uses the published WASM package: nothing is built from this repository's
-# Rust source, and nothing is uploaded to a store.
+# installed from its own lockfile, built into the four store zips (Chrome, Edge, Firefox, Safari)
+# and the source zip, held to the hashes its SHA256SUMS pins, inspected and linted for Firefox.
+# Each store zip is then extracted or installed as a store receives it and driven in a new
+# profile: the Chrome and the Edge zips in Playwright's Chromium, then each again in the runner's
+# Google Chrome or Microsoft Edge; the Firefox zip in the runner's own Firefox through WebDriver
+# BiDi; the Firefox build's page in Playwright's Firefox. The store screenshots and promotional
+# tiles are captured again from the Chrome build. The reports are judged by the repository's page
+# and acceptance judges, and the packages are rebuilt from the source zip. Three more jobs: safari
+# builds the Safari app on macOS, wasm-rebuild builds the WebAssembly module again from its Rust
+# source at tag v0.11.0 and requires the same bytes, and reproduce rebuilds the packages on Linux,
+# macOS and Windows with Node.js 22 and 24 in two time zones, each time to the pinned bytes.
+# Nothing is uploaded to a store.
 on:
   workflow_dispatch:
   pull_request:
@@ -88,6 +90,14 @@ jobs:
           node test/chromium.mjs --channel chrome \
             --package "build/qrcode-barcode-scanner-chrome-$version.zip" \
             --out build/acceptance/chrome-stable
+      - name: The Edge zip in the runner's Microsoft Edge
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          microsoft-edge --version
+          node test/chromium.mjs --channel msedge \
+            --package "build/qrcode-barcode-scanner-edge-$version.zip" \
+            --out build/acceptance/edge-stable
       - name: The store images, captured from the Chrome build
         run: node scripts/store-images.mjs --extension build/chrome --out build/store-images
       - name: The Firefox zip installed in the runner's Firefox
@@ -107,13 +117,13 @@ jobs:
           version=$(node -p "require('./$here/build/build-receipt.json').scanner.version")
           mkdir -p "$RUNNER_TEMP/receipts"
           for record in chrome/popup chrome/menu chrome-stable/popup chrome-stable/menu \
-            edge/popup edge/menu firefox-addon firefox-page; do
+            edge/popup edge/menu edge-stable/popup edge-stable/menu firefox-addon firefox-page; do
             reports="$here/build/acceptance/$record"
             python3 scripts/check-demo-page.py "$reports/page.json" \
               --example "$here" --page-key integrations/browser-extension
             case "$record" in
               firefox-addon) driver="node test/firefox-addon.mjs" ;;
-              firefox-page) driver="node test/firefox-page.mjs" ;;
+              firefox-page) driver="node test/engine-page.mjs --browser firefox" ;;
               *) driver="node test/chromium.mjs" ;;
             esac
             python3 scripts/destination-acceptance.py reports --kind page \
@@ -142,6 +152,115 @@ jobs:
             integrations/browser-extension/build/acceptance
             ${{ runner.temp }}/receipts
           if-no-files-found: error
+
+  # The Safari app for macOS: Apple's packager writes a macOS-only Xcode project from build/safari,
+  # xcodebuild builds the app without signing, and scripts/safari.mjs opens the built extension
+  # and requires the files of build/safari, byte for byte. The project is
+  # generated here on every run and never committed (listing/safari.md says why). Then the Safari
+  # build's page runs in Playwright's WebKit under the manifest's policy. Signing, notarizing and
+  # App Store Connect are the owner's.
+  safari:
+    name: Safari · Xcode project, unsigned macOS app, WebKit page
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/browser-extension
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Xcode 26, whose Safari 26 reads 'wasm-unsafe-eval' in an extension policy
+        run: |
+          set -euo pipefail
+          ls -d /Applications/Xcode*.app
+          xcode=$(ls -d /Applications/Xcode_26*.app | sort -t. -k2,2n -k3,3n | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+          sw_vers
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build the packages, to the pinned hashes
+        run: TZ=UTC npm run check:pins
+      - name: Generate the Xcode project, build the macOS app unsigned and inspect it
+        run: node scripts/safari.mjs --out build/safari-xcode
+      - name: The Safari build's page in Playwright's WebKit
+        run: |
+          set -euo pipefail
+          node node_modules/playwright/cli.js install webkit
+          npm run test:webkit-page
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: browser-extension-safari
+          path: |
+            integrations/browser-extension/build/qrcode-barcode-scanner-safari-*.zip
+            integrations/browser-extension/build/SHA256SUMS
+            integrations/browser-extension/build/safari-xcode/*.json
+            integrations/browser-extension/build/safari-xcode/*.log
+            integrations/browser-extension/build/safari-xcode/*.zip
+            integrations/browser-extension/build/acceptance/webkit-page
+            integrations/browser-extension/build/acceptance/webkit-page-run.json
+          if-no-files-found: error
+
+  # The WebAssembly module every package carries, rebuilt from its Rust source at tag v0.11.0 with
+  # the release job's own pinned tools (npm-publish.yml, build-wasm, at that tag) and held to the
+  # SHA-256 that package.json pins (config.wasmSha256; a unit test keeps the two equal). SOURCE.md
+  # gives a Firefox Add-ons reviewer the same steps. Nothing is published.
+  wasm-rebuild:
+    name: Rebuild the WebAssembly module from tag v0.11.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # The Rust of the v0.11.0 release (npm-publish.yml at that tag). It equals the repository's
+      # RUST_TOOLCHAIN today, and check-publish-guards.py wants one value: when the repository
+      # moves on, the next engine release's tag replaces v0.11.0 here.
+      RUST_TOOLCHAIN: "1.99.1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: v0.11.0
+          persist-credentials: false
+      - name: The tag is the revision the package records
+        run: test "$(git rev-parse HEAD)" = 176ac96ef16ee330dbfc6ada10327d0b4e23a8b2
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-10
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: wasm-pack@0.13.1
+      - name: binaryen version_130, sha256-verified
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/binaryen-version_130-x86_64-linux.tar.gz"
+          release=https://github.com/WebAssembly/binaryen/releases/download/version_130
+          curl -sSfL -o "$archive" "$release/binaryen-version_130-x86_64-linux.tar.gz"
+          echo "0a18362361ad05465118cd8eeb72edaeec89de6894bc283576ef4e07aa3babcc  $archive" \
+            | sha256sum -c -
+          tar xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/binaryen-version_130/bin" >> "$GITHUB_PATH"
+      - name: Build with the tag's scripts/build-wasm.sh
+        run: |
+          set -euo pipefail
+          echo "CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}"
+          ./scripts/build-wasm.sh
+      - name: The module is the one the packages carry
+        run: |
+          set -euo pipefail
+          module=crates/qrcode-ai-scanner-wasm/pkg/qrcode-barcode-scanner_bg.wasm
+          sha256sum "$module"
+          echo "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68  $module" \
+            | sha256sum -c -
 
   # The same bytes everywhere: three systems, the two supported Node.js lines and two time zones,
   # each build held to SHA256SUMS. Only the build's own dependency is installed, as SOURCE.md tells
