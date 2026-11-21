@@ -12,6 +12,10 @@ import { fileURLToPath } from "node:url";
 export type Profile = "full" | "fast" | "frame";
 export const PROFILES: Profile[] = ["full", "fast", "frame"];
 
+/** "profile" keeps the profile's own time budget; "none" lets the scan run to its end. */
+export type TimeLimit = "profile" | "none";
+export const TIME_LIMITS: TimeLimit[] = ["profile", "none"];
+
 /** The image files qrscan reads. */
 export const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -66,6 +70,20 @@ export interface ScanResult {
   profile: Profile;
   /** The scanner version in the report (`versions.scanner`). */
   engine: string;
+  /**
+   * How well the first code scans, the one the report judges (QR codes come first). Null when the
+   * profile judged nothing: frame never does, and a cut scan publishes no score.
+   */
+  score: Score | null;
+  /** The report qrscan printed, unchanged, for the "Copy Scan Report" action. */
+  report: unknown;
+}
+
+export interface Score {
+  /** 0 to 100. */
+  value: number;
+  /** `excellent`, `good`, `acceptable`, `fair` or `poor`. */
+  grade: string;
 }
 
 const LABELS: Record<string, string> = {
@@ -154,7 +172,15 @@ const defaultRun: Run = (file, args, options, callback) => {
 interface Report {
   versions?: { scanner?: string };
   detections?: { symbology?: unknown; content?: { text?: unknown; charset?: unknown } }[];
+  score?: { value?: unknown; grade?: unknown } | null;
   trace?: { budget_exhausted?: unknown };
+}
+
+/** The score of a report, or null when the profile did not judge one or the field is not a score. */
+function readScore(report: Report): Score | null {
+  const score = report.score;
+  if (!score || typeof score.value !== "number" || typeof score.grade !== "string") return null;
+  return { value: score.value, grade: score.grade };
 }
 
 function parseReport(stdout: string): Report {
@@ -173,17 +199,25 @@ function reason(stderr: string): string {
   return line.replace(/^\s*✖\s*/, "").trim() || "qrscan could not read this file";
 }
 
-/** Scans FILE with QRSCAN and the PROFILE's own time budget. */
+export interface ScanOptions {
+  /** The profile's own time budget (the default), or none: the scan runs to its end. */
+  limit?: TimeLimit;
+  run?: Run;
+  /** When qrscan is stopped without a report: 30 s within the profile's budget, 120 s without. */
+  timeoutMs?: number;
+}
+
+/** Scans FILE with QRSCAN and the PROFILE, within the profile's time budget unless LIMIT is none. */
 export function scanFile(
   qrscan: string,
   file: string,
   profile: Profile,
-  run: Run = defaultRun,
-  timeoutMs = 30000,
+  { limit = "profile", run = defaultRun, timeoutMs = limit === "none" ? 120000 : 30000 }: ScanOptions = {},
 ): Promise<ScanResult> {
   if (!PROFILES.includes(profile)) return Promise.reject(new ScanFailedError(`unknown profile ${String(profile)}`));
+  if (!TIME_LIMITS.includes(limit)) return Promise.reject(new ScanFailedError(`unknown time limit ${String(limit)}`));
   // The path is absolute, so qrscan never reads it as an option.
-  const args = [file, "--profile", profile];
+  const args = [file, "--profile", profile, ...(limit === "none" ? ["--budget-ms", "0"] : [])];
   return new Promise((resolve, reject) => {
     run(
       qrscan,
@@ -220,6 +254,8 @@ export function scanFile(
             budgetExhausted: report.trace?.budget_exhausted === true,
             profile,
             engine: typeof report.versions?.scanner === "string" ? report.versions.scanner : "",
+            score: readScore(report),
+            report,
           });
         } catch (failure) {
           reject(failure);
@@ -272,4 +308,9 @@ export async function pickImage(sources: ImageSources): Promise<Picked> {
 /** The decoded texts, one per line, for the "Copy All" action. */
 export function allTexts(codes: Code[]): string {
   return codes.map((code) => code.text).join("\n");
+}
+
+/** The report as qrscan printed it, indented, for the "Copy Scan Report" action. */
+export function reportText(result: ScanResult): string {
+  return JSON.stringify(result.report, null, 2);
 }
