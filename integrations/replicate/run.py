@@ -42,22 +42,13 @@ def scan_file(image, profile: str = "fast", budget_ms: Optional[int] = None) -> 
 
 
 class Runner(BaseRunner):
+    # `cog build` reads these inputs from the source without running it (Cog 0.23's static schema):
+    # each keyword must be one literal, a description one string on one line, choices a list.
     def run(
         self,
-        image: Path = Input(
-            description="The image to read: PNG, JPEG, WebP or GIF, at most 8 MiB and 4096 "
-                        "pixels per side. Every QR code and barcode in it is decoded."),
-        profile: str = Input(
-            default="fast", choices=list(PROFILES),
-            description="fast suits uploads and gives a reduced quality score. frame only decodes, as "
-                        "for camera frames, and gives no score. full searches deepest and gives the "
-                        "full score; artistic QR codes from a generator need it."),
-        budget_ms: Optional[int] = Input(
-            default=None, ge=0, le=MAX_BUDGET_MS,
-            description="A time limit in milliseconds. Empty keeps the profile's own budget (fast "
-                        "800, frame 80, full 4000). 0 removes it, so the scan always runs to its "
-                        "end. When the budget cuts a scan, trace.budget_exhausted is true and the "
-                        "result is not final."),
+        image: Path = Input(description="The image to read: PNG, JPEG, WebP or GIF, at most 8 MiB and 4096 pixels per side. Every QR code and barcode in it is decoded."),
+        profile: str = Input(default="fast", choices=["fast", "frame", "full"], description="fast suits uploads and gives a reduced quality score. frame only decodes, as for camera frames, and gives no score. full searches deepest and gives the full score; artistic QR codes from a generator need it."),
+        budget_ms: Optional[int] = Input(default=None, ge=0, le=60000, description="A time limit in milliseconds. Empty keeps the profile's own budget (fast 800, frame 80, full 4000). 0 removes it, so the scan always runs to its end. When the budget cuts a scan, trace.budget_exhausted is true and the result is not final."),
     ) -> dict:
         """The engine's complete scan report: each code's format, text, payload and measured place."""
         return scan_file(image, profile, budget_ms)

@@ -128,6 +128,25 @@ def test_the_inputs_cog_publishes(model):
     assert all(parameters[name].default.description for name in ("image", "profile", "budget_ms"))
 
 
+def test_every_input_keyword_is_a_literal_cog_build_can_read():
+    """Cog 0.23 builds the schema from run.py's source: a name, a call or joined strings are lost."""
+    import ast
+
+    source = (MODEL_ROOT / "run.py").read_text()
+    calls = [node for node in ast.walk(ast.parse(source))
+             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Input"]
+    assert len(calls) == 3
+    for call in calls:
+        for keyword in call.keywords:
+            value = keyword.value
+            literal = isinstance(value, ast.Constant) or (
+                isinstance(value, ast.List) and all(isinstance(item, ast.Constant) for item in value.elts))
+            assert literal, f"{keyword.arg} is not a literal"
+            if keyword.arg == "description":
+                text = ast.get_source_segment(source, value)
+                assert text == '"' + value.value + '"', f"the description {text[:40]} is not one string"
+
+
 def test_the_acceptance_reports_are_written_through_the_runner(runner, mixed_path):
     """Three reports for scripts/destination-acceptance.py, when an acceptance run asks for them."""
     written = kit.write_acceptance_reports(lambda profile: run(runner, mixed_path, profile))
