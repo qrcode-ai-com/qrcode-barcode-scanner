@@ -60,7 +60,8 @@ cargo run --locked --manifest-path "$MP" --bin uniffi-bindgen-swift -- \
   bindings/swift/Sources/QrcodeAiScanner --swift-sources
 cargo run --locked --manifest-path "$MP" --bin uniffi-bindgen-swift -- \
   "$T/aarch64-apple-ios/release/$LIB.a" \
-  build/swift/Modules --headers --xcframework --modulemap --modulemap-filename module.modulemap
+  build/swift/Modules --headers --modulemap --module-name qrcode_ai_scanner_uniffiFFI \
+  --modulemap-filename module.modulemap --link-frameworks CoreFoundation
 
 echo "==> lipo simulator slice + assembling the xcframework"
 lipo -create \
