@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-wordpress-dark.gif?v=0">
-      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-wordpress-light.gif?v=0" alt="QR Code &amp; Barcode Scanner for WordPress: the WordPress logo, the scanner block and its shortcode, and a QR code and a barcode being read" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-wordpress-dark.gif?v=63ce322607b0">
+      <img src="https://raw.githubusercontent.com/qrcode-ai-com/.github/main/profile/assets/banner-wordpress-light.gif?v=27a57dc7ab3c" alt="QR Code &amp; Barcode Scanner for WordPress: the WordPress logo, the scanner block of the block editor and the [qrcode_barcode_scanner] shortcode, and a QR code and a barcode being read" width="100%">
     </picture>
   </a>
 </p>
