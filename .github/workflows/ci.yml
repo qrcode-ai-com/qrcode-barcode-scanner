@@ -22,13 +22,14 @@ env:
 
 jobs:
   # Which jobs this change needs (scripts/ci-scope.py). A pull request that
-  # only touches integrations/, examples/, docs/, distribution/submissions/ or
-  # an integration-*.yml workflow changes nothing the gated jobs build: those
-  # trees consume the published artifacts and have their own workflows. Such a
-  # pull request skips test, msrv, wasm-shape, the Node and WASM smokes with
-  # their consumers and browser legs, corpus and deny; lint (publish guards,
-  # fmt, clippy) and packaging (README, licence and recipe checks) always run.
-  # Every push to main runs everything.
+  # only touches integrations/, examples/, docs/, distribution/submissions/,
+  # the README counts and release pins a new integration updates, or a
+  # workflow other than this one and wasm-browser.yml, changes nothing the
+  # gated jobs build: those trees consume the published artifacts and have
+  # their own workflows. Such a pull request skips test, msrv, wasm-shape, the
+  # Node and WASM smokes with their consumers and browser legs, corpus and
+  # deny; lint (publish guards, fmt, clippy) and packaging (README, licence,
+  # recipe and pin checks) always run. Every push to main runs everything.
   scope:
     runs-on: ubuntu-24.04
     outputs:

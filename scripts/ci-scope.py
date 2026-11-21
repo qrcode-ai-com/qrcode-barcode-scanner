@@ -3,11 +3,13 @@
 
 ci.yml builds and tests the Rust workspace, the native Node package and the
 WASM package on three systems. A pull request that only changes an
-integration, an example, the documentation or a prepared submission does not
-change any of that: those trees consume the published artifacts and have their
-own workflows (integration-*.yml, demos.yml, ...). For such a pull request the
-heavy jobs are skipped; lint (publish guards) and packaging (README, licence
-and recipe checks) still run.
+integration, an example, the documentation, a prepared submission, the README
+counts and release pins that come with a new integration, or a workflow other
+than ci.yml and the reusable workflows it calls, does not change any of that:
+those trees consume the published artifacts and have their own workflows. For
+such a pull request the heavy jobs are skipped; lint (publish guards, every
+workflow file) and packaging (README, licence, recipe and pin checks) still
+run.
 
 Usage:
     ci-scope.py --files FILE      read changed paths, one per line, from FILE
@@ -27,23 +29,46 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Paths whose changes never reach what ci.yml builds. Keep this list short and
-# literal: a new entry must be a tree that no ci.yml job reads.
+# Paths whose changes never reach what the gated ci.yml jobs build or read. Keep
+# this list short and literal: a new entry must be a path that no gated job
+# reads. The README, licence and release-pin checks below run in the packaging
+# job, which is never gated; every workflow file is judged by lint, never gated.
 OUTSIDE_ENGINE = (
     'integrations/*',
     'examples/*',
     'docs/*',
     'distribution/submissions/*',
-    '.github/workflows/integration-*.yml',
+    'distribution/releases/pins.toml',
+    'scripts/build-readme-actions.py',
+    'scripts/build-readme-licensing.py',
+    'scripts/readme_prose.py',
+    'scripts/test-licensing.py',
+    'scripts/test-readme-actions.py',
+    '.github/workflows/*',
+)
+
+# Workflow files the gated jobs run: ci.yml itself and the reusable workflows it
+# calls. A change to one of them always runs everything.
+ENGINE_WORKFLOWS = (
+    '.github/workflows/ci.yml',
+    '.github/workflows/wasm-browser.yml',
 )
 
 
+def outside_engine(path):
+    if path in ENGINE_WORKFLOWS:
+        return False
+    if path.startswith('.github/workflows/') and path.count('/') != 2:
+        return False
+    return any(fnmatch.fnmatchcase(path, pat) for pat in OUTSIDE_ENGINE)
+
+
 def touches_engine(paths):
-    """True unless every path matches OUTSIDE_ENGINE. An empty list is true."""
+    """True unless every path is outside the engine. An empty list is true."""
     cleaned = [p.strip() for p in paths if p.strip()]
     if not cleaned:
         return True
-    return not all(any(fnmatch.fnmatchcase(p, pat) for pat in OUTSIDE_ENGINE) for p in cleaned)
+    return not all(outside_engine(p) for p in cleaned)
 
 
 def git_paths(base, head):
@@ -76,13 +101,19 @@ def self_test():
         ('core source', ['crates/qrcode-ai-scanner/src/lib.rs'], True),
         ('integration plus core', ['integrations/canva/a.ts', 'crates/x/src/lib.rs'], True),
         ('ci.yml itself', ['.github/workflows/ci.yml'], True),
-        ('another workflow', ['.github/workflows/python.yml'], True),
-        ('a script', ['scripts/test-readme-actions.py'], True),
+        ('another workflow', ['.github/workflows/python.yml'], False),
+        ('the reusable browser workflow', ['.github/workflows/wasm-browser.yml'], True),
+        ('a nested workflow path', ['.github/workflows/sub/x.yml'], True),
+        ('readme counts and pins', ['integrations/x/README.md', 'scripts/test-licensing.py',
+                                    'scripts/test-readme-actions.py', 'scripts/readme_prose.py',
+                                    'distribution/releases/pins.toml'], False),
+        ('another script', ['integrations/x/a.js', 'scripts/package-inspect.py'], True),
+        ('another distribution file', ['distribution/releases/other.toml'], True),
+        ('the pins self-test script', ['scripts/release-fanout.py'], True),
         ('npm readme copied by node-smoke', ['distribution/npm/README.md'], True),
         ('root readme', ['README.md'], True),
         ('lockfile', ['Cargo.lock'], True),
         ('lookalike prefix', ['integrations-old/x'], True),
-        ('workflow lookalike', ['.github/workflows/integration-x.yaml'], True),
     )
     failed = 0
     for label, paths, want in cases:
