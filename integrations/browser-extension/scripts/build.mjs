@@ -258,10 +258,11 @@ function main() {
     archives.push({ target, path: relative(out, path), bytes: zip.length, sha256: sha256(zip),
       files: files.size });
   }
-  // The store forms take their own images: the Chrome Web Store a 128 px icon, Edge a 300 px logo.
+  // The store forms take their own images: the Chrome Web Store a 128 px icon whose art is 96 px
+  // with 16 px of transparent margin, Edge a 300 px logo.
   const assets = join(out, 'store-assets');
   mkdirSync(assets, { recursive: true });
-  writeFileSync(join(assets, 'icon-128.png'), drawIcon(128));
+  writeFileSync(join(assets, 'icon-128.png'), drawIcon(128, 16));
   writeFileSync(join(assets, 'logo-300.png'), drawIcon(300));
   const license = readFileSync(join(HERE, 'LICENSE'), 'utf8');
   writeFileSync(join(out, 'amo-metadata.json'),
