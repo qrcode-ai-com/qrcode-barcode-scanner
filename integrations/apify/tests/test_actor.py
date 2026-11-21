@@ -4,6 +4,7 @@ import io
 import json
 import os
 import pathlib
+import hashlib
 import re
 
 import pytest
@@ -169,7 +170,7 @@ def test_a_store_the_run_cannot_open_falls_back_to_the_address(monkeypatch):
 def test_the_actor_definition_is_consistent():
     definition = json.loads((ACTOR_ROOT / ".actor" / "actor.json").read_text())
     assert definition["actorSpecification"] == 1 and re.fullmatch(r"[a-z0-9-]+", definition["name"])
-    for key in ("inputSchema", "outputSchema", "dockerfile", "readme"):
+    for key in ("inputSchema", "outputSchema", "dockerfile", "readme", "changelog"):
         assert (ACTOR_ROOT / ".actor" / definition[key]).is_file(), key
     assert (ACTOR_ROOT / ".actor" / definition["storages"]["dataset"]).is_file()
     dataset = json.loads((ACTOR_ROOT / ".actor" / "dataset_schema.json").read_text())
@@ -177,7 +178,8 @@ def test_the_actor_definition_is_consistent():
     view = dataset["views"]["overview"]
     assert set(view["transformation"]["fields"]) == set(view["display"]["properties"]) <= ITEM_KEYS
     dockerfile = (ACTOR_ROOT / "Dockerfile").read_text()
-    assert dockerfile.splitlines()[2] == "FROM apify/actor-python:3.12"
+    assert [line for line in dockerfile.splitlines() if line.startswith("FROM ")] == ["FROM apify/actor-python:3.12"]
+    assert 'org.opencontainers.image.licenses="AGPL-3.0-or-later"' in dockerfile
     assert 'CMD ["python", "-m", "qrscan_actor"]' in dockerfile
     assert (ACTOR_ROOT / "requirements.txt").read_text().split() == [
         "apify==4.3.0", "httpx==0.28.1", "qrcode-barcode-scanner==0.11.0"]
@@ -208,3 +210,53 @@ def test_the_acceptance_reports_are_written_through_the_actor(run_actor, web, mi
     for profile in PROFILES:
         [item] = run_actor({"imageUrls": [url], "profile": profile}).items
         (pathlib.Path(out_dir) / f"{profile}.json").write_text(json.dumps(item["report"]), encoding="utf-8")
+
+
+# The three links public text may use; anything else in the Store page is an invented address.
+LINKS = {"https://qrcode-ai.com/", "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust",
+         "https://qrcode-ai-com.github.io/qrcode-barcode-scanner-rust/"}
+
+
+def test_the_store_page_follows_apify_readme_guidance():
+    """STORE.md is the README Apify shows: H2 and H3 only, the documented sections, the three links."""
+    definition = json.loads((ACTOR_ROOT / ".actor" / "actor.json").read_text())
+    assert definition["readme"] == "../STORE.md" and definition["changelog"] == "../CHANGELOG.md"
+    assert 0 < len(definition["description"]) <= 300 and definition["title"] == "QR Code & Barcode Scanner"
+    text = (ACTOR_ROOT / "STORE.md").read_text()
+    lines = text.splitlines()
+    fenced = False
+    headings = []
+    for line in lines:
+        if line.startswith("```"):
+            fenced = not fenced
+        elif not fenced and line.startswith("#"):
+            headings.append(line)
+    # Apify uses the Actor title as the page's H1.
+    assert all(re.match(r"^#{2,3} \S", heading) for heading in headings), headings
+    h2 = [heading[3:] for heading in headings if heading.startswith("## ")]
+    for wanted in ("What does QR Code & Barcode Scanner do?", "How to scan images", "Input", "Output",
+                   "How much does it cost?", "FAQ"):
+        assert wanted in h2, wanted
+    assert len(re.findall(r"[A-Za-z0-9']+", text)) >= 300
+    assert set(re.findall(r"\]\((https?://[^)\s]+)\)", text)) <= LINKS
+    bare = {address for address in re.findall(r"https?://[^\s\"')\]]+", text) if "example.com" not in address}
+    assert bare <= LINKS, bare - LINKS
+    assert "<picture" not in text and "qrcode-ai-readme-actions" not in text and "\u2014" not in text
+    # The input example is a valid input; the output example has the dataset item's keys.
+    blocks = re.findall(r"```json\n(.*?)```", text, re.S)
+    sources, profile, budget = actor.read_input(json.loads(blocks[0]))
+    assert (len(sources), profile, budget) == (1, "fast", 0)
+    assert set(json.loads(blocks[1])) == ITEM_KEYS
+
+
+def test_the_engine_notices_are_the_v0_11_0_copies():
+    """LICENSE-NOTES.md names the two engine notices the image carries, by their sha256."""
+    notes = (ACTOR_ROOT / "LICENSE-NOTES.md").read_text()
+    folder = ACTOR_ROOT / "licenses" / "engine-0.11.0"
+    assert sorted(path.name for path in folder.iterdir()) == ["LICENSE-APACHE-2.0", "THIRD-PARTY.md"]
+    for name in ("THIRD-PARTY.md", "LICENSE-APACHE-2.0"):
+        digest = hashlib.sha256((folder / name).read_bytes()).hexdigest()
+        assert digest in notes, name
+    assert "AGPL-3.0-or-later" in notes and "176ac96ef16ee330dbfc6ada10327d0b4e23a8b2" in notes
+    dockerignore = (ACTOR_ROOT / ".dockerignore").read_text().split()
+    assert "licenses" not in dockerignore and "LICENSE-NOTES.md" not in dockerignore
