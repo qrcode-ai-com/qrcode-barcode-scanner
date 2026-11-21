@@ -1,0 +1,103 @@
+name: integration-photoshop-uxp
+
+# The Photoshop plugin of integrations/photoshop-uxp, checked the way its README describes: installed
+# from its own lockfile, built into the plugin folder the UXP Developer Tool loads (engine inlined by
+# integrations/wasm-inline into index.js), rebuilt to compare the bytes, unit tested in a context
+# shaped like UXP, run in Playwright's Chromium with stand-ins for Photoshop's modules, judged by the
+# repository's acceptance judge, and given its listing images. It uses the published WASM package:
+# nothing is built from this repository's Rust source, and nothing is uploaded to Adobe. No hosted
+# runner can run Photoshop; running the plugin there is the owner's step.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/integration-photoshop-uxp.yml
+      - integrations/photoshop-uxp/**
+      - integrations/wasm-inline/inline.mjs
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/integration-photoshop-uxp.yml
+      - integrations/photoshop-uxp/**
+      - integrations/wasm-inline/inline.mjs
+      - fixtures/symbology/mixed-code128-qr.png
+      - scripts/destination-acceptance.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-photoshop-uxp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  photoshop-uxp:
+    name: Photoshop plugin · build, test in a stand-in panel
+    runs-on: ubuntu-24.04
+    # On an Apple Silicon laptop the build, the unit tests and the browser test took under a
+    # minute on 21 November 2026; the browser download with its system packages takes longer here.
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+        working-directory: integrations/photoshop-uxp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+      - name: Install Playwright's Chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - name: Build the plugin
+        run: npm run build
+      - name: Rebuild and compare the bytes
+        run: |
+          set -euo pipefail
+          zip=build/qrcode-barcode-scanner-photoshop-0.1.0.zip
+          first=$(sha256sum "$zip")
+          npm run build
+          second=$(sha256sum "$zip")
+          echo "$second"
+          [ "$first" = "$second" ]
+      - name: Unit tests
+        run: npm test
+      - name: The plugin in Playwright's Chromium, in a stand-in for a Photoshop panel
+        run: npm run test:uxp
+      - name: Judge the reports
+        working-directory: .
+        run: |
+          set -euo pipefail
+          here=integrations/photoshop-uxp
+          reports="$here/build/acceptance"
+          mkdir -p "$RUNNER_TEMP/receipts"
+          python3 scripts/destination-acceptance.py reports --kind page \
+            --produced-by "node test/uxp-panel.mjs" \
+            --fast "$reports/fast.json" --frame "$reports/frame.json" --full "$reports/full.json" \
+            --destination "$here, the plugin in a stand-in for a Photoshop panel, on the runner" \
+            --identifier "@qrcode-ai-com/qrcode-barcode-scanner-wasm" --version 0.11.0 \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/$here" \
+            --install "npm ci --ignore-scripts && npm run build" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt "$RUNNER_TEMP/receipts/photoshop-uxp.json"
+      - name: Listing images
+        run: npm run listing
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: photoshop-uxp-plugin
+          path: |
+            integrations/photoshop-uxp/dist
+            integrations/photoshop-uxp/build
+            ${{ runner.temp }}/receipts
+          if-no-files-found: error

@@ -59,6 +59,10 @@ paths = ["docs/assets/actions/brands/provenance.json"]
 why = "Dated license history and the exact legacy AGPL text; these never follow a new engine version."
 paths = ["docs/guides/license-history.mdx", "distribution/releases/historical-agpl-3.0.txt", "scripts/test-licensing.py", "integrations/openclaw/test/runtime-license.mjs"]
 
+[[frozen]]
+why = "Dated submission records: each states the pages and versions read on its day, for the owner to send."
+paths = ["distribution/submissions/**"]
+
 # ------------------------------------------------------------------ what a file follows
 
 [[file]]
@@ -139,10 +143,12 @@ paths = [
   ".github/workflows/integration-automation-js.yml",
   ".github/workflows/integration-browser-extension.yml",
   ".github/workflows/integration-canva.yml",
+  ".github/workflows/integration-dify-template.yml",
   ".github/workflows/integration-github-action.yml",
   ".github/workflows/action-consumer.yml",
   ".github/workflows/integration-obsidian.yml",
   ".github/workflows/integration-n8n-template.yml",
+  ".github/workflows/integration-photoshop-uxp.yml",
   ".github/workflows/integration-python-hosts.yml",
   ".github/workflows/integration-raycast.yml",
   ".github/workflows/integration-vscode.yml",

@@ -51,6 +51,7 @@ Barcode Scanner, at an exact version, and scans a sample image.
 | --- | --- | --- |
 | [`web-vite`](web-vite/) | Scan images in the browser: a Vite page that runs the WebAssembly package in a worker. | [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/fork/github/qrcode-ai-com/qrcode-barcode-scanner-rust/tree/demos-v0.11.0-r2/examples/web-vite) [GitHub Pages](https://qrcode-ai-com.github.io/qrcode-barcode-scanner-rust/) |
 | [`notebooks`](notebooks/) | Scan images in Python: a Jupyter notebook that installs the PyPI package and checks each result. | [![Launch on Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/qrcode-ai-com/qrcode-barcode-scanner-rust/demos-v0.11.0-r2?urlpath=lab/tree/examples/notebooks/scan-images.ipynb) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/qrcode-ai-com/qrcode-barcode-scanner-rust/blob/demos-v0.11.0-r2/examples/notebooks/scan-images.ipynb) |
+| [`kaggle`](kaggle/) | Scan images in a Kaggle notebook: the PyPI package installed, checked against the published wheels, run in three profiles and removed again. | Not on Kaggle yet: [`LISTING.md`](kaggle/LISTING.md) lists the owner's steps. |
 
 The StackBlitz, Binder and Colab links open the tag `demos-v0.11.0-r2`, so they keep running the
 same files while `main` changes. StackBlitz and Binder need no account; Colab runs the notebook for

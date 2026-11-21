@@ -118,27 +118,8 @@ The account, the form values tab by tab, the images and the sources read are in
 
 ## Microsoft Edge Add-ons (map-50)
 
-- **Account.** A Microsoft Partner Center account enrolled in the Microsoft Edge program. There
-  is no fee. A company account (SuperNovae Studio) goes through a verification; an individual
-  account does not.
-- **Upload.** Partner Center, Microsoft Edge, "Create new extension", then
-  `build/qrcode-barcode-scanner-edge-0.1.0.zip`. The package has no `update_url` and does not
-  name Chrome; `npm run inspect` checks both.
-- **Availability.** Public, all markets.
-- **Properties.** Category: Productivity (pick the closest name in the list). "Does this
-  extension access, collect or transmit personal information?": No, so no privacy policy is
-  required; the PRIVACY.md address can still be given. Website and support addresses as above.
-  Mature content: No.
-- **Store listing, English.** Description: the long description (Edge asks for 250 to 10,000
-  characters). Short description: the short description above. Logo: `logo-300.png`.
-  Screenshot: as above. Search terms, at most 7:
-
-  ```text
-  QR code; barcode; scanner; QR reader; barcode reader; Data Matrix; EAN
-  ```
-
-- **Notes for certification.** The reviewer notes below.
-- **Then** "Publish". Edge states a review time of up to seven business days.
+The account, the form values page by page, the search terms and the sources read are in
+[edge-add-ons.md](edge-add-ons.md).
 
 ## Firefox Add-ons (map-51)
 
