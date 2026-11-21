@@ -25,11 +25,11 @@ than a local workflow of the same directory, which this check reads.
 A job is PRIVILEGED when it publishes (cargo publish/yank/owner, npm
 publish/unpublish/deprecate/dist-tag/owner/access/stage, pnpm/yarn/bun
 publish, napi pre-publish unless it uploads nothing, pub publish,
-twine/uv/maturin/poetry publish, gh release create/upload/edit/delete or a
+gem push/yank/owner, twine/uv/maturin/poetry publish, gh release create/upload/edit/delete or a
 `gh api` call naming a release, an HTTP client (curl, wget, Invoke-WebRequest,
 Invoke-RestMethod, iwr, irm) on a line naming the GitHub API,
-pypa/gh-action-pypi-publish, rust-lang/crates-io-auth-action or a release
-action: RELEASE_ACTIONS), with options before the subcommand (gh's before
+pypa/gh-action-pypi-publish, rust-lang/crates-io-auth-action,
+rubygems/configure-rubygems-credentials or a release action: RELEASE_ACTIONS), with options before the subcommand (gh's before
 either word), npm's abbreviations and backslash-continued lines included,
 or when it holds a write permission (`id-token: write` included: it can
 mint registry tokens). Every privileged job must:
@@ -120,6 +120,16 @@ mint registry tokens). Every privileged job must:
                tag deployment rule), contents read/actions read/packages write,
                the exact OCI tag/BOM gate and in-job frozen artifact reinspection.
                No old registry job gains this permission or tag exception.
+  Ruby         ruby.yml > publish pushes the five inspected platform gems on a v*
+               tag, in the protected environment rubygems, with exactly contents
+               read and id-token write. It needs preflight, binding, natives,
+               pack and consumer, binds only pack's receipt digest, runs the
+               gate, RUBY_CANDIDATE (which lists the gems rubygems.org lacks and
+               refuses one it holds with other bytes) before one pinned
+               rubygems/configure-rubygems-credentials step taking only
+               trusted-publisher, then RUBY_PUSH. Its steps use only checkout,
+               download-artifact and that action, with no `if:` and no step env.
+               No other job inherits this exception.
   MCP          npm-mcp-publish.yml > publish uses agents-v* tags, npm-agents,
                an independent metadata/environment gate, its own seven-file
                archive inspector and the same inspected-operand discipline.
@@ -274,6 +284,17 @@ DOTNET_PUSH = "\n".join((
     'version=$(python3 -c "import tomllib; print(tomllib.load(open(\'Cargo.toml\', \'rb\'))[\'workspace\'][\'package\'][\'version\'])")',
     'dotnet nuget push "$PWD/dotnet-package/feed/QRCodeAI.QRCodeBarcodeScanner.$version.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --timeout 120',
 ))
+# The Ruby gem: its trusted-publisher token is minted by one reviewed action, and only the
+# inspected platform gems rubygems.org does not hold yet are pushed (ruby-gem.py candidate).
+RUBY_JOB = ("ruby.yml", "publish")
+RUBY_CANDIDATE = ('python3 scripts/ruby-gem.py candidate --folder "$PWD/ruby-gems" --natives "$PWD/ruby-natives" '
+                  '--receipt-sha256 "$RECEIPT_SHA256" --require-absent --pending "$RUNNER_TEMP/ruby-pending.txt"')
+RUBY_PUSH = "\n".join((
+    RUBY_CANDIDATE,
+    'while read -r file; do gem push "$PWD/ruby-gems/feed/$file" --host https://rubygems.org; done < "$RUNNER_TEMP/ruby-pending.txt"',
+))
+RUBY_CREDENTIALS = {"uses": "rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a",
+                    "with": {"trusted-publisher": "true"}}
 MCP_JOB = ("npm-mcp-publish.yml", "publish")
 MCP_GUARD = "startsWith(github.ref, 'refs/tags/agents-v')"
 MCP_GATE_RUN = 'python3 scripts/mcp-release.py gate --ref "$GITHUB_REF" --environment npm-agents'
@@ -523,6 +544,7 @@ NOT_ON_TAG = {"!startsWith(github.ref, 'refs/tags/')", "!startsWith(github.ref, 
 # zip, builds) what it uploads. A publishing job missing here fails.
 INSPECTION = {
     DOTNET_JOB: "pack",
+    RUBY_JOB: "pack",
     MCP_JOB: "pack",
     MCP_REGISTRY_JOB: "verify",
     OCI_JOB: "inspect",
@@ -541,6 +563,7 @@ INSPECTION = {
 # Archive shape and installed runtime are separate release gates.
 CONSUMERS = {
     DOTNET_JOB: {"preflight", "binding", "natives", "consumer"},
+    RUBY_JOB: {"preflight", "binding", "natives", "consumer"},
     MCP_JOB: {"preflight", "consume", "operand-proof"},
     MCPB_JOB: {"consume", "offline"},
     HTTP_JOB: {"consume", "rehearse"},
@@ -580,6 +603,7 @@ PUBLISHING_TOOLS = (
     ("uv", frozenset({"publish"}), "uv publish"),
     ("maturin", frozenset({"publish", "upload"}), "maturin publish"),
     ("poetry", frozenset({"publish"}), "poetry publish"),
+    ("gem", frozenset({"push", "yank", "owner"}), "gem push"),
 )
 # GitHub release writes. gh takes its options before either word (`gh -R o/r
 # release create`); a line is read as written and with its quotes stripped.
@@ -626,7 +650,8 @@ PUBLISHING_RUN = (
     (GH_API_RELEASE, RELEASE),
     (re.compile(HTTP_CLIENT.pattern + r".*(?:" + GITHUB_API.pattern + r")", re.I), RELEASE),
 )
-PUBLISHING_ACTIONS = ("NuGet/login", "pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action") + RELEASE_ACTIONS
+PUBLISHING_ACTIONS = ("NuGet/login", "pypa/gh-action-pypi-publish", "rust-lang/crates-io-auth-action",
+                      "rubygems/configure-rubygems-credentials") + RELEASE_ACTIONS
 NPM_FETCH = frozenset({"install", "i", "in", "ins", "inst", "insta", "instal", "isnt", "isnta", "isntal",
                        "isntall", "add", "update", "up", "upgrade", "udpate", "exec", "x", "init", "create",
                        "innit", "install-test", "it"})
@@ -1696,6 +1721,61 @@ def _dotnet_contract_problems(wf, publisher, first_publish):
     return out
 
 
+def _ruby_contract_problems(wf, publisher, first_publish):
+    """No broad RubyGems exception: one reviewed trusted-publisher action and the exact inspected gems."""
+    out = []
+    def fail(message, index=-1):
+        out.append(("ruby-contract", message, index))
+    for condition in ("github.event_name == 'push'",
+                      "github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'",
+                      "github.repository_id == '1126991539'",
+                      "needs.preflight.outputs.publish_allowed == 'true'"):
+        if _conjunct(publisher.get("if"), {condition}):
+            fail("publisher must bind tag-push, canonical identity and preflight approval readiness")
+    if publisher.get("env") != {"RECEIPT_SHA256": "${{ needs.pack.outputs.receipt_sha256 }}"}:
+        fail("bind the producer receipt digest, and nothing else")
+    jobs, steps = wf["jobs"], _steps(publisher)
+    preflight = jobs.get("preflight", {})
+    if preflight.get("outputs") != {"publish_allowed": "${{ steps.preflight.outputs.publish_allowed }}"} or not any(
+            step.get("id") == "preflight" and step.get("run") == "python3 scripts/ruby-gem.py preflight" and
+            "env" not in step for step in _steps(preflight)):
+        fail("prove the existing protected environment before scheduling publication")
+    for name in ("preflight", "binding", "natives", "pack", "consumer"):
+        job = jobs.get(name, {})
+        if "if" in job or "continue-on-error" in job:
+            fail(f"{name} may not skip or ignore its gate")
+        if any("continue-on-error" in step for step in _steps(job)):
+            fail(f"{name} may not ignore a failed step")
+    if jobs.get("pack", {}).get("outputs") != {"receipt_sha256": "${{ steps.receipt.outputs.sha256 }}"}:
+        fail("pack must export the digest of its gem inspection receipt")
+    if not any(_block(step.get("run")) == RUBY_CANDIDATE and set(step) <= {"name", "run"}
+               for step in steps[:first_publish]):
+        fail("reinspect the receipt, native floors and gems, and list what rubygems.org lacks before OIDC")
+    credentials = [step for step in steps if _uses(step)[0] == "rubygems/configure-rubygems-credentials"]
+    if credentials != [RUBY_CREDENTIALS]:
+        fail("use only the reviewed RubyGems trusted-publisher action, with no stored token or role")
+    runs = [_block(step.get("run")) for step in steps if "run" in step]
+    if runs != [GATE_RUN, RUBY_CANDIDATE, RUBY_PUSH]:
+        fail("publisher may run only the version gate, candidate reinspection and the exact gem pushes")
+    for i, step in enumerate(steps):
+        action = _uses(step)[0]
+        if action and action not in {"actions/checkout", "actions/download-artifact",
+                                     "rubygems/configure-rubygems-credentials"}:
+            fail("an unreviewed action would see the publishing job", i)
+        if "if" in step or "continue-on-error" in step:
+            fail("publisher steps cannot skip or ignore checks", i)
+        if "run" in step and "env" in step:
+            fail("no step passes its own credential: the trusted publisher's token is the only one", i)
+    for name, job in jobs.items():
+        for step in _steps(job):
+            given = step.get("with", {})
+            if _uses(step)[0] == "actions/download-artifact" and given.get("digest-mismatch") != "error":
+                fail(f"{name} must refuse artifact digest mismatches")
+            if _uses(step)[0] == "actions/upload-artifact" and "overwrite" in given:
+                fail(f"{name} cannot overwrite a qualified artifact")
+    return out
+
+
 def _mcp_contract_problems(wf: dict, publisher: dict, first_publish: int) -> list:
     """One independent adapter publisher; no other job gains its tag or environment."""
     out = []
@@ -1984,6 +2064,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     oci = (workflow, job_id) == OCI_JOB
     mcp = (workflow, job_id) == MCP_JOB
     dotnet = (workflow, job_id) == DOTNET_JOB
+    ruby = (workflow, job_id) == RUBY_JOB
     mcp_registry = (workflow, job_id) == MCP_REGISTRY_JOB
     pages = (workflow, job_id) == PAGES_JOB
     mcpb = (workflow, job_id) == MCPB_JOB
@@ -2006,7 +2087,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     env = job.get("environment")
     env_name = env.get("name") if isinstance(env, dict) else env
     allowed_environments = ({"mcp-registry"} if mcp_registry else {"github-pages"} if pages
-                            else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"container"} if oci
+                            else {"npm-agents"} if mcp else {"nuget"} if dotnet else {"rubygems"} if ruby else {"container"} if oci
                             else {"mcpb"} if mcpb else {"container-http"} if http else ENVIRONMENTS)
     if env_name not in allowed_environments:
         flag("environment", f"environment {env_name!r} is not one of {sorted(allowed_environments)}")
@@ -2018,7 +2099,7 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
     elif oci:
         if perms != {"contents": "read", "actions": "read", "packages": "write"}:
             flag("permissions", "OCI publisher needs exactly contents read, actions read and packages write; no id-token")
-    elif mcp_registry or dotnet:
+    elif mcp_registry or dotnet or ruby:
         if perms != {"contents": "read", "id-token": "write"}:
             flag("permissions", "this publisher needs exactly contents read and id-token write")
     elif pages:
@@ -2126,6 +2207,9 @@ def check_job(workflow: str, job_id: str, job: dict, wf: dict) -> list:
             flag(code, message, index)
     if dotnet:
         for code, message, index in _dotnet_contract_problems(wf, job, first_publish):
+            flag(code, message, index)
+    if ruby:
+        for code, message, index in _ruby_contract_problems(wf, job, first_publish):
             flag(code, message, index)
     if mcp:
         for code, message, index in _mcp_contract_problems(wf, job, first_publish):
@@ -3349,6 +3433,46 @@ MUTATIONS += (
     ("OCI publisher omits in-job reinspection", P, [("oci-publish.yml", "      - name: re-inspect both downloaded images before registry authentication\n        run: |\n          " + OCI_REINSPECT_RUN.replace("\n", "\n          ") + "\n", "")], {}, 1, "re-inspect both downloaded archives"),
     ("unknown job claims OCI package write", P, [("oci-publish.yml", "  publish:\n", "  surprise:\n")], {}, 1, "no inspection job declared"),
     ("OCI download ignores official digest", P, [("oci-publish.yml", "          digest-mismatch: error", "          digest-mismatch: ignore")], {}, 1, "exact frozen platform artifact"),
+)
+
+# The Ruby gem publisher as ruby.yml ships it: one exception, held whole.
+RUBY_PUSH_STEP = ("      - name: Push exactly the inspected gems that rubygems.org does not hold\n        run: |\n"
+                  + "".join(f"          {line}\n" for line in RUBY_PUSH.split("\n")))
+MUTATIONS += (
+    ("Ruby uses another environment", P, [("ruby.yml", "    environment: rubygems", "    environment: npm")], {}, 1,
+     "ruby.yml › publish [environment]"),
+    ("Ruby ignores canonical repository", P, [("ruby.yml", " && github.repository == 'qrcode-ai-com/qrcode-barcode-scanner-rust'", "")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby publishes on a manual run", P, [("ruby.yml", " && github.event_name == 'push' && github.repository ==", " && github.repository ==")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby skips the installed consumers", P, [("ruby.yml", "    needs: [preflight, binding, natives, pack, consumer]",
+                                                "    needs: [preflight, binding, natives, pack]")], {}, 1, "ruby.yml › publish [needs]"),
+    ("Ruby consumer may fail quietly", P, [("ruby.yml", "    needs: pack\n", "    needs: pack\n    continue-on-error: true\n")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby reinspection omitted", P, [("ruby.yml", "        run: " + RUBY_CANDIDATE + "\n", "        run: echo skipped\n")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby pushes every gem whatever rubygems.org holds", P, [("ruby.yml", 'done < "$RUNNER_TEMP/ruby-pending.txt"',
+                                                              'done < <(ls "$PWD/ruby-gems/feed")')], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby stored API token", P, [("ruby.yml", '          trusted-publisher: "true"', "          api-token: stored")], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby push step passes its own key", P, [("ruby.yml", RUBY_PUSH_STEP, RUBY_PUSH_STEP.replace(
+        "        run: |\n", "        env:\n          GEM_HOST_API_KEY: stored\n        run: |\n", 1))], {}, 1,
+     "ruby.yml › publish [ruby-contract]"),
+    ("Ruby unreviewed setup action sees the token", P, [("ruby.yml", RUBY_PUSH_STEP,
+        "      - uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18\n        with:\n          ruby-version: \"3.4.7\"\n"
+        + RUBY_PUSH_STEP)], {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby publisher writes contents", P, [("ruby.yml", "      contents: read\n      id-token: write",
+                                            "      contents: write\n      id-token: write")], {}, 1,
+     "ruby.yml › publish [permissions]"),
+    ("Ruby pack job pushes a gem", P, [("ruby.yml", '          cp receipt/gems.json "$RUNNER_TEMP/ruby-gems/"\n',
+                                        '          cp receipt/gems.json "$RUNNER_TEMP/ruby-gems/"\n          gem push "$RUNNER_TEMP/ruby-gems/feed/x.gem"\n')],
+     {}, 1, "ruby.yml › pack ["),
+    ("Ruby preflight output faked", P, [("ruby.yml", "publish_allowed: ${{ steps.preflight.outputs.publish_allowed }}",
+                                         "publish_allowed: 'true'")], {}, 1, "ruby.yml › publish [ruby-contract]"),
+    ("Ruby gem download ignores its digest", P, [("ruby.yml", "          name: ruby-gems\n          path: ruby-gems\n          digest-mismatch: error",
+                                                  "          name: ruby-gems\n          path: ruby-gems\n          digest-mismatch: warn")],
+     {}, 1, "ruby.yml › publish [ruby-contract]"),
 )
 
 # The mutations edit cli-archives.yml as it ships. attach's steps: 1 checkout,
