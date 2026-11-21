@@ -1,0 +1,151 @@
+name: integration-dify-template
+
+# The Dify template run in open-source Dify, the way a self-hosted user runs it: the docker/
+# folder of the Dify 1.20.0 release started with Docker Compose as its README says, the plugin
+# packaged from this checkout with Dify's own packaging CLI and installed as a local package (the
+# daemon's signature check is off, since the Marketplace has not signed it), the template imported
+# unchanged through the console API, and runs on the mixed fixture with the fast, frame and full
+# profiles, a blank image and a corrupt file, each judged by the End node it reaches and its
+# outputs. The apps are deleted and the plugin is uninstalled. The acceptance receipt judges the
+# three reports. No secrets, nothing published. Untrusted event fields never reach a shell script.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "integrations/dify/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - "scripts/destination-acceptance.py"
+      - ".github/workflows/integration-dify-template.yml"
+  push:
+    branches: [main]
+    paths:
+      - "integrations/dify/**"
+      - "fixtures/symbology/mixed-code128-qr.png"
+      - "scripts/destination-acceptance.py"
+      - ".github/workflows/integration-dify-template.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-dify-template-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Dify 1.20.0, released on 18 November 2026: its tag and the commit the tag names.
+  DIFY_VERSION: 1.20.0
+  DIFY_COMMIT: 7bef4e1b2dc21b2c694d3243425dd3fa6288f916
+  # The plugin packaging CLI of the dify-plugin-daemon release the 1.20.0 compose file runs.
+  DIFY_PLUGIN_CLI_VERSION: 0.6.15
+  DIFY_PLUGIN_CLI_SHA256: d0a1e3b25bd6c5f6cd749cad2cf04817ea808344e6cc07a2c49bb0108019ab93
+  PLUGIN_ID: qrcode-ai-com/qrcode-barcode-scanner
+  PLUGIN_VERSION: 0.1.0
+  ENGINE_VERSION: 0.11.0
+
+jobs:
+  template:
+    name: Template in Dify 1.20.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch the docker folder of the Dify release
+        run: |
+          set -euo pipefail
+          dify="$RUNNER_TEMP/dify"
+          git init -q "$dify"
+          git -C "$dify" remote add origin https://github.com/langgenius/dify.git
+          git -C "$dify" sparse-checkout set docker
+          git -C "$dify" fetch -q --depth 1 --filter=blob:none origin "refs/tags/$DIFY_VERSION"
+          git -C "$dify" checkout -q FETCH_HEAD
+          test "$(git -C "$dify" rev-parse HEAD)" = "$DIFY_COMMIT"
+      # The README's steps: copy the template, set the sandbox token. Then the overrides this run
+      # needs: the unsigned local package, the address the plugin daemon fetches files from, and
+      # time to install the plugin's Python dependencies.
+      - name: Configure and start Dify
+        working-directory: ${{ runner.temp }}/dify/docker
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          token="$(openssl rand -hex 32)"
+          sed -i "s/^DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN=.*/DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN=$token/" .env
+          test "$(grep -c "^DIFY_AGENT_LOCAL_SANDBOX_AUTH_TOKEN=$token$" .env)" = 1
+          {
+            echo "FORCE_VERIFYING_SIGNATURE=false"
+            echo "INTERNAL_FILES_URL=http://api:5001"
+            echo "PLUGIN_PYTHON_ENV_INIT_TIMEOUT=600"
+          } >> .env
+          docker compose version
+          docker compose pull --quiet
+          docker compose up -d
+          docker compose images
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Package the plugin with the Dify plugin CLI
+        run: |
+          set -euo pipefail
+          cli="$RUNNER_TEMP/dify-plugin"
+          curl -fsSL -o "$cli" \
+            "https://github.com/langgenius/dify-plugin-daemon/releases/download/$DIFY_PLUGIN_CLI_VERSION/dify-plugin-linux-amd64"
+          echo "$DIFY_PLUGIN_CLI_SHA256  $cli" | sha256sum -c -
+          chmod +x "$cli"
+          mkdir -p evidence
+          "$cli" plugin package integrations/dify -o "$RUNNER_TEMP/qrcode-barcode-scanner-$PLUGIN_VERSION.difypkg"
+          unzip -l "$RUNNER_TEMP/qrcode-barcode-scanner-$PLUGIN_VERSION.difypkg"
+      - name: Import, run and delete the template in Dify
+        run: |
+          set -euo pipefail
+          image="$(python3 scripts/destination-acceptance.py stage "$RUNNER_TEMP/input")"
+          python3 integrations/dify/tests/template_in_dify.py run \
+            --base http://localhost \
+            --package "$RUNNER_TEMP/qrcode-barcode-scanner-$PLUGIN_VERSION.difypkg" \
+            --mixed "$image" \
+            --work evidence \
+            --reports "$RUNNER_TEMP/reports"
+      - name: Judge the three reports and close the receipt
+        run: |
+          set -euo pipefail
+          python3 scripts/destination-acceptance.py reports --kind package \
+            --produced-by "Dify $DIFY_VERSION draft workflow run (console API), one app per profile, no budget" \
+            --fast "$RUNNER_TEMP/reports/fast.json" \
+            --frame "$RUNNER_TEMP/reports/frame.json" \
+            --full "$RUNNER_TEMP/reports/full.json" \
+            --destination "Dify template in Dify $DIFY_VERSION, plugin packaged from this checkout (not published)" \
+            --identifier "qr-and-barcode-reader.yml with $PLUGIN_ID $PLUGIN_VERSION" \
+            --version "$ENGINE_VERSION" \
+            --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/integrations/dify/template" \
+            --install "dify-plugin $DIFY_PLUGIN_CLI_VERSION plugin package, then Plugins, Install plugin, Local package file" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --receipt evidence/acceptance-dify-template.json
+          python3 scripts/destination-acceptance.py removed \
+            --gone "python3 integrations/dify/tests/template_in_dify.py installed --base http://localhost --work evidence" \
+            --uninstall "Plugins, the plugin's menu, Remove (console API plugin/uninstall)" \
+            --receipt evidence/acceptance-dify-template.json
+          python3 scripts/destination-acceptance.py check evidence/acceptance-dify-template.json
+      - name: Show the service logs
+        if: failure()
+        working-directory: ${{ runner.temp }}/dify/docker
+        run: docker compose logs --no-color --tail 300 api worker plugin_daemon
+      - name: Record the files and their sha256
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          rm -f evidence/owner.json
+          cp integrations/dify/template/qr-and-barcode-reader.yml evidence/
+          cp "$RUNNER_TEMP/qrcode-barcode-scanner-$PLUGIN_VERSION.difypkg" evidence/ 2>/dev/null || true
+          (cd evidence && sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS" && mv "$RUNNER_TEMP/SHA256SUMS" . && cat SHA256SUMS)
+      - name: Stop Dify
+        if: always()
+        working-directory: ${{ runner.temp }}/dify/docker
+        run: docker compose down --volumes --timeout 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.1
+        if: always()
+        with:
+          name: dify-template-in-dify-1.20.0
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
