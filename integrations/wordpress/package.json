@@ -1,0 +1,36 @@
+{
+  "name": "qrcode-barcode-scanner-wordpress",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WordPress plugin that reads QR codes and barcodes in the visitor's browser with the published WASM",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://qrcode-ai.com/en-US/qr-code-scanner/integrations/wordpress",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust.git",
+    "directory": "integrations/wordpress"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0"
+  },
+  "config": {
+    "wasmSha256": "a5d684cec3863e210bbb7f473267dcf07a8321ff57bf17a321af58f5d261ab68"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "inspect": "node scripts/inspect.mjs build",
+    "test": "node --test test/unit.test.mjs",
+    "test:playground": "node test/playground.mjs",
+    "test:reproduce": "node test/reproduce.mjs",
+    "assets": "node scripts/directory-assets.mjs"
+  },
+  "dependencies": {
+    "@qrcode-ai-com/qrcode-barcode-scanner-wasm": "0.11.0"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "37.2.0",
+    "@wp-playground/cli": "3.1.65",
+    "playwright": "1.61.0"
+  }
+}
